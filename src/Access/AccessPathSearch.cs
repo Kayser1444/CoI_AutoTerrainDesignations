@@ -130,6 +130,10 @@ namespace AutoTerrainDesignations.Access
                     new Tile2i(12, 12), halfLevelProfile, out string halfLevelMismatch)
                 || halfLevelMismatch != "HalfLevelCorner")
             { failure = "generated profiles with half-level corners must be rejected during expansion"; return false; }
+            if (!AutoDepthDesignation.TrySelectHandoffOperationForProfile(
+                    0, 1.5f, out AccessHandoffOperation singleOriginOperation)
+                || singleOriginOperation != AccessHandoffOperation.Mining)
+            { failure = "single-origin handoff should infer mining from the terminal profile when no predecessor exists"; return false; }
             AccessHeightProfile.TryForMode(AccessSearchMode.YNegative, 1, out AccessHeightProfile edgeContactSlope);
             Tile2i handoffOrigin = new Tile2i(12, 12);
             Tile2i handoffCenter = new Tile2i(14, 14);

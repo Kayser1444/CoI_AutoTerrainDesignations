@@ -58,6 +58,17 @@ namespace AutoTerrainDesignations
             return false;
         }
 
+        internal static bool TrySelectHandoffOperationForProfile(
+            int profileCenter2,
+            float groundHeight,
+            out AccessHandoffOperation operation)
+        {
+            operation = profileCenter2 / 2f < groundHeight
+                ? AccessHandoffOperation.Mining
+                : AccessHandoffOperation.Dumping;
+            return true;
+        }
+
         private static bool TryBuildExperimentalAccessSnapshot(
             IAreaManagingTower tower,
             Dict<Tile2i, int> tileDepths,
@@ -429,11 +440,16 @@ namespace AutoTerrainDesignations
                 new HeightTilesI(profile.Ne2 / 2),
                 new HeightTilesI(profile.Se2 / 2),
                 new HeightTilesI(profile.Sw2 / 2));
-            Tile2i predecessorCenter = predecessorOrigin + new RelTile2i(2, 2);
-            float predecessorGroundCenter = terrMgr.GetHeight(predecessorCenter).Value.ToFloat();
-            AccessHandoffOperation operation = predecessorProfile.Center2 / 2f < predecessorGroundCenter
-                ? AccessHandoffOperation.Mining
-                : AccessHandoffOperation.Dumping;
+            Tile2i referenceOrigin = predecessorOrigin != default && predecessorOrigin != origin
+                ? predecessorOrigin
+                : origin;
+            Tile2i referenceCenter = referenceOrigin + new RelTile2i(2, 2);
+            float referenceGroundCenter = terrMgr.GetHeight(referenceCenter).Value.ToFloat();
+            int referenceProfileCenter2 = referenceOrigin == origin
+                ? profile.Center2
+                : predecessorProfile.Center2;
+            if (!TrySelectHandoffOperationForProfile(referenceProfileCenter2, referenceGroundCenter, out AccessHandoffOperation operation))
+                return Array.Empty<AccessGroundHandoff>();
             TerrainDesignationProto? proto = operation == AccessHandoffOperation.Mining
                 ? s_miningProto
                 : s_dumpingProto;
