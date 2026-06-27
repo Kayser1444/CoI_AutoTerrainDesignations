@@ -81,6 +81,12 @@ namespace AutoTerrainDesignations
             Tile2i towerCenter = tower is IEntityWithPosition positioned
                 ? positioned.Position2f.Tile2i
                 : new Tile2i((boundsMin.X + boundsMax.X) / 2, (boundsMin.Y + boundsMax.Y) / 2);
+            Tile2i groundCaptureMin = new Tile2i(
+                Math.Min(boundsMin.X, towerCenter.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                Math.Min(boundsMin.Y, towerCenter.Y) - RAMP_ACCESS_SEARCH_MARGIN_TILES);
+            Tile2i groundCaptureMax = new Tile2i(
+                Math.Max(boundsMax.X, towerCenter.X) + RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                Math.Max(boundsMax.Y, towerCenter.Y) + RAMP_ACCESS_SEARCH_MARGIN_TILES);
 
             var groundHeight2 = new Dictionary<Tile2i, int>();
             var terrainCenterHeight2 = new Dictionary<Tile2i, int>();
@@ -111,12 +117,11 @@ namespace AutoTerrainDesignations
 
             int minHeight2 = int.MaxValue;
             int maxHeight2 = int.MinValue;
-            for (int x = boundsMin.X; x <= boundsMax.X; x++)
+            for (int x = groundCaptureMin.X; x <= groundCaptureMax.X; x++)
             {
-                for (int y = boundsMin.Y; y <= boundsMax.Y; y++)
+                for (int y = groundCaptureMin.Y; y <= groundCaptureMax.Y; y++)
                 {
                     Tile2i tile = new Tile2i(x, y);
-                    if (!tower.Area.ContainsTile(tile)) continue;
                     int height2 = ToHeight2(terrMgr.GetHeight(tile).Value.ToFloat());
                     groundHeight2[tile] = height2;
                     if (terrMgr.IsOcean(tile)) oceanTiles.Add(tile);
@@ -200,7 +205,7 @@ namespace AutoTerrainDesignations
                 (origin, profile, predecessorOrigin, predecessorProfile) =>
                     BuildProspectiveWorkableHandoffs(
                         origin, profile, predecessorOrigin, predecessorProfile,
-                        terrMgr, towerReachableGround));
+                        terrMgr, groundNodes));
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -210,13 +215,50 @@ namespace AutoTerrainDesignations
             return true;
         }
 
-        private static AccessSearchResult RunExperimentalAccessDryRun(
+        private static AccessPathRequest BuildTowerRootedAccessRequest(
             AccessSearchSnapshot snapshot,
+            AccessOriginCluster cluster,
+            int requiredWidth)
+        {
+            return new AccessPathRequest(
+                $"tower-rooted-cluster-{cluster.ClusterId}",
+                snapshot,
+                new AccessPathEndpoint(
+                    AccessPathEndpointKind.FixedProfiles,
+                    cluster.Origins.Select(origin => origin.Origin)),
+                new AccessPathEndpoint(
+                    AccessPathEndpointKind.GroundTiles,
+                    snapshot.GoalGroundNodes),
+                requiredWidth,
+                AccessPathIntent.ConstructAccessway);
+        }
+
+        private static AccessPathRequest BuildFixedProfileAccessRequest(
+            AccessSearchSnapshot snapshot,
+            AccessOriginCluster cluster,
+            IEnumerable<Tile2i> fixedGoalOrigins,
+            int requiredWidth)
+        {
+            return new AccessPathRequest(
+                $"fixed-network-cluster-{cluster.ClusterId}",
+                snapshot,
+                new AccessPathEndpoint(
+                    AccessPathEndpointKind.FixedProfiles,
+                    cluster.Origins.Select(origin => origin.Origin)),
+                new AccessPathEndpoint(
+                    AccessPathEndpointKind.FixedProfiles,
+                    fixedGoalOrigins),
+                requiredWidth,
+                AccessPathIntent.ConstructAccessway);
+        }
+
+        private static AccessSearchResult RunExperimentalAccessDryRun(
+            AccessPathRequest request,
             AccessOriginCluster cluster)
         {
-            Tile2i[] origins = cluster.Origins.Select(origin => origin.Origin).ToArray();
+            AccessSearchSnapshot snapshot = request.Snapshot;
             Stopwatch searchTimer = Stopwatch.StartNew();
-            AccessSearchResult result = AccessPathSearch.FindPath(snapshot, origins);
+            AccessSearchResult result = AccessPathSearch.FindPath(request);
             searchTimer.Stop();
             LastExperimentalAccessSearch = result;
             string rejections = result.Rejections.Count == 0
@@ -229,7 +271,15 @@ namespace AutoTerrainDesignations
             string cost = result.Cost.ToString("0.##", CultureInfo.InvariantCulture);
             string searchMs = searchTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
             string landslideRun = snapshot.LandslideRunPerHeight.ToString("0.##", CultureInfo.InvariantCulture);
-            LogExperimentalAccessDebug($"[ATD Experimental Access] cluster={cluster.ClusterId} algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} success={result.Success} reason={reason} start=({result.StartOrigin.X},{result.StartOrigin.Y}) goals={snapshot.GoalCount} landslideRun={landslideRun} landslideSources={snapshot.LandslideSourceCount} cost={cost} visited={result.VisitedNodes} pathNodes={result.Path.Count} searchMs={searchMs} rejections=[{rejections}]");
+            LogExperimentalAccessDebug(
+                $"[ATD Experimental Access] request={request.RequestId} " +
+                $"{FormatAccessPathRequest(request)} cluster={cluster.ClusterId} " +
+                $"algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
+                $"success={result.Success} reason={reason} start=({result.StartOrigin.X},{result.StartOrigin.Y}) " +
+                $"goals={request.Goal.Nodes.Count} landslideRun={landslideRun} " +
+                $"landslideSources={snapshot.LandslideSourceCount} cost={cost} " +
+                $"visited={result.VisitedNodes} pathNodes={result.Path.Count} " +
+                $"searchMs={searchMs} rejections=[{rejections}]");
             if (result.Success)
             {
                 LogExperimentalAccessDebug($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
@@ -251,13 +301,22 @@ namespace AutoTerrainDesignations
             return result;
         }
 
+        private static string FormatAccessPathRequest(AccessPathRequest request)
+        {
+            return
+                $"intent={request.Intent} width={request.RequiredWidth} " +
+                $"start={request.Start.Kind}:{request.Start.Nodes.Count} " +
+                $"goal={request.Goal.Kind}:{request.Goal.Nodes.Count} " +
+                $"bounds=({request.BoundsMin.X},{request.BoundsMin.Y})..({request.BoundsMax.X},{request.BoundsMax.Y})";
+        }
+
         private static IReadOnlyList<AccessGroundHandoff> BuildProspectiveWorkableHandoffs(
             Tile2i origin,
             AccessHeightProfile profile,
             Tile2i predecessorOrigin,
             AccessHeightProfile predecessorProfile,
             TerrainManager terrMgr,
-            HashSet<Tile2i> towerReachableGround)
+            HashSet<Tile2i> groundNodes)
         {
             if (((profile.Nw2 | profile.Ne2 | profile.Se2 | profile.Sw2) & 1) != 0)
                 return Array.Empty<AccessGroundHandoff>();
@@ -291,7 +350,9 @@ namespace AutoTerrainDesignations
                     uint mask = GetDesignationMask(x, y);
                     if ((fulfilledBitmap & mask) == 0) continue;
                     Tile2i tile = origin + new RelTile2i(x, y);
-                    if (towerReachableGround.Contains(tile))
+                    // Handoff may enter any valid ground node; only the final
+                    // search goal needs to be in the tower-reachable flood.
+                    if (groundNodes.Contains(tile))
                         result.Add(new AccessGroundHandoff(tile, operation));
                 }
             }
@@ -319,10 +380,13 @@ namespace AutoTerrainDesignations
                     item.Profile.Sw2 / 2));
             }
 
-            int dx = towerPosition.X - plan.HandoffGround.X;
-            int dy = towerPosition.Y - plan.HandoffGround.Y;
+            Tile2i terminal = plan.GroundNodeCount > 0
+                ? plan.HandoffGround
+                : result.Path[result.Path.Count - 1].Position;
+            int dx = towerPosition.X - terminal.X;
+            int dy = towerPosition.Y - terminal.Y;
             return new EvaluatedAccessCandidate(
-                plan.HandoffGround,
+                terminal,
                 isValid: true,
                 isReachableNow: true,
                 mouthDistance: dx * dx + dy * dy,
@@ -381,7 +445,9 @@ namespace AutoTerrainDesignations
                     new HeightTilesI(item.Profile.Se2 / 2),
                     new HeightTilesI(item.Profile.Sw2 / 2));
                 TerrainDesignationProto itemProto = rampProto;
-                if (hasGeneratedTerminal && item.Origin == terminalOrigin)
+                if (hasGeneratedTerminal
+                    && item.Origin == terminalOrigin
+                    && placementPlan.HandoffOperation != AccessHandoffOperation.None)
                 {
                     TerrainDesignationProto? terminalProto = placementPlan.HandoffOperation == AccessHandoffOperation.Mining
                         ? s_miningProto
@@ -603,7 +669,7 @@ namespace AutoTerrainDesignations
         {
             reachedGround = new HashSet<Tile2i>();
             Tile2i towerPosition = GetTowerPosition(tower, boundsMin, boundsMax);
-            if (!TryFindNearestPathableTile(provider, pathParams, towerPosition, out start))
+            if (!TryFindNearestTowerGroundSeed(tower, groundNodes, provider, pathParams, towerPosition, out start))
                 return false;
 
             int minX = Math.Min(boundsMin.X, towerPosition.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
@@ -640,6 +706,72 @@ namespace AutoTerrainDesignations
                 }
             }
             return true;
+        }
+
+        private static bool TryFindNearestTowerGroundSeed(
+            IAreaManagingTower tower,
+            HashSet<Tile2i> groundNodes,
+            IPathabilityProvider provider,
+            VehiclePathFindingParams pathParams,
+            Tile2i origin,
+            out Tile2i seed)
+        {
+            if (IsTowerGroundSeed(tower, groundNodes, provider, pathParams, origin))
+            {
+                seed = origin;
+                return true;
+            }
+
+            for (int radius = 1; radius <= RAMP_ACCESS_SEARCH_MARGIN_TILES; radius++)
+            {
+                for (int y = -radius; y <= radius; y++)
+                {
+                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(-radius, y), out seed)
+                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(radius, y), out seed))
+                        return true;
+                }
+
+                for (int x = -radius + 1; x < radius; x++)
+                {
+                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, -radius), out seed)
+                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, radius), out seed))
+                        return true;
+                }
+            }
+
+            seed = origin;
+            return false;
+        }
+
+        private static bool TryUseTowerGroundSeed(
+            IAreaManagingTower tower,
+            HashSet<Tile2i> groundNodes,
+            IPathabilityProvider provider,
+            VehiclePathFindingParams pathParams,
+            Tile2i candidate,
+            out Tile2i seed)
+        {
+            if (IsTowerGroundSeed(tower, groundNodes, provider, pathParams, candidate))
+            {
+                seed = candidate;
+                return true;
+            }
+
+            seed = candidate;
+            return false;
+        }
+
+        private static bool IsTowerGroundSeed(
+            IAreaManagingTower tower,
+            HashSet<Tile2i> groundNodes,
+            IPathabilityProvider provider,
+            VehiclePathFindingParams pathParams,
+            Tile2i candidate)
+        {
+            if (!provider.IsPathable(candidate, pathParams.PathabilityQueryMask))
+                return false;
+
+            return !tower.Area.ContainsTile(candidate) || groundNodes.Contains(candidate);
         }
 
         private static int ToHeight2(float height)

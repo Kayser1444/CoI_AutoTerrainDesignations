@@ -203,7 +203,17 @@ When the path leaves an existing designation into a newly generated designation,
 3. Require the operation to be incomplete and at least one fulfilled perimeter bit (`0x1F8C63F`).
 4. Emit V-to-G edges only for fulfilled perimeter tiles that belong to the tower-reachable G flood.
 
-The selected operation and G tile are edge metadata. Materialization replays the same prospective check against a fresh snapshot, and placement gives the final generated V tile the corresponding mining or dumping proto without a leveling fallback. Synthetic graph fixtures that do not configure the prospective evaluator retain exact-contact handoffs solely as a test fallback.
+The selected operation and G tile are edge metadata. Materialization replays the same prospective check against the immutable search snapshot, and placement gives the final generated V tile the corresponding mining or dumping proto without a leveling fallback. Synthetic graph fixtures that do not configure the prospective evaluator retain exact-contact handoffs solely as a test fallback.
+
+## Validation timing
+
+Reject every condition at the earliest layer that has enough information, while retaining later replay as defense in depth:
+
+* **Expansion-time:** all snapshot-pure node and edge constraints: materializable integer-corner profiles, horizontal/vertical bounds, work-operation compatibility, ocean floor, buildings, durability, fixed-neighbour fights, V/V edge profiles, origin revisits, nonconsecutive corner contact, and prospective G/V handoffs. Search and materialization must call the same predecessor-sensitive generated-profile feasibility helper so directional durability pruning cannot disagree with replay.
+* **Goal-time:** reconstruct and fully materialize every reached goal before accepting it. This replays continuity, profiles, handoffs, duplicate origins, shared corners, final goal membership, and generated-profile feasibility over the complete path. If replay rejects the goal, record its exact reason, expand that G node normally, and continue A*/Dijkstra toward another goal.
+* **Placement-time only:** conditions that depend on mutable world state or the designation API: manager availability, a designation appearing after the immutable snapshot, `AddOrReplaceDesignation` failure, and failed post-placement provider reachability. These retain transactional rollback and legacy fallback.
+
+End validation is not removed when a condition moves into expansion; it verifies that graph generation and materialization continue to agree. A snapshot-pure rejection discovered only during placement is an implementation defect and should be moved forward.
 
 ## The fight invariant
 
@@ -301,6 +311,36 @@ Build behind the same `AccessCandidate` contract the framework already defines, 
 3. **Reuse-aware trunk behaviour** through `G` segments and existing designations; defer any multi-source cost-to-ground field until the per-cluster V1 graph is proven.
 4. **Fight-invariant feasibility, durability-envelope, and debug visualization diagnostics.** Fight-invariant and durability feasibility must be enforced from step 1 (they prevent irreparable landslides); this step adds the overlay, decision dumps, and cost-breakdown tooling needed to tune and trust the search.
 5. **Compare** against the straight-corridor generator on representative saves; promote when it wins on cost, robustness, and explainability.
+
+## Future expansion: generic path A to B
+
+The V/G graph should eventually support a generic request such as "find the cheapest drivable or constructible path from A to B." Mine-tower access is then one adapter: the origin cluster supplies A and tower-reachable ground supplies the goal set B. The graph, transition validation, cost model, search, and materialization remain shared.
+
+Introduce an `AccessPathRequest`-style boundary rather than a second pathfinder. A request should provide:
+
+* one or more start endpoints and one or more goal endpoints;
+* endpoint adapters for G tiles, fixed V profiles, areas, or generated candidate sets;
+* explicit bounds or a bounded search-radius policy instead of implicit tower-area bounds;
+* allowed construction modes, clearance/search-space version, and cost settings;
+* intent: inspect an existing drivable route, plan a constructible route, or materialize/place that route.
+
+Generic routing also requires fully symmetric G/V entry and exit. Production V1 currently exercises cluster-side V toward tower-side G most heavily; A-to-B must support either endpoint being G or V and may cross a G/V seam at either end. Tower-specific clustering, candidate comparison, notifications, fallback, and post-placement provider flooding stay outside the core request.
+
+This expansion comes after traversal/goal validation is unified and covered by deterministic fixtures. A generic API must not expose paths that can still fail snapshot-pure materialization checks after search; only mutable-world placement failures may remain deferred.
+
+### Rooted-network bridge (initial implementation)
+
+The first extraction is deliberately narrower than fully symmetric A-to-B routing. An `AccessPathRequest` carries a frozen snapshot, typed start and goal endpoints, intent, bounds, and required corridor width. The mine-tower adapter supplies a set of fixed-profile work origins as the start and tower-reachable G tiles as the goal. This preserves the existing rooted-network problem while removing tower-specific assumptions from the search entry point.
+
+`Create Designations` also treats every active, incomplete mining, dumping, or leveling designation inside the tower area as a fixed work endpoint. This supports access-only repair: with experimental turning ramps enabled and width 1, invoking the command can connect existing player-authored terrain work to the tower even when the ore scan produces no new mining plan. Its target profile is copied into the snapshot exactly. An existing designation may also remain an access provider when its target geometry already forms a tower-rooted chain; endpoint classification must not hide that valid provider. Accessway materialization owns only newly generated accessway origins and must not replace or remove the endpoint designation.
+
+When generated mining and existing terrain work coexist, they participate in the same rooted reachability analysis and can form multiple clusters. Clusters containing an existing terrain-work endpoint use only the generic V1 request; they do not enter the legacy straight-ramp generator, whose mining-specific placement assumptions could rewrite or misinterpret the marker. Generated-mining-only clusters retain legacy comparison/fallback during the experimental rollout.
+
+Initial constraints:
+
+* The rooted request supports `FixedProfiles -> GroundTiles`, construction intent, and required width `1` only. Other endpoint combinations and widths fail explicitly rather than silently degrading.
+* Existing designations that overlap a newly computed mining plan remain subject to the current mining regeneration behavior. Distinguishing player-authored markers from stale ATD output requires persisted provenance or a mining-parameter fingerprint; add that before promising selective mining regeneration.
+* A future symmetric A-to-B caller may use a tower placed at either endpoint and an arbitrary terrain designation at the other, but it should build on the same request boundary rather than infer special marker semantics inside the graph.
 
 ## Open questions
 

@@ -115,6 +115,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps (experimental)", "Settings toggle label for experimental turning ramps.");
         public static LocStr SettingsTurningRampsTooltip =
             Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires the tower's ramp width to be set to 1. Corridor clearance is independent. Wider ramps and corner or saddle designations are not included.", "Tooltip for experimental turning ramps.");
+        public static LocStr SettingsSuppressLegacyRampsLabel =
+            Loc.Str("settings.experimental_access.suppress_legacy_ramps.label", "Suppress legacy ramps", "Settings toggle label for suppressing legacy access ramps.");
+        public static LocStr SettingsSuppressLegacyRampsTooltip =
+            Loc.Str("settings.experimental_access.suppress_legacy_ramps.tooltip", "Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave off for normal fallback behavior.", "Tooltip for suppressing legacy access ramps.");
         public static LocStr SettingsAccessAStarLabel =
             Loc.Str("settings.experimental_access.astar.label", "Use A* search", "Settings toggle label for experimental A* access search.");
         public static LocStr SettingsAccessAStarTooltip =

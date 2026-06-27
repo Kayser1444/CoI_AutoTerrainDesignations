@@ -67,17 +67,27 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    public enum AccessWorkOriginKind
+    {
+        GeneratedMiningPlan,
+        ExternalTerrainWorkEndpoint
+    }
+
     public class AccessWorkOrigin
     {
         public Tile2i Origin { get; }
         public AccessWorkIntent SourceIntent { get; }
         public bool RequiresSoilTopLayer { get; }
+        public AccessWorkOriginKind Kind { get; }
 
-        public AccessWorkOrigin(Tile2i origin, AccessWorkIntent sourceIntent, bool requiresSoilTopLayer)
+        public AccessWorkOrigin(Tile2i origin, AccessWorkIntent sourceIntent,
+            bool requiresSoilTopLayer,
+            AccessWorkOriginKind kind = AccessWorkOriginKind.GeneratedMiningPlan)
         {
             Origin = origin;
             SourceIntent = sourceIntent;
             RequiresSoilTopLayer = requiresSoilTopLayer;
+            Kind = kind;
         }
     }
 

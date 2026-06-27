@@ -90,6 +90,7 @@ namespace AutoTerrainDesignations.Access
         }
 
         public int Center2 => (Nw2 + Ne2 + Se2 + Sw2) / 4;
+        public bool HasIntegerCorners => ((Nw2 | Ne2 | Se2 | Sw2) & 1) == 0;
 
         public int GetHeight2NumeratorAt(int x, int y)
         {
@@ -192,6 +193,7 @@ namespace AutoTerrainDesignations.Access
         public float WorkDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
         public int GoalCount => m_goalGroundNodes.Count;
+        public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
         public int LandslideSourceCount => m_durabilityCorners.Length;
 
         public AccessSearchSnapshot(
@@ -306,6 +308,7 @@ namespace AutoTerrainDesignations.Access
             if (!IsOriginInside(origin)) { reason = "HorizontalBounds"; return false; }
             if (m_workOrigins.Contains(origin)) { reason = "WorkOrigin"; return false; }
             if (m_fixedProfiles.ContainsKey(origin)) { reason = "ExistingDesignation"; return false; }
+            if (!profile.HasIntegerCorners) { reason = "HalfLevelCorner"; return false; }
             if (profile.Center2 < MinHeight2 || profile.Center2 > MaxHeight2) { reason = "VerticalBounds"; return false; }
             if (IsProfileOceanBlocked(origin, profile)) { reason = "OceanBelowMinimum"; return false; }
 
@@ -430,6 +433,9 @@ namespace AutoTerrainDesignations.Access
             var queue = new Queue<int>();
             foreach (Tile2i goal in goals)
             {
+                if (goal.X < boundsMin.X || goal.X > boundsMax.X
+                    || goal.Y < boundsMin.Y || goal.Y > boundsMax.Y)
+                    continue;
                 int index = (goal.Y - boundsMin.Y) * width + goal.X - boundsMin.X;
                 result[index] = 0;
                 queue.Enqueue(index);

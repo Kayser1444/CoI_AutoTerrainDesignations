@@ -148,6 +148,14 @@
     "När det är aktiverat kan ATD välja och placera experimentella V1-svängnings- eller återkopplingsvägar med vaniljplatt- och sluttningsbeteckningar. Kräver att tornets rampbredd ställs in på 1. Korridorfrigången är oberoende. Bredare ramper och hörn- eller sadelbeteckningar ingår inte."
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "Dämpa äldre ramper"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "Inaktivera den äldre rakrampsgeneratorn så att experimentella accesswayresultat och fel kan testas direkt. Lämna av för normalt reservbeteende."
+  ],
+  [
     "settings.experimental_access.astar.label",
     "Använd A*-sökning"
   ],

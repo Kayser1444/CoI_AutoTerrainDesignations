@@ -60,6 +60,8 @@ namespace AutoTerrainDesignations
         internal static void ClearDesignationsForTower(IAreaManagingTower tower)
         {
             ClearDesignationsInArea(tower);
+            ClearRegisteredGeneratedAccessways(tower);
+            MarkTowerMiningPlanDirty(tower);
         }
 
         private static void RemoveFulfilledDesignationsForTower(

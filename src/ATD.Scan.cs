@@ -67,6 +67,21 @@ namespace AutoTerrainDesignations
             if (area.IsEmpty) yield break;
 
             var terrMgr = s_desigManager.TerrainManager;
+            var towerSettings = GetOrCreateTowerSettings(tower);
+            string miningPlanFingerprint = BuildMiningPlanFingerprint(tower, towerSettings);
+
+            if (IsTowerMiningPlanCurrent(tower, miningPlanFingerprint))
+            {
+                LogDebug("Mining plan parameters are unchanged; skipping mining designation regeneration.");
+                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                if (inspectorInstance != null)
+                {
+                    OreCompositionPanel.ResetContent(inspectorInstance);
+                    DesignationPanel.RefreshDisplays(inspectorInstance);
+                }
+
+                yield break;
+            }
 
             var bbMin = TerrainDesignation.GetOrigin(area.BoundingBoxMin);
             var bbMax = TerrainDesignation.GetOrigin(area.BoundingBoxMax);
@@ -76,6 +91,8 @@ namespace AutoTerrainDesignations
             List<LooseProductProto> scanProducts = GetCandidateScanProducts(tower);
             if (scanProducts.Count == 0)
             {
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -86,7 +103,6 @@ namespace AutoTerrainDesignations
 
             var productCounts = new Dictionary<LooseProductProto, int>();
             var resourceDetailsByTile = new Dictionary<Tile2i, List<ProductResource>>();
-            var towerSettings = GetOrCreateTowerSettings(tower);
             int maxHeightDiff = towerSettings.MaxHeightDiff;
             int maxLayersToExcavate = towerSettings.MaxLayersToExcavate;
             int? maxDepthToDigTo = towerSettings.MaxDepthToDigTo;
@@ -161,6 +177,8 @@ namespace AutoTerrainDesignations
                 {
                     yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
                 }
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -223,6 +241,8 @@ namespace AutoTerrainDesignations
                 {
                     yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
                 }
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -235,6 +255,8 @@ namespace AutoTerrainDesignations
                 {
                     yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
                 }
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -261,6 +283,8 @@ namespace AutoTerrainDesignations
             LogDebug(string.Format("Creating designations for {0} tiles with overall max depth {1}", maxOreDepths.Count, maxOreDepthOverall));
 
             var cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
+            HashSet<Tile2i> preexistingTerrainWorkOrigins =
+                CollectExistingTerrainWorkEndpointOrigins(tower);
 
             int designCount = 0;
             foreach (var kvp in maxOreDepths)
@@ -296,6 +320,7 @@ namespace AutoTerrainDesignations
             }
 
             LogDebug(string.Format("Created {0} designations", designCount));
+            MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
 
             if (generateRamps)
             {
@@ -313,7 +338,8 @@ namespace AutoTerrainDesignations
                     out Tile2i rampTopTile);
                 SetTowerLastRampOutcome(tower, rampOutcome);
 
-                var protectedAccesswayOrigins = new HashSet<Tile2i>(placedAccesswayOrigins);
+                var protectedAccesswayOrigins = new HashSet<Tile2i>(preexistingTerrainWorkOrigins);
+                protectedAccesswayOrigins.UnionWith(placedAccesswayOrigins);
                 RemoveFulfilledDesignationsForTower(tower, protectedAccesswayOrigins);
                 CleanupIsolatedLeftoverDesignationsForTower(tower, maxOreDepths, protectedAccesswayOrigins);
             }
@@ -331,6 +357,55 @@ namespace AutoTerrainDesignations
                 OreCompositionPanel.ResetContent(inspectorInstance);
                 DesignationPanel.RefreshDisplays(inspectorInstance);
             }
+        }
+
+        private static string BuildMiningPlanFingerprint(IAreaManagingTower tower, ATDTowerSettings towerSettings)
+        {
+            var area = tower.Area;
+            string selectedOreId = GetSelectedOre(tower)?.Id.Value ?? "<auto>";
+            return string.Join("|",
+                area.BoundingBoxMin.X,
+                area.BoundingBoxMin.Y,
+                area.BoundingBoxMax.X,
+                area.BoundingBoxMax.Y,
+                towerSettings.MaxHeightDiff,
+                towerSettings.MaxLayersToExcavate,
+                towerSettings.MaxDepthToDigTo?.ToString() ?? "<none>",
+                towerSettings.OrePurityLevel,
+                towerSettings.CorridorClearance,
+                selectedOreId,
+                AutoTerrainDesignationsMod.BottomFlatteningEnabled,
+                AutoTerrainDesignationsMod.BottomFlatteningStrength);
+        }
+
+        private static bool TryRepairExistingTerrainWorkAccess(
+            IAreaManagingTower tower,
+            TerrainManager terrMgr,
+            ATDTowerSettings towerSettings,
+            bool generateRamps)
+        {
+            if (!generateRamps
+                || !AutoTerrainDesignationsMod.TurningRampsExperimental
+                || towerSettings.RampWidth != 1
+                || s_miningProto == null
+                || !HasExistingTerrainWorkEndpoint(tower))
+                return false;
+
+            var emptyGeneratedPlan = new Dict<Tile2i, int>();
+            var endpointCornerHeights = new Dict<Tile2i, int>();
+            var placedAccesswayOrigins = new List<Tile2i>();
+            RampPlacementOutcome outcome = CreateAccessRamp(
+                tower,
+                emptyGeneratedPlan,
+                endpointCornerHeights,
+                terrMgr,
+                towerSettings.RampWidth,
+                s_miningProto,
+                placedAccesswayOrigins,
+                null,
+                out _);
+            SetTowerLastRampOutcome(tower, outcome);
+            return true;
         }
 
         private const int RAMP_ACCESS_SEARCH_MARGIN_TILES = 48;
@@ -373,7 +448,10 @@ namespace AutoTerrainDesignations
             Option<TerrainDesignation> existing = s_desigManager.GetDesignationAt(origin);
             if (!existing.HasValue) return false;
 
-            if (!existing.Value.IsReadyToMineNonAmphibious()) return false;
+            TerrainDesignation designation = existing.Value;
+            bool isReady = designation.IsReadyToMineNonAmphibious()
+                || designation.IsReadyToDumpNonAmphibious();
+            if (!isReady) return false;
 
             if (s_vehiclePathFindingManager == null || s_excavatorPathFindingParams == null) return true;
             IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;

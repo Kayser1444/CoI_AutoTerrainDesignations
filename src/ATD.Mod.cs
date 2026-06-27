@@ -115,6 +115,7 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
         SetRampNotificationsEnabled(true);
         SetAutoReleaseVehiclesWhenIdle(false);
         SetTurningRampsExperimental(true);
+        SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
         SetAccessWorkDistanceScale(1f);
         SetAccessLandslideRunPerHeight(1f);
@@ -271,6 +272,14 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
     public static void SetTurningRampsExperimental(bool value)
     {
         TurningRampsExperimental = value;
+    }
+
+    /// <summary>Debug/experimental switch that disables the legacy straight-ramp fallback.</summary>
+    public static bool SuppressLegacyAccessRamps { get; private set; }
+
+    public static void SetSuppressLegacyAccessRamps(bool value)
+    {
+        SuppressLegacyAccessRamps = value;
     }
 
     /// <summary>Uses A* instead of reference Dijkstra for the experimental access search.</summary>

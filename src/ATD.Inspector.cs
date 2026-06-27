@@ -62,6 +62,19 @@ namespace AutoTerrainDesignations
                 {
                     Log.Warning($"[AutoDepth] EXCEPTION patching OnActivated: {ex2}");
                 }
+
+                try
+                {
+                    var onDeactivatedMethod = inspectorType.GetMethod("OnDeactivated",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                    if (onDeactivatedMethod != null)
+                        harmony.Patch(onDeactivatedMethod,
+                            postfix: new HarmonyMethod(typeof(AutoDepthDesignation), nameof(InspectorDeactivatePostfix)));
+                }
+                catch (Exception ex2)
+                {
+                    Log.Warning($"[AutoDepth] EXCEPTION patching OnDeactivated: {ex2}");
+                }
             }
             catch (Exception ex)
             {
@@ -74,6 +87,28 @@ namespace AutoTerrainDesignations
             DesignationPanel.RefreshDisplays(__instance);
             OreCompositionPanel.ResetContent(__instance);
             FarmingAnalysisPanel.ResetContent(__instance);
+        }
+
+        public static void InspectorDeactivatePostfix(object __instance)
+        {
+            try
+            {
+                var inspectorType = __instance.GetType();
+                PropertyInfo? entityProp = null;
+
+                while (inspectorType != null && entityProp == null)
+                {
+                    entityProp = inspectorType.GetProperty("Entity", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    inspectorType = inspectorType.BaseType;
+                }
+
+                if (entityProp?.GetValue(__instance) is IAreaManagingTower tower)
+                    MarkTowerMiningPlanDirty(tower);
+            }
+            catch (Exception ex)
+            {
+                Debug.Log($"AutoDepth InspectorDeactivatePostfix EXCEPTION: {ex}");
+            }
         }
 
         public static void InspectorCtorPostfix(object __instance)

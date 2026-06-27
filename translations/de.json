@@ -148,6 +148,14 @@
     "Wenn diese Option aktiviert ist, kann ATD experimentelle V1-Abbiege- oder Serpentinenzufahrten unter Verwendung von Vanilla-Flach- und Gefällebezeichnungen auswählen und platzieren. Erfordert die Einstellung der Rampenbreite des Turms auf 1. Der Korridorabstand ist unabhängig. Breitere Rampen sowie Eck- oder Sattelbezeichnungen sind nicht enthalten."
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "Unterdrücken Sie alte Rampen"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "Deaktivieren Sie den alten Straight-Ramp-Generator, damit experimentelle Zugangsergebnisse und Fehler direkt getestet werden können. Lassen Sie es weg, um zum normalen Fallback-Verhalten zu gelangen."
+  ],
+  [
     "settings.experimental_access.astar.label",
     "Verwenden Sie die A*-Suche"
   ],

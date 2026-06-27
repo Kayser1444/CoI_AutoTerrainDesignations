@@ -148,6 +148,14 @@
     "Quando ativado, o ATD pode selecionar e posicionar vias de acesso experimentais V1 ou em ziguezague usando designações simples de plano e inclinação. Requer que a largura da rampa da torre seja definida como 1. A folga do corredor é independente. Rampas mais largas e designações de canto ou sela não estão incluídas."
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "Suprimir rampas legadas"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "Desative o gerador de rampa direta herdado para que os resultados e falhas experimentais da via de acesso possam ser testados diretamente. Deixe para o comportamento normal de reserva."
+  ],
+  [
     "settings.experimental_access.astar.label",
     "Use a pesquisa A*"
   ],

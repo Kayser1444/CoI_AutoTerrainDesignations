@@ -68,6 +68,8 @@ namespace AutoTerrainDesignations
             public int CorridorClearance { get; private set; }
             public bool AutoReleaseExcavatorsWhenIdle { get; private set; }
             public bool AutoReleaseTrucksWhenIdle { get; private set; }
+            public bool MiningPlanDirty { get; private set; } = true;
+            public string? LastMiningPlanFingerprint { get; private set; }
 
             /// <summary>Outcome of the most recent ramp generation attempt. Null = no scan run yet.</summary>
             public RampPlacementOutcome? LastRampOutcome { get; set; }
@@ -94,17 +96,46 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle,
                 AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle);
 
-            public void SetMaxHeightDiff(int value) => MaxHeightDiff = Math.Max(1, Math.Min(3, value));
+            public void SetMaxHeightDiff(int value)
+            {
+                int clamped = Math.Max(1, Math.Min(3, value));
+                if (MaxHeightDiff != clamped)
+                    MiningPlanDirty = true;
+                MaxHeightDiff = clamped;
+            }
 
             public void SetRampWidth(int value) => RampWidth = Math.Max(0, Math.Min(5, value));
 
-            public void SetMaxLayersToExcavate(int value) => MaxLayersToExcavate = Math.Max(0, value);
+            public void SetMaxLayersToExcavate(int value)
+            {
+                int clamped = Math.Max(0, value);
+                if (MaxLayersToExcavate != clamped)
+                    MiningPlanDirty = true;
+                MaxLayersToExcavate = clamped;
+            }
 
-            public void SetMaxDepthToDigTo(int? value) => MaxDepthToDigTo = value;
+            public void SetMaxDepthToDigTo(int? value)
+            {
+                if (MaxDepthToDigTo != value)
+                    MiningPlanDirty = true;
+                MaxDepthToDigTo = value;
+            }
 
-            public void SetOrePurityLevel(int value) => OrePurityLevel = Math.Max(0, Math.Min(4, value));
+            public void SetOrePurityLevel(int value)
+            {
+                int clamped = Math.Max(0, Math.Min(4, value));
+                if (OrePurityLevel != clamped)
+                    MiningPlanDirty = true;
+                OrePurityLevel = clamped;
+            }
 
-            public void SetCorridorClearance(int value) => CorridorClearance = Math.Max(0, Math.Min(2, value));
+            public void SetCorridorClearance(int value)
+            {
+                int clamped = Math.Max(0, Math.Min(2, value));
+                if (CorridorClearance != clamped)
+                    MiningPlanDirty = true;
+                CorridorClearance = clamped;
+            }
 
             public void SetAutoReleaseExcavatorsWhenIdle(bool value) => AutoReleaseExcavatorsWhenIdle = value;
 
@@ -114,6 +145,17 @@ namespace AutoTerrainDesignations
             {
                 SetAutoReleaseExcavatorsWhenIdle(value);
                 SetAutoReleaseTrucksWhenIdle(value);
+            }
+
+            public void MarkMiningPlanDirty()
+            {
+                MiningPlanDirty = true;
+            }
+
+            public void MarkMiningPlanClean(string fingerprint)
+            {
+                LastMiningPlanFingerprint = fingerprint;
+                MiningPlanDirty = false;
             }
 
             public bool MatchesGlobalDefaults()
@@ -151,6 +193,8 @@ namespace AutoTerrainDesignations
             new Dictionary<EntityId, bool>();
         private static readonly Dictionary<EntityId, bool> s_farmingPanelCollapsedByEntityId =
             new Dictionary<EntityId, bool>();
+        private static readonly Dictionary<EntityId, HashSet<Tile2i>> s_generatedAccesswayOriginsByTowerEntityId =
+            new Dictionary<EntityId, HashSet<Tile2i>>();
         private static bool s_startupTowerPrioritySyncCompleted;
         private static int s_startupTowerPrioritySyncAttempts;
 
@@ -192,6 +236,9 @@ namespace AutoTerrainDesignations
         {
             if (tower == null) return;
             if (!TryGetTowerEntityId(tower, out EntityId entityId)) return;
+            ProductProto? previous = s_selectedOrePerTower.TryGetValue(entityId, out var existing) ? existing : null;
+            if (!ReferenceEquals(previous, ore))
+                GetOrCreateTowerSettings(tower).MarkMiningPlanDirty();
             if (ore == null)
                 s_selectedOrePerTower.Remove(entityId);
             else
@@ -245,6 +292,48 @@ namespace AutoTerrainDesignations
 
         internal static int GetTowerCorridorClearance(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).CorridorClearance;
         internal static void SetTowerCorridorClearance(IAreaManagingTower tower, int value) => GetOrCreateTowerSettings(tower).SetCorridorClearance(value);
+
+        internal static bool IsTowerMiningPlanDirty(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).MiningPlanDirty;
+
+        internal static bool IsTowerMiningPlanCurrent(IAreaManagingTower tower, string fingerprint)
+        {
+            ATDTowerSettings settings = GetOrCreateTowerSettings(tower);
+            return !settings.MiningPlanDirty
+                && string.Equals(settings.LastMiningPlanFingerprint, fingerprint, StringComparison.Ordinal);
+        }
+
+        internal static void MarkTowerMiningPlanDirty(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).MarkMiningPlanDirty();
+
+        internal static void MarkTowerMiningPlanClean(IAreaManagingTower tower, string fingerprint) =>
+            GetOrCreateTowerSettings(tower).MarkMiningPlanClean(fingerprint);
+
+        private static void RegisterGeneratedAccesswayOrigins(IAreaManagingTower tower, IEnumerable<Tile2i> origins)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId))
+                return;
+
+            if (!s_generatedAccesswayOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered))
+            {
+                registered = new HashSet<Tile2i>();
+                s_generatedAccesswayOriginsByTowerEntityId[entityId] = registered;
+            }
+
+            foreach (Tile2i origin in origins)
+                registered.Add(origin);
+        }
+
+        private static bool IsRegisteredGeneratedAccesswayOrigin(IAreaManagingTower tower, Tile2i origin)
+        {
+            return TryGetTowerEntityId(tower, out EntityId entityId)
+                && s_generatedAccesswayOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered)
+                && registered.Contains(origin);
+        }
+
+        private static void ClearRegisteredGeneratedAccessways(IAreaManagingTower tower)
+        {
+            if (TryGetTowerEntityId(tower, out EntityId entityId))
+                s_generatedAccesswayOriginsByTowerEntityId.Remove(entityId);
+        }
 
         internal static bool GetTowerAutoReleaseExcavatorsWhenIdle(IAreaManagingTower tower)
         {

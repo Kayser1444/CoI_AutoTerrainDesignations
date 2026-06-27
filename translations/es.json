@@ -148,6 +148,14 @@
     "Cuando está habilitado, ATD puede seleccionar y colocar vías de acceso experimentales de giro o curvatura V1 utilizando designaciones planas y inclinadas. Requiere que el ancho de la rampa de la torre se establezca en 1. El espacio libre del corredor es independiente. No se incluyen rampas más anchas ni designaciones de esquinas o monturas."
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "Suprimir rampas heredadas"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "Deshabilite el generador de rampa recta heredado para que los resultados y fallas de las vías de acceso experimentales se puedan probar directamente. Déjelo para el comportamiento de reserva normal."
+  ],
+  [
     "settings.experimental_access.astar.label",
     "Utilice la búsqueda A*"
   ],

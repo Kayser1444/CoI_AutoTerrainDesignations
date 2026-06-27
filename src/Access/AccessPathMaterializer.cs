@@ -19,6 +19,8 @@ namespace AutoTerrainDesignations.Access
             Tile2i previousPosition = result.StartOrigin;
             Tile2i previousVPredecessorPosition = result.StartOrigin;
             AccessHeightProfile previousVPredecessorProfile = previousProfile;
+            var previousNode = new AccessSearchNode(
+                result.StartOrigin, previousProfile.Center2, AccessSearchMode.Existing);
             bool previousWasGround = false;
             int reusedNodes = 0;
             int groundNodes = 0;
@@ -47,6 +49,7 @@ namespace AutoTerrainDesignations.Access
 
                     previousWasGround = true;
                     previousPosition = node.Position;
+                    previousNode = node;
                     handoffGround = node.Position;
                     handoffOperation = node.HandoffOperation;
                     groundNodes++;
@@ -56,6 +59,7 @@ namespace AutoTerrainDesignations.Access
                 if (!AccessPathSearch.TryGetProfile(snapshot, node, out AccessHeightProfile profile))
                     return Invalid("PlanMissingProfile", result, designations, reusedNodes, groundNodes);
 
+                Tile2i stepDirection = default;
                 if (previousWasGround)
                 {
                     if (!AccessPathSearch.ContainsHandoffTile(snapshot, node.Position, profile, previousPosition))
@@ -63,8 +67,11 @@ namespace AutoTerrainDesignations.Access
                 }
                 else
                 {
-                    Tile2i direction = new Tile2i(node.Position.X - previousPosition.X, node.Position.Y - previousPosition.Y);
-                    if (!IsOriginStep(direction) || !AccessPathSearch.EdgesMatch(previousProfile, profile, direction))
+                    stepDirection = new Tile2i(
+                        node.Position.X - previousPosition.X,
+                        node.Position.Y - previousPosition.Y);
+                    if (!IsOriginStep(stepDirection)
+                        || !AccessPathSearch.EdgesMatch(previousProfile, profile, stepDirection))
                         return Invalid("PlanEdgeMismatch", result, designations, reusedNodes, groundNodes);
                 }
 
@@ -76,7 +83,8 @@ namespace AutoTerrainDesignations.Access
                 }
                 else
                 {
-                    if (!snapshot.IsCandidateProfileFeasible(node.Position, profile, out string reason))
+                    if (!AccessPathSearch.IsGeneratedProfileFeasible(
+                        snapshot, node.Position, profile, previousNode, stepDirection, out string reason))
                         return Invalid("Plan" + reason, result, designations, reusedNodes, groundNodes);
 
                     var planned = new AccessPlannedDesignation(node.Position, node.Mode, profile);
@@ -114,10 +122,13 @@ namespace AutoTerrainDesignations.Access
                 previousWasGround = false;
                 previousPosition = node.Position;
                 previousProfile = profile;
+                previousNode = node;
             }
 
             AccessSearchNode end = result.Path[result.Path.Count - 1];
-            if (!end.IsGround || !snapshot.IsGoalGroundNode(end.Position))
+            if (end.IsGround && !snapshot.IsGoalGroundNode(end.Position))
+                return Invalid("PlanGoalMissing", result, designations, reusedNodes, groundNodes);
+            if (!end.IsGround && end.Mode != AccessSearchMode.Existing)
                 return Invalid("PlanGoalMissing", result, designations, reusedNodes, groundNodes);
 
             return new AccessDesignationPlan(true, string.Empty, result.StartOrigin, handoffGround,

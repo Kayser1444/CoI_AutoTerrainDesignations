@@ -1,3 +1,12 @@
+v0.4.6a | 2026-06-27
+* Improved: Experimental accessways can connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
+* Improved: Later clusters can reuse newly placed experimental accessways instead of creating duplicate ramps back to the tower
+* Fixed: Experimental routes can hand off to valid ground while still requiring final tower-reachable access, reducing unnecessary accessway designations over drivable terrain
+* Fixed: Endpoint starts can immediately hand off to ground when valid
+* Fixed: Existing planned access profiles can be reused as provider-join goals, including already-provided zero-new-designation paths
+* Added: **Suppress legacy ramps** experimental/debug setting and console command for testing V1 without straight-ramp fallback
+* Improved: Accessway diagnostics distinguish generated mining clusters from external terrain-work endpoints and report when legacy fallback was intentionally suppressed
+
 v0.4.5a | 2026-06-21
 * Improved: Experimental turning accessways connect to uneven ground using vanilla mining and dumping workability rules, with the correct designation type on the final tile
 * Fixed: Turning accessways can crest onto usable ground instead of unnecessarily continuing close to the surface

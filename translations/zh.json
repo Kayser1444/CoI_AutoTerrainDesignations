@@ -148,6 +148,14 @@
     "启用后，ATD 可以使用普通平坦和斜坡名称选择并放置实验性 V1 转弯或之字形通道。要求将塔楼的坡道宽度设置为 1。走廊间隙是独立的。不包括更宽的坡道和拐角或鞍座名称。"
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "抑制遗留斜坡"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "禁用传统的直斜坡发生器，以便可以直接测试实验通道结果和故障。保留正常的后备行为。"
+  ],
+  [
     "settings.experimental_access.astar.label",
     "使用 A* 搜索"
   ],

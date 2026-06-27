@@ -475,6 +475,10 @@ namespace AutoTerrainDesignations
                 if (turningRampsExperimental.HasValue && ShouldPreserveBool(turningRampsExperimental.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetTurningRampsExperimental(turningRampsExperimental.Value);
 
+                bool? suppressLegacyAccessRamps = ParseBool(json, "suppressLegacyAccessRamps");
+                if (suppressLegacyAccessRamps.HasValue && ShouldPreserveBool(suppressLegacyAccessRamps.Value, migrateGeneratedDefaults, false))
+                    AutoTerrainDesignationsMod.SetSuppressLegacyAccessRamps(suppressLegacyAccessRamps.Value);
+
                 bool? experimentalAccessUseAStar = ParseBool(json, "experimentalAccessUseAStar");
                 if (experimentalAccessUseAStar.HasValue && ShouldPreserveBool(experimentalAccessUseAStar.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(experimentalAccessUseAStar.Value);
@@ -814,7 +818,10 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires ramp width 1; corridor clearance is independent. Default: true.\",");
             sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsExperimental)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use A* instead of reference Dijkstra for experimental turning ramps. Default: false.\",");
+            sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
+            sb.AppendLine($"  \"suppressLegacyAccessRamps\": {BoolToJsonStr(AutoTerrainDesignationsMod.SuppressLegacyAccessRamps)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use A* instead of reference Dijkstra for experimental turning ramps. Fixed-profile provider-join searches still use Dijkstra until their own admissible heuristic is added. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessWorkDistanceScale\": \"Tile-distance cost assigned to one unit of center-height terrain work in experimental access search. Range: 0-100. Default: 1.\",");

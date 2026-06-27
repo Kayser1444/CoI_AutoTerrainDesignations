@@ -488,7 +488,7 @@ Implement the bounded heterogeneous graph from [Accessway Pathfinding](../planne
 
 **Exit gate:** deterministic unit-level graph tests cover flat travel, straight ramps, flat landings, switchbacks, V/G handoffs, fixed existing profiles, blocked durability zones, and no-path results. A dry run reproduces at least one existing straight ramp and finds at least one valid turning path unavailable to the control generator.
 
-**Implementation status:** the heterogeneous G/V state model, scaled profiles, mechanical transitions, fixed-profile reuse, V/G handoffs, bounds, durability/fight checks, additive cost, Dijkstra/A*, path reconstruction, rejection summary, final self-contact validation, and gated per-cluster dry-run hook are implemented. Executable transition and synthetic V-to-G fixtures run before snapshot construction. Representative straight-ramp and switchback save fixtures remain to be captured.
+**Implementation status:** the heterogeneous G/V state model, scaled profiles, mechanical transitions, fixed-profile reuse, V/G handoffs, bounds, durability/fight checks, additive cost, Dijkstra/A*, path reconstruction, rejection summary, final self-contact validation, and gated per-cluster dry-run hook are implemented. Snapshot-pure profile feasibility is enforced during expansion, and every reached goal is fully materialized before search accepts it; an invalid goal is recorded and search continues. Executable transition and synthetic V-to-G fixtures run before snapshot construction. Representative straight-ramp and switchback save fixtures remain to be captured.
 
 ### Phase 5 - Candidate materialization and safety validation (implemented; save validation pending)
 
@@ -502,7 +502,7 @@ Turn a successful V1 path into an ordinary framework candidate:
 
 **Exit gate:** every emitted path passes the same dry-run/final validation immediately before placement; invalid paths leave the world unchanged; the post-placement reachability flood reaches the intended cluster through the new provider.
 
-**Implementation status:** successful search paths are converted into explicit flat/slope designation plans. The materializer independently replays V/V and V/G transitions, rechecks generated-node feasibility, fixed-profile reuse, duplicate origins, nonconsecutive self-contact corner consistency, and final goal membership. Legal matching diagonal contact at a flat-landed turn is explicitly covered by a fixture. Active designation corners and occupied building foundations share the parameterized landslide-source index, while buildings remain hard traversal obstacles. Generated accessway bodies use the leveling proto so one route may safely combine cuts and fills. V/G handoffs classify mining versus dumping from the predecessor V center, reconstruct vanilla's corresponding fulfilled bitmap over the prospective terminal 5x5 profile, and require a fulfilled perimeter tile in tower-reachable G. The selected operation is preserved as edge/plan metadata and applied to the final generated V tile with no leveling fallback. Immediately before placement, ATD rematerializes the path against the unchanged search snapshot; placement still checks that no designation appeared at each generated origin. Placement tracks each origin together with its actual proto and rolls all of them back on failure. The next cluster rebuilds the snapshot after any successful placement, and the resulting provider is accepted only if a fresh reachability flood reaches the intended cluster. Representative-save validation of mixed cut/fill placement and terminal specialization remains pending.
+**Implementation status:** successful search paths are converted into explicit flat/slope designation plans. Search expansion and materialization share predecessor-sensitive generated-profile feasibility, including the same full-versus-directional durability rule, while the materializer independently replays V/V and V/G transitions, fixed-profile reuse, duplicate origins, nonconsecutive self-contact corner consistency, and final goal membership. Legal matching diagonal contact at a flat-landed turn is explicitly covered by a fixture. Active designation corners and occupied building foundations share the parameterized landslide-source index, while buildings remain hard traversal obstacles. Generated accessway bodies use the leveling proto so one route may safely combine cuts and fills. V/G handoffs classify mining versus dumping from the predecessor V center, reconstruct vanilla's corresponding fulfilled bitmap over the prospective terminal 5x5 profile, and require a fulfilled perimeter tile on a valid ground node; final route acceptance still requires tower-reachable access through ground or fixed providers. The selected operation is preserved as edge/plan metadata and applied to the final generated V tile with no leveling fallback. Immediately before placement, ATD rematerializes the path against the unchanged search snapshot; placement still checks that no designation appeared at each generated origin. Placement tracks each origin together with its actual proto and rolls all of them back on failure. The next cluster rebuilds the snapshot after any successful placement, and the resulting provider is accepted only if a fresh reachability flood reaches the intended cluster. Representative-save validation of mixed cut/fill placement and terminal specialization remains pending.
 
 ### Phase 6 - Experimental integration and fallback (implemented; save validation pending)
 
@@ -517,6 +517,24 @@ Integrate V1 into Provision Pipeline step 8 behind the public feature gate:
 **Exit gate:** disabling the toggle is behaviorally equivalent to the Phase 2 baseline; enabling it can select and place a switchback; a V1 failure falls back cleanly; no save data becomes dependent on the experimental feature.
 
 **Implementation status:** V1 plans are adapted to the production `EvaluatedAccessCandidate` ranking using the same material-work estimate and mouth-distance tie-breaks as legacy candidates. Exact ties favor the legacy candidate. With the toggle enabled, each cluster evaluates both generators, selects the better valid candidate, and places V1 transactionally when selected. Search, rematerialization, placement, or post-placement reachability failure rolls back V1 changes and executes the already evaluated legacy candidate. With the toggle disabled, no V1 snapshot or search is constructed. In-save switchback placement, rollback, and toggle-off equivalence remain to be recorded against the regression matrix.
+
+### Phase 6A - Rooted request extraction and access-only repair (implemented; save validation pending)
+
+Extract tower access as a typed `AccessPathRequest` without yet generalizing the graph to every A-to-B endpoint combination:
+
+* The request owns its immutable snapshot, fixed-profile start set, tower-reachable G goal set, bounds, construction intent, and required width.
+* The existing mine-tower workflow is an adapter that submits each inaccessible origin cluster to this rooted request. Search and materialization no longer derive their endpoint semantics from tower orchestration.
+* Active, incomplete mining, dumping, and leveling designations inside the tower area are additional fixed work endpoints. `Create Designations` may therefore perform access-only repair when no ore-generated plan exists.
+* Existing terrain work endpoints are treated as `ExternalTerrainWorkEndpoint` origins. Copy their target profiles for routing and never remove or replace them as accessway output. They may still qualify as existing providers when their target geometry already forms a tower-rooted chain. Only newly generated accessway origins belong to the request transaction.
+* ATD-generated accessways are tracked as generated providers during the runtime session and must not be reclassified as `ExternalTerrainWorkEndpoint` merely because they are unfulfilled leveling designations on the next pass.
+* Clusters containing external terrain work endpoints use the generic experimental path only. Generated-mining-only clusters retain legacy candidate comparison and fallback until V1 rollout is complete.
+* Reject required width other than `1` explicitly. Width 2+ belongs to V2 and must not be approximated by this adapter.
+* A valid rooted path that materializes zero new designations is an already-provided route through fixed profiles. Treat it as successful reuse; do not pass it to placement or report a missing-candidate warning.
+* Diagnostics log the request intent, start/goal endpoint kinds and counts, bounds, and per-cluster ownership split (`GeneratedMiningPlan` vs. `ExternalTerrainWorkEndpoint`) so A-to-B repair and normal mining access can be distinguished from logs.
+
+**Exit gate:** the request fixture returns the same path as the pre-extraction search call; width 2 fails explicitly; invoking `Create Designations` over an area containing only an inaccessible terrain designation can place a width-1 accessway without rewriting the endpoint; ordinary generated mining retains its existing fallback behavior.
+
+**Remaining ownership issue:** an existing designation whose origin overlaps the newly regenerated mining plan is not reliably distinguishable from ATD output from a previous run. The current runtime mining-plan fingerprint avoids unnecessary same-session regeneration, but persisted provenance or a saved mining-settings fingerprint is required before selective "regenerate mining only when parameters changed" behavior can be guaranteed across reloads.
 
 ### Phase 7 - Diagnosability and A* comparison
 
@@ -550,6 +568,21 @@ The following are explicitly outside the V1 rollout and require their own design
 * **V2:** `accessWayClearance = 2`, wider node profiles, footprint costs, and 2x2-origin turn handling.
 * **V' / V'':** corner and saddle designation transition tables.
 * Multi-source cached cost-to-ground fields, full band-state search, and material-aware landslide simulation.
+* Fixed-profile goal A* heuristic: V1 currently keeps fixed-profile goal requests on Dijkstra because the implemented A* lower bound is keyed to tower-reachable ground goals. Add a multi-source lower-bound map seeded from fixed-profile goal origins so "connect to an already-accessible cluster/provider" can use A* safely instead of falling back to the reference Dijkstra search.
+
+### Future cost and durability refinements
+
+The V1 implementation deliberately keeps cost and durability parameters simple. The following refinements are candidates once correctness and rollout behavior are stable:
+
+* Split work-vs-distance weighting between mining work and dumping work. A player or local situation may prefer spending excavator work to avoid dumping, or spending dumping work to avoid mining.
+* Estimate accessway work from corner deltas instead of the center-height delta. This should better represent mixed cut/fill origins and tilted terminal tiles.
+* Check landslide/durability exclusion from corner geometry instead of center-height geometry, for the same reason: slides are driven by the actual edge/corner profile, not only by the origin center.
+* For dumping durability, use the slope factor of the most slippery selected dumping material. This lets the player influence expected stability by selecting, for example, rock when a steeper protected slope is acceptable.
+* Split landslide-protection work factors into separate mining and dumping parameters. Mining through hard rock and dumping disturbed material may justify different assumed stability.
+* Replace the raw landslide-protection factor with a loose material/proto selector, so the setting is expressed as an assumed material class rather than an abstract number.
+* Add an Auto mode that inspects the material being mined and derives the landslide-protection factor from that material when possible.
+* Add an **Avoid buildings** toggle for access and mining designation generation. When enabled, building footprints and their collapse-risk envelopes remain hard constraints.
+* When **Avoid buildings** is disabled, emit a warning if ATD places mining/access designations whose completion could undermine or slide material onto an existing, planned, or ghost building, including the mine control tower itself.
 
 ## Architectural Rules (Resolved Decisions)
 

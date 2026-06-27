@@ -1,3 +1,13 @@
+v0.4.6a | 2026-06-27
+* Improved: experimental accessways can now connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
+* Improved: generated accessways are tracked as runtime providers, so later clusters can reuse newly placed routes instead of creating duplicate ramps back to the tower
+* Fixed: experimental routes can hand off from V-space to any valid ground node while still requiring the final route to connect to tower-reachable ground, reducing unnecessary V-designations over drivable terrain
+* Fixed: endpoint starts can immediately hand off to ground when valid, avoiding needless flat accessway designations over already pathable terrain
+* Fixed: fixed-profile/provider-join routes can end by reusing existing planned access profiles, including zero-new-designation paths that already provide access
+* Added: **Suppress legacy ramps** experimental/debug setting and console command, allowing V1 accessway failures to be tested without the straight-ramp fallback taking over
+* Improved: accessway diagnostics now distinguish generated mining clusters from external terrain-work endpoints, report fixed-network request shape, and include a `legacy-suppressed` decision reason when fallback is intentionally disabled
+* Updated: access framework design notes and release defaults for the current V1 alpha behavior
+
 v0.4.5a | 2026-06-21
 * Improved: experimental turning accessways now hand off to ground using vanilla's prospective mining/dumping workability checks instead of requiring exact terrain-height contact; the final accessway tile uses the matching mining or dumping designation while mixed cut/fill route bodies continue to use leveling designations
 * Fixed: V-to-G operation selection now uses the predecessor tile's relation to current terrain, allowing a route to crest uneven ground instead of continuing through unnecessary V tiles near the surface

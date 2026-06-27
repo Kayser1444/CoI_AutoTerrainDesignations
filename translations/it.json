@@ -148,6 +148,14 @@
     "Se abilitato, ATD può selezionare e posizionare accessi sperimentali di svolta o tornanti V1 utilizzando designazioni piatte e in pendenza. Richiede che la larghezza della rampa della torre sia impostata su 1. La distanza del corridoio è indipendente. Rampe più larghe e designazioni di angoli o selle non sono incluse."
   ],
   [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "Elimina le rampe legacy"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "Disabilitare il generatore di rampe diritte legacy in modo che i risultati e i guasti degli accessi sperimentali possano essere testati direttamente. Lasciare fuori per il normale comportamento di fallback."
+  ],
+  [
     "settings.experimental_access.astar.label",
     "Utilizza la ricerca A*"
   ],

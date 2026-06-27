@@ -41,6 +41,9 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  RampNotifications     = {AutoTerrainDesignationsMod.RampNotificationsEnabled}");
         sb.AppendLine($"  AutoReleaseExcavators = {AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle}");
         sb.AppendLine($"  AutoReleaseTrucks     = {AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle}");
+        sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
+        sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
+        sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
         sb.AppendLine($"  CornerDesignationKey  = {AutoTerrainDesignationsMod.CornerDesignationKey}");
         sb.Append(AutoDepthDesignation.FormatPurityArrays());
         return sb.ToString();
@@ -238,6 +241,16 @@ public sealed class AtdConsoleCommands
 
         AutoTerrainDesignationsMod.SetCornerDesignationKey(parsed);
         return $"[ATD] CornerDesignationKey set to {AutoTerrainDesignationsMod.CornerDesignationKey}.";
+    }
+
+    [ConsoleCommand(false, false, "Enables/disables the legacy straight-ramp generator fallback (true/false, on/off, 1/0).", null)]
+    private string atdSetSuppressLegacyRamps(string value)
+    {
+        if (!TryParseConsoleBool(value, out bool parsed))
+            return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
+
+        AutoTerrainDesignationsMod.SetSuppressLegacyAccessRamps(parsed);
+        return $"[ATD] SuppressLegacyAccessRamps set to {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}.";
     }
 
     [ConsoleCommand(false, false, "Sets minBottomOreDensity for a purity level (0-4), clamped 0-1. Minimum ore/(ore+waste) ratio a zone must have to be included. E.g. atd_set_min_bottom_ore_density 2 0.25", null)]
