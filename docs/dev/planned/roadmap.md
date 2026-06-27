@@ -58,4 +58,10 @@ Ensure the settings UI tooltip for the CornerDesignationKey explicitly documents
 ## Topsoil Optimization
 Investigate placing only the minimum required soil to satisfy farmability (e.g., 95% thickness) instead of a full topsoil band. Deferred during the access framework rewrite.
 
+## Concurrency issue in TickIdleVehicleRelease
+`AutoDepthDesignation.TickIdleVehicleRelease()` runs on the simulation thread (`~Sim` thread) and iterates over active towers using `m_entitiesManager.GetAllEntitiesOfType<MineTower>()`. This can collide with the Unity main thread (`~Mai` thread) when other UI elements (like `PollutionWorldRenderer` or other mods) try to enumerate entities of any type concurrently using MaFi's non-thread-safe `LystMutableDuringIter` collections, triggering `Outer enumerator finished first?` assertions in the game's log.
+
+**Solution:** Query and snapshot the entities safely on a main-thread tick or copy them to avoid concurrent enumeration.
+
 Check Wanderer's issues
+
