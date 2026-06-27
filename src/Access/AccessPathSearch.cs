@@ -380,21 +380,29 @@ namespace AutoTerrainDesignations.Access
 
         public static AccessSearchResult FindPath(AccessPathRequest request)
         {
+            AccessPathSearchSession session = CreateSession(request);
+            while (!session.IsComplete)
+                session.Step(int.MaxValue);
+            return session.Result;
+        }
+
+        public static AccessPathSearchSession CreateSession(AccessPathRequest request)
+        {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             Tile2i start = request.Start.Nodes.Count > 0 ? request.Start.Nodes[0] : default;
             if (request.RequiredWidth != 1)
-                return Failed("UnsupportedWidth", start, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("UnsupportedWidth", start, 0, rejections));
             if (request.Start.Kind != AccessPathEndpointKind.FixedProfiles)
-                return Failed("UnsupportedStartEndpoint", start, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("UnsupportedStartEndpoint", start, 0, rejections));
             if (request.Goal.Kind != AccessPathEndpointKind.GroundTiles
                 && request.Goal.Kind != AccessPathEndpointKind.FixedProfiles)
-                return Failed("UnsupportedGoalEndpoint", start, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("UnsupportedGoalEndpoint", start, 0, rejections));
             if (request.Intent != AccessPathIntent.ConstructAccessway)
-                return Failed("UnsupportedIntent", start, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("UnsupportedIntent", start, 0, rejections));
             HashSet<Tile2i>? fixedGoalOrigins = request.Goal.Kind == AccessPathEndpointKind.FixedProfiles
                 ? new HashSet<Tile2i>(request.Goal.Nodes)
                 : null;
-            return FindPath(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
+            return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
                 useAStarHeuristic: request.Goal.Kind == AccessPathEndpointKind.GroundTiles);
         }
 
@@ -405,18 +413,31 @@ namespace AutoTerrainDesignations.Access
             HashSet<Tile2i>? fixedGoalOrigins = null,
             bool useAStarHeuristic = true)
         {
+            AccessPathSearchSession session = CreateSession(snapshot, clusterOrigins, rejectGoal, fixedGoalOrigins, useAStarHeuristic);
+            while (!session.IsComplete)
+                session.Step(int.MaxValue);
+            return session.Result;
+        }
+
+        private static AccessPathSearchSession CreateSession(
+            AccessSearchSnapshot snapshot,
+            IReadOnlyList<Tile2i> clusterOrigins,
+            Func<AccessSearchResult, string?>? rejectGoal,
+            HashSet<Tile2i>? fixedGoalOrigins,
+            bool useAStarHeuristic)
+        {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             Tile2i startOrigin = SelectStart(clusterOrigins);
             if (clusterOrigins.Count == 0)
-                return Failed("NoStart", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("NoStart", startOrigin, 0, rejections));
             if (fixedGoalOrigins == null && snapshot.GoalCount == 0)
-                return Failed("NoGoalGround", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("NoGoalGround", startOrigin, 0, rejections));
             if (fixedGoalOrigins != null && fixedGoalOrigins.Count == 0)
-                return Failed("NoGoalFixedProfile", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("NoGoalFixedProfile", startOrigin, 0, rejections));
             if (!snapshot.TryGetFixedProfile(startOrigin, out AccessHeightProfile startProfile))
-                return Failed("NoStartProfile", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("NoStartProfile", startOrigin, 0, rejections));
             if (snapshot.IsProfileOceanBlocked(startOrigin, startProfile))
-                return Failed("OceanStartBelowMinimum", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("OceanStartBelowMinimum", startOrigin, 0, rejections));
 
             var distance = new Dictionary<AccessSearchNode, float>();
             var previous = new Dictionary<AccessSearchNode, AccessSearchNode>();
@@ -430,62 +451,163 @@ namespace AutoTerrainDesignations.Access
                 distance, previous, queue, rejections, useAStarHeuristic);
 
             if (queue.Count == 0)
-                return Failed("NoInitialSuccessor", startOrigin, 0, rejections);
+                return AccessPathSearchSession.Completed(Failed("NoInitialSuccessor", startOrigin, 0, rejections));
 
-            int visited = 0;
-            while (queue.Count > 0 && visited < MAX_VISITED_NODES)
+            return new AccessPathSearchSession(snapshot, startOrigin, startNode, fixedGoalOrigins, rejectGoal,
+                useAStarHeuristic, distance, previous, queue, rejections, lastRejectedGoalPath,
+                lastGoalRejectionReason, lastRejectedGoalCost);
+        }
+
+        public sealed class AccessPathSearchSession
+        {
+            private readonly AccessSearchSnapshot m_snapshot;
+            private readonly Tile2i m_startOrigin;
+            private readonly AccessSearchNode m_startNode;
+            private readonly HashSet<Tile2i>? m_fixedGoalOrigins;
+            private readonly Func<AccessSearchResult, string?>? m_rejectGoal;
+            private readonly bool m_useAStarHeuristic;
+            private readonly Dictionary<AccessSearchNode, float> m_distance;
+            private readonly Dictionary<AccessSearchNode, AccessSearchNode> m_previous;
+            private readonly MinQueue m_queue;
+            private readonly Dictionary<string, int> m_rejections;
+            private List<AccessSearchNode>? m_lastRejectedGoalPath;
+            private string m_lastGoalRejectionReason;
+            private float m_lastRejectedGoalCost;
+            private int m_visited;
+
+            public bool IsComplete { get; private set; }
+            public AccessSearchResult Result { get; private set; }
+            public int VisitedNodes => m_visited;
+
+            internal static AccessPathSearchSession Completed(AccessSearchResult result)
+                => new AccessPathSearchSession(result);
+
+            private AccessPathSearchSession(AccessSearchResult result)
             {
-                QueueEntry entry = queue.Pop();
-                if (!distance.TryGetValue(entry.Node, out float known) || entry.PathCost > known + 0.0001f)
-                    continue;
+                m_snapshot = null!;
+                m_startOrigin = result.StartOrigin;
+                m_startNode = default;
+                m_fixedGoalOrigins = null;
+                m_rejectGoal = null;
+                m_useAStarHeuristic = false;
+                m_distance = null!;
+                m_previous = null!;
+                m_queue = null!;
+                m_rejections = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, int> pair in result.Rejections)
+                    m_rejections[pair.Key] = pair.Value;
+                m_lastGoalRejectionReason = string.Empty;
+                Result = result;
+                IsComplete = true;
+            }
 
-                AccessSearchNode current = entry.Node;
-                visited++;
-                bool isGoal = current.IsGround && snapshot.IsGoalGroundNode(current.Position);
-                if (fixedGoalOrigins != null)
-                    isGoal = current.Mode == AccessSearchMode.Existing
-                        && fixedGoalOrigins.Contains(current.Position);
-                if (isGoal)
+            internal AccessPathSearchSession(
+                AccessSearchSnapshot snapshot,
+                Tile2i startOrigin,
+                AccessSearchNode startNode,
+                HashSet<Tile2i>? fixedGoalOrigins,
+                Func<AccessSearchResult, string?>? rejectGoal,
+                bool useAStarHeuristic,
+                Dictionary<AccessSearchNode, float> distance,
+                Dictionary<AccessSearchNode, AccessSearchNode> previous,
+                MinQueue queue,
+                Dictionary<string, int> rejections,
+                List<AccessSearchNode>? lastRejectedGoalPath,
+                string lastGoalRejectionReason,
+                float lastRejectedGoalCost)
+            {
+                m_snapshot = snapshot;
+                m_startOrigin = startOrigin;
+                m_startNode = startNode;
+                m_fixedGoalOrigins = fixedGoalOrigins;
+                m_rejectGoal = rejectGoal;
+                m_useAStarHeuristic = useAStarHeuristic;
+                m_distance = distance;
+                m_previous = previous;
+                m_queue = queue;
+                m_rejections = rejections;
+                m_lastRejectedGoalPath = lastRejectedGoalPath;
+                m_lastGoalRejectionReason = lastGoalRejectionReason;
+                m_lastRejectedGoalCost = lastRejectedGoalCost;
+                Result = Failed("SearchNotComplete", startOrigin, 0, rejections);
+            }
+
+            public int Step(int maxVisitedNodes)
+            {
+                if (IsComplete) return 0;
+                if (maxVisitedNodes <= 0) maxVisitedNodes = 1;
+
+                int visitedThisStep = 0;
+                while (m_queue.Count > 0 && m_visited < MAX_VISITED_NODES && visitedThisStep < maxVisitedNodes)
                 {
-                    List<AccessSearchNode> path = Reconstruct(current, startNode, previous);
-                    var candidate = new AccessSearchResult(
-                        true, string.Empty, startOrigin, path, known, visited, rejections);
-                    AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(snapshot, candidate);
-                    string goalFailure = goalPlan.IsValid
-                        ? rejectGoal?.Invoke(candidate) ?? string.Empty
-                        : string.IsNullOrEmpty(goalPlan.FailureReason)
-                            ? "Materialization"
-                            : goalPlan.FailureReason;
-                    if (!string.IsNullOrEmpty(goalFailure))
+                    QueueEntry entry = m_queue.Pop();
+                    if (!m_distance.TryGetValue(entry.Node, out float known) || entry.PathCost > known + 0.0001f)
+                        continue;
+
+                    AccessSearchNode current = entry.Node;
+                    m_visited++;
+                    visitedThisStep++;
+                    bool isGoal = current.IsGround && m_snapshot.IsGoalGroundNode(current.Position);
+                    if (m_fixedGoalOrigins != null)
+                        isGoal = current.Mode == AccessSearchMode.Existing
+                            && m_fixedGoalOrigins.Contains(current.Position);
+                    if (isGoal)
                     {
-                        Reject(rejections, "Goal" + goalFailure);
-                        lastRejectedGoalPath = path;
-                        lastGoalRejectionReason = goalFailure;
-                        lastRejectedGoalCost = known;
+                        List<AccessSearchNode> path = Reconstruct(current, m_startNode, m_previous);
+                        var candidate = new AccessSearchResult(
+                            true, string.Empty, m_startOrigin, path, known, m_visited, m_rejections);
+                        AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(m_snapshot, candidate);
+                        string goalFailure = goalPlan.IsValid
+                            ? m_rejectGoal?.Invoke(candidate) ?? string.Empty
+                            : string.IsNullOrEmpty(goalPlan.FailureReason)
+                                ? "Materialization"
+                                : goalPlan.FailureReason;
+                        if (!string.IsNullOrEmpty(goalFailure))
+                        {
+                            Reject(m_rejections, "Goal" + goalFailure);
+                            m_lastRejectedGoalPath = path;
+                            m_lastGoalRejectionReason = goalFailure;
+                            m_lastRejectedGoalCost = known;
+                        }
+                        else
+                        {
+                            Result = candidate;
+                            IsComplete = true;
+                            return visitedThisStep;
+                        }
                     }
+
+                    if (current.IsGround)
+                        ExpandGround(m_snapshot, current, known, m_distance, m_previous, m_queue, m_rejections, m_useAStarHeuristic);
+                    else if (TryGetProfile(m_snapshot, current, out AccessHeightProfile currentProfile))
+                        ExpandOrigin(m_snapshot, current, currentProfile, known, m_distance, m_previous, m_queue, m_rejections, m_useAStarHeuristic);
                     else
-                    {
-                        return candidate;
-                    }
+                        Reject(m_rejections, "MissingProfile");
                 }
 
-                if (current.IsGround)
-                    ExpandGround(snapshot, current, known, distance, previous, queue, rejections, useAStarHeuristic);
-                else if (TryGetProfile(snapshot, current, out AccessHeightProfile currentProfile))
-                    ExpandOrigin(snapshot, current, currentProfile, known, distance, previous, queue, rejections, useAStarHeuristic);
-                else
-                    Reject(rejections, "MissingProfile");
+                if (m_queue.Count == 0 || m_visited >= MAX_VISITED_NODES)
+                    CompleteFailed();
+
+                return visitedThisStep;
             }
 
-            if (lastRejectedGoalPath != null)
+            private void CompleteFailed()
             {
-                string reason = visited >= MAX_VISITED_NODES
-                    ? "VisitedLimitAfterGoalRejection"
-                    : lastGoalRejectionReason;
-                return new AccessSearchResult(false, reason, startOrigin, lastRejectedGoalPath,
-                    lastRejectedGoalCost, visited, rejections);
+                if (m_lastRejectedGoalPath != null)
+                {
+                    string reason = m_visited >= MAX_VISITED_NODES
+                        ? "VisitedLimitAfterGoalRejection"
+                        : m_lastGoalRejectionReason;
+                    Result = new AccessSearchResult(false, reason, m_startOrigin, m_lastRejectedGoalPath,
+                        m_lastRejectedGoalCost, m_visited, m_rejections);
+                }
+                else
+                {
+                    Result = Failed(m_visited >= MAX_VISITED_NODES ? "VisitedLimit" : "NoPath",
+                        m_startOrigin, m_visited, m_rejections);
+                }
+                IsComplete = true;
             }
-            return Failed(visited >= MAX_VISITED_NODES ? "VisitedLimit" : "NoPath", startOrigin, visited, rejections);
         }
 
         private static Tile2i SelectStart(IReadOnlyList<Tile2i> origins)
@@ -803,7 +925,7 @@ namespace AutoTerrainDesignations.Access
         private static float EstimateWork(int targetHeight2, int terrainHeight2)
         {
             float deltaHeight = Math.Abs(targetHeight2 - terrainHeight2) / 2f;
-            return 0.5f * deltaHeight * deltaHeight;
+            return deltaHeight * deltaHeight;
         }
 
         private static List<AccessSearchNode> Reconstruct(AccessSearchNode end,
@@ -870,7 +992,7 @@ namespace AutoTerrainDesignations.Access
             Dictionary<string, int> rejections)
             => new AccessSearchResult(false, reason, start, Array.Empty<AccessSearchNode>(), 0f, visited, rejections);
 
-        private readonly struct QueueEntry
+        internal readonly struct QueueEntry
         {
             public AccessSearchNode Node { get; }
             public float PathCost { get; }
@@ -879,7 +1001,7 @@ namespace AutoTerrainDesignations.Access
             { Node = node; PathCost = pathCost; Priority = priority; }
         }
 
-        private sealed class MinQueue
+        internal sealed class MinQueue
         {
             private readonly List<QueueEntry> m_items = new List<QueueEntry>();
             public int Count => m_items.Count;

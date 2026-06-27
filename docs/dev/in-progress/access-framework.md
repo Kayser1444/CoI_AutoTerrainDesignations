@@ -483,7 +483,7 @@ Implement the bounded heterogeneous graph from [Accessway Pathfinding](../planne
 * Create origin-based V1 nodes `(origin, h, mode)` for `F`, `X+`, `X-`, `Y+`, and `Y-`, using scaled integer heights.
 * Select cluster start `S`, derive tower-reachable goal set `E`, and apply the documented horizontal/vertical bounds.
 * Implement mechanical V-to-V edge-profile transitions, symmetric V/G handoffs, existing-designation edge compatibility, construction-slope checks, fight-invariant checks, and the durability envelope.
-* Implement the additive V1 cost: tile Manhattan length plus `workDistanceScale * (0.5 * centerHeightDelta^2)`; reused active designations have zero work cost but still pay length.
+* Implement the additive V1 cost: tile Manhattan length plus `workDistanceScale * centerHeightDelta^2`; reused active designations have zero work cost but still pay length.
 * Run Dijkstra first (`heuristic = 0`) and reconstruct an in-memory path and rejection summary. Do not mutate terrain or designation state.
 
 **Exit gate:** deterministic unit-level graph tests cover flat travel, straight ramps, flat landings, switchbacks, V/G handoffs, fixed existing profiles, blocked durability zones, and no-path results. A dry run reproduces at least one existing straight ramp and finds at least one valid turning path unavailable to the control generator.
@@ -546,6 +546,7 @@ Add the developer-facing tooling needed to explain and tune the search:
 * Cache only the latest search trace by default and provide explicit log-dump buttons for bounds, visited nodes, rejection counts, cost breakdown, and tie-break decisions.
 * Keep verbose logging behind debug controls; expected candidate rejection must not produce unconditional per-pass log spam.
 * Enable the public A* option using the admissible paired horizontal/height lower bound and compare visited-node count, isolated snapshot/search/materialization runtime, and selected path against Dijkstra. Dijkstra remains the reference oracle for optimal-cost comparisons.
+* Add configurable responsiveness limits for experimental access analysis: per-frame search budget, total search timeout, and a player-visible abort/cancel action for long-running analysis.
 
 **Exit gate:** Dijkstra and A* return the same minimum-cost path on deterministic fixtures; debug tooling can explain every blocked class without affecting search results when disabled.
 
@@ -575,7 +576,7 @@ The following are explicitly outside the V1 rollout and require their own design
 The V1 implementation deliberately keeps cost and durability parameters simple. The following refinements are candidates once correctness and rollout behavior are stable:
 
 * Split work-vs-distance weighting between mining work and dumping work. A player or local situation may prefer spending excavator work to avoid dumping, or spending dumping work to avoid mining.
-* Estimate accessway work from corner deltas instead of the center-height delta. This should better represent mixed cut/fill origins and tilted terminal tiles.
+* Estimate accessway work from corner deltas instead of the center-height delta, for example `sum(dh_c^2)` over the relevant outer footprint corners. This should better represent mixed cut/fill origins, tilted terminal tiles, and hillside routing; it applies to V1 as well as V2.
 * Check landslide/durability exclusion from corner geometry instead of center-height geometry, for the same reason: slides are driven by the actual edge/corner profile, not only by the origin center.
 * For dumping durability, use the slope factor of the most slippery selected dumping material. This lets the player influence expected stability by selecting, for example, rock when a steeper protected slope is acceptable.
 * Split landslide-protection work factors into separate mining and dumping parameters. Mining through hard rock and dumping disturbed material may justify different assumed stability.
@@ -583,6 +584,29 @@ The V1 implementation deliberately keeps cost and durability parameters simple. 
 * Add an Auto mode that inspects the material being mined and derives the landslide-protection factor from that material when possible.
 * Add an **Avoid buildings** toggle for access and mining designation generation. When enabled, building footprints and their collapse-risk envelopes remain hard constraints.
 * When **Avoid buildings** is disabled, emit a warning if ATD places mining/access designations whose completion could undermine or slide material onto an existing, planned, or ghost building, including the mine control tower itself.
+
+### V2 implementation direction
+
+V2 is the next major accessway search space after V1 stabilization. Its purpose is mega-vehicle access: mega vehicles require 5 terrain tiles of clearance, which maps to two 4x4 designation origins side by side. Treat V2 as a direct **2x2 origin brush search**, not as "run V1 and thicken it" for production behavior.
+
+The first V2 graph should keep V1 signed mode tokens, but compose them into a cross-section profile string:
+
+```text
+V1 node: (origin, h, F|X+|X-|Y+|Y-)
+V2 node: (2x2 brush vertex, h, axis, profile-string)
+
+Clearance 2 profile examples: FF, FX+, X+X+, X+X-
+Clearance 3 profile examples: FFF, X+FX+, X+X+X+
+```
+
+For V2, `FF` is the full flat 2x2 brush, `X+X+` is a uniform two-lane ramp, `FX+` is a flat-to-ramp transition brush, and opposed same-axis pairs such as `X+X-` are included because they can connect nearby level profiles efficiently. The initial coherent-profile set is: `FF`; every flat/ramp and ramp/flat pair; uniform same-sign ramps; and opposed same-axis pairs (`X+X-`, `X-X+`, `Y+Y-`, `Y-Y+`). Mixed-axis profiles such as `X+Y+` are deferred. The profile string has one V1-mode token per lane across the corridor width, which distinguishes cases that a single lifted mode would collapse. A turn requires an `FF` brush, giving the required 8x8-tile landing for a two-lane corridor to pivot.
+
+Implementation order:
+
+* Add deterministic V2 profile fixtures first: profile-string-to-four-origin profiles, shared-strip compatibility, strafe legality, flat-brush turn legality, width-2 V/G handoff frontage, clearance-2 G flood semantics, footprint cost, and materialization replay.
+* Extend `AccessPathRequest` width dispatch so width 1 uses V1 and width 2 fails with a V2-specific unsupported reason until the fixtures and graph are present. Once present, V2 competes with the legacy straight generator under the same selection/fallback logic as V1 unless **Suppress legacy ramps** is enabled.
+* Implement V2 search as its own graph adapter over the existing snapshot, durability index, fixed-provider profiles, and G/V handoff machinery.
+* Keep centerline-thicken as a diagnostic comparator or fallback idea only; it is not robust enough as the primary model because it can choose a centerline whose widened turn or adjacent lane is not constructible.
 
 ## Architectural Rules (Resolved Decisions)
 

@@ -7,6 +7,7 @@
 // intended to contain only original mod code/configuration; if MaFi Games material
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Mafi;
@@ -121,6 +122,12 @@ namespace AutoTerrainDesignations
                 Height = height;
                 IsFixed = isFixed;
             }
+        }
+
+        private sealed class RampGenerationResult
+        {
+            public RampPlacementOutcome Outcome = RampPlacementOutcome.Failed;
+            public Tile2i TopRowTile = default;
         }
 
         private struct RampVertexEdge
@@ -387,11 +394,46 @@ namespace AutoTerrainDesignations
             out Tile2i topRowTile,
             HashSet<Tile2i>? forbiddenApproachClusterOrigins = null)
         {
-            topRowTile = default;
+            var result = new RampGenerationResult();
+            IEnumerator routine = CreateAccessRampCoroutine(
+                tower,
+                tileDepths,
+                cornerHeights,
+                terrMgr,
+                configuredRampWidth,
+                rampProto,
+                placedRampOrigins,
+                reservedRampTiles,
+                useLocalSurfaceReference,
+                allowExistingPlannedRampShortcut,
+                result,
+                forbiddenApproachClusterOrigins);
+            while (routine.MoveNext()) { }
+            topRowTile = result.TopRowTile;
+            return result.Outcome;
+        }
+
+        private static IEnumerator CreateAccessRampCoroutine(
+            IAreaManagingTower tower,
+            Dict<Tile2i, int> tileDepths,
+            Dict<Tile2i, int> cornerHeights,
+            TerrainManager terrMgr,
+            int configuredRampWidth,
+            TerrainDesignationProto? rampProto,
+            List<Tile2i>? placedRampOrigins,
+            HashSet<Tile2i>? reservedRampTiles,
+            bool useLocalSurfaceReference,
+            bool allowExistingPlannedRampShortcut,
+            RampGenerationResult result,
+            HashSet<Tile2i>? forbiddenApproachClusterOrigins = null)
+        {
+            result.TopRowTile = default;
+            result.Outcome = RampPlacementOutcome.Failed;
 
             if (s_desigManager == null || rampProto == null)
             {
-                return RampPlacementOutcome.Failed;
+                result.Outcome = RampPlacementOutcome.Failed;
+                yield break;
             }
 
             TerrainDesignationProto sourceWorkProto = rampProto;
@@ -408,15 +450,17 @@ namespace AutoTerrainDesignations
                 tower, accessWorkDepths, cornerHeights);
             if (accessWorkDepths.Count == 0)
             {
-                return RampPlacementOutcome.Failed;
+                result.Outcome = RampPlacementOutcome.Failed;
+                yield break;
             }
 
             // 1. Group active designations into origin clusters
             List<List<Tile2i>> rawClusters = BuildDesignationOriginClusters(accessWorkDepths, terrMgr);
             if (rawClusters.Count == 0)
             {
-                topRowTile = default;
-                return RampPlacementOutcome.Crested;
+                result.TopRowTile = default;
+                result.Outcome = RampPlacementOutcome.Crested;
+                yield break;
             }
 
             var miningIntent = new GenericWorkIntent("generated-mining-plan");
@@ -529,8 +573,9 @@ namespace AutoTerrainDesignations
                 && originClusters.All(c => states[c] == AccessClusterState.AccessibleDirect || states[c] == AccessClusterState.AccessibleViaProvider))
             {
                 LogDebug("Skipping ramp generation: every excavation cluster already has tower-reachable access.");
-                topRowTile = default;
-                return RampPlacementOutcome.Crested;
+                result.TopRowTile = default;
+                result.Outcome = RampPlacementOutcome.Crested;
+                yield break;
             }
 
             // 4. Sort unreachable clusters closest-to-tower first
@@ -553,8 +598,11 @@ namespace AutoTerrainDesignations
             bool validatedExistingRoute = false;
 
             // 5. Generate missing providers closest-first
-            foreach (var cluster in unreachableClusters)
+            int unreachableClusterCount = unreachableClusters.Count;
+            for (int clusterLoopIndex = 0; clusterLoopIndex < unreachableClusters.Count; clusterLoopIndex++)
             {
+                var cluster = unreachableClusters[clusterLoopIndex];
+                int currentClusterOrdinal = clusterLoopIndex + 1;
                 // Re-evaluate state in case a previous loop iteration's placement connected this cluster
                 if (states[cluster] == AccessClusterState.AccessibleDirect || states[cluster] == AccessClusterState.AccessibleViaProvider)
                 {
@@ -581,7 +629,10 @@ namespace AutoTerrainDesignations
                         experimentalSnapshot = refreshedSnapshot;
                         AccessPathRequest request = BuildTowerRootedAccessRequest(
                             refreshedSnapshot, cluster, configuredRampWidth);
-                        AccessSearchResult experimentalResult = RunExperimentalAccessDryRun(request, cluster);
+                        var experimentalDryRun = new ExperimentalAccessDryRunResult();
+                        yield return RunExperimentalAccessDryRunSliced(
+                            request, cluster, currentClusterOrdinal, unreachableClusterCount, experimentalDryRun);
+                        AccessSearchResult experimentalResult = experimentalDryRun.Result!;
                         AccessDesignationPlan? experimentalPlan = LastExperimentalAccessPlan;
                         if (!experimentalResult.Success)
                         {
@@ -611,7 +662,10 @@ namespace AutoTerrainDesignations
                         {
                             AccessPathRequest fixedRequest = BuildFixedProfileAccessRequest(
                                 refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
-                            AccessSearchResult fixedResult = RunExperimentalAccessDryRun(fixedRequest, cluster);
+                            var fixedDryRun = new ExperimentalAccessDryRunResult();
+                            yield return RunExperimentalAccessDryRunSliced(
+                                fixedRequest, cluster, currentClusterOrdinal, unreachableClusterCount, fixedDryRun);
+                            AccessSearchResult fixedResult = fixedDryRun.Result!;
                             AccessDesignationPlan? fixedPlan = LastExperimentalAccessPlan;
                             if (fixedResult.Success
                                 && fixedPlan != null
@@ -756,7 +810,7 @@ namespace AutoTerrainDesignations
                         if (states[cluster] == AccessClusterState.AccessibleViaProvider
                             || states[cluster] == AccessClusterState.AccessibleDirect)
                         {
-                            topRowTile = experimentalTopTile;
+                            result.TopRowTile = experimentalTopTile;
                             placedAny = true;
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
@@ -812,7 +866,7 @@ namespace AutoTerrainDesignations
 
                     if (placementOutcome != RampPlacementOutcome.Failed)
                     {
-                        topRowTile = topTile;
+                        result.TopRowTile = topTile;
                         placedAny = true;
                         placedRampOrigins?.AddRange(localPlacedOrigins);
                         RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
@@ -881,10 +935,12 @@ namespace AutoTerrainDesignations
 
             if (!placedAny && !validatedExistingRoute && worstOutcome == RampPlacementOutcome.Crested)
             {
-                return RampPlacementOutcome.Failed;
+                result.Outcome = RampPlacementOutcome.Failed;
+                yield break;
             }
 
-            return worstOutcome;
+            result.Outcome = worstOutcome;
+            yield break;
         }
 
         private static string FormatExperimentalFailureSummary(AccessSearchResult result)

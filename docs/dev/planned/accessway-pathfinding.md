@@ -12,7 +12,7 @@ Expose this generator as an experimental public toggle:
 
 * **Setting:** `Turning ramps (experimental)`
 * **Default:** off
-* **Scope:** enables only the V1 search space: vanilla flat/slope designations with `accessWayClearance = 1`.
+* **Scope:** enables only the V1 search space today: vanilla flat/slope designations with `accessWayClearance = 1`.
 * **Tooltip:** `When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires ramp width 1; corridor clearance is independent. Wider ramps and corner or saddle designations are not included.`
 
 When the toggle is off, accessway generation uses the current straight-corridor generator unchanged. When it is on, the framework evaluates V1 alongside the straight generator, compares both through the production candidate ranking, and may place the V1 result. V1 placement is revalidated immediately before mutation and rolled back if placement or the post-placement reachability flood fails; the straight candidate remains the fallback.
@@ -75,7 +75,7 @@ This document uses two separate naming axes:
 * **Designation set** - `V` means vanilla flat/slope designations only; `V'` adds corner designations; `V''` adds saddles or other stronger shapes.
 * **Clearance version** - `1` means `accessWayClearance = 1` (single lane); `2` means `accessWayClearance = 2` (double lane).
 
-So **V1** means **V designation set + clearance 1**. The signed-mode graph and edge-profile math below describe V1. **V2** means **V designation set + clearance 2**; it should reuse the same principles, but its node footprint, cost footprint, turn granularity, and edge-profile checks are different enough to treat as a later search space rather than a trivial parameter flip. This is separate from `V'`, which changes available designation shapes.
+So **V1** means **V designation set + clearance 1**. The signed-mode graph and edge-profile math below describe V1. **V2** means **V designation set + clearance 2**; it reuses the same signed height-gradient idea, but each node is a 2x2 origin brush rather than a single origin. This is separate from `V'`, which changes available designation shapes.
 
 ### Lattice coordinates by clearance
 
@@ -176,6 +176,37 @@ Which transitions are legal between adjacent origins depends on which designatio
   5. Reject if no unique `h'` exists, if the construction slope bound fails, if `(origin', h', mode')` is outside search bounds, if the fight invariant fails, or if the durability envelope blocks any candidate corner.
   6. Assign the local edge cost and push the successor.
 
+* **V2 - vanilla shapes only (flat + slope), clearance 2.** Selecting clearance 2+ means the player is asking ATD to provide access for mega vehicles, primarily mega excavators. Mega vehicles need 5 terrain tiles of clearance, which corresponds to two 4x4 designation origins side by side. Model this as pathing with a **2x2 origin brush**:
+  * A V2 node is `(brushVertex, h, axis, profile)` where `brushVertex` is the lower/negative corner of a 2x2 origin footprint on the clearance-2 lattice, `h` is the brush's reference center height, `axis in { X, Y }` is the corridor travel axis for non-turn states, and `profile` is a width-2 string of V1 modes across that corridor's cross-section.
+  * The profile string has one token per side-by-side lane. For clearance 2, examples are `FF`, `FX+`, `X+X+`, and `X+X-`. For a future clearance 3, the same notation extends naturally to `FFF`, `X+FX+`, `X+X+X+`, and so on. This is preferable to inventing special names for each width. When signs make a compact string hard to read, diagnostics may print the same profile as a delimited token list.
+  * `FF` is a full flat 2x2 brush. `X+X+` is a two-lane uniform ramp whose covered origins all slope with height increasing in `X+`. `FX+` means one cross-section/lane is still flat while the adjacent one is ramping. Which physical origins those tokens occupy is determined by the node's `axis` and movement direction.
+  * Initial clearance-2 profile set:
+
+    ```text
+    FF
+    FX+  X+F  FX-  X-F  FY+  Y+F  FY-  Y-F
+    X+X+ X-X- Y+Y+ Y-Y-
+    X+X- X-X+ Y+Y- Y-Y+
+    ```
+
+    The first row is the flat turn/landing brush. The second row covers flat-to-ramp and ramp-to-flat transition brushes. The third row covers uniform two-lane ramps. The fourth row covers opposed same-axis pairs, which can be optimal when connecting two level profiles separated by two origins. Mixed-axis profiles such as `X+Y+` are deferred to a later full-band search space.
+  * In the first V2 model, restrict profiles to coherent two-lane bands: every non-flat token in a profile must use the same axis family (`X` or `Y`), signs may differ, and the brush must remain drivable across its width. Fully arbitrary lane-asymmetric mixtures are a later full-band search space.
+  * Straight travel advances the 2x2 brush by one origin step in the movement direction. The new brush overlaps the old brush by one 1x2 strip. The overlapping strip must have identical origin profiles, using the same edge-profile equation as V1 but lifted from a 1D shared edge to a shared strip.
+  * Strafing is legal as a lateral one-origin step while maintaining the same corridor axis and profile string. The new brush overlaps the old brush by the side lane/strip; that overlap must be identical, and the newly exposed strip must pass the same construction slope, fight-invariant, durability, bounds, and workability checks as straight travel. This is the V2 analogue of V1 slope strafing (`X+ -> X+` while moving in `Y`, or `Y+ -> Y+` while moving in `X`).
+  * A turn is legal only through `FF`. Because the node footprint itself is 2x2, a flat V2 node is the required 8x8-tile landing where a two-lane corridor can pivot without clipping the inside or outside lane. A slope-to-slope axis change remains illegal unless an intervening `FF` brush exists.
+
+  This gives a compact and V1-compatible mode scheme:
+
+  ```text
+  V1 node: (origin, h, F|X+|X-|Y+|Y-)
+  V2 node: (2x2 brush vertex, h, axis, profile-string)
+
+  Clearance 2 profile examples: FF, FX+, X+X+, X+X-
+  Clearance 3 profile examples: FFF, X+FX+, X+X+X+
+  ```
+
+  Avoid punctuation-heavy names such as `F_to_X+` or `F+X+` in the graph state. They are readable in prose but do not scale well to clearance 3+. The profile string itself is the name.
+
 * **V' - corners allowed (future).** Adding corner designations (one corner raised or lowered relative to the other three) opens many more transitions. Note that the **current straight-corridor ramp generator does *not* use V'** - it emits only flat/slope shapes (V); the V' corner shapes appear in the *mining designation area*, which is a different algorithm altogether and not the routing path this note replaces. A reasonable first model for adopting V' here - to be verified against the actual corner proto rules - is that a corner acts as a quarter-turn between two slope axes: a slope may transition into a corner that begins reorienting its descent axis, and a corner may be followed by a slope on the *new* axis, giving an L-bend **without** an intervening flat landing. A single-corner height change can also satisfy the fight invariant against a diagonal neighbour that a flat/slope pair could not. The exact admissible corner-to-slope and corner-to-corner transitions should be enumerated from the game's corner designation definitions before the search relies on them.
 
 * **V'' - saddles allowed (future).** Out of scope here; revisit once the V/V' designation sets are proven.
@@ -204,6 +235,29 @@ When the path leaves an existing designation into a newly generated designation,
 4. Emit V-to-G edges only for fulfilled perimeter tiles that belong to the tower-reachable G flood.
 
 The selected operation and G tile are edge metadata. Materialization replays the same prospective check against the immutable search snapshot, and placement gives the final generated V tile the corresponding mining or dumping proto without a leveling fallback. Synthetic graph fixtures that do not configure the prospective evaluator retain exact-contact handoffs solely as a test fallback.
+
+### V2 G handoffs and G-plane clearance
+
+V2 must not reuse V1's single-tile G semantics. Width-2 access exists for mega vehicles, so every G-side test in a V2 request must be clearance-aware and use the effective mega-vehicle pathing parameters:
+
+* **Vehicle target.** For explicit clearance 2+, assume the intended vehicle class is the mega excavator class. Future `Auto` clearance should derive this from vanilla vehicle research/availability and assigned/global vehicle requirements, then select the corresponding vanilla `VehiclePathFindingParams`.
+* **Vanilla pathability reuse.** Use the selected vehicle's `PathabilityQueryMask` with vanilla `IPathabilityProvider.IsPathable(centerTile, mask)` for G occupancy. The mask already encodes the vehicle's `MinSizeClearance`, steepness, height-clearance, and ocean rules; do not use the single-tile mask for clearance-2/mega G checks.
+* **G nodes / G flood.** Precompute a clearance-2 G graph, not only individual pathable tiles. A G state is valid only when the corresponding 5-tile mega vehicle footprint can occupy or traverse that position according to vanilla mega-vehicle pathability. The tower-reachable G flood, G-to-G expansion, and final goal set must all use this clearance-2 graph.
+* **V2 -> G handoff.** A V2 path may leave generated V-space only through a width-2 workable frontage on one side of the terminal 2x2 brush. The exposed side has two adjacent origin edges, one per lane. Each lane runs the same prospective mining/dumping workability check as V1, and the two resulting contacts must be consecutive and compatible with the same clearance-2 G component.
+* **G -> V2 handoff.** Entering generated V2 from G is symmetric: the first generated brush must expose a width-2 attachable frontage to a clearance-2 G component.
+* **Operation selection.** Use the V1 predecessor rule per exposed lane: if the predecessor lane profile is below current terrain, select mining; otherwise select dumping. Mixed mining/dumping terminal lanes are allowed if each lane independently passes workability and the two terminal profiles share corners correctly.
+* **Fixed-provider handoff.** Existing accessways and planned providers are fixed profile bands. A V2 brush may attach only when two consecutive provider edges match the exposed brush side and the provider chain is reachable with clearance 2.
+
+In shorthand:
+
+```text
+V2 handoff = two adjacent V1-style handoffs on the same brush side
+             + compatible terminal profiles
+             + consecutive G/provider contact
+             + clearance-2 reachability beyond the seam
+```
+
+The 8-tile physical width of a two-origin accessway gives useful slack over the 5-tile mega vehicle requirement, but the seam itself must still prove a real width-2 frontage. Otherwise the route can pinch exactly where it joins ground.
 
 ## Validation timing
 
@@ -241,7 +295,7 @@ run = configured horizontal run per vertical level
 blocked iff delta > 0 and abs(x' - x) < delta * run and abs(y' - y) < delta * run
 ```
 
-This is a deliberately conservative approximation of both lost support below and future material spread above. A designation corner casts the same finite square envelope upward and downward. The public `accessLandslideRunPerHeight` parameter defaults to `1`, giving `max(abs(dx), abs(dy)) < delta`: a Chebyshev-distance approximation of a 45-degree hourglass. Values above `1` widen the exclusion volume and are more conservative; values below `1` narrow it. Clamp the public range to `0.05..2`; at the upper bound, a drivable G step can enlarge an exclusion radius no faster than it moves away from a source. Using `or` between the axis tests would create infinite exclusion strips and incorrectly block distant points that merely share X or Y with the designation corner. The strict `<` leaves the boundary available; switch to `<=` only if in-save testing shows boundary collapses are common. The rule is applied against concrete designation **corners**, not only origin centers, because corner failure is the damaging case and because V/V' shapes can have different corner heights even when their center height is the same. If multiple active designations disagree at a shared corner, retain every distinct target height as an exclusion source rather than collapsing them to one extreme.
+This is a deliberately conservative approximation of both lost support below and future material spread above. A designation corner casts the same finite square envelope upward and downward. The public `accessLandslideRunPerHeight` parameter defaults to `1`, giving `max(abs(dx), abs(dy)) < delta`: a Chebyshev-distance approximation of a 45-degree hourglass. Values above `1` widen the exclusion volume and are more conservative; values below `1` narrow it. Clamp the public range to `0.05..2`; at the upper bound, a drivable G step can enlarge an exclusion radius no faster than it moves away from a source. Using `or` between the axis tests would create infinite exclusion strips and incorrectly block distant points that merely share X or Y with the designation corner. Keep the strict `<` boundary: a tiny amount of slide can often be tolerated, and width-2 mega access has extra physical slack (the designated two-origin band is 8 tiles wide while mega pathing needs 5 tiles). Switch to `<=` only if in-save testing shows boundary collapses are common. The rule is applied against concrete designation **corners**, not only origin centers, because corner failure is the damaging case and because V/V' shapes can have different corner heights even when their center height is the same. If multiple active designations disagree at a shared corner, retain every distinct target height as an exclusion source rather than collapsing them to one extreme.
 
 For V1, expansion implements this as a local feasibility check after converting `(origin, h, mode)` to its four candidate corner heights. Strictly interior corners of a connected, compatible designation region are omitted: the region's drivable target profiles bound their height change, so those interior hourglasses cannot escape the perimeter envelope. Disagreeing shared-corner heights and all building-foundation samples are retained. The resulting source index filters `G`, because currently pathable ground may become unsafe after pending work. The first generated node and every fixed/G-to-generated handoff test the full source index. After a generated predecessor has been validated, a successor tests only sources ahead in its movement axis; with `run <= 2`, a drivable transition cannot enlarge the envelope faster than it moves away from sources behind. Traversal on an already designated origin uses that designation's fixed profile and is not rejected by its own hourglass. Building footprints remain hard obstacles and are never traversable graph nodes; sharing the landslide index does not change that distinction. This generalizes the existing *Ramp safety margin* roadmap item into the graph itself as a hard inadmissibility rule, rather than a soft cost penalty.
 
@@ -254,22 +308,23 @@ For V1, expansion implements this as a local feasibility check after converting 
 | **1** (odd) | centered on one origin | origin **centers** | the single covered origin |
 | **2** (even) | centered on the seam between two origins, one lane each side | origin **vertices** | the two covered origins (one per side) |
 
-So the horizontal node set shifts by half an origin with width parity: origin-centered for odd clearance, vertex-centered for even clearance. The V1 graph above covers only the clearance-1 row. V2 is expected to need at least these changes:
+So the horizontal node set shifts by half an origin with width parity: origin-centered for odd clearance, vertex-centered for even clearance. The V1 graph above covers only the clearance-1 row. V2 uses the clearance-2 row as a 2x2 brush lattice:
 
-* **Cost spans the whole footprint.** The precise node cost is the work to bring the node's *entire covered footprint* to its target profile, not just one origin. The fast corner/center approximations in *Core model* are deliberate cheaper estimates of this same quantity; the center-point form in particular under-counts wide bands, so prefer the corner (or full-footprint) form as clearance grows.
-* **The node profile is wider than one designation.** V1 can describe one origin by `(h, mode)`. V2 has a band footprint over two origins, so the node must either carry a small cross-section profile or derive one from the two covered origins and then validate it.
-* **Perpendicular planarity must still hold.** The along-path slope is handled by the edge rule, but the band must also be drivable *across*. Each node's lateral profile has to be makeable planar within the fight invariant. This is the one place a pure single-lane centerline search can lie, and it is the first thing to prototype carefully.
-* **A double lane needs a 2x2 origin block to turn.** A width-2 corridor cannot pivot on a single origin the way a single lane can - a turn requires an **8x8-tile (2x2 origin)** area to swing the outer lane around the inner one. So V2 should **turn on a 2x2 origin grid**: coarsen the turning lattice to 2x2 origin blocks and apply equivalent V rules *within that coarser grid* (a "node" for turning purposes is a 2x2 block, and straight runs between turns can stay on the finer lattice). Straight double-lane segments still advance one origin at a time; only the **turns** snap to the 2x2 block grid. This is still a large upgrade over the straight-only model, just with a coarser turning granularity for wide corridors.
+* **Cost spans the whole brush.** The node cost should eventually be the work to bring all four covered origins to the brush's target profiles. For the first V2 implementation, center-point `dh^2` is acceptable as the same cheap approximation V1 uses, scaled through the public `workDistanceScale` parameter. Add a refinement backlog item to estimate work from the covered origins' outer-corner deltas, for example `sum(dh_c^2)` over the outer footprint corners; that refinement would also improve V1 hillside routing.
+* **The brush profile is a short V1-mode string.** V1 can describe one origin by `(h, mode)`. V2 describes a 2x2 brush by `(h, axis, profile)`, where the profile string has one V1-mode token per lane across the corridor width. This distinguishes uniform ramp brushes (`X+X+`) from transition brushes (`FX+`), which the single lifted-mode notation cannot represent.
+* **Perpendicular drivability is explicit.** The lateral direction must remain drivable across all lanes in the brush. The first implementation should allow only coherent profiles whose tokens produce a valid side-by-side band; arbitrary mixtures are deferred.
+* **Turns require a flat brush.** A V2 route may change slope axis only through `FF`. The flat 2x2 brush is the required 8x8-tile landing that lets the two-lane corridor turn without narrowing below clearance 2.
+* **Edges compare shared strips, not just shared edges.** Moving a V2 brush by one origin creates a 1x2-origin overlap with the previous brush. The old and new profiles over that overlap must agree exactly. The two newly exposed origins are then checked for construction slope, fight invariants, durability, bounds, and workability.
 
-Auto clearance derives the width from assigned/global vehicles exactly as the framework's *Corridor width* describes; the search just consumes the resulting integer width and its parity.
+Auto clearance derives the width from vanilla vehicle research/availability and assigned/global vehicles exactly as the framework's *Corridor width* describes. If mega excavators are relevant or available, Auto maps to clearance 2 and the V2 search uses the matching vanilla mega-vehicle pathing parameters; otherwise it remains at the narrower available requirement. The search just consumes the resulting integer width, vehicle pathing parameters, and lattice parity.
 
 ## Width handling strategy
 
 Searching the full perpendicular band profile as state is exponential and is **not** the plan. In increasing order of cost/correctness:
 
-1. **Centerline + thicken + revalidate** (bridge from V1 to wider corridors). Search a V1 `(origin, h, mode)` path, expand it to the `corridorWidth` band, re-check perpendicular slope/clearance and the fight invariant, and lateral-retry on failure - the same spirit as today's lateral retry. Cheap; can occasionally miss a valid wiggly band.
-2. **Footprint-cost search** (escalate if #1 yields bad corridors). Keep the single-lane lattice but cost and feasibility-test each node over its full width-N footprint, forbidding nodes whose band cannot be made locally planar. Correct-ish, more expensive.
-3. **Full band-state search.** State = entire perpendicular profile. Exponential; avoid.
+1. **V2 brush search** (preferred for mega access). Search `(2x2 brush vertex, h, axis, profile)` directly, with each profile encoded as a short cross-section string of V1 modes (`FF`, `FX+`, `X+X+`, `X+X-`). This is more expensive than V1, but still bounded and avoids the correctness traps of thickening a centerline after the fact.
+2. **Centerline + thicken + revalidate** (fallback/prototype only). Search a V1 `(origin, h, mode)` path, expand it to the `corridorWidth` band, re-check perpendicular slope/clearance and the fight invariant, and lateral-retry on failure. Cheap, but it can pick a centerline whose thickened corridor cannot turn or whose adjacent lane is not constructible.
+3. **Full band-state search.** State = entire perpendicular profile, allowing lane-asymmetric leans and richer multi-lane geometry. This is the most general model but grows quickly; avoid until the profile-string brush model proves insufficient.
 
 ## Trunk-and-branch via reusable pathing
 
@@ -278,9 +333,11 @@ The MVP search can run per cluster from `S` toward any tower-reachable end `E`. 
 ## Performance and bounding
 
 * Height augmentation multiplies node count by the number of quantized levels, so cap the search. The MVP horizontal bound is the tower area in `x/y`. The MVP vertical bound is `[lowestTraversable - 1, highestTraversable + 1]`, where `lowestTraversable` is the lowest active designation floor or ground height in the bound, and `highestTraversable` is the highest active designation floor or pathable ground height in the bound.
+* V2 uses the same horizontal tower-area bound for generated designations, but the **entire 2x2 brush footprint** must fit inside the bounded designation area. Do not expand outside the managed area just to fit mega access; if no brush path fits, report a width-specific blocked reason such as `NoWidth2BrushPath` / `Width2BrushOutOfBounds` and let the normal legacy fallback compete unless suppressed.
 * Precompute G nodes from the vanilla pathing flood before running the graph search. Seed that flood from vanilla-pathable terrain adjacent to the actual tower, even when the tower lies outside its managed area, then enter and traverse the managed area only through eligible G nodes. `E` is any G node reached by that flood; the nearest in-area tile to the tower is not sufficient proof of reachability.
 * Start with Dijkstra (`heuristic = 0`) for the MVP. It is easier to validate because priority is exactly accumulated path cost.
 * Keep A* available behind a public setting once the graph is validated. Use `min_E max(Manhattan(node, E), 2 * abs(h(node) - h(E)))`. The horizontal term is unavoidable literal tile travel. The vertical term is also a lower bound because even G traversal changes height by at most `0.5` per tile; V traversal is no steeper. Taking the maximum avoids double-counting travel that satisfies both bounds, and minimizing the paired bound over actual goals avoids combining horizontal distance to one goal with height distance to another. The heuristic ignores terrain work and remains admissible when existing designations have zero work cost.
+* For future fixed-profile/provider goals, a cluster center with a representative height is useful for ordering and diagnostics, but distance to a center can overestimate distance to the nearest reachable profile edge. Keep center distance as a tie-break unless the heuristic is adjusted to a true lower bound, for example by seeding a multi-source lower-bound map from actual goal origins/profiles. A construction-only lower bound may use `max(Manhattan, 4 * abs(dh))`, but the mixed G/fixed-profile graph must use the weaker travel-safe height term (`2 * abs(dh)`) or prove the steeper reuse path is unavailable.
 * Distance to tower center `T` is a good tie-break, but it is not automatically an admissible A* heuristic because the search stops at `E`, not at `T`. It can overestimate when a valid `E` is nearer than `T`. If a T-shaped heuristic is desired, use an adjusted lower bound such as `max(0, distance(node, T) - maxDistance(E, T))`, or keep raw distance-to-`T` only as a secondary ordering key after `f`.
 * Do not include estimated terrain work in the heuristic: an existing designation may bridge the same height gap at zero work cost. The travel-only height term above is independent of `workDistanceScale` and remains admissible under reuse.
 * The search re-runs each pass like the rest of the framework; keeping it bounded is what makes per-pass re-planning affordable.
@@ -307,7 +364,7 @@ Add an opt-in **pathfinding debug surface** for development builds and advanced 
 Build behind the same `AccessCandidate` contract the framework already defines, gated by `Turning ramps (experimental)`, and compare against the current generator on real saves before promoting:
 
 1. **V1 height-augmented Dijkstra** from cluster start `S` to a tower-reachable pathing end `E`, restricted to the **V** (flat + slope) designation set, `accessWayClearance = 1`, the construction-slope bound, and the durability envelope. Keep A* selectable through a public setting, initially off. Validate it reproduces today's straight ramps **and** discovers a switchback the current code cannot.
-2. **Add width / V2 bridge** (centerline + thicken + revalidate, strategy #1), still within the V designation set.
+2. **Add V2 brush search** for `accessWayClearance = 2`, still within the V designation set, using a 2x2 origin brush, cross-section profile strings, flat-brush turns, and footprint work estimates. V2 competes with the legacy straight generator under the same selection/fallback logic as V1; if **Suppress legacy ramps** is enabled, V2 failures are exposed directly for testing.
 3. **Reuse-aware trunk behaviour** through `G` segments and existing designations; defer any multi-source cost-to-ground field until the per-cluster V1 graph is proven.
 4. **Fight-invariant feasibility, durability-envelope, and debug visualization diagnostics.** Fight-invariant and durability feasibility must be enforced from step 1 (they prevent irreparable landslides); this step adds the overlay, decision dumps, and cost-breakdown tooling needed to tune and trust the search.
 5. **Compare** against the straight-corridor generator on representative saves; promote when it wins on cost, robustness, and explainability.
@@ -346,13 +403,12 @@ Initial constraints:
 
 * Exact vertical quantization to use for height levels.
 * The initial public setting/default range for `workDistanceScale`.
-* The exact V2 state representation: centerline + thicken, footprint-profile nodes, or a small explicit two-lane cross-section.
+* Whether the initial coherent V2 profile set (`FF`, flat/ramp transitions, uniform same-sign ramps, and opposed same-axis pairs) is sufficient in practice.
 * The full **V' corner-to-slope / corner-to-corner** transition table, enumerated from the game's corner designation definitions.
-* Durability-envelope calibration: strict `<` vs `<=`.
-* Whether centerline + thicken (#1) is sufficient in practice or whether footprint-cost search (#2) is needed for common terrain.
+* Whether centerline + thicken is useful as a fallback/debug comparator once direct V2 brush search exists. This is not important for correctness and can be skipped unless needed for diagnostics.
 * How aggressively to bound the search radius before declaring `Blocked`, and how that maps onto the existing `NoCandidate` / `MouthUnreachable` reasons.
 * Whether a later cost-to-ground field should be cached across passes and incrementally invalidated, or whether per-cluster `S -> E` Dijkstra/A* is fast enough.
-* Work is estimated as `0.5 * dh^2`, where `dh` is the absolute difference between the candidate and current terrain center heights. This approximates the triangular cross-section moved under a 45-degree repose angle. It is still a center-point V1 approximation; V2 should estimate the full corridor footprint.
+* Work is estimated as `dh^2`, where `dh` is the absolute difference between the candidate and current terrain center heights. The public `workDistanceScale` parameter handles calibration, so the formula keeps no fixed `0.5` coefficient. It is still a center-point approximation; V2 may start with it for speed, but true optimal hillside routing needs a corner/footprint estimate such as `sum(dh_c^2)` over outer corners.
 
 ## Relationship to the access framework
 

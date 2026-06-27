@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,6 +11,8 @@ using Mafi.Core.Entities;
 using Mafi.Core.PathFinding;
 using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
+using Mafi.Localization;
+using Mafi.Unity.UiToolkit;
 using AutoTerrainDesignations.Access;
 
 namespace AutoTerrainDesignations
@@ -23,6 +26,9 @@ namespace AutoTerrainDesignations
 
         internal static AccessSearchResult? LastExperimentalAccessSearch { get; private set; }
         internal static AccessDesignationPlan? LastExperimentalAccessPlan { get; private set; }
+        private const int EXPERIMENTAL_ACCESS_SEARCH_FRAME_BUDGET_MS = 30;
+        private const int EXPERIMENTAL_ACCESS_SEARCH_TOTAL_LIMIT_SECONDS = 60;
+        private static UiRoot? s_uiRoot;
 
         private readonly struct PlacedExperimentalDesignation
         {
@@ -233,6 +239,16 @@ namespace AutoTerrainDesignations
                 AccessPathIntent.ConstructAccessway);
         }
 
+        private sealed class ExperimentalAccessDryRunResult
+        {
+            public AccessSearchResult? Result;
+        }
+
+        internal static void SetUiRoot(UiRoot uiRoot)
+        {
+            s_uiRoot = uiRoot;
+        }
+
         private static AccessPathRequest BuildFixedProfileAccessRequest(
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
@@ -260,6 +276,92 @@ namespace AutoTerrainDesignations
             Stopwatch searchTimer = Stopwatch.StartNew();
             AccessSearchResult result = AccessPathSearch.FindPath(request);
             searchTimer.Stop();
+            RecordExperimentalAccessDryRun(request, cluster, snapshot, result, searchTimer.Elapsed, 1, searchTimer.Elapsed);
+            return result;
+        }
+
+        private static IEnumerator RunExperimentalAccessDryRunSliced(
+            AccessPathRequest request,
+            AccessOriginCluster cluster,
+            int clusterIndex,
+            int clusterCount,
+            ExperimentalAccessDryRunResult output)
+        {
+            AccessSearchSnapshot snapshot = request.Snapshot;
+            Stopwatch searchTimer = Stopwatch.StartNew();
+            var session = AccessPathSearch.CreateSession(request);
+            int frames = 0;
+            TimeSpan maxSlice = TimeSpan.Zero;
+            int lastToastSecond = -1;
+
+            while (!session.IsComplete)
+            {
+                Stopwatch sliceTimer = Stopwatch.StartNew();
+                do
+                {
+                    session.Step(1);
+                }
+                while (!session.IsComplete
+                    && sliceTimer.ElapsedMilliseconds < EXPERIMENTAL_ACCESS_SEARCH_FRAME_BUDGET_MS
+                    && searchTimer.Elapsed.TotalSeconds < EXPERIMENTAL_ACCESS_SEARCH_TOTAL_LIMIT_SECONDS);
+                sliceTimer.Stop();
+                if (sliceTimer.Elapsed > maxSlice) maxSlice = sliceTimer.Elapsed;
+                frames++;
+                int elapsedSeconds = Math.Min(
+                    EXPERIMENTAL_ACCESS_SEARCH_TOTAL_LIMIT_SECONDS,
+                    (int)Math.Floor(searchTimer.Elapsed.TotalSeconds));
+                if (elapsedSeconds != lastToastSecond)
+                {
+                    ShowTerrainAnalysisProgressToast(clusterIndex, clusterCount, elapsedSeconds);
+                    lastToastSecond = elapsedSeconds;
+                }
+                if (!session.IsComplete)
+                    yield return null;
+                if (searchTimer.Elapsed.TotalSeconds >= EXPERIMENTAL_ACCESS_SEARCH_TOTAL_LIMIT_SECONDS
+                    && !session.IsComplete)
+                {
+                    break;
+                }
+            }
+
+            searchTimer.Stop();
+            AccessSearchResult result = session.IsComplete
+                ? session.Result
+                : new AccessSearchResult(
+                    false,
+                    "SearchTimeLimit",
+                    request.Start.Nodes.Count > 0 ? request.Start.Nodes[0] : default,
+                    Array.Empty<AccessSearchNode>(),
+                    0f,
+                    session.VisitedNodes,
+                    new Dictionary<string, int>(StringComparer.Ordinal));
+            output.Result = result;
+            RecordExperimentalAccessDryRun(request, cluster, snapshot, result, searchTimer.Elapsed, frames, maxSlice);
+        }
+
+        private static void ShowTerrainAnalysisProgressToast(int clusterIndex, int clusterCount, int elapsedSeconds)
+        {
+            if (s_uiRoot == null) return;
+            try
+            {
+                s_uiRoot.ToastNotifProvider.ShowSuccess(
+                    new LocStrFormatted(
+                        $"[ATD] Terrain analysis in progress (cluster {clusterIndex}/{clusterCount}, {elapsedSeconds}s)"));
+            }
+            catch
+            {
+            }
+        }
+
+        private static void RecordExperimentalAccessDryRun(
+            AccessPathRequest request,
+            AccessOriginCluster cluster,
+            AccessSearchSnapshot snapshot,
+            AccessSearchResult result,
+            TimeSpan elapsed,
+            int frames,
+            TimeSpan maxSlice)
+        {
             LastExperimentalAccessSearch = result;
             string rejections = result.Rejections.Count == 0
                 ? "none"
@@ -269,7 +371,8 @@ namespace AutoTerrainDesignations
                     .Select(pair => $"{pair.Key}:{pair.Value}"));
             string reason = string.IsNullOrEmpty(result.FailureReason) ? "none" : result.FailureReason;
             string cost = result.Cost.ToString("0.##", CultureInfo.InvariantCulture);
-            string searchMs = searchTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+            string searchMs = elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+            string maxSliceMs = maxSlice.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
             string landslideRun = snapshot.LandslideRunPerHeight.ToString("0.##", CultureInfo.InvariantCulture);
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access] request={request.RequestId} " +
@@ -278,8 +381,9 @@ namespace AutoTerrainDesignations
                 $"success={result.Success} reason={reason} start=({result.StartOrigin.X},{result.StartOrigin.Y}) " +
                 $"goals={request.Goal.Nodes.Count} landslideRun={landslideRun} " +
                 $"landslideSources={snapshot.LandslideSourceCount} cost={cost} " +
-                $"visited={result.VisitedNodes} pathNodes={result.Path.Count} " +
-                $"searchMs={searchMs} rejections=[{rejections}]");
+                $"visited={result.VisitedNodes} pathNodes={result.Path.Count} frames={frames} " +
+                $"searchMs={searchMs} maxSliceMs={maxSliceMs} " +
+                $"rejections=[{rejections}]");
             if (result.Success)
             {
                 LogExperimentalAccessDebug($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
@@ -298,7 +402,6 @@ namespace AutoTerrainDesignations
                 if (result.Path.Count > 0)
                     LogExperimentalAccessDebug($"[ATD Experimental Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
-            return result;
         }
 
         private static string FormatAccessPathRequest(AccessPathRequest request)

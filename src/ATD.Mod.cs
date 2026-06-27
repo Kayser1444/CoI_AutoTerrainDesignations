@@ -460,6 +460,7 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
                 resolver.Resolve<HudController>(),
                 resolver.Resolve<UiRoot>(),
                 resolver.Resolve<IRootEscapeManager>());
+            AutoDepthDesignation.SetUiRoot(resolver.Resolve<UiRoot>());
 
             ModSettings.RegisterTab(AtdModSettingsTab.BuildDefaultsTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildGameSettingsTab());

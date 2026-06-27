@@ -326,7 +326,8 @@ namespace AutoTerrainDesignations
             {
                 LogDebug("Creating access ramp...");
                 var placedAccesswayOrigins = new List<Tile2i>();
-                RampPlacementOutcome rampOutcome = CreateAccessRamp(
+                var rampResult = new RampGenerationResult();
+                yield return CreateAccessRampCoroutine(
                     tower,
                     maxOreDepths,
                     cornerHeights,
@@ -335,7 +336,10 @@ namespace AutoTerrainDesignations
                     s_miningProto,
                     placedAccesswayOrigins,
                     null,
-                    out Tile2i rampTopTile);
+                    useLocalSurfaceReference: false,
+                    allowExistingPlannedRampShortcut: true,
+                    rampResult);
+                RampPlacementOutcome rampOutcome = rampResult.Outcome;
                 SetTowerLastRampOutcome(tower, rampOutcome);
 
                 var protectedAccesswayOrigins = new HashSet<Tile2i>(preexistingTerrainWorkOrigins);
