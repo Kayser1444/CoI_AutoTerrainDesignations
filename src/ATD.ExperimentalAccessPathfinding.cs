@@ -69,6 +69,12 @@ namespace AutoTerrainDesignations
             return true;
         }
 
+        internal static bool TrySelectHandoffOperationForOrigin(
+            int predecessorProfileCenter2,
+            float predecessorGroundHeight,
+            out AccessHandoffOperation operation)
+            => TrySelectHandoffOperationForProfile(predecessorProfileCenter2, predecessorGroundHeight, out operation);
+
         private static bool TryBuildExperimentalAccessSnapshot(
             IAreaManagingTower tower,
             Dict<Tile2i, int> tileDepths,
@@ -235,7 +241,8 @@ namespace AutoTerrainDesignations
         private static AccessPathRequest BuildTowerRootedAccessRequest(
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
-            int requiredWidth)
+            int requiredWidth,
+            float maxCostLimit = float.MaxValue)
         {
             return new AccessPathRequest(
                 $"tower-rooted-cluster-{cluster.ClusterId}",
@@ -247,7 +254,8 @@ namespace AutoTerrainDesignations
                     AccessPathEndpointKind.GroundTiles,
                     snapshot.GoalGroundNodes),
                 requiredWidth,
-                AccessPathIntent.ConstructAccessway);
+                AccessPathIntent.ConstructAccessway,
+                maxCostLimit);
         }
 
         private sealed class ExperimentalAccessDryRunResult
@@ -264,7 +272,8 @@ namespace AutoTerrainDesignations
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
-            int requiredWidth)
+            int requiredWidth,
+            float maxCostLimit = float.MaxValue)
         {
             return new AccessPathRequest(
                 $"fixed-network-cluster-{cluster.ClusterId}",
@@ -276,7 +285,8 @@ namespace AutoTerrainDesignations
                     AccessPathEndpointKind.FixedProfiles,
                     fixedGoalOrigins),
                 requiredWidth,
-                AccessPathIntent.ConstructAccessway);
+                AccessPathIntent.ConstructAccessway,
+                maxCostLimit);
         }
 
         private static AccessSearchResult RunExperimentalAccessDryRun(
@@ -345,7 +355,7 @@ namespace AutoTerrainDesignations
                     Array.Empty<AccessSearchNode>(),
                     0f,
                     session.VisitedNodes,
-                    new Dictionary<string, int>(StringComparer.Ordinal));
+                    session.Rejections);
             output.Result = result;
             RecordExperimentalAccessDryRun(request, cluster, snapshot, result, searchTimer.Elapsed, frames, maxSlice);
         }
@@ -448,7 +458,7 @@ namespace AutoTerrainDesignations
             int referenceProfileCenter2 = referenceOrigin == origin
                 ? profile.Center2
                 : predecessorProfile.Center2;
-            if (!TrySelectHandoffOperationForProfile(referenceProfileCenter2, referenceGroundCenter, out AccessHandoffOperation operation))
+            if (!TrySelectHandoffOperationForOrigin(referenceProfileCenter2, referenceGroundCenter, out AccessHandoffOperation operation))
                 return Array.Empty<AccessGroundHandoff>();
             TerrainDesignationProto? proto = operation == AccessHandoffOperation.Mining
                 ? s_miningProto
@@ -519,6 +529,7 @@ namespace AutoTerrainDesignations
             AccessSearchSnapshot snapshot,
             TerrainDesignationProto rampProto,
             ExperimentalAccessCandidate candidate,
+            IAreaManagingTower tower,
             List<Tile2i>? placedRampOrigins,
             HashSet<Tile2i>? reservedRampTiles,
             out Tile2i topRowTile,
@@ -548,13 +559,13 @@ namespace AutoTerrainDesignations
                 if (((item.Profile.Nw2 | item.Profile.Ne2 | item.Profile.Se2 | item.Profile.Sw2) & 1) != 0)
                 {
                     failureReason = "HalfLevelCorner";
-                    RollBackExperimentalDesignations(placedNow, reservedRampTiles);
+                    RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                     return false;
                 }
                 if (s_desigManager.GetDesignationAt(item.Origin).HasValue)
                 {
                     failureReason = "DesignationAppeared";
-                    RollBackExperimentalDesignations(placedNow, reservedRampTiles);
+                    RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                     return false;
                 }
 
@@ -576,7 +587,7 @@ namespace AutoTerrainDesignations
                     if (terminalProto == null)
                     {
                         failureReason = "MissingHandoffOperationProto";
-                        RollBackExperimentalDesignations(placedNow, reservedRampTiles);
+                        RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                         return false;
                     }
                     itemProto = terminalProto;
@@ -584,10 +595,11 @@ namespace AutoTerrainDesignations
                 if (!s_desigManager.AddOrReplaceDesignation(itemProto, data))
                 {
                     failureReason = "PlacementFailed";
-                    RollBackExperimentalDesignations(placedNow, reservedRampTiles);
+                    RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                     return false;
                 }
 
+                RegisterGeneratedDesignationOrigin(tower, item.Origin);
                 placedNow.Add(new PlacedExperimentalDesignation(item.Origin, itemProto));
                 s_designationOriginsInArea.Add(item.Origin);
                 reservedRampTiles?.Add(item.Origin);
@@ -604,6 +616,7 @@ namespace AutoTerrainDesignations
 
         private static void RollBackExperimentalDesignations(
             IReadOnlyList<PlacedExperimentalDesignation> designations,
+            IAreaManagingTower tower,
             HashSet<Tile2i>? reservedRampTiles)
         {
             if (s_desigManager == null) return;
@@ -613,12 +626,14 @@ namespace AutoTerrainDesignations
                 if (designation.HasValue && designation.Value.Prototype == placed.Proto)
                     s_desigManager.RemoveDesignation(placed.Origin);
                 s_designationOriginsInArea.Remove(placed.Origin);
+                UnregisterGeneratedDesignationOrigin(tower, placed.Origin);
                 reservedRampTiles?.Remove(placed.Origin);
             }
         }
 
         private static void RollBackExperimentalDesignations(
             IReadOnlyList<Tile2i> origins,
+            IAreaManagingTower tower,
             TerrainDesignationProto rampProto,
             HashSet<Tile2i>? reservedRampTiles)
         {
@@ -629,6 +644,7 @@ namespace AutoTerrainDesignations
                 if (designation.HasValue && IsAccesswayDesignationProto(designation.Value.Prototype, rampProto))
                     s_desigManager.RemoveDesignation(origin);
                 s_designationOriginsInArea.Remove(origin);
+                UnregisterGeneratedDesignationOrigin(tower, origin);
                 reservedRampTiles?.Remove(origin);
             }
         }
@@ -639,11 +655,21 @@ namespace AutoTerrainDesignations
         {
             terminalOrigin = default;
             if (result.Path.Count < 2) return false;
-            AccessSearchNode terminal = result.Path[result.Path.Count - 2];
-            if (terminal.IsGround || terminal.Mode == AccessSearchMode.Existing)
-                return false;
-            terminalOrigin = terminal.Position;
-            return true;
+
+            // The path may continue through additional G nodes after the first handoff,
+            // so walk backward from the end and use the last generated V node before
+            // the terminal ground/existing suffix as the handoff target.
+            for (int index = result.Path.Count - 1; index >= 0; index--)
+            {
+                AccessSearchNode node = result.Path[index];
+                if (node.IsGround || node.Mode == AccessSearchMode.Existing)
+                    continue;
+
+                terminalOrigin = node.Position;
+                return true;
+            }
+
+            return false;
         }
 
         private static string FormatExperimentalPath(AccessSearchResult result)
@@ -738,16 +764,40 @@ namespace AutoTerrainDesignations
         private static bool IsStrictlyInteriorDesignationCorner(Tile2i corner,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> profiles)
         {
-            if (!profiles.TryGetValue(corner + new RelTile2i(-4, -4), out AccessHeightProfile nw)
-                || !profiles.TryGetValue(corner + new RelTile2i(0, -4), out AccessHeightProfile ne)
-                || !profiles.TryGetValue(corner + new RelTile2i(-4, 0), out AccessHeightProfile sw)
-                || !profiles.TryGetValue(corner, out AccessHeightProfile se))
-                return false;
+            bool hasNw = profiles.TryGetValue(corner + new RelTile2i(-4, -4), out AccessHeightProfile nw);
+            bool hasNe = profiles.TryGetValue(corner + new RelTile2i(0, -4), out AccessHeightProfile ne);
+            bool hasSw = profiles.TryGetValue(corner + new RelTile2i(-4, 0), out AccessHeightProfile sw);
+            bool hasSe = profiles.TryGetValue(corner, out AccessHeightProfile se);
 
+            int count = (hasNw ? 1 : 0) + (hasNe ? 1 : 0) + (hasSw ? 1 : 0) + (hasSe ? 1 : 0);
+            if (count < 3) return false;
+
+            if (count == 4)
+            {
+                return ProfilesShareEdge(nw, ne, new Tile2i(1, 0))
+                    && ProfilesShareEdge(nw, sw, new Tile2i(0, 1))
+                    && ProfilesShareEdge(ne, se, new Tile2i(0, 1))
+                    && ProfilesShareEdge(sw, se, new Tile2i(1, 0));
+            }
+
+            if (!hasNw) // NE, SW, SE
+            {
+                return ProfilesShareEdge(ne, se, new Tile2i(0, 1))
+                    && ProfilesShareEdge(sw, se, new Tile2i(1, 0));
+            }
+            if (!hasNe) // NW, SW, SE
+            {
+                return ProfilesShareEdge(nw, sw, new Tile2i(0, 1))
+                    && ProfilesShareEdge(sw, se, new Tile2i(1, 0));
+            }
+            if (!hasSw) // NW, NE, SE
+            {
+                return ProfilesShareEdge(nw, ne, new Tile2i(1, 0))
+                    && ProfilesShareEdge(ne, se, new Tile2i(0, 1));
+            }
+            // !hasSe // NW, NE, SW
             return ProfilesShareEdge(nw, ne, new Tile2i(1, 0))
-                && ProfilesShareEdge(nw, sw, new Tile2i(0, 1))
-                && ProfilesShareEdge(ne, se, new Tile2i(0, 1))
-                && ProfilesShareEdge(sw, se, new Tile2i(1, 0));
+                && ProfilesShareEdge(nw, sw, new Tile2i(0, 1));
         }
 
         private static bool ProfilesShareEdge(AccessHeightProfile first,

@@ -1,5 +1,9 @@
-v0.4.6a | 2026-06-27
+v0.4.6a | 2026-06-28
 * Improved: experimental accessways can now connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
+* Improved: experimental V-to-G handoff operation selection uses the connected cluster-origin predecessor for single-origin access paths instead of relying on a misleading center estimate, and final terminal placement checks walk backward to target the last generated V node before the ground suffix
+* Improved: experimental access decisions are logged to debug console, and global `suppressLegacyAccessRamps` settings are now read from the migrated `ATDsettings.json` configuration file rather than save files
+* Added: **Shift-click trashcan option** in the designations panel to clear ONLY automatic ATD-generated designations inside the tower's boundaries, keeping player-drawn designations intact; the panel tooltip is updated with the shortcut instruction
+* Changed: removed the `[Kayser's AutoTerrainDesignations]` suffix tag from general standalone tooltips to clean up UI noise, keeping it focused on inspector panel headers
 * Improved: generated accessways are tracked as runtime providers, so later clusters can reuse newly placed routes instead of creating duplicate ramps back to the tower
 * Fixed: experimental routes can hand off from V-space to any valid ground node while still requiring the final route to connect to tower-reachable ground, reducing unnecessary V-designations over drivable terrain
 * Fixed: endpoint starts can immediately hand off to ground when valid, avoiding needless flat accessway designations over already pathable terrain

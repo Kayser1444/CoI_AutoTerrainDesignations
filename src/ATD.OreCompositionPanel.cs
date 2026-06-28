@@ -108,7 +108,7 @@ namespace AutoTerrainDesignations
 
                 var orePanel = new PanelWithHeader()
                     .Title(AtdLocalization.OreTitle,
-                           AtdLocalization.Tip(AtdLocalization.OreDescription));
+                           AtdLocalization.PanelTip(AtdLocalization.OreDescription));
                 var oreInitTower = entityProp.GetValue(inspector) as IAreaManagingTower;
                 orePanel.Collapsed(oreInitTower != null
                     ? AutoDepthDesignation.GetTowerOreCompositionPanelCollapsed(oreInitTower)
@@ -184,7 +184,7 @@ namespace AutoTerrainDesignations
 
             var orePanel = new PanelWithHeader()
                 .Title(AtdLocalization.OreTitle,
-                       AtdLocalization.Tip(AtdLocalization.OreDescription));
+                       AtdLocalization.PanelTip(AtdLocalization.OreDescription));
             var oreInitTower = getTower();
             orePanel.Collapsed(oreInitTower != null
                 ? AutoDepthDesignation.GetTowerOreCompositionPanelCollapsed(oreInitTower)

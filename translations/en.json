@@ -44,6 +44,10 @@
     "Clear all terrain designations in this tower's area."
   ],
   [
+    "panel.designations.clear_tooltip.shift_click",
+    "Clear all terrain designations in this tower's area. (Shift-click to clear generated terrain designations only.)"
+  ],
+  [
     "panel.designations.ore_filter.auto",
     "Auto (useful -> debris -> dirt)"
   ],

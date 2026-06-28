@@ -38,6 +38,7 @@ namespace AutoTerrainDesignations.Access
         public Tile2i BoundsMax { get; }
         public int RequiredWidth { get; }
         public AccessPathIntent Intent { get; }
+        public float MaxCostLimit { get; }
 
         public AccessPathRequest(
             string requestId,
@@ -45,7 +46,8 @@ namespace AutoTerrainDesignations.Access
             AccessPathEndpoint start,
             AccessPathEndpoint goal,
             int requiredWidth,
-            AccessPathIntent intent)
+            AccessPathIntent intent,
+            float maxCostLimit = float.MaxValue)
         {
             RequestId = requestId ?? throw new ArgumentNullException(nameof(requestId));
             Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
@@ -55,6 +57,7 @@ namespace AutoTerrainDesignations.Access
             BoundsMax = snapshot.BoundsMax;
             RequiredWidth = requiredWidth;
             Intent = intent;
+            MaxCostLimit = maxCostLimit;
         }
     }
 }

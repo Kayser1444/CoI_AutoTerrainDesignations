@@ -61,6 +61,45 @@ namespace AutoTerrainDesignations
         {
             ClearDesignationsInArea(tower);
             ClearRegisteredGeneratedAccessways(tower);
+            ClearRegisteredGeneratedDesignations(tower);
+            MarkTowerMiningPlanDirty(tower);
+        }
+        internal static bool HasGeneratedDesignationsForTower(IAreaManagingTower tower)
+        {
+            if (s_desigManager == null) return false;
+
+            foreach (TerrainDesignation designation in tower.ManagedDesignations)
+            {
+                if (IsGeneratedDesignationOrigin(tower, designation.OriginTileCoord))
+                    return true;
+            }
+
+            return false;
+        }
+
+        internal static void ClearGeneratedDesignationsForTower(IAreaManagingTower tower)
+        {
+            if (s_desigManager == null)
+            {
+                ClearRegisteredGeneratedAccessways(tower);
+                ClearRegisteredGeneratedDesignations(tower);
+                return;
+            }
+
+            var originsToRemove = new List<Tile2i>();
+            foreach (TerrainDesignation designation in tower.ManagedDesignations)
+            {
+                if (IsGeneratedDesignationOrigin(tower, designation.OriginTileCoord))
+                    originsToRemove.Add(designation.OriginTileCoord);
+            }
+
+            foreach (Tile2i origin in originsToRemove)
+            {
+                s_desigManager.RemoveDesignation(origin);
+            }
+
+            ClearRegisteredGeneratedAccessways(tower);
+            ClearRegisteredGeneratedDesignations(tower);
             MarkTowerMiningPlanDirty(tower);
         }
 

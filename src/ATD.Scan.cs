@@ -308,7 +308,11 @@ namespace AutoTerrainDesignations
                     new HeightTilesI(hNW), new HeightTilesI(hNE),
                     new HeightTilesI(hSE), new HeightTilesI(hSW));
 
-                if (!s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
+                if (s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
+                {
+                    RegisterGeneratedDesignationOrigin(tower, tile);
+                }
+                else
                 {
                     s_log.Warning(string.Format("Failed to create designation for tile {0}", tile));
                 }
@@ -453,8 +457,7 @@ namespace AutoTerrainDesignations
             if (!existing.HasValue) return false;
 
             TerrainDesignation designation = existing.Value;
-            bool isReady = designation.IsReadyToMineNonAmphibious()
-                || designation.IsReadyToDumpNonAmphibious();
+            bool isReady = IsDesignationReadyForOwnOperation(designation);
             if (!isReady) return false;
 
             if (s_vehiclePathFindingManager == null || s_excavatorPathFindingParams == null) return true;
@@ -475,6 +478,62 @@ namespace AutoTerrainDesignations
             }
 
             return IsReachableFromTowerInternal(tower, targetTiles, tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax);
+        }
+
+        private static bool IsClusterOriginReadyForWork(Tile2i origin)
+        {
+            if (s_desigManager == null) return false;
+            Option<TerrainDesignation> existing = s_desigManager.GetDesignationAt(origin);
+            return existing.HasValue && IsDesignationReadyForOwnOperation(existing.Value);
+        }
+
+        private static string DescribeClusterOriginReachability(IAreaManagingTower tower, Tile2i origin)
+        {
+            if (s_desigManager == null)
+                return $"{origin}: designationManager=missing";
+
+            Option<TerrainDesignation> existing = s_desigManager.GetDesignationAt(origin);
+            if (!existing.HasValue)
+                return $"{origin}: designation=missing";
+
+            TerrainDesignation designation = existing.Value;
+            bool miningReady = designation.IsReadyToMineNonAmphibious();
+            bool dumpingReady = designation.IsReadyToDumpNonAmphibious();
+            bool ownReady = IsDesignationReadyForOwnOperation(designation);
+            string proto = designation.Prototype.Id.Value;
+
+            if (s_vehiclePathFindingManager == null || s_excavatorPathFindingParams == null)
+                return $"{origin}: proto={proto} miningReady={miningReady} dumpingReady={dumpingReady} ownReady={ownReady} pathing=unavailable direct={ownReady}";
+
+            IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;
+            VehiclePathFindingParams pfParams = s_excavatorPathFindingParams;
+            var targetTiles = new HashSet<Tile2i>();
+            for (int y = 0; y < 4; y++)
+            {
+                for (int x = 0; x < 4; x++)
+                {
+                    Tile2i target = origin + new RelTile2i(x, y);
+                    if (pathabilityProvider.IsPathable(target, pfParams.PathabilityQueryMask))
+                        targetTiles.Add(target);
+                }
+            }
+
+            bool direct = ownReady
+                && IsReachableFromTowerInternal(tower, targetTiles, tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax);
+            return $"{origin}: proto={proto} miningReady={miningReady} dumpingReady={dumpingReady} ownReady={ownReady} pathableTiles={targetTiles.Count} direct={direct}";
+        }
+
+        private static bool IsDesignationReadyForOwnOperation(TerrainDesignation designation)
+        {
+            TerrainDesignationProto proto = designation.Prototype;
+            if (s_miningProto != null && proto == s_miningProto)
+                return designation.IsReadyToMineNonAmphibious();
+            if (s_dumpingProto != null && proto == s_dumpingProto)
+                return designation.IsReadyToDumpNonAmphibious();
+            if (s_levelingProto != null && proto == s_levelingProto)
+                return designation.IsReadyToMineNonAmphibious()
+                    || designation.IsReadyToDumpNonAmphibious();
+            return false;
         }
 
         private static bool IsReachableFromTowerInternal(
@@ -865,6 +924,7 @@ namespace AutoTerrainDesignations
 
                 if (s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
                 {
+                    RegisterGeneratedDesignationOrigin(tower, origin);
                     created++;
                 }
 

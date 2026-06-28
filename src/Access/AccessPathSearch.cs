@@ -407,7 +407,7 @@ namespace AutoTerrainDesignations.Access
                 ? new HashSet<Tile2i>(request.Goal.Nodes)
                 : null;
             return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
-                useAStarHeuristic: request.Goal.Kind == AccessPathEndpointKind.GroundTiles);
+                useAStarHeuristic: request.Snapshot.UseAStar, maxCostLimit: request.MaxCostLimit);
         }
 
         private static AccessSearchResult FindPath(
@@ -417,7 +417,7 @@ namespace AutoTerrainDesignations.Access
             HashSet<Tile2i>? fixedGoalOrigins = null,
             bool useAStarHeuristic = true)
         {
-            AccessPathSearchSession session = CreateSession(snapshot, clusterOrigins, rejectGoal, fixedGoalOrigins, useAStarHeuristic);
+            AccessPathSearchSession session = CreateSession(snapshot, clusterOrigins, rejectGoal, fixedGoalOrigins, useAStarHeuristic, float.MaxValue);
             while (!session.IsComplete)
                 session.Step(int.MaxValue);
             return session.Result;
@@ -428,7 +428,8 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyList<Tile2i> clusterOrigins,
             Func<AccessSearchResult, string?>? rejectGoal,
             HashSet<Tile2i>? fixedGoalOrigins,
-            bool useAStarHeuristic)
+            bool useAStarHeuristic,
+            float maxCostLimit)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             Tile2i startOrigin = SelectStart(clusterOrigins);
@@ -443,6 +444,33 @@ namespace AutoTerrainDesignations.Access
             if (snapshot.IsProfileOceanBlocked(startOrigin, startProfile))
                 return AccessPathSearchSession.Completed(Failed("OceanStartBelowMinimum", startOrigin, 0, rejections));
 
+            int[] goalDistance;
+            int minGoalHeight2;
+            int maxGoalHeight2;
+
+            if (fixedGoalOrigins != null)
+            {
+                goalDistance = AccessSearchSnapshot.BuildGoalDistance(snapshot.BoundsMin, snapshot.BoundsMax, fixedGoalOrigins);
+                int minH2 = int.MaxValue;
+                int maxH2 = int.MinValue;
+                foreach (Tile2i goal in fixedGoalOrigins)
+                {
+                    if (snapshot.TryGetFixedProfile(goal, out AccessHeightProfile profile))
+                    {
+                        minH2 = Math.Min(minH2, Math.Min(profile.Nw2, profile.Ne2));
+                        maxH2 = Math.Max(maxH2, Math.Max(profile.Se2, profile.Sw2));
+                    }
+                }
+                minGoalHeight2 = minH2 == int.MaxValue ? 0 : minH2;
+                maxGoalHeight2 = maxH2 == int.MinValue ? 0 : maxH2;
+            }
+            else
+            {
+                goalDistance = snapshot.AnyGoalDistance;
+                minGoalHeight2 = snapshot.MinGoalHeight2;
+                maxGoalHeight2 = snapshot.MaxGoalHeight2;
+            }
+
             var distance = new Dictionary<AccessSearchNode, float>();
             var previous = new Dictionary<AccessSearchNode, AccessSearchNode>();
             var queue = new MinQueue();
@@ -452,13 +480,14 @@ namespace AutoTerrainDesignations.Access
             float lastRejectedGoalCost = 0f;
 
             ExpandOrigin(snapshot, startNode, startProfile, 0f,
-                distance, previous, queue, rejections, useAStarHeuristic);
+                distance, previous, queue, rejections, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
 
             if (queue.Count == 0)
                 return AccessPathSearchSession.Completed(Failed("NoInitialSuccessor", startOrigin, 0, rejections));
 
             return new AccessPathSearchSession(snapshot, startOrigin, startNode, fixedGoalOrigins, rejectGoal,
-                useAStarHeuristic, distance, previous, queue, rejections, lastRejectedGoalPath,
+                useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2, maxCostLimit,
+                distance, previous, queue, rejections, lastRejectedGoalPath,
                 lastGoalRejectionReason, lastRejectedGoalCost);
         }
 
@@ -478,10 +507,15 @@ namespace AutoTerrainDesignations.Access
             private string m_lastGoalRejectionReason;
             private float m_lastRejectedGoalCost;
             private int m_visited;
+            private readonly int[] m_goalDistance;
+            private readonly int m_minGoalHeight2;
+            private readonly int m_maxGoalHeight2;
+            private readonly float m_maxCostLimit;
 
             public bool IsComplete { get; private set; }
             public AccessSearchResult Result { get; private set; }
             public int VisitedNodes => m_visited;
+            public Dictionary<string, int> Rejections => m_rejections;
 
             internal static AccessPathSearchSession Completed(AccessSearchResult result)
                 => new AccessPathSearchSession(result);
@@ -501,6 +535,10 @@ namespace AutoTerrainDesignations.Access
                 foreach (KeyValuePair<string, int> pair in result.Rejections)
                     m_rejections[pair.Key] = pair.Value;
                 m_lastGoalRejectionReason = string.Empty;
+                m_goalDistance = Array.Empty<int>();
+                m_minGoalHeight2 = 0;
+                m_maxGoalHeight2 = 0;
+                m_maxCostLimit = float.MaxValue;
                 Result = result;
                 IsComplete = true;
             }
@@ -512,6 +550,10 @@ namespace AutoTerrainDesignations.Access
                 HashSet<Tile2i>? fixedGoalOrigins,
                 Func<AccessSearchResult, string?>? rejectGoal,
                 bool useAStarHeuristic,
+                int[] goalDistance,
+                int minGoalHeight2,
+                int maxGoalHeight2,
+                float maxCostLimit,
                 Dictionary<AccessSearchNode, float> distance,
                 Dictionary<AccessSearchNode, AccessSearchNode> previous,
                 MinQueue queue,
@@ -526,6 +568,10 @@ namespace AutoTerrainDesignations.Access
                 m_fixedGoalOrigins = fixedGoalOrigins;
                 m_rejectGoal = rejectGoal;
                 m_useAStarHeuristic = useAStarHeuristic;
+                m_goalDistance = goalDistance;
+                m_minGoalHeight2 = minGoalHeight2;
+                m_maxGoalHeight2 = maxGoalHeight2;
+                m_maxCostLimit = maxCostLimit;
                 m_distance = distance;
                 m_previous = previous;
                 m_queue = queue;
@@ -545,6 +591,11 @@ namespace AutoTerrainDesignations.Access
                 while (m_queue.Count > 0 && m_visited < MAX_VISITED_NODES && visitedThisStep < maxVisitedNodes)
                 {
                     QueueEntry entry = m_queue.Pop();
+                    if (entry.Priority > m_maxCostLimit)
+                    {
+                        CompleteFailed("CostLimitExceeded");
+                        break;
+                    }
                     if (!m_distance.TryGetValue(entry.Node, out float known) || entry.PathCost > known + 0.0001f)
                         continue;
 
@@ -582,33 +633,35 @@ namespace AutoTerrainDesignations.Access
                     }
 
                     if (current.IsGround)
-                        ExpandGround(m_snapshot, current, known, m_distance, m_previous, m_queue, m_rejections, m_useAStarHeuristic);
+                        ExpandGround(m_snapshot, current, known, m_distance, m_previous, m_queue, m_rejections,
+                            m_useAStarHeuristic, m_goalDistance, m_minGoalHeight2, m_maxGoalHeight2);
                     else if (TryGetProfile(m_snapshot, current, out AccessHeightProfile currentProfile))
-                        ExpandOrigin(m_snapshot, current, currentProfile, known, m_distance, m_previous, m_queue, m_rejections, m_useAStarHeuristic);
+                        ExpandOrigin(m_snapshot, current, currentProfile, known, m_distance, m_previous, m_queue, m_rejections,
+                            m_useAStarHeuristic, m_goalDistance, m_minGoalHeight2, m_maxGoalHeight2);
                     else
                         Reject(m_rejections, "MissingProfile");
                 }
 
-                if (m_queue.Count == 0 || m_visited >= MAX_VISITED_NODES)
+                if (!IsComplete && (m_queue.Count == 0 || m_visited >= MAX_VISITED_NODES))
                     CompleteFailed();
 
                 return visitedThisStep;
             }
 
-            private void CompleteFailed()
+            private void CompleteFailed(string? reason = null)
             {
                 if (m_lastRejectedGoalPath != null)
                 {
-                    string reason = m_visited >= MAX_VISITED_NODES
+                    string finalReason = reason ?? (m_visited >= MAX_VISITED_NODES
                         ? "VisitedLimitAfterGoalRejection"
-                        : m_lastGoalRejectionReason;
-                    Result = new AccessSearchResult(false, reason, m_startOrigin, m_lastRejectedGoalPath,
+                        : m_lastGoalRejectionReason);
+                    Result = new AccessSearchResult(false, finalReason, m_startOrigin, m_lastRejectedGoalPath,
                         m_lastRejectedGoalCost, m_visited, m_rejections);
                 }
                 else
                 {
-                    Result = Failed(m_visited >= MAX_VISITED_NODES ? "VisitedLimit" : "NoPath",
-                        m_startOrigin, m_visited, m_rejections);
+                    string finalReason = reason ?? (m_visited >= MAX_VISITED_NODES ? "VisitedLimit" : "NoPath");
+                    Result = Failed(finalReason, m_startOrigin, m_visited, m_rejections);
                 }
                 IsComplete = true;
             }
@@ -638,24 +691,22 @@ namespace AutoTerrainDesignations.Access
             Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous,
             MinQueue queue, Dictionary<string, int> rejections,
-            bool useAStarHeuristic)
+            bool useAStarHeuristic, int[] goalDistance, int minGoalHeight2, int maxGoalHeight2)
         {
-            AccessSearchNode predecessor = previous.TryGetValue(current, out AccessSearchNode predecessorNode)
-                ? predecessorNode
-                : current;
-            AccessHeightProfile predecessorProfile = !predecessor.IsGround
-                && TryGetProfile(snapshot, predecessor, out AccessHeightProfile foundPredecessorProfile)
-                    ? foundPredecessorProfile
+            AccessSearchNode handoffPredecessor = SelectConnectedClusterOrigin(current, previous);
+            AccessHeightProfile handoffPredecessorProfile = !handoffPredecessor.IsGround
+                && TryGetProfile(snapshot, handoffPredecessor, out AccessHeightProfile foundHandoffPredecessorProfile)
+                    ? foundHandoffPredecessorProfile
                     : currentProfile;
             foreach (AccessGroundHandoff handoff in GetHandoffs(
                 snapshot, current.Position, currentProfile,
-                predecessor.Position, predecessorProfile))
+                handoffPredecessor.Position, handoffPredecessorProfile))
             {
                 if (!snapshot.TryGetGroundHeight2(handoff.Tile, out int groundHeight2)) continue;
                 var ground = new AccessSearchNode(handoff.Tile, groundHeight2,
                     AccessSearchMode.Ground, handoff.Operation);
                 Relax(snapshot, current, ground, currentCost + Manhattan(current.CostPosition, handoff.Tile),
-                    distance, previous, queue, useAStarHeuristic);
+                    distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
             }
 
             foreach (Tile2i direction in s_originDirections)
@@ -669,8 +720,24 @@ namespace AutoTerrainDesignations.Access
                     continue;
                 }
                 AddOriginSuccessors(snapshot, current.Position, currentProfile, nextOrigin, direction,
-                    current, true, currentCost, distance, previous, queue, rejections, useAStarHeuristic);
+                    current, true, currentCost, distance, previous, queue, rejections, useAStarHeuristic,
+                    goalDistance, minGoalHeight2, maxGoalHeight2);
             }
+        }
+
+        private static AccessSearchNode SelectConnectedClusterOrigin(
+            AccessSearchNode current,
+            Dictionary<AccessSearchNode, AccessSearchNode> previous)
+        {
+            AccessSearchNode connectedOrigin = current;
+            AccessSearchNode cursor = current;
+            while (previous.TryGetValue(cursor, out AccessSearchNode parent))
+            {
+                if (!parent.IsGround && parent.Mode != AccessSearchMode.Existing)
+                    connectedOrigin = parent;
+                cursor = parent;
+            }
+            return connectedOrigin;
         }
 
         private static void AddOriginSuccessors(AccessSearchSnapshot snapshot,
@@ -679,7 +746,7 @@ namespace AutoTerrainDesignations.Access
             Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous,
             MinQueue queue, Dictionary<string, int> rejections,
-            bool useAStarHeuristic)
+            bool useAStarHeuristic, int[] goalDistance, int minGoalHeight2, int maxGoalHeight2)
         {
             if (!snapshot.IsOriginInside(nextOrigin)) { Reject(rejections, "HorizontalBounds"); return; }
 
@@ -689,7 +756,8 @@ namespace AutoTerrainDesignations.Access
                 { Reject(rejections, "OceanBelowMinimum"); return; }
                 if (!EdgesMatch(currentProfile, fixedProfile, direction)) { Reject(rejections, "FixedEdgeMismatch"); return; }
                 var existing = new AccessSearchNode(nextOrigin, fixedProfile.Center2, AccessSearchMode.Existing);
-                Relax(snapshot, current, existing, baseCost + 4f, distance, previous, queue, useAStarHeuristic, hasCurrent);
+                Relax(snapshot, current, existing, baseCost + 4f, distance, previous, queue, useAStarHeuristic,
+                    goalDistance, minGoalHeight2, maxGoalHeight2, hasCurrent);
                 return;
             }
 
@@ -707,7 +775,8 @@ namespace AutoTerrainDesignations.Access
                 var next = new AccessSearchNode(nextOrigin, nextProfile.Center2, mode);
                 float work = EstimateWork(nextProfile.Center2, snapshot.GetTerrainCenterHeight2(nextOrigin));
                 float nextCost = baseCost + 4f + snapshot.WorkDistanceScale * work;
-                Relax(snapshot, current, next, nextCost, distance, previous, queue, useAStarHeuristic, hasCurrent);
+                Relax(snapshot, current, next, nextCost, distance, previous, queue, useAStarHeuristic,
+                    goalDistance, minGoalHeight2, maxGoalHeight2, hasCurrent);
             }
         }
 
@@ -715,14 +784,14 @@ namespace AutoTerrainDesignations.Access
             Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous,
             MinQueue queue, Dictionary<string, int> rejections,
-            bool useAStarHeuristic)
+            bool useAStarHeuristic, int[] goalDistance, int minGoalHeight2, int maxGoalHeight2)
         {
             foreach (RelTile2i direction in s_tileDirections)
             {
                 Tile2i nextTile = current.Position + direction;
                 if (!snapshot.IsGroundNode(nextTile) || !snapshot.TryGetGroundHeight2(nextTile, out int height2)) continue;
                 var next = new AccessSearchNode(nextTile, height2, AccessSearchMode.Ground);
-                Relax(snapshot, current, next, currentCost + 1f, distance, previous, queue, useAStarHeuristic);
+                Relax(snapshot, current, next, currentCost + 1f, distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
             }
 
             foreach (Tile2i origin in CandidateOriginsAtGroundTile(current.Position))
@@ -743,7 +812,7 @@ namespace AutoTerrainDesignations.Access
                         float work = EstimateWork(profile.Center2, center2);
                         float cost = currentCost + Manhattan(current.Position, next.CostPosition)
                             + snapshot.WorkDistanceScale * work;
-                        Relax(snapshot, current, next, cost, distance, previous, queue, useAStarHeuristic);
+                        Relax(snapshot, current, next, cost, distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
                     }
                 }
             }
@@ -915,15 +984,33 @@ namespace AutoTerrainDesignations.Access
         private static void Relax(AccessSearchSnapshot snapshot, AccessSearchNode current, AccessSearchNode next,
             float nextCost, Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous, MinQueue queue,
-            bool useAStarHeuristic, bool hasCurrent = true)
+            bool useAStarHeuristic, int[] goalDistance, int minGoalHeight2, int maxGoalHeight2,
+            bool hasCurrent = true)
         {
             if (distance.TryGetValue(next, out float existing) && existing <= nextCost + 0.0001f) return;
             distance[next] = nextCost;
             if (hasCurrent) previous[next] = current;
-            float heuristic = snapshot.UseAStar && useAStarHeuristic
-                ? snapshot.GetGoalTravelLowerBound(next.CostPosition, next.Height2)
-                : 0f;
+            float heuristic = GetHeuristic(next, snapshot, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
             queue.Push(new QueueEntry(next, nextCost, nextCost + heuristic));
+        }
+
+        private static float GetHeuristic(AccessSearchNode node, AccessSearchSnapshot snapshot, bool useAStarHeuristic,
+            int[] goalDistance, int minGoalHeight2, int maxGoalHeight2)
+        {
+            if (!snapshot.UseAStar || !useAStarHeuristic || goalDistance == null || goalDistance.Length == 0)
+                return 0f;
+            int x = node.CostPosition.X - snapshot.BoundsMin.X;
+            int y = node.CostPosition.Y - snapshot.BoundsMin.Y;
+            int width = snapshot.GoalDistanceWidth;
+            int height = snapshot.GoalDistanceHeight;
+            if (x < 0 || x >= width || y < 0 || y >= height) return 0f;
+            int index = y * width + x;
+            int horizontalDistance = goalDistance[index];
+            if (horizontalDistance < 0) return 0f;
+            int verticalDistance = node.Height2 < minGoalHeight2
+                ? minGoalHeight2 - node.Height2
+                : (node.Height2 > maxGoalHeight2 ? node.Height2 - maxGoalHeight2 : 0);
+            return Math.Max(horizontalDistance, verticalDistance);
         }
 
         private static float EstimateWork(int targetHeight2, int terrainHeight2)

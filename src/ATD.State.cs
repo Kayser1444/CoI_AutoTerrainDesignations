@@ -195,6 +195,8 @@ namespace AutoTerrainDesignations
             new Dictionary<EntityId, bool>();
         private static readonly Dictionary<EntityId, HashSet<Tile2i>> s_generatedAccesswayOriginsByTowerEntityId =
             new Dictionary<EntityId, HashSet<Tile2i>>();
+        private static readonly Dictionary<EntityId, HashSet<Tile2i>> s_generatedDesignationOriginsByTowerEntityId =
+            new Dictionary<EntityId, HashSet<Tile2i>>();
         private static bool s_startupTowerPrioritySyncCompleted;
         private static int s_startupTowerPrioritySyncAttempts;
 
@@ -327,6 +329,42 @@ namespace AutoTerrainDesignations
             return TryGetTowerEntityId(tower, out EntityId entityId)
                 && s_generatedAccesswayOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered)
                 && registered.Contains(origin);
+        }
+
+        internal static void RegisterGeneratedDesignationOrigin(IAreaManagingTower tower, Tile2i origin)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId))
+                return;
+
+            if (!s_generatedDesignationOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered))
+            {
+                registered = new HashSet<Tile2i>();
+                s_generatedDesignationOriginsByTowerEntityId[entityId] = registered;
+            }
+
+            registered.Add(origin);
+        }
+
+        internal static void UnregisterGeneratedDesignationOrigin(IAreaManagingTower tower, Tile2i origin)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId))
+                return;
+
+            if (s_generatedDesignationOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered))
+                registered.Remove(origin);
+        }
+
+        private static bool IsGeneratedDesignationOrigin(IAreaManagingTower tower, Tile2i origin)
+        {
+            return TryGetTowerEntityId(tower, out EntityId entityId)
+                && s_generatedDesignationOriginsByTowerEntityId.TryGetValue(entityId, out HashSet<Tile2i> registered)
+                && registered.Contains(origin);
+        }
+
+        private static void ClearRegisteredGeneratedDesignations(IAreaManagingTower tower)
+        {
+            if (TryGetTowerEntityId(tower, out EntityId entityId))
+                s_generatedDesignationOriginsByTowerEntityId.Remove(entityId);
         }
 
         private static void ClearRegisteredGeneratedAccessways(IAreaManagingTower tower)

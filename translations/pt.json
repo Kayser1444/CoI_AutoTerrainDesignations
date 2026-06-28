@@ -41,7 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "Limpar todas as designações de terreno na área desta torre."
+    "Limpe todas as designações de terreno na área desta torre."
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "Limpe todas as designações de terreno na área desta torre. (Clique com a tecla Shift pressionada para limpar apenas as designações de terreno geradas.)"
   ],
   [
     "panel.designations.ore_filter.auto",

@@ -41,7 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "Rensa alla terränganvisningar i tornets område."
+    "Rensa alla terrängbeteckningar i detta torns område."
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "Rensa alla terrängbeteckningar i detta torns område. (Skift-klicka endast för att rensa genererade terrängbeteckningar.)"
   ],
   [
     "panel.designations.ore_filter.auto",

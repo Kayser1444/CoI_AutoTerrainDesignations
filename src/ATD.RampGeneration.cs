@@ -535,14 +535,15 @@ namespace AutoTerrainDesignations
 
             foreach (var origin in s_designationOriginsInArea)
             {
-                if (tileDepths.ContainsKey(origin))
+                if (accessWorkDepths.ContainsKey(origin)
+                    && !IsRegisteredGeneratedAccesswayOrigin(tower, origin))
                     continue;
 
                 Option<TerrainDesignation> existingDesignation = s_desigManager.GetDesignationAt(origin);
                 if (existingDesignation.HasValue
                     && IsAccesswayDesignationProto(existingDesignation.Value.Prototype, accesswayProto))
                 {
-                    bool reachesTower = ExistingAccessOriginConnectsToTower(tower, origin, tileDepths, accesswayProto, accessibleAccessOrigins, inaccessibleAccessOrigins);
+                    bool reachesTower = ExistingAccessOriginConnectsToTower(tower, origin, accessWorkDepths, accesswayProto, accessibleAccessOrigins, inaccessibleAccessOrigins);
                     existingProviders.Add(new AccessProvider(new[] { origin, origin.AddX(4), origin.AddY(4), origin.AddXy(4) }, reachesTower));
                 }
             }
@@ -627,44 +628,26 @@ namespace AutoTerrainDesignations
                         out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
                     {
                         experimentalSnapshot = refreshedSnapshot;
-                        AccessPathRequest request = BuildTowerRootedAccessRequest(
-                            refreshedSnapshot, cluster, configuredRampWidth);
-                        var experimentalDryRun = new ExperimentalAccessDryRunResult();
-                        yield return RunExperimentalAccessDryRunSliced(
-                            request, cluster, currentClusterOrdinal, unreachableClusterCount, experimentalDryRun);
-                        AccessSearchResult experimentalResult = experimentalDryRun.Result!;
-                        AccessDesignationPlan? experimentalPlan = LastExperimentalAccessPlan;
-                        if (!experimentalResult.Success)
-                        {
-                            experimentalFailureSummary = FormatExperimentalFailureSummary(experimentalResult);
-                        }
-                        if (experimentalResult.Success
-                            && experimentalPlan != null
-                            && experimentalPlan.IsValid
-                            && experimentalPlan.Designations.Count == 0)
-                        {
-                            // The rooted search reached tower-reachable G entirely through
-                            // fixed profiles. This is an already-provided route, not an empty
-                            // placement failure.
-                            states[cluster] = AccessClusterState.AccessibleViaProvider;
-                            validatedExistingRoute = true;
-                            LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
-                                $"selected=existing-route reused={experimentalPlan.ReusedNodeCount}");
-                            continue;
-                        }
-                        experimentalCandidate = EvaluateExperimentalAccessCandidate(
-                            experimentalResult, experimentalPlan, towerPos, terrMgr);
+                        AccessSearchResult experimentalResult = null!;
+                        AccessDesignationPlan? experimentalPlan = null;
 
                         List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
                             originClusters, states, cluster);
+                        bool skippedDueToExistingFixedRoute = false;
+                        LogExperimentalAccessDebug(
+                            $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
+                            $"preparing fixedGoals={accessibleFixedGoals.Count} " +
+                            $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
+
                         if (accessibleFixedGoals.Count > 0)
                         {
                             AccessPathRequest fixedRequest = BuildFixedProfileAccessRequest(
                                 refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
                             var fixedDryRun = new ExperimentalAccessDryRunResult();
-                            yield return RunExperimentalAccessDryRunSliced(
+                            IEnumerator fixedSearch = RunExperimentalAccessDryRunSliced(
                                 fixedRequest, cluster, currentClusterOrdinal, unreachableClusterCount, fixedDryRun);
+                            while (fixedSearch.MoveNext())
+                                yield return fixedSearch.Current;
                             AccessSearchResult fixedResult = fixedDryRun.Result!;
                             AccessDesignationPlan? fixedPlan = LastExperimentalAccessPlan;
                             if (fixedResult.Success
@@ -677,19 +660,62 @@ namespace AutoTerrainDesignations
                                 LogExperimentalAccessDebug(
                                     $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
                                     $"selected=existing-fixed-route reused={fixedPlan.ReusedNodeCount}");
-                                continue;
+                                skippedDueToExistingFixedRoute = true;
                             }
-
-                            EvaluatedAccessCandidate? fixedCandidate = EvaluateExperimentalAccessCandidate(
-                                fixedResult, fixedPlan, towerPos, terrMgr);
-                            if (fixedCandidate != null
-                                && (experimentalCandidate == null
-                                    || EvaluatedAccessCandidate.Compare(fixedCandidate, experimentalCandidate) < 0))
+                            else
                             {
                                 experimentalResult = fixedResult;
                                 experimentalPlan = fixedPlan;
-                                experimentalCandidate = fixedCandidate;
+                                experimentalCandidate = EvaluateExperimentalAccessCandidate(
+                                    fixedResult, fixedPlan, towerPos, terrMgr);
                             }
+                        }
+
+                        if (!skippedDueToExistingFixedRoute)
+                        {
+                            float costLimit = (experimentalCandidate != null) ? experimentalResult.Cost : float.MaxValue;
+                            AccessPathRequest request = BuildTowerRootedAccessRequest(
+                                refreshedSnapshot, cluster, configuredRampWidth, costLimit);
+                            var experimentalDryRun = new ExperimentalAccessDryRunResult();
+                            IEnumerator rootedSearch = RunExperimentalAccessDryRunSliced(
+                                request, cluster, currentClusterOrdinal, unreachableClusterCount, experimentalDryRun);
+                            while (rootedSearch.MoveNext())
+                                yield return rootedSearch.Current;
+                            AccessSearchResult rootedResult = experimentalDryRun.Result!;
+                            AccessDesignationPlan? rootedPlan = LastExperimentalAccessPlan;
+
+                            if (rootedResult.Success
+                                && rootedPlan != null
+                                && rootedPlan.IsValid
+                                && rootedPlan.Designations.Count == 0)
+                            {
+                                states[cluster] = AccessClusterState.AccessibleViaProvider;
+                                validatedExistingRoute = true;
+                                LogExperimentalAccessDebug(
+                                    $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
+                                    $"selected=existing-route reused={rootedPlan.ReusedNodeCount}");
+                                continue;
+                            }
+
+                            if (!rootedResult.Success)
+                            {
+                                experimentalFailureSummary = FormatExperimentalFailureSummary(rootedResult);
+                            }
+
+                            EvaluatedAccessCandidate? rootedCandidate = EvaluateExperimentalAccessCandidate(
+                                rootedResult, rootedPlan, towerPos, terrMgr);
+                            if (rootedCandidate != null
+                                && (experimentalCandidate == null
+                                    || EvaluatedAccessCandidate.Compare(rootedCandidate, experimentalCandidate) < 0))
+                            {
+                                experimentalResult = rootedResult;
+                                experimentalPlan = rootedPlan;
+                                experimentalCandidate = rootedCandidate;
+                            }
+                        }
+                        else
+                        {
+                            continue;
                         }
                     }
                     else
@@ -786,6 +812,7 @@ namespace AutoTerrainDesignations
                         experimentalSnapshot!,
                         accesswayProto,
                         source,
+                        tower,
                         localPlacedOrigins,
                         reservedRampTiles,
                         out Tile2i experimentalTopTile,
@@ -826,7 +853,7 @@ namespace AutoTerrainDesignations
                         }
 
                         existingProviders.Remove(experimentalProvider);
-                        RollBackExperimentalDesignations(localPlacedOrigins, accesswayProto, reservedRampTiles);
+                        RollBackExperimentalDesignations(localPlacedOrigins, tower, accesswayProto, reservedRampTiles);
                         states = AccessReachability.EvaluateReachability(
                             originClusters,
                             existingProviders,
@@ -1698,7 +1725,7 @@ namespace AutoTerrainDesignations
                     AddGapConnectorPlans(plannedTiles, candidate, laneFirstEdgeHeights, laneSecondEdgeHeights);
                     if (!dryRun)
                     {
-                        ApplyRampPlan(plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
+                        ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
                     topRowTile = candidate.RampTiles[0];
                     return RampPlacementOutcome.Crested;
@@ -1815,7 +1842,7 @@ namespace AutoTerrainDesignations
                     AddGapConnectorPlans(plannedTiles, candidate, laneFirstEdgeHeights, laneSecondEdgeHeights);
                     if (!dryRun)
                     {
-                        ApplyRampPlan(plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
+                        ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
 
                     topRowTile = currentTiles[0];
@@ -1839,7 +1866,7 @@ namespace AutoTerrainDesignations
                     AddGapConnectorPlans(plannedTiles, candidate, laneFirstEdgeHeights, laneSecondEdgeHeights);
                     if (!dryRun)
                     {
-                        ApplyRampPlan(plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
+                        ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
 
                     topRowTile = currentTiles[0];
@@ -2095,13 +2122,13 @@ namespace AutoTerrainDesignations
             return new RampTilePlan(tile, nwHeight, neHeight, seHeight, swHeight);
         }
 
-        private static void ApplyRampPlan(List<RampTilePlan> plannedTiles, Dict<Tile2i, int> tileDepths, Dict<Tile2i, int> cornerHeights, TerrainDesignationProto rampProto, List<Tile2i>? placedRampOrigins)
+        private static void ApplyRampPlan(IAreaManagingTower tower, List<RampTilePlan> plannedTiles, Dict<Tile2i, int> tileDepths, Dict<Tile2i, int> cornerHeights, TerrainDesignationProto rampProto, List<Tile2i>? placedRampOrigins)
         {
             NormalizeRampPlan(plannedTiles, tileDepths, cornerHeights);
 
             foreach (RampTilePlan plannedTile in plannedTiles)
             {
-                PlaceDesignation(rampProto, plannedTile.Tile, plannedTile.NwHeight, plannedTile.NeHeight, plannedTile.SeHeight, plannedTile.SwHeight, placedRampOrigins);
+                PlaceDesignation(tower, rampProto, plannedTile.Tile, plannedTile.NwHeight, plannedTile.NeHeight, plannedTile.SeHeight, plannedTile.SwHeight, placedRampOrigins);
             }
         }
 
@@ -2265,7 +2292,7 @@ namespace AutoTerrainDesignations
             swCorner = tile.AddY(4);
         }
 
-        private static void PlaceDesignation(TerrainDesignationProto proto, Tile2i tile, int nwHeight, int neHeight, int seHeight, int swHeight, List<Tile2i>? placedRampOrigins)
+        private static void PlaceDesignation(IAreaManagingTower tower, TerrainDesignationProto proto, Tile2i tile, int nwHeight, int neHeight, int seHeight, int swHeight, List<Tile2i>? placedRampOrigins)
         {
             if (s_desigManager == null)
             {
@@ -2281,6 +2308,8 @@ namespace AutoTerrainDesignations
                 Log.Warning(string.Format("Failed to create ramp designation for tile {0}", tile));
                 return;
             }
+
+            RegisterGeneratedDesignationOrigin(tower, tile);
 
             // Keep the per-pass designation cache consistent so that subsequent CollectRampCandidates
             // calls within the same CreateAccessRamp invocation (shifted/narrow retries, multi-cluster

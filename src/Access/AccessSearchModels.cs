@@ -175,10 +175,16 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_occupiedTiles;
         private readonly HashSet<Tile2i> m_oceanTiles;
         private readonly HashSet<Tile2i> m_validOrigins;
-        private readonly Dictionary<int, int[]> m_goalDistancesByHeight2;
+        private readonly int[] m_anyGoalDistance;
+        private readonly int m_minGoalHeight2;
+        private readonly int m_maxGoalHeight2;
         private readonly int m_goalDistanceWidth;
         private readonly int m_goalDistanceHeight;
         private readonly AccessDurabilityCorner[] m_durabilityCorners;
+        private readonly List<AccessDurabilityCorner>?[,] m_spatialGrid;
+        private readonly int m_gridWidth;
+        private readonly int m_gridHeight;
+        private const int SPATIAL_CELL_SIZE = 16;
         private readonly Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
             IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffs;
 
@@ -240,10 +246,58 @@ namespace AutoTerrainDesignations.Access
             m_validOrigins = new HashSet<Tile2i>(m_terrainCenterHeight2.Keys);
             m_goalDistanceWidth = boundsMax.X - boundsMin.X + 1;
             m_goalDistanceHeight = boundsMax.Y - boundsMin.Y + 1;
-            m_goalDistancesByHeight2 = useAStar
-                ? BuildGoalDistancesByHeight(boundsMin, boundsMax, m_goalGroundNodes, m_groundHeight2)
-                : new Dictionary<int, int[]>();
+            m_anyGoalDistance = useAStar
+                ? BuildGoalDistance(boundsMin, boundsMax, m_goalGroundNodes)
+                : Array.Empty<int>();
+
+            int minGoalHeight2 = int.MaxValue;
+            int maxGoalHeight2 = int.MinValue;
+            foreach (Tile2i goal in m_goalGroundNodes)
+            {
+                if (m_groundHeight2.TryGetValue(goal, out int height2))
+                {
+                    if (height2 < minGoalHeight2) minGoalHeight2 = height2;
+                    if (height2 > maxGoalHeight2) maxGoalHeight2 = height2;
+                }
+            }
+            m_minGoalHeight2 = minGoalHeight2 == int.MaxValue ? 0 : minGoalHeight2;
+            m_maxGoalHeight2 = maxGoalHeight2 == int.MinValue ? 0 : maxGoalHeight2;
             m_durabilityCorners = new List<AccessDurabilityCorner>(durabilityCorners).ToArray();
+
+            int widthTiles = boundsMax.X - boundsMin.X + 1;
+            int heightTiles = boundsMax.Y - boundsMin.Y + 1;
+            m_gridWidth = (widthTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
+            m_gridHeight = (heightTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
+            m_spatialGrid = new List<AccessDurabilityCorner>[m_gridWidth, m_gridHeight];
+
+            foreach (AccessDurabilityCorner corner in m_durabilityCorners)
+            {
+                int maxDelta2 = Math.Max(Math.Abs(MinHeight2 - corner.Height2), Math.Abs(MaxHeight2 - corner.Height2));
+                int maxDistance = (int)Math.Ceiling(maxDelta2 * LandslideRunPerHeight / 2.0);
+
+                int minX = Math.Max(boundsMin.X, corner.Position.X - maxDistance);
+                int maxX = Math.Min(boundsMax.X, corner.Position.X + maxDistance);
+                int minY = Math.Max(boundsMin.Y, corner.Position.Y - maxDistance);
+                int maxY = Math.Min(boundsMax.Y, corner.Position.Y + maxDistance);
+
+                int minCx = Math.Max(0, (minX - boundsMin.X) / SPATIAL_CELL_SIZE);
+                int maxCx = Math.Min(m_gridWidth - 1, (maxX - boundsMin.X) / SPATIAL_CELL_SIZE);
+                int minCy = Math.Max(0, (minY - boundsMin.Y) / SPATIAL_CELL_SIZE);
+                int maxCy = Math.Min(m_gridHeight - 1, (maxY - boundsMin.Y) / SPATIAL_CELL_SIZE);
+
+                for (int cx = minCx; cx <= maxCx; cx++)
+                {
+                    for (int cy = minCy; cy <= maxCy; cy++)
+                    {
+                        if (m_spatialGrid[cx, cy] == null)
+                        {
+                            m_spatialGrid[cx, cy] = new List<AccessDurabilityCorner>();
+                        }
+                        m_spatialGrid[cx, cy]!.Add(corner);
+                    }
+                }
+            }
+
             m_workableHandoffs = workableHandoffs;
         }
 
@@ -257,21 +311,25 @@ namespace AutoTerrainDesignations.Access
         public bool TryGetFixedProfile(Tile2i origin, out AccessHeightProfile profile) => m_fixedProfiles.TryGetValue(origin, out profile);
         public bool IsGroundNode(Tile2i tile) => m_groundNodes.Contains(tile);
         public bool IsGoalGroundNode(Tile2i tile) => m_goalGroundNodes.Contains(tile);
+        internal int[] AnyGoalDistance => m_anyGoalDistance;
+        internal int MinGoalHeight2 => m_minGoalHeight2;
+        internal int MaxGoalHeight2 => m_maxGoalHeight2;
+        internal int GoalDistanceWidth => m_goalDistanceWidth;
+        internal int GoalDistanceHeight => m_goalDistanceHeight;
+
         public int GetGoalTravelLowerBound(Tile2i tile, int height2)
         {
+            if (m_anyGoalDistance == null || m_anyGoalDistance.Length == 0) return 0;
             int x = tile.X - BoundsMin.X;
             int y = tile.Y - BoundsMin.Y;
             if (x < 0 || x >= m_goalDistanceWidth || y < 0 || y >= m_goalDistanceHeight) return 0;
             int index = y * m_goalDistanceWidth + x;
-            int best = int.MaxValue;
-            foreach (KeyValuePair<int, int[]> entry in m_goalDistancesByHeight2)
-            {
-                int horizontalDistance = entry.Value[index];
-                if (horizontalDistance < 0) continue;
-                int verticalDistance = Math.Abs(height2 - entry.Key);
-                best = Math.Min(best, Math.Max(horizontalDistance, verticalDistance));
-            }
-            return best == int.MaxValue ? 0 : best;
+            int horizontalDistance = m_anyGoalDistance[index];
+            if (horizontalDistance < 0) return 0;
+            int verticalDistance = height2 < m_minGoalHeight2
+                ? m_minGoalHeight2 - height2
+                : (height2 > m_maxGoalHeight2 ? height2 - m_maxGoalHeight2 : 0);
+            return Math.Max(horizontalDistance, verticalDistance);
         }
         public bool TryGetGroundHeight2(Tile2i tile, out int height2) => m_groundHeight2.TryGetValue(tile, out height2);
         public int GetTerrainCenterHeight2(Tile2i origin) => m_terrainCenterHeight2.TryGetValue(origin, out int h2) ? h2 : 0;
@@ -357,7 +415,17 @@ namespace AutoTerrainDesignations.Access
 
         public bool IsDurabilityBlocked(Tile2i position, int height2)
         {
-            foreach (AccessDurabilityCorner corner in m_durabilityCorners)
+            if (position.X < BoundsMin.X || position.X > BoundsMax.X
+                || position.Y < BoundsMin.Y || position.Y > BoundsMax.Y)
+                return false;
+
+            int cx = (position.X - BoundsMin.X) / SPATIAL_CELL_SIZE;
+            int cy = (position.Y - BoundsMin.Y) / SPATIAL_CELL_SIZE;
+            if (cx < 0 || cx >= m_gridWidth || cy < 0 || cy >= m_gridHeight) return false;
+            List<AccessDurabilityCorner>? cellCorners = m_spatialGrid[cx, cy];
+            if (cellCorners == null) return false;
+
+            foreach (AccessDurabilityCorner corner in cellCorners)
             {
                 if (corner.Blocks(position, height2, LandslideRunPerHeight))
                     return true;
@@ -368,7 +436,17 @@ namespace AutoTerrainDesignations.Access
         private bool IsDurabilityBlockedAhead(Tile2i position, int height2,
             Tile2i predecessorOrigin, Tile2i direction)
         {
-            foreach (AccessDurabilityCorner corner in m_durabilityCorners)
+            if (position.X < BoundsMin.X || position.X > BoundsMax.X
+                || position.Y < BoundsMin.Y || position.Y > BoundsMax.Y)
+                return false;
+
+            int cx = (position.X - BoundsMin.X) / SPATIAL_CELL_SIZE;
+            int cy = (position.Y - BoundsMin.Y) / SPATIAL_CELL_SIZE;
+            if (cx < 0 || cx >= m_gridWidth || cy < 0 || cy >= m_gridHeight) return false;
+            List<AccessDurabilityCorner>? cellCorners = m_spatialGrid[cx, cy];
+            if (cellCorners == null) return false;
+
+            foreach (AccessDurabilityCorner corner in cellCorners)
             {
                 bool ahead = direction.X > 0 ? corner.Position.X > predecessorOrigin.X
                     : direction.X < 0 ? corner.Position.X < predecessorOrigin.X
@@ -401,29 +479,9 @@ namespace AutoTerrainDesignations.Access
             return true;
         }
 
-        private static Dictionary<int, int[]> BuildGoalDistancesByHeight(
-            Tile2i boundsMin, Tile2i boundsMax, HashSet<Tile2i> goals,
-            Dictionary<Tile2i, int> groundHeight2)
-        {
-            var goalsByHeight2 = new Dictionary<int, HashSet<Tile2i>>();
-            foreach (Tile2i goal in goals)
-            {
-                if (!groundHeight2.TryGetValue(goal, out int height2)) continue;
-                if (!goalsByHeight2.TryGetValue(height2, out HashSet<Tile2i>? sameHeightGoals))
-                {
-                    sameHeightGoals = new HashSet<Tile2i>();
-                    goalsByHeight2.Add(height2, sameHeightGoals);
-                }
-                sameHeightGoals.Add(goal);
-            }
 
-            var result = new Dictionary<int, int[]>();
-            foreach (KeyValuePair<int, HashSet<Tile2i>> entry in goalsByHeight2)
-                result.Add(entry.Key, BuildGoalDistance(boundsMin, boundsMax, entry.Value));
-            return result;
-        }
 
-        private static int[] BuildGoalDistance(Tile2i boundsMin, Tile2i boundsMax,
+        internal static int[] BuildGoalDistance(Tile2i boundsMin, Tile2i boundsMax,
             HashSet<Tile2i> goals)
         {
             int width = boundsMax.X - boundsMin.X + 1;

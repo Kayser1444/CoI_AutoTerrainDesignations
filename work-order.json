@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 104,
+  "total_keys": 105,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
@@ -21,28 +21,17 @@
       "ru": "Макс",
       "zh": "最大限度"
     },
-    "settings.experimental_access.suppress_legacy_ramps.label": {
-      "en": "Suppress legacy ramps",
-      "context": "Settings toggle label for suppressing legacy access ramps.",
-      "de": "Unterdrücken Sie alte Rampen",
-      "es": "Suprimir rampas heredadas",
-      "it": "Elimina le rampe legacy",
-      "pt": "Suprimir rampas legadas",
-      "ru": "Подавить устаревшие пандусы",
-      "sv": "Dämpa äldre ramper",
-      "zh": "抑制遗留斜坡"
-    },
-    "settings.experimental_access.suppress_legacy_ramps.tooltip": {
-      "en": "Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave off for normal fallback behavior.",
-      "context": "Tooltip for suppressing legacy access ramps.",
-      "de": "Deaktivieren Sie den alten Straight-Ramp-Generator, damit experimentelle Zugangsergebnisse und Fehler direkt getestet werden können. Lassen Sie es weg, um zum normalen Fallback-Verhalten zu gelangen.",
-      "es": "Deshabilite el generador de rampa recta heredado para que los resultados y fallas de las vías de acceso experimentales se puedan probar directamente. Déjelo para el comportamiento de reserva normal.",
-      "it": "Disabilitare il generatore di rampe diritte legacy in modo che i risultati e i guasti degli accessi sperimentali possano essere testati direttamente. Lasciare fuori per il normale comportamento di fallback.",
-      "pt": "Desative o gerador de rampa direta herdado para que os resultados e falhas experimentais da via de acesso possam ser testados diretamente. Deixe para o comportamento normal de reserva.",
-      "ru": "Отключите устаревший генератор прямолинейных режимов, чтобы можно было напрямую протестировать результаты и неисправности экспериментальных подходов. Оставьте для нормального резервного поведения.",
-      "sv": "Inaktivera den äldre rakrampsgeneratorn så att experimentella accesswayresultat och fel kan testas direkt. Lämna av för normalt reservbeteende.",
-      "zh": "禁用传统的直斜坡发生器，以便可以直接测试实验通道结果和故障。保留正常的后备行为。"
+    "panel.designations.clear_tooltip": {
+      "en": "Clear all terrain designations in this tower's area.",
+      "context": "Tooltip on the Clear button.",
+      "de": "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms.",
+      "es": "Elimina todas las designaciones de terreno en el área de esta torre.",
+      "it": "Cancella tutte le designazioni del terreno nell'area di questa torre.",
+      "pt": "Limpe todas as designações de terreno na área desta torre.",
+      "ru": "Удалите все обозначения местности в районе этой башни.",
+      "sv": "Rensa alla terrängbeteckningar i detta torns område.",
+      "zh": "清除该塔区域内的所有地形标记。"
     }
   },
-  "keys_needing_translation": 3
+  "keys_needing_translation": 2
 }

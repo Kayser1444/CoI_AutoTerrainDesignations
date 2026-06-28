@@ -26,7 +26,8 @@ namespace AutoTerrainDesignations.Access
             IAreaManagingTower tower,
             TerrainManager terrMgr,
             Func<Tile2i, bool> isReachableFromTower,
-            Func<Tile2i, Tile2i, bool> isEdgeTraversable)
+            Func<Tile2i, Tile2i, bool> isEdgeTraversable,
+            Func<Tile2i, bool>? isOriginReadyForWork = null)
         {
             var states = new Dictionary<AccessOriginCluster, AccessClusterState>();
             var clusterTileLookup = new Dictionary<Tile2i, AccessOriginCluster>();
@@ -68,7 +69,7 @@ namespace AutoTerrainDesignations.Access
                         continue;
                     }
 
-                    if (CheckClusterConnection(cluster, clusterTileLookup, providerTiles, states, isEdgeTraversable))
+                    if (CheckClusterConnection(cluster, clusterTileLookup, providerTiles, states, isEdgeTraversable, isOriginReadyForWork))
                     {
                         states[cluster] = AccessClusterState.AccessibleViaProvider;
                         changed = true;
@@ -92,7 +93,8 @@ namespace AutoTerrainDesignations.Access
             Dictionary<Tile2i, AccessOriginCluster> clusterTileLookup,
             HashSet<Tile2i> providerTiles,
             Dictionary<AccessOriginCluster, AccessClusterState> states,
-            Func<Tile2i, Tile2i, bool> isEdgeTraversable)
+            Func<Tile2i, Tile2i, bool> isEdgeTraversable,
+            Func<Tile2i, bool>? isOriginReadyForWork)
         {
             foreach (var origin in cluster.Origins)
             {
@@ -117,6 +119,12 @@ namespace AutoTerrainDesignations.Access
                     {
                         AccessDiagnostics.LogDebug($"[ATD Access Debug] Cluster {cluster.ClusterId} accessible via provider tile {neighbor} from origin {origin.Origin}");
                         return true;
+                    }
+
+                    if (isOriginReadyForWork != null && !isOriginReadyForWork(origin.Origin))
+                    {
+                        AccessDiagnostics.LogDebug($"[ATD Access Debug] Cluster {cluster.ClusterId} origin {origin.Origin} is not ready for its own operation; neighbor-cluster connection ignored");
+                        continue;
                     }
 
                     // 3. Is it touching another accessible cluster?

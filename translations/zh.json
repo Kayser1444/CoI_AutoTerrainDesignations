@@ -41,7 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "清除此塔区域内的所有地形规划。"
+    "清除该塔区域内的所有地形标记。"
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "清除该塔区域内的所有地形标记。 （按住 Shift 键单击仅可清除生成的地形名称。）"
   ],
   [
     "panel.designations.ore_filter.auto",

@@ -66,7 +66,7 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
     public static string ModMarker => $"Kayser's AutoTerrainDesignations v{ModVersion}";
 
     /// <summary>Returns <paramref name="text"/> with the mod sign-off appended, for use in tooltips.</summary>
-    public static string Tt(string text) => $"{text}\n[{ModMarker}]";
+public static string Tt(string text) => text;
 
     public ModJsonConfig JsonConfig { get; }
 

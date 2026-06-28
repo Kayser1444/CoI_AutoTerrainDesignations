@@ -17,8 +17,6 @@ namespace AutoTerrainDesignations.Access
             var generatedByOrigin = new Dictionary<Tile2i, AccessPlannedDesignation>();
             var cornerHeights = new Dictionary<Tile2i, int>();
             Tile2i previousPosition = result.StartOrigin;
-            Tile2i previousVPredecessorPosition = result.StartOrigin;
-            AccessHeightProfile previousVPredecessorProfile = previousProfile;
             var previousNode = new AccessSearchNode(
                 result.StartOrigin, previousProfile.Center2, AccessSearchMode.Existing);
             bool previousWasGround = false;
@@ -39,12 +37,16 @@ namespace AutoTerrainDesignations.Access
                         if (Manhattan(previousPosition, node.Position) != 1)
                             return Invalid("PlanGroundDiscontinuity", result, designations, reusedNodes, groundNodes);
                     }
-                    else if (!AccessPathSearch.ContainsHandoff(
-                        snapshot, previousPosition, previousProfile,
-                        previousVPredecessorPosition, previousVPredecessorProfile,
-                        node.Position, node.HandoffOperation))
+                    else
                     {
-                        return Invalid("PlanVToGHandoff", result, designations, reusedNodes, groundNodes);
+                        FindPredecessorProfile(result, pathIndex, snapshot, out Tile2i predPosition, out AccessHeightProfile predProfile);
+                        if (!AccessPathSearch.ContainsHandoff(
+                            snapshot, previousPosition, previousProfile,
+                            predPosition, predProfile,
+                            node.Position, node.HandoffOperation))
+                        {
+                            return Invalid("PlanVToGHandoff", result, designations, reusedNodes, groundNodes);
+                        }
                     }
 
                     previousWasGround = true;
@@ -114,11 +116,6 @@ namespace AutoTerrainDesignations.Access
                     }
                 }
 
-                if (!previousWasGround)
-                {
-                    previousVPredecessorPosition = previousPosition;
-                    previousVPredecessorProfile = previousProfile;
-                }
                 previousWasGround = false;
                 previousPosition = node.Position;
                 previousProfile = profile;
@@ -152,5 +149,38 @@ namespace AutoTerrainDesignations.Access
 
         private static int Manhattan(Tile2i left, Tile2i right)
             => Math.Abs(left.X - right.X) + Math.Abs(left.Y - right.Y);
+
+        private static void FindPredecessorProfile(
+            AccessSearchResult result,
+            int currentIndex,
+            AccessSearchSnapshot snapshot,
+            out Tile2i predPosition,
+            out AccessHeightProfile predProfile)
+        {
+            predPosition = result.StartOrigin;
+            snapshot.TryGetFixedProfile(result.StartOrigin, out predProfile);
+
+            if (currentIndex == 0) return;
+
+            predPosition = result.Path[currentIndex - 1].Position;
+            if (!AccessPathSearch.TryGetProfile(snapshot, result.Path[currentIndex - 1], out predProfile))
+            {
+                predPosition = result.StartOrigin;
+                snapshot.TryGetFixedProfile(result.StartOrigin, out predProfile);
+            }
+
+            for (int i = currentIndex - 2; i >= 0; i--)
+            {
+                AccessSearchNode node = result.Path[i];
+                if (!node.IsGround && node.Mode != AccessSearchMode.Existing)
+                {
+                    if (AccessPathSearch.TryGetProfile(snapshot, node, out AccessHeightProfile p))
+                    {
+                        predPosition = node.Position;
+                        predProfile = p;
+                    }
+                }
+            }
+        }
     }
 }

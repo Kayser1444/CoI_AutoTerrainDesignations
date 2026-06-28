@@ -17,11 +17,16 @@ namespace AutoTerrainDesignations
     internal static class AtdLocalization
     {
         /// <summary>
-        /// Returns a <see cref="LocStrFormatted"/> with the ATD mod marker appended,
-        /// for use as tooltip text.
+        /// Returns a <see cref="LocStrFormatted"/> for general tooltip text without the mod marker.
         /// </summary>
         public static LocStrFormatted Tip(LocStr s) =>
             new LocStrFormatted(AutoTerrainDesignationsMod.Tt(s.TranslatedString));
+
+        /// <summary>
+        /// Returns a <see cref="LocStrFormatted"/> for inspector-panel tooltip text with the mod marker.
+        /// </summary>
+        public static LocStrFormatted PanelTip(LocStr s) =>
+            new LocStrFormatted($"{AutoTerrainDesignationsMod.ModMarker}\n\n{AutoTerrainDesignationsMod.Tt(s.TranslatedString)}");
 
         // ------------------------------------------------------------------ //
         // Common levels
@@ -47,6 +52,8 @@ namespace AutoTerrainDesignations
             Loc.Str("panel.designations.debris_tooltip", "Designate all debris in the area for mining/removal. Overrides any forestry designations.", "Tooltip on the Debris button.");
         public static LocStr DesigClearTip =
             Loc.Str("panel.designations.clear_tooltip", "Clear all terrain designations in this tower's area.", "Tooltip on the Clear button.");
+        public static LocStr DesigClearTipWithShiftClick =
+            Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear all terrain designations in this tower's area. (Shift-click to clear generated terrain designations only.)", "Tooltip on the Clear button when generated designations exist.");
         public static LocStr DesigOreFilterAuto =
             Loc.Str("panel.designations.ore_filter.auto", "Auto (useful -> debris -> dirt)", "Label for the automatic ore filter option in the ore picker.");
         public static LocStr DesigRampWidthLabel =

@@ -41,7 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "Entfernt alle Geländemarkierungen im Bereich dieses Turms."
+    "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms."
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms. (Umschalttaste gedrückt halten, um nur generierte Geländebezeichnungen zu löschen.)"
   ],
   [
     "panel.designations.ore_filter.auto",

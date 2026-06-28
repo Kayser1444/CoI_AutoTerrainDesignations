@@ -95,7 +95,7 @@ namespace AutoTerrainDesignations
                 var panel = new PanelWithHeader()
                     .Title(
                         AtdLocalization.FarmingTitle,
-                        AtdLocalization.Tip(AtdLocalization.FarmingDescription));
+                        AtdLocalization.PanelTip(AtdLocalization.FarmingDescription));
                 panel.Collapsed(farmingInitTower != null
                     ? AutoDepthDesignation.GetTowerFarmingPanelCollapsed(farmingInitTower)
                     : AutoTerrainDesignationsMod.FarmingPanelCollapsed);

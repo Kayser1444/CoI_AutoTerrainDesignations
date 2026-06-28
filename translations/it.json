@@ -41,7 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "Elimina tutte le designazioni del terreno nell'area di questa torre."
+    "Cancella tutte le designazioni del terreno nell'area di questa torre."
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "Cancella tutte le designazioni del terreno nell'area di questa torre. (Fare clic tenendo premuto il tasto Maiusc per cancellare solo le designazioni del terreno generate.)"
   ],
   [
     "panel.designations.ore_filter.auto",

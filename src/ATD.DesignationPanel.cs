@@ -43,6 +43,7 @@ namespace AutoTerrainDesignations
             public Mafi.Unity.Ui.Library.Display MinElevDisplay { get; }
             public Mafi.Unity.Ui.Library.Display OrePurityDisplay { get; }
             public Mafi.Unity.Ui.Library.Display ClearanceDisplay { get; }
+            public ButtonIcon ClearBtn { get; }
 
             public Bindings(
                 Func<IAreaManagingTower?> getTower,
@@ -51,7 +52,8 @@ namespace AutoTerrainDesignations
                 Mafi.Unity.Ui.Library.Display maxLayersDisplay,
                 Mafi.Unity.Ui.Library.Display minElevDisplay,
                 Mafi.Unity.Ui.Library.Display orePurityDisplay,
-                Mafi.Unity.Ui.Library.Display clearanceDisplay)
+                Mafi.Unity.Ui.Library.Display clearanceDisplay,
+                ButtonIcon clearBtn)
             {
                 GetTower = getTower;
                 Panel = panel;
@@ -60,6 +62,7 @@ namespace AutoTerrainDesignations
                 MinElevDisplay = minElevDisplay;
                 OrePurityDisplay = orePurityDisplay;
                 ClearanceDisplay = clearanceDisplay;
+                ClearBtn = clearBtn;
             }
         }
 
@@ -88,6 +91,9 @@ namespace AutoTerrainDesignations
             b.MinElevDisplay.SetValue(new LocStrFormatted(MinElevText(AutoDepthDesignation.GetTowerMaxDepthToDigTo(tower))));
             b.OrePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(AutoDepthDesignation.GetTowerOrePurityLevel(tower))));
             b.ClearanceDisplay.SetValue(new LocStrFormatted(ClearanceLevelText(AutoDepthDesignation.GetTowerCorridorClearance(tower))));
+
+            bool hasGen = AutoDepthDesignation.HasGeneratedDesignationsForTower(tower);
+            b.ClearBtn.Tooltip(AtdLocalization.Tip(hasGen ? AtdLocalization.DesigClearTipWithShiftClick : AtdLocalization.DesigClearTip));
         }
 
         /// <summary>
@@ -191,21 +197,24 @@ namespace AutoTerrainDesignations
                 .Tooltip(AtdLocalization.Tip(AtdLocalization.DesigDebrisTip));
 
             // --- Clear button ---
-            var clearBtn = new ButtonIcon(
-                Button.General,
-                "Assets/Unity/UserInterface/General/Trash128.png",
-                (Action)delegate
+            bool initialHasGen = initialTower != null && AutoDepthDesignation.HasGeneratedDesignationsForTower(initialTower);
+            var clearBtn = new ButtonIcon(Button.General, "Assets/Unity/UserInterface/General/Trash128.png")
+                .OnClick((Action)delegate
                 {
                     try
                     {
                         var tower = getTower();
                         if (tower == null) return;
                         AutoDepthDesignation.ClearTowerLastRampOutcome(tower);
-                        AutoDepthDesignation.ClearDesignationsForTower(tower);
+                        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+                            AutoDepthDesignation.ClearGeneratedDesignationsForTower(tower);
+                        else
+                            AutoDepthDesignation.ClearDesignationsForTower(tower);
+                        RefreshDisplays(key);
                     }
                     catch (Exception ex) { Debug.Log($"[ATD] Clear button click EXCEPTION: {ex}"); }
-                })
-                .Tooltip(AtdLocalization.Tip(AtdLocalization.DesigClearTip));
+                }, allowKeyPresses: true)
+                .Tooltip(AtdLocalization.Tip(initialHasGen ? AtdLocalization.DesigClearTipWithShiftClick : AtdLocalization.DesigClearTip));
 
             digBtn.MarginTopBottom(1.pt());
             debrisBtn.MarginTopBottom(1.pt()).AlignSelfEnd();
@@ -220,7 +229,7 @@ namespace AutoTerrainDesignations
 
             var panel = new PanelWithHeader()
                 .Title(AtdLocalization.DesigTitle,
-                       AtdLocalization.Tip(AtdLocalization.DesigDescription));
+                       AtdLocalization.PanelTip(AtdLocalization.DesigDescription));
             panel.Collapsed(initialTower != null
                 ? AutoDepthDesignation.GetTowerTerrainPanelCollapsed(initialTower)
                 : AutoTerrainDesignationsMod.TerrainDesignationsPanelCollapsed);
@@ -368,7 +377,7 @@ namespace AutoTerrainDesignations
                 panel.BodyAdd(oreRow);
             }
 
-            s_bindings[key] = new Bindings(getTower, panel, rampWidthDisplay, maxLayersDisplay, minElevDisplay, orePurityDisplay, clearanceDisplay);
+            s_bindings[key] = new Bindings(getTower, panel, rampWidthDisplay, maxLayersDisplay, minElevDisplay, orePurityDisplay, clearanceDisplay, clearBtn);
             return panel;
         }
 
