@@ -409,6 +409,9 @@ Initial constraints:
 * How aggressively to bound the search radius before declaring `Blocked`, and how that maps onto the existing `NoCandidate` / `MouthUnreachable` reasons.
 * Whether a later cost-to-ground field should be cached across passes and incrementally invalidated, or whether per-cluster `S -> E` Dijkstra/A* is fast enough.
 * Work is estimated as `dh^2`, where `dh` is the absolute difference between the candidate and current terrain center heights. The public `workDistanceScale` parameter handles calibration, so the formula keeps no fixed `0.5` coefficient. It is still a center-point approximation; V2 may start with it for speed, but true optimal hillside routing needs a corner/footprint estimate such as `sum(dh_c^2)` over outer corners.
+* Can we merge the tower-rooted-cluster and fixed-network-cluster into one by merging the goals and mapping out a common heuristic (manhattan+2*dh to closest goal tile).
+* Continue investigating route quality and correctness for paths involving multiple V/G handoffs. Known symptoms include missed early G handoffs, unnecessary V stretches over pathable terrain, and handoff proto selection that needs to remain stable across repeated G/V transitions.
+* Account for debris in pathfinding. Debris can block or alter practical vehicle access even when the terrain height/pathability model otherwise looks valid.
 
 ## Relationship to the access framework
 

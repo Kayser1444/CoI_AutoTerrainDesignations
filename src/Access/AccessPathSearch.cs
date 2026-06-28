@@ -891,11 +891,15 @@ namespace AutoTerrainDesignations.Access
             AccessSearchSnapshot snapshot, Tile2i origin, AccessHeightProfile profile,
             Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
         {
+            var emitted = new HashSet<Tile2i>();
             if (snapshot.HasWorkableHandoffEvaluator)
             {
                 foreach (AccessGroundHandoff handoff in snapshot.GetWorkableHandoffs(
                     origin, profile, predecessorOrigin, predecessorProfile))
-                    yield return handoff;
+                {
+                    if (emitted.Add(handoff.Tile))
+                        yield return handoff;
+                }
                 yield break;
             }
 
@@ -918,10 +922,16 @@ namespace AutoTerrainDesignations.Access
             if (!centerMatches && matchingCornerCount < 2) yield break;
 
             if (centerMatches)
-                yield return new AccessGroundHandoff(center, AccessHandoffOperation.None);
+            {
+                if (emitted.Add(center))
+                    yield return new AccessGroundHandoff(center, AccessHandoffOperation.None);
+            }
             for (int i = 0; i < corners.Length; i++)
                 if (matchingCorners[i])
-                    yield return new AccessGroundHandoff(corners[i], AccessHandoffOperation.None);
+                {
+                    if (emitted.Add(corners[i]))
+                        yield return new AccessGroundHandoff(corners[i], AccessHandoffOperation.None);
+                }
         }
 
         internal static bool ContainsHandoffTile(AccessSearchSnapshot snapshot, Tile2i origin,

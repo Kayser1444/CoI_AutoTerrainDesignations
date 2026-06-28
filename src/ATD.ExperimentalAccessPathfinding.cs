@@ -445,11 +445,6 @@ namespace AutoTerrainDesignations
             if (((profile.Nw2 | profile.Ne2 | profile.Se2 | profile.Sw2) & 1) != 0)
                 return Array.Empty<AccessGroundHandoff>();
 
-            var data = new DesignationData(origin,
-                new HeightTilesI(profile.Nw2 / 2),
-                new HeightTilesI(profile.Ne2 / 2),
-                new HeightTilesI(profile.Se2 / 2),
-                new HeightTilesI(profile.Sw2 / 2));
             Tile2i referenceOrigin = predecessorOrigin != default && predecessorOrigin != origin
                 ? predecessorOrigin
                 : origin;
@@ -460,17 +455,25 @@ namespace AutoTerrainDesignations
                 : predecessorProfile.Center2;
             if (!TrySelectHandoffOperationForOrigin(referenceProfileCenter2, referenceGroundCenter, out AccessHandoffOperation operation))
                 return Array.Empty<AccessGroundHandoff>();
+
+            var result = new List<AccessGroundHandoff>();
+            var emitted = new HashSet<Tile2i>();
+            AddExactGroundHandoffs(origin, profile, groundNodes, terrMgr, operation, result, emitted);
+
+            var data = new DesignationData(origin,
+                new HeightTilesI(profile.Nw2 / 2),
+                new HeightTilesI(profile.Ne2 / 2),
+                new HeightTilesI(profile.Se2 / 2),
+                new HeightTilesI(profile.Sw2 / 2));
             TerrainDesignationProto? proto = operation == AccessHandoffOperation.Mining
                 ? s_miningProto
                 : s_dumpingProto;
             if (proto == null || !TryBuildProspectiveFulfilledBitmap(
                 proto, terrMgr, data, operation, out uint fulfilledBitmap))
-                return Array.Empty<AccessGroundHandoff>();
-            if (fulfilledBitmap == ALL_DESIGNATION_TILES_MASK
-                || (fulfilledBitmap & READY_PERIMETER_MASK) == 0)
-                return Array.Empty<AccessGroundHandoff>();
+                return result;
+            if ((fulfilledBitmap & READY_PERIMETER_MASK) == 0)
+                return result;
 
-            var result = new List<AccessGroundHandoff>();
             for (int y = 0; y <= 4; y++)
             {
                 for (int x = 0; x <= 4; x++)
@@ -481,11 +484,50 @@ namespace AutoTerrainDesignations
                     Tile2i tile = origin + new RelTile2i(x, y);
                     // Handoff may enter any valid ground node; only the final
                     // search goal needs to be in the tower-reachable flood.
-                    if (groundNodes.Contains(tile))
+                    if (groundNodes.Contains(tile) && emitted.Add(tile))
                         result.Add(new AccessGroundHandoff(tile, operation));
                 }
             }
             return result;
+        }
+
+        private static void AddExactGroundHandoffs(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            HashSet<Tile2i> groundNodes,
+            TerrainManager terrMgr,
+            AccessHandoffOperation operation,
+            List<AccessGroundHandoff> result,
+            HashSet<Tile2i> emitted)
+        {
+            Tile2i center = origin + new RelTile2i(2, 2);
+            bool centerMatches = groundNodes.Contains(center)
+                && ToHeight2(terrMgr.GetHeight(center).Value.ToFloat()) == profile.Center2;
+
+            Tile2i[] corners =
+            {
+                origin,
+                origin + new RelTile2i(4, 0),
+                origin + new RelTile2i(4, 4),
+                origin + new RelTile2i(0, 4),
+            };
+            int[] heights = { profile.Nw2, profile.Ne2, profile.Se2, profile.Sw2 };
+            var matchingCorners = new bool[corners.Length];
+            int matchingCornerCount = 0;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                matchingCorners[i] = groundNodes.Contains(corners[i])
+                    && ToHeight2(terrMgr.GetHeight(corners[i]).Value.ToFloat()) == heights[i];
+                if (matchingCorners[i]) matchingCornerCount++;
+            }
+
+            if (!centerMatches && matchingCornerCount < 2) return;
+
+            if (centerMatches && emitted.Add(center))
+                result.Add(new AccessGroundHandoff(center, operation));
+            for (int i = 0; i < corners.Length; i++)
+                if (matchingCorners[i] && emitted.Add(corners[i]))
+                    result.Add(new AccessGroundHandoff(corners[i], operation));
         }
 
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
