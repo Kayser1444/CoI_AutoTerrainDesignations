@@ -64,6 +64,11 @@ Start with `workDistanceScale = 1`, meaning one product-unit of center-height wo
 
 Because every admissible edge already encodes slope, and cost already encodes work, **the path cost is the candidate's score** - routing and selection collapse into one search.
 
+
+## Debris amendment
+
+Debris pathfinding is specified in [Accessway Pathfinding Debris Amendment](accessway-pathfinding-debris.md). In short, debris that sits on otherwise drivable ground remains a **G-node route option** with a small cleanup cost, and materialization emits debris-removal mining designations rather than forcing a G/V/G dig-under detour.
+
 ## From path to designations (the corner problem)
 
 A node carries a single reference height `h`, but a CoI designation is defined by **four corner heights**, and the fight invariant (next section) is stated over shared corners. The search therefore needs an explicit mapping from a path of height/mode nodes to concrete designations. This has two parts: the allowed **jumps** between adjacent nodes, and the **transformation** of a jump sequence into designation pieces.
@@ -411,7 +416,7 @@ Initial constraints:
 * Work is estimated as `dh^2`, where `dh` is the absolute difference between the candidate and current terrain center heights. The public `workDistanceScale` parameter handles calibration, so the formula keeps no fixed `0.5` coefficient. It is still a center-point approximation; V2 may start with it for speed, but true optimal hillside routing needs a corner/footprint estimate such as `sum(dh_c^2)` over outer corners.
 * Can we merge the tower-rooted-cluster and fixed-network-cluster into one by merging the goals and mapping out a common heuristic (manhattan+2*dh to closest goal tile).
 * Continue investigating route quality and correctness for paths involving multiple V/G handoffs. Known symptoms include missed early G handoffs, unnecessary V stretches over pathable terrain, and handoff proto selection that needs to remain stable across repeated G/V transitions.
-* Account for debris in pathfinding. Debris can block or alter practical vehicle access even when the terrain height/pathability model otherwise looks valid.
+* Debris handling is specified by [Accessway Pathfinding Debris Amendment](accessway-pathfinding-debris.md); remaining work is implementation and fixtures for cleanup-cost routing and cleanup-designation materialization.
 
 ## Relationship to the access framework
 
