@@ -47,7 +47,7 @@ Augmenting the state with height is what makes the slope constraint local and ke
 
   The two differ because a `0.5` slope is drivable but **not constructible/workable**: pushing the allowed-slope all the way to within-designation delta `2` (slope `0.5`) has **proven not to work** - excavation cannot take place on that slope. The **saddle designation** is the practical middle ground (slope stays `0.25`, but the *diagonal* corner delta may be `2`) and is the relaxation knob to experiment with later, not the full `0.5` slope.
 
-**MVP edge cost.** Two cost terms, both real and deliberately simple:
+**MVP edge cost.** Two cost terms, both real and deliberately simple. The MVP starts with center-height work to keep the first search small; the planned production refinement for mountain and cliff routing is specified in [Accessway Pathfinding Side-Ray Work Cost Amendment](accessway-pathfinding-side-ray-cost.md):
 
   * **Terrain work** - for a new V1 designation, approximate work by the absolute center-height delta between the current terrain center height and the candidate node height: `work = abs(h - terrainCenter(origin))`. Do **not** apply any useful-product rebate in the MVP. A pre-existing designation that the search reuses has **zero work cost** because it is already scheduled to be worked anyway.
   * **Traversal length** - every transition pays a positive driving cost equal to tile Manhattan length: `deltaX + deltaY`. A V-to-V origin step therefore costs `4` length units, while a G-to-G vanilla tile step costs `1`. A longer corridor lengthens every future haul: the mining trucks that will work the whole dig site drive this accessway repeatedly, so a long flat detour across prepared ground imposes a real downstream cost on the excavation/mining teams.
@@ -64,6 +64,11 @@ Start with `workDistanceScale = 1`, meaning one product-unit of center-height wo
 
 Because every admissible edge already encodes slope, and cost already encodes work, **the path cost is the candidate's score** - routing and selection collapse into one search.
 
+
+
+## Side-ray work-cost amendment
+
+The center-height terrain-work term above is the MVP cost only. The planned production scorer is specified in [Accessway Pathfinding Side-Ray Work Cost Amendment](accessway-pathfinding-side-ray-cost.md). It scores each generated segment's lateral exit corners with bounded accelerating rays and integrates `stepLength * dh` until the material-slope ray reaches terrain, so hillside routes pay for side-wedge depth instead of only local vertical delta.
 
 ## Debris amendment
 
