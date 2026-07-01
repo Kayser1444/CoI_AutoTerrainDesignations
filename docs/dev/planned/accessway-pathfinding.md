@@ -51,14 +51,15 @@ Augmenting the state with height is what makes the slope constraint local and ke
 
   * **Terrain work** - for a new V1 designation, approximate work by the absolute center-height delta between the current terrain center height and the candidate node height: `work = abs(h - terrainCenter(origin))`. Do **not** apply any useful-product rebate in the MVP. A pre-existing designation that the search reuses has **zero work cost** because it is already scheduled to be worked anyway.
   * **Traversal length** - every transition pays a positive driving cost equal to tile Manhattan length: `deltaX + deltaY`. A V-to-V origin step therefore costs `4` length units, while a G-to-G vanilla tile step costs `1`. A longer corridor lengthens every future haul: the mining trucks that will work the whole dig site drive this accessway repeatedly, so a long flat detour across prepared ground imposes a real downstream cost on the excavation/mining teams.
+  * **Generated-V fixed overhead** - every newly generated `V` designation pays a small positive overhead in addition to length and terrain work. This breaks ties where a zero-work `V` macro-cell is otherwise equal to several `G` tile steps, and it deliberately makes a wiggly `G` route through sparse forest cheaper than straightening the forest into generated terrain work. Existing/reused access profiles do not pay this overhead because they are already scheduled or built. This overhead is only a preference term; prop legality is still governed by the debris/forest amendment, where `V` may ignore removable non-tree props with any amount of mining, but dumping onto removable props and all tree cases require the verified game removal thresholds.
 
 Combine them with one global tuning parameter that translates work into distance:
 
 ```text
-edgeCost = (deltaX + deltaY) + workDistanceScale * work
+edgeCost = (deltaX + deltaY) + workDistanceScale * work + generatedVFixedOverheadWhenEnteringNewV
 ```
 
-Start with `workDistanceScale = 1`, meaning one product-unit of center-height work is treated like one tile of travel. Keep it configurable in public mod settings because it is the main behavioural knob. This cost is additive, local, and non-negative, which is the main A*/Dijkstra requirement. The exact footprint integral, distinct-corner accounting, and useful-product discount can be revisited later; they are intentionally outside the MVP cost function.
+Start with `workDistanceScale = 1`, meaning one product-unit of center-height work is treated like one tile of travel. Keep it configurable in public mod settings because it is the main behavioural knob. The generated-`V` overhead is zero for `G` and existing/reused access profiles, and may be a fixed tuning constant at first; it must be large enough to prefer plausible `G` wiggles through naturally spaced trees over unnecessary generated `V`, but small enough that true terrain accessways still win when `G` is blocked or excessively long. This cost is additive, local, and non-negative, which is the main A*/Dijkstra requirement. The exact footprint integral, distinct-corner accounting, prop-class cleanup costs, and useful-product discount can be revisited later; they are intentionally outside the MVP cost function.
 
 **Start / end.** For a cluster `C`, choose a representative start origin `S` by averaging the cluster origins' center coordinates `(x, y)` and taking the origin whose center has the smallest Manhattan distance to that average. The search runs from `S` toward the tower center `T`, but `T` itself is inside the tower and not pathable, so it is **not** the graph end. The end condition is any precomputed `G` node `E` in the tower-reachable vanilla flood. In other words: route from the cluster to tower-reachable pathable ground, not literally into the tower footprint.
 
@@ -72,7 +73,7 @@ The center-height terrain-work term above is the MVP cost only. The planned prod
 
 ## Debris amendment
 
-Debris pathfinding is specified in [Accessway Pathfinding Debris Amendment](accessway-pathfinding-debris.md). In short, debris that sits on otherwise drivable ground remains a **G-node route option** with a small cleanup cost, and materialization emits debris-removal mining designations rather than forcing a G/V/G dig-under detour.
+Debris and forest-prop pathfinding is specified in [Accessway Pathfinding Debris Amendment](accessway-pathfinding-debris.md). In short, debris that sits on otherwise drivable ground remains a **G-node route option** with a small cleanup cost, trees are treated as sparse forest props that should prefer wiggly `G` traversal/harvesting over generated `V`, and materialization emits cleanup or harvesting designations rather than forcing a G/V/G dig-under detour.
 
 ## From path to designations (the corner problem)
 
