@@ -29,13 +29,13 @@ The exact weights are tuning parameters. The important behavioral change is that
 
 ## Exit-corner sampling
 
-For an ordered corridor path, each generated segment scores only its exit edge:
+For an ordered corridor path, score only constructed interior exit edges:
 
-* The predecessor already accounted for the shared entry edge.
-* Scoring only exits avoids double-counting interior segment boundaries.
-* The first generated segment still pays the fixed designation overhead; a future implementation may also score its exposed entry edge if tests show undercounting at route starts.
+* The starting edge has zero terrain-work cost. Accessways always start from a handoff edge, whose mining/dumping proto does not work the ground-connecting edge, or from an intent-fixed profile that is already determined outside this scorer.
+* Interior generated-to-generated exits are the only edges that need side-ray terrain-work scoring. The predecessor accounted for the shared entry edge, so scoring exits avoids double-counting interior segment boundaries.
+* The terminal edge has zero terrain-work cost. Accessways end through the same kind of 0-work handoff to V/G or at another cluster/fixed designation whose profile is already fixed; do not add side-ray or overhead work for the last handoff segment. Traversal length may still be paid separately by the main edge-cost formula.
 
-For a segment moving in direction `d`, choose the two corners on the outgoing edge and shoot one lateral ray from each corner:
+For a scored interior segment moving in direction `d`, choose the two corners on the outgoing edge and shoot one lateral ray from each corner:
 
 | Move direction | Exit edge | Exit corners | Lateral rays |
 |---|---|---|---|
@@ -48,7 +48,7 @@ The side-ray cost is therefore direction-aware: the same origin and target profi
 
 ## Lateral-only ray march
 
-Only lateral rays are sampled. Longitudinal start/end work is already represented by the path's predecessor/successor structure: an accessway starts from ground, connects segment-to-segment through shared edges, and ends at ground. The missing signal is side exposure, especially on steep terrain.
+Only lateral rays are sampled. Longitudinal start/end work is represented by handoff or intent-fixed profiles and has zero terrain-work cost in this scorer; generated interior segments connect through shared edges. The missing signal is side exposure, especially on steep terrain.
 
 Each lateral ray starts at a planned exit corner height and follows an idealized material slope outward until that slope intersects terrain or reaches a fixed maximum distance. This estimates the cross-sectional wedge that must be excavated or filled to make the accessway's side stable/workable.
 
@@ -74,6 +74,15 @@ The sign of the ray slope depends on whether the side is fill or cut. Determine 
 
 * **Fill side:** planned corner is above terrain; the side ray slopes downward/outward until it reaches ground.
 * **Cut side:** planned corner is below terrain; the side ray slopes upward/outward until it reaches ground/open terrain.
+
+## Material run-slope selection
+
+`materialSlope` should be chosen from the material that will actually form the side wedge, and fill/cut must use different material forms:
+
+* **Dumping/fill:** inspect the active dumping rules for the tower/accessway, look up each allowed material's terrain properties, and use the material with the lowest stable slope/angle as the ray slope. This is the most conservative option because trucks may dump the runniest allowed material. Use the **disturbed** material properties for dumping; dumped material is loose/disturbed and is significantly more runny than the normal in-ground material.
+* **Mining/cut:** sample the terrain material at the exit corner's `(x, y)` and the planned corner elevation used by the ray. This point is guaranteed to be underground for a cut side. Use the material's **normal** in-ground properties, not its disturbed/dumped variant.
+
+If a material lookup fails, fall back to the conservative runniest known terrain-material slope and include diagnostics so the scorer does not silently become optimistic.
 
 ## Discrete cost integration
 
@@ -107,6 +116,8 @@ but the initial implementation should prefer the simpler `stepLength * dh` form.
 
 Every ray must have a maximum distance and maximum contribution. If no intersection is found within the step table, add a large capped unresolved-ray penalty rather than infinity. This keeps all candidates comparable while strongly discouraging routes that cut across cliffs or require unbounded shoulders.
 
+If a lateral ray reaches the edge of the map before it intersects terrain, handle it by operation type. For a **fill** side, the map edge is fatal: outside-map space cannot support an infinite dumping shoulder, so the candidate edge should be rejected or assigned an effectively infinite cost rather than the finite unresolved-ray penalty. For a **cut/mining** side, the map edge counts as success: the cut has reached open boundary space, so stop the ray and keep only the integrated in-bounds cost accumulated so far. Do not sample outside the map. A generated designation whose own footprint is outside the map remains invalid; this rule only covers side-ray scoring for otherwise valid in-bounds segments near the map edge.
+
 Recommended first-pass controls:
 
 ```text
@@ -114,6 +125,20 @@ maxRayDistance      = 16 terrain tiles by default; test 21 only if cliffs are un
 maxRayCost          = tuned finite cap
 unresolvedRayPenalty = tuned finite penalty added at max distance
 ```
+
+## Deferred durability and obstruction integration
+
+Do not combine side rays with durability or obstruction feasibility in the first implementation. Keep the initial side-ray work scoped to cost estimation until the routing, material-slope selection, and tuning are stable. The existing durability/hourglass and hard-obstacle checks should remain the authoritative feasibility filters during that phase.
+
+Once the cost scorer is stable, the side-ray march is a candidate for a more accurate generated-edge landslide/support check. At that later stage, reuse the same ray samples for scoring and feasibility where possible: one bounded march can return the integrated work cost plus any hard blocker it encountered.
+
+Deferred feasibility rules to evaluate later:
+
+* **Buildings:** if the ray/wedge crosses an occupied or planned building footprint, reject the candidate edge. Buildings remain hard obstacles, not soft cost.
+* **Other designations:** if the ray/wedge crosses an active or fixed designation that is not the predecessor/successor profile already accounted for by the accessway, reject unless that designation's fixed target profile is explicitly compatible with the ray side. Do not assume future landslides may consume or overwrite unrelated work.
+* **Current candidate designations:** compatible generated neighbours in the same candidate path are allowed; shared interior edges are already accounted for by the exit-only scoring rule.
+
+The broad durability/hourglass index can remain as a cheap prefilter for sources not represented by the current side ray, for G-node safety, and for diagnostics. Only after the side-ray cost implementation has been validated should generated-edge durability consider preferring the side-ray result, because it follows the actual direction, operation, and material run slope of the candidate edge.
 
 ## Relationship to direct work cost
 
@@ -129,13 +154,11 @@ terrainWorkCost = overhead
 
 ## Turns and special cases
 
-The first implementation can score every segment's exit edge in its own direction and rely on the fixed overhead to cover remaining work. Later refinements may add:
+The first implementation should score each constructed interior segment's exit edge in its own direction and leave start/terminal handoff or fixed edges at zero terrain-work cost. Later refinements may add:
 
-* an exposed-entry score for the first generated segment,
 * an outside-corner ray for sharp turns and switchbacks,
 * unique-edge accounting for branched or reused fixed profiles,
-* separate cut and fill weights,
-* material-specific slope factors when reliable data is available.
+* separate cut and fill weights.
 
 ## Expected behavior
 
