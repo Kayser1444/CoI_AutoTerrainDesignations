@@ -26,6 +26,12 @@ ATD's standalone debris cleanup flow already has the two pieces this amendment n
 * **Detection.** `CollectDebrisDesignationOrigins` enumerates terrain props in the tower area, ignores props whose proto does not block vehicles, converts occupied terrain tiles to 4x4 designation origins, and keeps only origins whose whole designation footprint is inside the managed area.
 * **Materialization.** `CreateDebrisRemovalDesignationsCoroutine` places a mining designation at each debris origin when the origin has no ore designation, no existing terrain designation, and remains fully inside the managed area. Each corner target is the current surface height at that corner plus one level. Successful placements are registered as generated tower designations.
 
+AFD's forestry information panel provides the tree-harvest precedent to verify before implementation ([`CoI_AutoForestryDesignations/src/AFD.ForestryInfoPanel.cs`](https://github.com/Kayser1444/CoI_AutoForestryDesignations/blob/main/src/AFD.ForestryInfoPanel.cs)):
+
+* It imports `Mafi.Core.Buildings.Forestry` and `Mafi.Core.Terrain.Trees`, works from a `ForestryTower`, and iterates `tower.Trees` through `TreesManager.Trees` while filtering to tiles covered by fulfilled forestry designations.
+* Its UI bucket click path checks `TreesManager.IsTreeSelected(treeId)`, calls `TreesManager.AddToHarvest(treeId)` for unselected trees, calls `TreesManager.RemoveFromHarvest(treeId)` when toggling a fully selected bucket off, and then activates the harvest overlay.
+* ATD should not copy AFD UI code, but the cleanup materializer can use the same manager-level operations as the implementation clue for tree cleanup actions: collect `TreeId`s in the selected cleanup footprint, mark them for harvest, and leave ordinary debris cleanup on the mining-designation path.
+
 The accessway implementation already separates immutable search state from placement. `BuildExperimentalAccessSnapshot` captures ground heights, fixed designation profiles, occupied building tiles, ocean tiles, durability sources, and currently pathable `G` nodes before search. `AccessPathMaterializer.Materialize` then replays the accepted path against the snapshot, emits generated `V` designations, preserves reused `G` nodes as no-op path segments, and rejects snapshot-inconsistent paths before mutable placement begins.
 
 ## Desired behavior
@@ -67,6 +73,16 @@ The search state can remain `AccessSearchMode.Ground`; debris is edge/path metad
 
 Prop cleanup designations must stay out of generated-profile compatibility inputs. Do not add their `surfaceHeight + 1` corner targets to fixed profiles, path-history corner maps, durability-corner sources, or fight-invariant checks. A true V mining handoff or generated accessway segment may start adjacent to a debris cleanup origin; it only needs to satisfy the normal V/G or V/V rules against real terrain or real V profiles, not share an edge with the cleanup designation.
 
+## Vanilla pathfinder integration
+
+The vanilla pathability provider remains authoritative for ordinary already-clear `G`, tower seeds, and final post-placement validation, but it should not be asked to pretend that cleanup props are absent. If vanilla exposes a safe query that ignores terrain props while retaining slope, ocean, building, and vehicle-clearance rules, ATD may use it as an optimization. Otherwise the accessway search needs an ATD overlay graph:
+
+1. Query vanilla pathability normally and keep every passing tile/footprint as ordinary clear `G`.
+2. For vanilla-blocked tiles/footprints, look up the blocker in the immutable prop snapshot. If every blocker is cleanup-eligible and the underlying terrain would satisfy ATD's terrain, slope, ocean, durability, building, area, and clearance checks, admit the tile/footprint as cleanup `G` with the appropriate cleanup metadata and cost.
+3. Keep all other vanilla-blocked tiles/footprints blocked. Do not globally disable prop checks in vanilla pathing, because that would also hide non-removable blockers and would make the final route disagree with real vehicle pathing until cleanup/materialization has happened.
+
+In other words, this amendment does not require replacing vanilla pathfinding wholesale, but it does require ATD-owned graph expansion for the speculative cleanup layer. Vanilla pathfinding can still validate the already-clear parts of the route and the completed world after cleanup/designation placement.
+
 ## Costing and tie-breaks
 
 A cleanup origin has cost:
@@ -96,7 +112,7 @@ The accepted path materializes in two independent buckets:
 
 Before placement, rematerialization must revalidate that each cleanup origin still has the blocking prop classes recorded by the selected path, is still fully inside the area, and still has no terrain designation. For generated `V` paths that rely on terrain work to remove props, rematerialization must also re-check that the final target profile still performs the required prop-removing work: any mining for removable non-tree props, verified-threshold dumping for removable non-tree props, and verified-threshold mining/dumping for trees. If a cleanup origin became unnecessary because all relevant props disappeared, drop that cleanup item and continue. If only some classes disappeared from a mixed origin, keep the remaining cleanup actions and update diagnostics. If any cleanup origin became unsafe or conflicted with a terrain designation, reject the candidate and let the caller search again against a fresh snapshot or fall back.
 
-Placement should use the mining proto and target `surfaceHeight + 1` at each of the four designation corners for debris cleanup, matching the existing cleanup flow. Tree cleanup may use the appropriate harvesting/removal action if available; if the game cannot safely express tree harvesting together with debris cleanup for the same origin, the mixed origin should fall back to the debris cleanup action that removes all blocking props or be rejected and re-searched. Treat these placements/actions as cleanup work items rather than terrain profiles: they should be registered for ownership and rollback, but not reintroduced into the access snapshot as access providers, fixed V profiles, fight-invariant blockers, or durability-envelope sources. Successful debris cleanup placements should be registered through the same generated-designation ownership path used by ATD-generated mining/accessway designations so rollback, tower ownership, and save-removability behavior stay consistent.
+Placement should use the mining proto and target `surfaceHeight + 1` at each of the four designation corners for debris cleanup, matching the existing cleanup flow. Tree cleanup should prefer the forestry harvest mechanism verified from AFD: resolve the `TreeId`s in the accepted cleanup footprint, call the tree manager's harvest-selection operation for each unselected tree, and activate/refresh the harvest overlay if needed. If the game cannot safely express tree harvesting together with debris cleanup for the same origin, the mixed origin should fall back to the debris cleanup action that removes all blocking props or be rejected and re-searched. Treat these placements/actions as cleanup work items rather than terrain profiles: they should be registered for ownership and rollback, but not reintroduced into the access snapshot as access providers, fixed V profiles, fight-invariant blockers, or durability-envelope sources. Successful debris cleanup placements should be registered through the same generated-designation ownership path used by ATD-generated mining/accessway designations so rollback, tower ownership, and save-removability behavior stay consistent.
 
 Rollback must remove both generated `V` designations and debris cleanup designations placed for the failed accessway transaction.
 
@@ -118,12 +134,26 @@ G(debris cleanup) -> G
 
 The V/G handoff rules remain unchanged for genuine terrain edits. Handoff operation selection still applies only to generated V terminal designations, not to debris cleanup G nodes.
 
+## Higher clearance
+
+Cleanup routing must be evaluated over the same clearance footprint as the access request, not over individual center tiles:
+
+* For clearance 1, a cleanup `G` state can be admitted from the affected tile/origin metadata described above.
+* For clearance 2+ / mega vehicles, the candidate `G` state is valid only if the whole vanilla vehicle footprint or ATD clearance brush can be occupied after the planned cleanup. Each footprint tile that vanilla reports blocked must map either to an already-clear pathability result, an eligible cleanup prop, or a generated `V` terrain edit that removes the prop under the mining/dumping rules above.
+* Cleanup cost is still charged once per 4x4 cleanup origin, even if a wide vehicle footprint touches several tiles in that origin. A wide route that touches multiple cleanup origins pays for each distinct origin it requires.
+* A mixed wide footprint must not be downgraded to tree-only just because one lane is forest: if any lane/footprint tile needs dense-debris cleanup, the route carries the dense-debris category and materialization metadata for that origin.
+* V2+ G/V handoffs must prove both width and prop legality at the seam. It is not enough for one lane to be cleanup-valid; every lane in the exposed frontage must be clear, cleanup-eligible, or prop-removing through verified terrain work.
+
+This keeps the sparse-forest preference for mega vehicles without assuming that single-tile pathability generalizes to higher clearance.
+
 ## Fixtures and acceptance criteria
 
 Add deterministic fixtures before enabling this in production routing:
 
-* A sparse forest corridor routes through `G` with tree cleanup/harvesting metadata instead of a generated `V` straightening pass.
+* A sparse forest corridor routes through `G` with tree cleanup/harvesting metadata instead of a generated `V` straightening pass, and materialization marks the selected `TreeId`s for harvest through the tree manager rather than emitting a terrain profile.
+* If vanilla cannot ignore cleanup props selectively, the same sparse forest corridor is admitted through the ATD overlay graph rather than by globally disabling prop checks in the vanilla pathability provider.
 * A flat ground corridor blocked by one non-tree debris origin routes through G with one cleanup designation and no generated V designations.
+* A clearance-2 route through cleanup props validates the whole mega-vehicle footprint, charges each cleanup origin once, and rejects if any lane contains a non-cleanup blocker.
 * The same corridor without debris routes through plain G with zero cleanup cost.
 * A path that crosses multiple tiles of the same debris origin pays cleanup cost once.
 * A mixed tree-plus-boulder origin is classified as cleanup `G`, pays the dense-debris cleanup cost once, preserves both cleanup classes for materialization/diagnostics, and is not treated as tree-only forest traversal.
