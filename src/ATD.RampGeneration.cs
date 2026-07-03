@@ -9,6 +9,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
@@ -163,6 +164,64 @@ namespace AutoTerrainDesignations
         private static int s_buildingOccupiedTilesCachedTick = int.MinValue;
 
         internal enum RampPlacementOutcome { Failed, Truncated, Crested, NotAccessible }
+
+        /// <summary>
+        /// Per-phase timings for one <see cref="CreateAccessRampCoroutine"/> run, logged when the
+        /// run exceeds <see cref="ACCESS_RAMP_PERF_LOG_THRESHOLD_MS"/>. Diagnostics only — reset at
+        /// coroutine start, accumulated by the phases and by
+        /// <see cref="FindBestCandidateForCluster"/> across retries.
+        /// </summary>
+        private sealed class AccessRampPerfStats
+        {
+            public long SetupMs;
+            public long EndpointsMs;
+            public long ClusteringMs;
+            public long ProvidersMs;
+            public long ReachabilityMs;
+            public long GenerationMs;
+            public long CandidateCollectMs;
+            public long CandidateEvalMs;
+            public int Clusters;
+            public int UnreachableClusters;
+            public int Candidates;
+            public int DryRuns;
+
+            public void Reset()
+            {
+                SetupMs = 0;
+                EndpointsMs = 0;
+                ClusteringMs = 0;
+                ProvidersMs = 0;
+                ReachabilityMs = 0;
+                GenerationMs = 0;
+                CandidateCollectMs = 0;
+                CandidateEvalMs = 0;
+                Clusters = 0;
+                UnreachableClusters = 0;
+                Candidates = 0;
+                DryRuns = 0;
+            }
+        }
+
+        private const long ACCESS_RAMP_PERF_LOG_THRESHOLD_MS = 500;
+        private static readonly AccessRampPerfStats s_accessRampPerf = new AccessRampPerfStats();
+
+        private static void LogAccessRampPerfIfSlow(IAreaManagingTower tower, long totalMs)
+        {
+            if (totalMs < ACCESS_RAMP_PERF_LOG_THRESHOLD_MS)
+                return;
+
+            string towerText = TryGetTowerEntityId(tower, out EntityId towerId) && towerId.IsValid
+                ? towerId.ToString()
+                : "?";
+            AccessRampPerfStats p = s_accessRampPerf;
+            s_log.Info(
+                $"[ATD Access Perf] CreateAccessRamp: {totalMs} ms, tower={towerText}, " +
+                $"setup={p.SetupMs}ms, endpoints={p.EndpointsMs}ms, clustering={p.ClusteringMs}ms, " +
+                $"providers={p.ProvidersMs}ms, reachability={p.ReachabilityMs}ms, generation={p.GenerationMs}ms " +
+                $"(candidateCollect={p.CandidateCollectMs}ms, candidateEval={p.CandidateEvalMs}ms), " +
+                $"clusters={p.Clusters}, unreachable={p.UnreachableClusters}, candidates={p.Candidates}, dryRuns={p.DryRuns}");
+        }
 
         private const uint ALL_DESIGNATION_TILES_MASK = 0x1FFFFFF;
         private const uint READY_PERIMETER_MASK = 0x1F8C63F;
@@ -440,18 +499,25 @@ namespace AutoTerrainDesignations
             TerrainDesignationProto accesswayProto = s_levelingProto ?? sourceWorkProto;
             bool accesswayAllowsMixedWork = s_levelingProto != null && accesswayProto == s_levelingProto;
 
+            s_accessRampPerf.Reset();
+            Stopwatch accessRampTotalSw = Stopwatch.StartNew();
+            Stopwatch accessRampPhaseSw = Stopwatch.StartNew();
+
             // Deliberately redundant with the invalidation inside candidate search: a caller may
             // have placed/removed designations since the last flood, and this coroutine may be
             // frame-sliced, so start every ramp-generation run from a fresh flood.
             InvalidateTowerReachabilityFlood();
             BuildBuildingOccupiedTiles(tower);
             BuildDesignationOriginsInArea(tower);
+            s_accessRampPerf.SetupMs = accessRampPhaseSw.ElapsedMilliseconds;
 
+            accessRampPhaseSw.Restart();
             var accessWorkDepths = new Dict<Tile2i, int>();
             foreach (var pair in tileDepths)
                 accessWorkDepths[pair.Key] = pair.Value;
             HashSet<Tile2i> existingEndpointOrigins = AddExistingTerrainWorkEndpoints(
                 tower, accessWorkDepths, cornerHeights);
+            s_accessRampPerf.EndpointsMs = accessRampPhaseSw.ElapsedMilliseconds;
             if (accessWorkDepths.Count == 0)
             {
                 result.Outcome = RampPlacementOutcome.Failed;
@@ -459,6 +525,7 @@ namespace AutoTerrainDesignations
             }
 
             // 1. Group active designations into origin clusters
+            accessRampPhaseSw.Restart();
             List<List<Tile2i>> rawClusters = BuildDesignationOriginClusters(accessWorkDepths, terrMgr);
             if (rawClusters.Count == 0)
             {
@@ -493,6 +560,9 @@ namespace AutoTerrainDesignations
                 originClusters.Add(new AccessOriginCluster(
                     ++nextClusterId, accessOrigins, sourceIntents));
             }
+
+            s_accessRampPerf.ClusteringMs = accessRampPhaseSw.ElapsedMilliseconds;
+            s_accessRampPerf.Clusters = originClusters.Count;
 
             if (AutoTerrainDesignationsMod.TurningRampsExperimental)
             {
@@ -533,6 +603,7 @@ namespace AutoTerrainDesignations
             }
 
             // 2. Identify existing access providers
+            accessRampPhaseSw.Restart();
             var existingProviders = new List<AccessProvider>();
             var accessibleAccessOrigins = new HashSet<Tile2i>();
             var inaccessibleAccessOrigins = new HashSet<Tile2i>();
@@ -552,7 +623,10 @@ namespace AutoTerrainDesignations
                 }
             }
 
+            s_accessRampPerf.ProvidersMs = accessRampPhaseSw.ElapsedMilliseconds;
+
             // 3. Evaluate initial reachability
+            accessRampPhaseSw.Restart();
             var states = AccessReachability.EvaluateReachability(
                 originClusters,
                 existingProviders,
@@ -572,12 +646,15 @@ namespace AutoTerrainDesignations
                 AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, state, AccessNeed.Mining, null, null, BlockedReason.None, 0f));
             }
 
+            s_accessRampPerf.ReachabilityMs = accessRampPhaseSw.ElapsedMilliseconds;
+
             // If everything is already reachable, we can skip ramp generation
             if (allowExistingPlannedRampShortcut
                 && !useLocalSurfaceReference
                 && originClusters.All(c => states[c] == AccessClusterState.AccessibleDirect || states[c] == AccessClusterState.AccessibleViaProvider))
             {
                 LogDebug("Skipping ramp generation: every excavation cluster already has tower-reachable access.");
+                LogAccessRampPerfIfSlow(tower, accessRampTotalSw.ElapsedMilliseconds);
                 result.TopRowTile = default;
                 result.Outcome = RampPlacementOutcome.Crested;
                 yield break;
@@ -603,6 +680,8 @@ namespace AutoTerrainDesignations
             bool validatedExistingRoute = false;
 
             // 5. Generate missing providers closest-first
+            s_accessRampPerf.UnreachableClusters = unreachableClusters.Count;
+            accessRampPhaseSw.Restart();
             int unreachableClusterCount = unreachableClusters.Count;
             for (int clusterLoopIndex = 0; clusterLoopIndex < unreachableClusters.Count; clusterLoopIndex++)
             {
@@ -964,6 +1043,9 @@ namespace AutoTerrainDesignations
                 }
             }
 
+            s_accessRampPerf.GenerationMs = accessRampPhaseSw.ElapsedMilliseconds;
+            LogAccessRampPerfIfSlow(tower, accessRampTotalSw.ElapsedMilliseconds);
+
             if (!placedAny && !validatedExistingRoute && worstOutcome == RampPlacementOutcome.Crested)
             {
                 result.Outcome = RampPlacementOutcome.Failed;
@@ -1030,7 +1112,10 @@ namespace AutoTerrainDesignations
         {
             allEvaluated = new List<EvaluatedAccessCandidate>();
 
+            Stopwatch candidateSw = Stopwatch.StartNew();
             List<RampCandidate> candidates = CollectRampCandidates(tower, clusterTileDepths, rampWidth, lateralRetryOffset, reservedRampTiles);
+            s_accessRampPerf.CandidateCollectMs += candidateSw.ElapsedMilliseconds;
+            s_accessRampPerf.Candidates += candidates.Count;
             if (candidates.Count == 0)
             {
                 return null;
@@ -1038,12 +1123,14 @@ namespace AutoTerrainDesignations
 
             RefreshPathabilityAndInvalidateReachability();
 
+            candidateSw.Restart();
             var testedMouthReachability = new Dictionary<Tile2i, bool>();
             int reachabilityChecks = 0;
 
             for (int candidateOrder = 0; candidateOrder < candidates.Count; candidateOrder++)
             {
                 RampCandidate candidate = candidates[candidateOrder];
+                s_accessRampPerf.DryRuns++;
                 RampPlacementOutcome dryOutcome = TryPlaceRamp(
                     tower,
                     candidate,
@@ -1123,6 +1210,8 @@ namespace AutoTerrainDesignations
 
                 allEvaluated.Add(evaluated);
             }
+
+            s_accessRampPerf.CandidateEvalMs += candidateSw.ElapsedMilliseconds;
 
             if (allEvaluated.Count == 0)
             {
