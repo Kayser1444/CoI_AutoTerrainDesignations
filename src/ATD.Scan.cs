@@ -36,6 +36,10 @@ namespace AutoTerrainDesignations
                 bool movedNext;
                 object? current = null;
 
+                // Each MoveNext resumption is a new frame: the pathability bitmap may have been
+                // flushed while the coroutine was suspended, so a flood cached by other code
+                // (e.g. the farming tick) must not satisfy this frame's reachability queries.
+                InvalidateTowerReachabilityFlood();
                 s_createDesignationsDebugContext = true;
                 try
                 {
@@ -536,6 +540,132 @@ namespace AutoTerrainDesignations
             return false;
         }
 
+        /// <summary>
+        /// Tiles reached by the shared tower-reachability flood (see
+        /// <see cref="EnsureTowerReachabilityFlood"/>). Valid only while
+        /// <see cref="s_towerReachabilityFloodValid"/> is set and the tower/bounds key matches.
+        /// Single-slot cache: callers batch many queries against one tower before moving on,
+        /// so one slot suffices. Interleaving queries for different towers/bounds would thrash
+        /// the slot and rebuild the flood per query — keep per-tower query batches together.
+        /// </summary>
+        private static readonly HashSet<Tile2i> s_towerReachabilityFloodVisited = new HashSet<Tile2i>();
+        private static readonly Queue<Tile2i> s_towerReachabilityFloodQueue = new Queue<Tile2i>();
+        private static Tile2i s_towerReachabilityFloodBbMin;
+        private static Tile2i s_towerReachabilityFloodBbMax;
+        private static Tile2i s_towerReachabilityFloodTowerPosition;
+        private static bool s_towerReachabilityFloodHasStart;
+        private static bool s_towerReachabilityFloodValid;
+
+        /// <summary>
+        /// Drops the cached tower-reachability flood. Must be called whenever the pathability
+        /// bitmap may have changed — i.e. wherever <c>PathabilityProvider.UpdateChangedTiles()</c>
+        /// is invoked, at the start of each farming tick, and on each resumed frame of the
+        /// mining scan coroutine.
+        /// </summary>
+        private static void InvalidateTowerReachabilityFlood()
+        {
+            s_towerReachabilityFloodValid = false;
+        }
+
+        /// <summary>
+        /// Invalidates the cached flood and releases its tile set. For world teardown; the hot
+        /// path uses <see cref="InvalidateTowerReachabilityFlood"/> and reuses the allocation.
+        /// </summary>
+        private static void ClearTowerReachabilityFlood()
+        {
+            s_towerReachabilityFloodValid = false;
+            s_towerReachabilityFloodVisited.Clear();
+        }
+
+        /// <summary>
+        /// Flushes pending pathability changes and drops the cached tower-reachability flood.
+        /// Always use this instead of calling <c>PathabilityProvider.UpdateChangedTiles()</c>
+        /// directly — a refreshed bitmap with a stale flood returns wrong reachability answers.
+        /// </summary>
+        private static void RefreshPathabilityAndInvalidateReachability()
+        {
+            if (s_vehiclePathFindingManager != null)
+            {
+                try { s_vehiclePathFindingManager.PathabilityProvider.UpdateChangedTiles(); }
+                catch { }
+            }
+
+            InvalidateTowerReachabilityFlood();
+        }
+
+        /// <summary>
+        /// Builds (or reuses) one BFS flood from the tower that answers every subsequent
+        /// "is this tile vehicle-reachable from the tower" query as a set lookup. The flood
+        /// reproduces the per-query BFS in <see cref="IsReachableFromTowerInternal"/> exactly —
+        /// same start tile, same bounds, same expansion order, same visit cap — so membership in
+        /// the flooded set is equivalent to what an individual query BFS would have returned.
+        /// Access-ramp generation issues hundreds of such queries per pass (candidate mouths,
+        /// existing accessway components, owned-ramp purges), and each failing query previously
+        /// paid a full worst-case flood; sharing one flood removes multi-second sim stalls.
+        /// </summary>
+        private static void EnsureTowerReachabilityFlood(
+            IPathabilityProvider pathabilityProvider,
+            VehiclePathFindingParams pfParams,
+            Tile2i towerPosition,
+            Tile2i bbMin,
+            Tile2i bbMax)
+        {
+            if (s_towerReachabilityFloodValid
+                && s_towerReachabilityFloodBbMin == bbMin
+                && s_towerReachabilityFloodBbMax == bbMax
+                && s_towerReachabilityFloodTowerPosition == towerPosition)
+            {
+                return;
+            }
+
+            s_towerReachabilityFloodValid = false;
+            s_towerReachabilityFloodVisited.Clear();
+            s_towerReachabilityFloodBbMin = bbMin;
+            s_towerReachabilityFloodBbMax = bbMax;
+            s_towerReachabilityFloodTowerPosition = towerPosition;
+            s_towerReachabilityFloodHasStart =
+                TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start);
+            if (!s_towerReachabilityFloodHasStart)
+            {
+                s_towerReachabilityFloodValid = true;
+                LogLegacyAccessDebug($"[ATD Reachability Debug] Flood: cannot find pathable tile near tower {towerPosition}");
+                return;
+            }
+
+            int minX = Math.Min(bbMin.X, towerPosition.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int minY = Math.Min(bbMin.Y, towerPosition.Y) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int maxX = Math.Max(bbMax.X, towerPosition.X) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int maxY = Math.Max(bbMax.Y, towerPosition.Y) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+
+            HashSet<Tile2i> visited = s_towerReachabilityFloodVisited;
+            Queue<Tile2i> queue = s_towerReachabilityFloodQueue;
+            queue.Clear();
+            visited.Add(start);
+            queue.Enqueue(start);
+
+            while (queue.Count > 0 && visited.Count < MAX_RAMP_ACCESS_SEARCH_TILES)
+            {
+                Tile2i current = queue.Dequeue();
+
+                foreach (RelTile2i direction in s_rampAccessSearchDirections)
+                {
+                    Tile2i next = current + direction;
+                    if (next.X < minX || next.X > maxX || next.Y < minY || next.Y > maxY)
+                        continue;
+                    if (visited.Contains(next))
+                        continue;
+                    if (!pathabilityProvider.IsPathable(next, pfParams.PathabilityQueryMask))
+                        continue;
+
+                    visited.Add(next);
+                    queue.Enqueue(next);
+                }
+            }
+
+            s_towerReachabilityFloodValid = true;
+            LogLegacyAccessDebug($"[ATD Reachability Debug] Flood rebuilt from tower={towerPosition} start={start}: {visited.Count} reachable tile(s)");
+        }
+
         private static bool IsReachableFromTowerInternal(
             IAreaManagingTower tower,
             HashSet<Tile2i> targetTiles,
@@ -555,6 +685,46 @@ namespace AutoTerrainDesignations
             IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;
             VehiclePathFindingParams pfParams = s_excavatorPathFindingParams;
             Tile2i towerPosition = GetTowerPosition(tower, bbMin, bbMax);
+
+            // Targets inside the tower/bounds box do not widen the search area, so the shared
+            // flood explores exactly the tiles a per-query BFS would; answer from the flooded
+            // set. Targets outside the box would have extended the bounds — keep the original
+            // per-query BFS for those (rare) queries so behavior is unchanged.
+            int baseMinX = Math.Min(bbMin.X, towerPosition.X);
+            int baseMinY = Math.Min(bbMin.Y, towerPosition.Y);
+            int baseMaxX = Math.Max(bbMax.X, towerPosition.X);
+            int baseMaxY = Math.Max(bbMax.Y, towerPosition.Y);
+            bool targetsWithinBaseBounds = true;
+            foreach (Tile2i target in targetTiles)
+            {
+                if (target.X < baseMinX || target.X > baseMaxX || target.Y < baseMinY || target.Y > baseMaxY)
+                {
+                    targetsWithinBaseBounds = false;
+                    break;
+                }
+            }
+
+            if (targetsWithinBaseBounds)
+            {
+                EnsureTowerReachabilityFlood(pathabilityProvider, pfParams, towerPosition, bbMin, bbMax);
+                if (!s_towerReachabilityFloodHasStart)
+                {
+                    LogLegacyAccessDebug($"[ATD Reachability Debug] Cannot find pathable tile near tower {towerPosition}");
+                    return false;
+                }
+
+                foreach (Tile2i target in targetTiles)
+                {
+                    if (s_towerReachabilityFloodVisited.Contains(target))
+                    {
+                        LogLegacyAccessDebug($"[ATD Reachability Debug] Reachable via flood: target {target}");
+                        return true;
+                    }
+                }
+
+                LogLegacyAccessDebug($"[ATD Reachability Debug] Not reachable via flood ({s_towerReachabilityFloodVisited.Count} flooded tiles)");
+                return false;
+            }
 
             if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
             {

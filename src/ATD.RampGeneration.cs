@@ -440,6 +440,10 @@ namespace AutoTerrainDesignations
             TerrainDesignationProto accesswayProto = s_levelingProto ?? sourceWorkProto;
             bool accesswayAllowsMixedWork = s_levelingProto != null && accesswayProto == s_levelingProto;
 
+            // Deliberately redundant with the invalidation inside candidate search: a caller may
+            // have placed/removed designations since the last flood, and this coroutine may be
+            // frame-sliced, so start every ramp-generation run from a fresh flood.
+            InvalidateTowerReachabilityFlood();
             BuildBuildingOccupiedTiles(tower);
             BuildDesignationOriginsInArea(tower);
 
@@ -1032,11 +1036,7 @@ namespace AutoTerrainDesignations
                 return null;
             }
 
-            if (s_vehiclePathFindingManager != null)
-            {
-                try { s_vehiclePathFindingManager.PathabilityProvider.UpdateChangedTiles(); }
-                catch { }
-            }
+            RefreshPathabilityAndInvalidateReachability();
 
             var testedMouthReachability = new Dictionary<Tile2i, bool>();
             int reachabilityChecks = 0;
@@ -2445,8 +2445,7 @@ namespace AutoTerrainDesignations
             if (s_desigManager == null)
                 return false;
 
-            try { s_vehiclePathFindingManager.PathabilityProvider.UpdateChangedTiles(); }
-            catch { }
+            RefreshPathabilityAndInvalidateReachability();
 
             List<List<Tile2i>> rawClusters = BuildDesignationOriginClusters(tileDepths, terrMgr);
             if (rawClusters.Count == 0)

@@ -178,7 +178,7 @@ namespace AutoTerrainDesignations
             float landslideRunPerHeight = AutoTerrainDesignationsMod.AccessLandslideRunPerHeight;
             IPathabilityProvider provider = s_vehiclePathFindingManager.PathabilityProvider;
             VehiclePathFindingParams pathParams = s_excavatorPathFindingParams;
-            try { provider.UpdateChangedTiles(); } catch { }
+            RefreshPathabilityAndInvalidateReachability();
 
             var groundNodes = new HashSet<Tile2i>();
             foreach (var pair in groundHeight2)

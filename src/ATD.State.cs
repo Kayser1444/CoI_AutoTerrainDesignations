@@ -46,6 +46,8 @@ namespace AutoTerrainDesignations
         private static IInputScheduler? s_inputScheduler;
         private static ConfigSerializationContext? s_configSerializationContext;
         private static TerrainPropsManager? s_terrainPropsManager;
+        // Flush pathability only via RefreshPathabilityAndInvalidateReachability() — a direct
+        // PathabilityProvider.UpdateChangedTiles() call leaves the tower-reachability flood stale.
         private static IVehiclePathFindingManager? s_vehiclePathFindingManager;
         private static ParkAndWaitJobFactory? s_parkAndWaitJobFactory;
         private static VehiclePathFindingParams? s_excavatorPathFindingParams;
@@ -533,6 +535,7 @@ namespace AutoTerrainDesignations
             ClearFarmingRuntimeState();
             ClearFarmPlacementAssistRuntimeState();
             ClearIdleVehicleReleaseState();
+            ClearTowerReachabilityFlood();
         }
 
         public static void Initialize(

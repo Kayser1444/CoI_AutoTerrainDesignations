@@ -736,11 +736,7 @@ namespace AutoTerrainDesignations
             TerrainDesignationProto accesswayProto = s_levelingProto ?? rampProto;
 
             // Ensure the pathability bitmap is up-to-date before running BFS checks.
-            if (s_vehiclePathFindingManager != null)
-            {
-                try { s_vehiclePathFindingManager.PathabilityProvider.UpdateChangedTiles(); }
-                catch { }
-            }
+            RefreshPathabilityAndInvalidateReachability();
 
             bool anyPurged = false;
             foreach (Tile2i origin in ownedRamps.ToList())
@@ -819,13 +815,7 @@ namespace AutoTerrainDesignations
             IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;
             VehiclePathFindingParams pfParams = s_excavatorPathFindingParams;
 
-            try
-            {
-                pathabilityProvider.UpdateChangedTiles();
-            }
-            catch
-            {
-            }
+            RefreshPathabilityAndInvalidateReachability();
 
             Tile2i bbMin = tower.Area.BoundingBoxMin;
             Tile2i bbMax = tower.Area.BoundingBoxMax;

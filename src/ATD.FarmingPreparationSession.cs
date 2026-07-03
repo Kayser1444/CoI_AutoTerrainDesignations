@@ -521,6 +521,8 @@ namespace AutoTerrainDesignations
             if (s_desigManager == null)
                 return;
 
+            // Terrain (and thus pathability) may have changed since the previous tick.
+            InvalidateTowerReachabilityFlood();
             s_farmingAutomationTickIndex++;
             BootstrapFarmingAutomationForExistingTowers();
 

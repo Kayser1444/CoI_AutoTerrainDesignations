@@ -1,4 +1,5 @@
 v0.4.6a | 2026-06-28
+* Fixed: farming automation no longer stalls the simulation for seconds to minutes when tracked designations need access ramps; the tower-reachability BFS flood is now computed once per pathability refresh and shared by all access checks (candidate ramp mouths, existing accessway components, owned-ramp purges, cluster perimeter checks) instead of re-flooding the same area for every single query
 * Improved: experimental accessways can now connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
 * Improved: experimental V-to-G handoff operation selection uses the connected cluster-origin predecessor for single-origin access paths instead of relying on a misleading center estimate, and final terminal placement checks walk backward to target the last generated V node before the ground suffix
 * Improved: experimental access decisions are logged to debug console, and global `suppressLegacyAccessRamps` settings are now read from the migrated `ATDsettings.json` configuration file rather than save files

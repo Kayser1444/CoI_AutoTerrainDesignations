@@ -1,4 +1,5 @@
 v0.4.6a | 2026-06-27
+* Fixed: Farming automation no longer freezes the game while it plans access ramps for hard-to-reach areas
 * Improved: Experimental accessways can connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
 * Improved: Later clusters can reuse newly placed experimental accessways instead of creating duplicate ramps back to the tower
 * Fixed: Experimental routes can hand off to valid ground while still requiring final tower-reachable access, reducing unnecessary accessway designations over drivable terrain
