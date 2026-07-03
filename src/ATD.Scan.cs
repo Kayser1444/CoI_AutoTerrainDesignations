@@ -10,6 +10,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
@@ -706,6 +707,7 @@ namespace AutoTerrainDesignations
 
             if (targetsWithinBaseBounds)
             {
+                s_accessRampPerf.FloodQueries++;
                 EnsureTowerReachabilityFlood(pathabilityProvider, pfParams, towerPosition, bbMin, bbMax);
                 if (!s_towerReachabilityFloodHasStart)
                 {
@@ -726,6 +728,27 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
+            s_accessRampPerf.FallbackQueries++;
+            Stopwatch fallbackSw = Stopwatch.StartNew();
+            bool fallbackReachable = IsReachableFromTowerViaFullBfs(
+                targetTiles, bbMin, bbMax, towerPosition, pathabilityProvider, pfParams);
+            s_accessRampPerf.FallbackMs += fallbackSw.ElapsedMilliseconds;
+            return fallbackReachable;
+        }
+
+        /// <summary>
+        /// The original per-query BFS, kept verbatim as the fallback for queries whose targets
+        /// fall outside the base bounds box (they would widen the search area, so the shared
+        /// flood cannot answer them).
+        /// </summary>
+        private static bool IsReachableFromTowerViaFullBfs(
+            HashSet<Tile2i> targetTiles,
+            Tile2i bbMin,
+            Tile2i bbMax,
+            Tile2i towerPosition,
+            IPathabilityProvider pathabilityProvider,
+            VehiclePathFindingParams pfParams)
+        {
             if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
             {
                 LogLegacyAccessDebug($"[ATD Reachability Debug] Cannot find pathable tile near tower {towerPosition}");

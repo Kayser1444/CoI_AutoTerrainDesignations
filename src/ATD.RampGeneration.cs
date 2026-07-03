@@ -185,6 +185,11 @@ namespace AutoTerrainDesignations
             public int UnreachableClusters;
             public int Candidates;
             public int DryRuns;
+            public int FloodQueries;
+            public int FallbackQueries;
+            public long FallbackMs;
+            public int ProviderCandidates;
+            public int ProviderConnectCalls;
 
             public void Reset()
             {
@@ -200,6 +205,11 @@ namespace AutoTerrainDesignations
                 UnreachableClusters = 0;
                 Candidates = 0;
                 DryRuns = 0;
+                FloodQueries = 0;
+                FallbackQueries = 0;
+                FallbackMs = 0;
+                ProviderCandidates = 0;
+                ProviderConnectCalls = 0;
             }
         }
 
@@ -220,7 +230,9 @@ namespace AutoTerrainDesignations
                 $"setup={p.SetupMs}ms, endpoints={p.EndpointsMs}ms, clustering={p.ClusteringMs}ms, " +
                 $"providers={p.ProvidersMs}ms, reachability={p.ReachabilityMs}ms, generation={p.GenerationMs}ms " +
                 $"(candidateCollect={p.CandidateCollectMs}ms, candidateEval={p.CandidateEvalMs}ms), " +
-                $"clusters={p.Clusters}, unreachable={p.UnreachableClusters}, candidates={p.Candidates}, dryRuns={p.DryRuns}");
+                $"clusters={p.Clusters}, unreachable={p.UnreachableClusters}, candidates={p.Candidates}, dryRuns={p.DryRuns}, " +
+                $"floodQueries={p.FloodQueries}, fallbackQueries={p.FallbackQueries} ({p.FallbackMs}ms), " +
+                $"providerCandidates={p.ProviderCandidates}, providerConnectCalls={p.ProviderConnectCalls}");
         }
 
         private const uint ALL_DESIGNATION_TILES_MASK = 0x1FFFFFF;
@@ -618,6 +630,8 @@ namespace AutoTerrainDesignations
                 if (existingDesignation.HasValue
                     && IsAccesswayDesignationProto(existingDesignation.Value.Prototype, accesswayProto))
                 {
+                    s_accessRampPerf.ProviderCandidates++;
+                    s_accessRampPerf.ProviderConnectCalls++;
                     bool reachesTower = ExistingAccessOriginConnectsToTower(tower, origin, accessWorkDepths, accesswayProto, accessibleAccessOrigins, inaccessibleAccessOrigins);
                     existingProviders.Add(new AccessProvider(new[] { origin, origin.AddX(4), origin.AddY(4), origin.AddXy(4) }, reachesTower));
                 }
