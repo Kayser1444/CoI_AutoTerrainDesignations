@@ -118,6 +118,8 @@ Every ray must have a maximum distance and maximum contribution. If no intersect
 
 If a lateral ray reaches the edge of the map before it intersects terrain, handle it by operation type. For a **fill** side, the map edge is fatal: outside-map space cannot support an infinite dumping shoulder, so the candidate edge should be rejected or assigned an effectively infinite cost rather than the finite unresolved-ray penalty. For a **cut/mining** side, the map edge counts as success: the cut has reached open boundary space, so stop the ray and keep only the integrated in-bounds cost accumulated so far. Do not sample outside the map. A generated designation whose own footprint is outside the map remains invalid; this rule only covers side-ray scoring for otherwise valid in-bounds segments near the map edge.
 
+Ocean handling is also operation-specific. For **cut/mining** rays, terminating on an ocean tile below level `+01` is fatal because water would flood the accessway; reject the candidate edge or assign effectively infinite cost. For **dumping/fill** rays, ocean is equivalent to air under CoI mechanics: water does not support or reduce the dumping run, so continue evaluating the fill ray exactly as if the ocean tile were empty space until the ray reaches actual ground, hits the map edge, or exhausts its maximum distance.
+
 Recommended first-pass controls:
 
 ```text
