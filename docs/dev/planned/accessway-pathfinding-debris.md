@@ -73,6 +73,39 @@ The search state can remain `AccessSearchMode.Ground`; debris is edge/path metad
 
 Prop cleanup designations must stay out of generated-profile compatibility inputs. Do not add their `surfaceHeight + 1` corner targets to fixed profiles, path-history corner maps, durability-corner sources, or fight-invariant checks. A true V mining handoff or generated accessway segment may start adjacent to a debris cleanup origin; it only needs to satisfy the normal V/G or V/V rules against real terrain or real V profiles, not share an edge with the cleanup designation.
 
+### Hard blockers
+
+A vanilla-blocked ground candidate may become cleanup `G` only when **every** current blocker is known cleanup-safe, the whole required footprint is otherwise terrain-valid, and the required cleanup action can be materialized without conflicting with access, ownership, or save-removability constraints. Everything else remains a hard blocker for cleanup routing.
+
+Hard blockers include:
+
+* **Non-removable props.** A vehicle-blocking prop with no verified safe removal path remains impassable. Do not infer removability from visual similarity to bushes, boulders, or trees; require a known cleanup designation, harvest operation, or verified terrain-work removal rule.
+* **Buildings and entity footprints.** Cleanup designations must not pretend that buildings or other occupied entity footprints are removable terrain debris.
+* **Active terrain designations.** An origin that already has a terrain designation is not cleanup-eligible. This avoids fighting player work, ATD-generated V profiles, fixed-profile collection, rollback ownership, and materialization ordering.
+* **Ocean-blocked terrain.** Removing a prop does not make ocean/underwater terrain valid for vehicle access.
+* **Durability-excluded terrain.** A cleanup action does not make landslide-risk or otherwise durability-rejected terrain safe.
+* **Out-of-area cleanup footprints.** ATD should not inject cleanup work for a 4x4 designation origin unless the full cleanup footprint is inside the managed tower area.
+* **Underlying terrain invalid for vehicles.** A removable prop on an otherwise invalid slope, height discontinuity, seam, or clearance footprint is still blocked; cleanup only removes the prop layer.
+* **Unknown or mixed blockers where any blocker is not cleanup-safe.** Mixed tree-plus-debris origins are cleanup `G` only if every relevant blocker has a safe cleanup or harvest action. If any lane or tile in the required footprint contains an unsafe blocker, the candidate remains blocked.
+* **Zero-work generated V over props.** A generated V candidate that does not perform verified prop-removing terrain work, and does not carry cleanup metadata for the occupied prop origins, must not ignore blocking props merely because it is in V mode.
+* **Clearance 2+ footprints with unsafe lanes.** For wide vehicles, every tile/lane in the vehicle footprint or ATD clearance brush must be already clear, cleanup-eligible, or cleared by verified prop-removing terrain work. One cleanup-valid lane does not make the whole footprint valid.
+
+In table form:
+
+| Blocker type | Cleanup `G`? | Reason |
+| --- | --- | --- |
+| Already pathable ground | Yes, ordinary `G` | No cleanup needed. |
+| Tree / forest blocker | Yes, if harvestable and terrain-valid | Carry tree cleanup/harvest metadata. |
+| Removable boulder/bush/debris | Yes, if cleanup-safe and terrain-valid | Carry debris cleanup designation metadata. |
+| Mixed tree + removable debris | Yes, only if all blockers are safe | Carry every cleanup class; prefer dense-debris costing. |
+| Non-removable prop | No | No verified cleanup action. |
+| Building/entity footprint | No | Not terrain debris. |
+| Existing terrain designation | No | Conflict with player/ATD terrain work and fixed-profile handling. |
+| Ocean-blocked tile | No | Cleanup does not solve ocean validity. |
+| Durability-blocked tile | No | Cleanup does not solve durability validity. |
+| Out-of-area origin | No | ATD should not inject cleanup outside the managed footprint. |
+| Clearance 2+ footprint with one unsafe lane | No | The whole vehicle footprint must be valid. |
+
 ## Vanilla pathfinder integration
 
 The vanilla pathability provider remains authoritative for ordinary already-clear `G`, tower seeds, and final post-placement validation, but it should not be asked to pretend that cleanup props are absent. If vanilla exposes a safe query that ignores terrain props while retaining slope, ocean, building, and vehicle-clearance rules, ATD may use it as an optimization. Otherwise the accessway search needs an ATD overlay graph:
