@@ -117,7 +117,8 @@ public static string Tt(string text) => text;
         SetTurningRampsExperimental(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
-        SetAccessWorkDistanceScale(1f);
+        SetAccessLandscapingCostDistanceScale(1f);
+        SetAccessPropCleanupLandscapingCost(6f);
         SetAccessLandslideRunPerHeight(1f);
         SetCornerDesignationKey(KeyCode.K);
     }
@@ -290,12 +291,20 @@ public static string Tt(string text) => text;
         ExperimentalAccessUseAStar = value;
     }
 
-    /// <summary>Tile-distance cost assigned to one unit of center-height terrain work.</summary>
-    public static float AccessWorkDistanceScale { get; private set; } = 1f;
+    /// <summary>Tile-distance cost assigned to one unit of landscaping cost.</summary>
+    public static float AccessLandscapingCostDistanceScale { get; private set; } = 1f;
 
-    public static void SetAccessWorkDistanceScale(float value)
+    public static void SetAccessLandscapingCostDistanceScale(float value)
     {
-        AccessWorkDistanceScale = Math.Max(0f, Math.Min(100f, value));
+        AccessLandscapingCostDistanceScale = Math.Max(0f, Math.Min(100f, value));
+    }
+
+    /// <summary>Landscaping cost charged once per cleanup origin used by experimental access routing.</summary>
+    public static float AccessPropCleanupLandscapingCost { get; private set; } = 6f;
+
+    public static void SetAccessPropCleanupLandscapingCost(float value)
+    {
+        AccessPropCleanupLandscapingCost = Math.Max(0f, Math.Min(100f, value));
     }
 
     /// <summary>Horizontal landslide-envelope run per vertical terrain level. 1 = 45 degrees.</summary>

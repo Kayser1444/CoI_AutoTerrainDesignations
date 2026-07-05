@@ -465,7 +465,7 @@ Build the mode-independent inputs needed by both the current generator and the e
 
 * Add the public `Turning ramps (experimental)` setting, default off, with the V1-only tooltip defined in [Accessway Pathfinding](../planned/accessway-pathfinding.md#public-feature-gate).
 * Add a public search-algorithm sub setting with Dijkstra as the default and A* available but initially opt-in.
-* Add public parameter `workDistanceScale`, default `1`, through the existing Mod Settings / `ATDsettings.json` path without introducing mod-owned save state.
+* Add public parameter `landscapingCostDistanceScale`, default `1`, through the existing Mod Settings / `ATDsettings.json` path without introducing mod-owned save state.
 * Add public parameter `accessLandslideRunPerHeight`, default `1` (45 degrees), range `0.05..2`, so the symmetric landslide hourglass can be widened or narrowed without invalidating directional durability pruning.
 * Snapshot all search inputs once per provision pass: tower bounds, active vanilla designations, current terrain heights, target corner profiles, building occupancy, durability exclusions, tower-reachable G flood, origin clusters, and existing providers.
 * Keep the snapshot immutable for one cluster search. Stored/temporarily hidden designations and speculative search output are not part of it.
@@ -483,7 +483,7 @@ Implement the bounded heterogeneous graph from [Accessway Pathfinding](../planne
 * Create origin-based V1 nodes `(origin, h, mode)` for `F`, `X+`, `X-`, `Y+`, and `Y-`, using scaled integer heights.
 * Select cluster start `S`, derive tower-reachable goal set `E`, and apply the documented horizontal/vertical bounds.
 * Implement mechanical V-to-V edge-profile transitions, symmetric V/G handoffs, existing-designation edge compatibility, construction-slope checks, fight-invariant checks, and the durability envelope.
-* Implement the additive V1 cost: tile Manhattan length plus `workDistanceScale * centerHeightDelta^2`; reused active designations have zero work cost but still pay length.
+* Implement the additive V1 cost: tile Manhattan length plus `landscapingCostDistanceScale * landscapingCost`, where initial V1 landscaping cost is `16 * abs(centerHeightDelta)` for one 4x4 designation cell using ATD's Ore composition report normalization; reused active designations have zero landscaping cost but still pay length.
 * Run Dijkstra first (`heuristic = 0`) and reconstruct an in-memory path and rejection summary. Do not mutate terrain or designation state.
 
 **Exit gate:** deterministic unit-level graph tests cover flat travel, straight ramps, flat landings, switchbacks, V/G handoffs, fixed existing profiles, blocked durability zones, and no-path results. A dry run reproduces at least one existing straight ramp and finds at least one valid turning path unavailable to the control generator.

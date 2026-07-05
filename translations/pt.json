@@ -168,12 +168,20 @@
     "Use A* em vez da referência Dijkstra para ensaios experimentais de vias de acesso. Dijkstra é a linha de base de validação mais segura."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Escala de distância de trabalho"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Custo de terraplenagem vs. distância"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Custo da distância do bloco atribuído a uma unidade de trabalho de terreno na altura central. Faixa: 0-100; padrão: 1."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Custo em distância atribuído a uma unidade de custo de terraplenagem. Uma unidade de custo de terraplenagem equivale a despejar ou escavar uma unidade de rocha. Intervalo: 0-100; padrão: 1. Um valor mais alto favorece rotas com menos alteração do terreno."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Custo de terraplenagem da limpeza"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Custo de terraplenagem cobrado uma vez por origem de limpeza de objetos usada pela busca experimental de acessos. Uma unidade equivale a uma unidade de rocha despejada ou escavada; o padrão 6 favorece contornar obstáculos de limpeza quando houver um desvio razoável. Valores mais altos tornam rotas com limpeza menos atraentes."
   ],
   [
     "settings.experimental_access.landslide_run.label",

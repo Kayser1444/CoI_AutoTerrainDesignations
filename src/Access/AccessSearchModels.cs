@@ -196,7 +196,7 @@ namespace AutoTerrainDesignations.Access
         public bool IsMining { get; }
         public bool AllowsMixedWork { get; }
         public bool UseAStar { get; }
-        public float WorkDistanceScale { get; }
+        public float LandscapingCostDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
         public int GoalCount => m_goalGroundNodes.Count;
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
@@ -211,7 +211,7 @@ namespace AutoTerrainDesignations.Access
             bool isMining,
             bool allowsMixedWork,
             bool useAStar,
-            float workDistanceScale,
+            float landscapingCostDistanceScale,
             float landslideRunPerHeight,
             IDictionary<Tile2i, int> groundHeight2,
             IDictionary<Tile2i, int> terrainCenterHeight2,
@@ -233,7 +233,7 @@ namespace AutoTerrainDesignations.Access
             IsMining = isMining;
             AllowsMixedWork = allowsMixedWork;
             UseAStar = useAStar;
-            WorkDistanceScale = workDistanceScale;
+            LandscapingCostDistanceScale = landscapingCostDistanceScale;
             LandslideRunPerHeight = landslideRunPerHeight;
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
             m_terrainCenterHeight2 = new Dictionary<Tile2i, int>(terrainCenterHeight2);

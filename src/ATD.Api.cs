@@ -29,6 +29,22 @@ namespace AutoTerrainDesignations
         /// Check this before calling any other API method from early-init code.
         /// </summary>
         public static bool IsInitialized => AutoDepthDesignation.IsInitialized;
+
+        /// <summary>
+        /// Gets the landscaping cost charged once per prop cleanup origin used by
+        /// experimental access routing. One landscaping-cost unit is equivalent to dumping or
+        /// digging one unit of rock.
+        /// </summary>
+        public static float GetAccessPropCleanupLandscapingCost() =>
+            AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
+
+        /// <summary>
+        /// Sets the landscaping cost charged once per prop cleanup origin used by
+        /// experimental access routing. Values are clamped to the global mod-settings range.
+        /// </summary>
+        public static void SetAccessPropCleanupLandscapingCost(float value) =>
+            AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(value);
+
         /// <summary>
         /// Scans the given tower's area for ore resources and creates mining designations.
         /// Respects the per-tower ore selection and global ramp/slope settings.

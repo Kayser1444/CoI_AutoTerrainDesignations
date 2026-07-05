@@ -168,12 +168,20 @@
     "Utilizzare A* anziché fare riferimento a Dijkstra per i percorsi a secco di accessi sperimentali. Dijkstra è la base di convalida più sicura."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Scala della distanza di lavoro"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Costo paesaggistico vs. distanza"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Costo della distanza delle tessere assegnato a un'unità di lavoro del terreno ad altezza centrale. Intervallo: 0-100; predefinito: 1."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Costo in distanza assegnato a un'unità di costo paesaggistico. Un'unità di costo paesaggistico equivale a scaricare o scavare un'unità di roccia. Intervallo: 0-100; predefinito: 1. Un valore più alto favorisce percorsi con meno rimodellamento del terreno."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Costo paesaggistico pulizia oggetti"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Costo paesaggistico applicato una volta per ogni origine di pulizia oggetti usata dalla ricerca sperimentale degli accessi. Un'unità equivale a un'unità di roccia scaricata o scavata; il valore predefinito 6 favorisce l'aggiramento degli ostacoli di pulizia quando esiste una deviazione ragionevole. Valori più alti rendono meno attraenti i percorsi con pulizia."
   ],
   [
     "settings.experimental_access.landslide_run.label",

@@ -186,7 +186,7 @@ namespace AutoTerrainDesignations.Access
             }
 
             // A complete, immediately usable provider outranks a truncated or deferred
-            // provider regardless of work cost. Partial legacy ramps remain valid fallbacks.
+            // provider regardless of landscaping cost. Partial legacy ramps remain valid fallbacks.
             if (left.IsReachableNow != right.IsReachableNow)
             {
                 return left.IsReachableNow ? -1 : 1;

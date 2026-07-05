@@ -168,12 +168,20 @@
     "Använd A* istället för referens Dijkstra för experimentella tillfartskörningar. Dijkstra är den säkrare valideringsbaslinjen."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Arbetsavståndsskala"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Terrängkostnad vs. avstånd"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Kostnad för kakelavstånd tilldelad en enhet av mitthöjd terrängarbete. Område: 0-100; standard: 1."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Avståndskostnad som tilldelas en enhet terrängkostnad. En terrängkostnadsenhet motsvarar att dumpa eller gräva en enhet sten. Intervall: 0-100; standard: 1. Ett högre värde gynnar rutter med mindre terrängarbete."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Terrängkostnad för propprensning"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Terrängkostnad som debiteras en gång per rensningsursprung för objekt som används av den experimentella åtkomstsökningen. En enhet motsvarar en dumpad eller grävd enhet sten; standard 6 gynnar att köra runt rensningshinder när en rimlig omväg finns. Högre värden gör rensningsrutter mindre attraktiva."
   ],
   [
     "settings.experimental_access.landslide_run.label",
