@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned design revision. This supersedes the earlier tower-gravity/hourglass-penalty idea.
+Planned design revision. This supersedes the earlier tower-gravity/hourglass-penalty idea. See [Accessway Implementation Sequence](accessway-implementation-sequence.md) for the proposed branch stack; merged-goal Dijkstra should land before the A* heuristic branch.
 
 ## Context
 

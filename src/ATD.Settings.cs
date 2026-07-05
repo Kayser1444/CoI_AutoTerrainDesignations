@@ -483,9 +483,14 @@ namespace AutoTerrainDesignations
                 if (experimentalAccessUseAStar.HasValue && ShouldPreserveBool(experimentalAccessUseAStar.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(experimentalAccessUseAStar.Value);
 
-                float? accessWorkDistanceScale = ParseFloat(json, "accessWorkDistanceScale");
-                if (accessWorkDistanceScale.HasValue && ShouldPreserveFloat(accessWorkDistanceScale.Value, migrateGeneratedDefaults, 1f))
-                    AutoTerrainDesignationsMod.SetAccessWorkDistanceScale(accessWorkDistanceScale.Value);
+                float? accessLandscapingCostDistanceScale = ParseFloat(json, "accessLandscapingCostDistanceScale")
+                    ?? ParseFloat(json, "accessWorkDistanceScale");
+                if (accessLandscapingCostDistanceScale.HasValue && ShouldPreserveFloat(accessLandscapingCostDistanceScale.Value, migrateGeneratedDefaults, 1f))
+                    AutoTerrainDesignationsMod.SetAccessLandscapingCostDistanceScale(accessLandscapingCostDistanceScale.Value);
+
+                float? accessPropCleanupLandscapingCost = ParseFloat(json, "accessPropCleanupLandscapingCost");
+                if (accessPropCleanupLandscapingCost.HasValue && ShouldPreserveFloat(accessPropCleanupLandscapingCost.Value, migrateGeneratedDefaults, 6f))
+                    AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(accessPropCleanupLandscapingCost.Value);
 
                 float? accessLandslideRunPerHeight = ParseFloat(json, "accessLandslideRunPerHeight");
                 if (accessLandslideRunPerHeight.HasValue && ShouldPreserveFloat(accessLandslideRunPerHeight.Value, migrateGeneratedDefaults, 1f))
@@ -824,8 +829,11 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use A* instead of reference Dijkstra for experimental turning ramps. Fixed-profile provider-join searches still use Dijkstra until their own admissible heuristic is added. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessWorkDistanceScale\": \"Tile-distance cost assigned to one unit of center-height terrain work in experimental access search. Range: 0-100. Default: 1.\",");
-            sb.AppendLine($"  \"accessWorkDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessWorkDistanceScale)},");
+            sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
+            sb.AppendLine($"  \"accessLandscapingCostDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 6, tuned to favor driving around cleanup obstacles when a reasonable detour exists. Range: 0-100.\",");
+            sb.AppendLine($"  \"accessPropCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the experimental landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
             sb.AppendLine($"  \"accessLandslideRunPerHeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandslideRunPerHeight)},");

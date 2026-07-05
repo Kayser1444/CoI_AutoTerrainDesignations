@@ -1,6 +1,6 @@
 # Accessway Pathfinding Debris Amendment
 
-Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note narrows the existing open debris question into a route-search and materialization contract for the new accessway pathfinder.
+Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note narrows the existing open debris question into a route-search and materialization contract for the new accessway pathfinder. See [Accessway Implementation Sequence](accessway-implementation-sequence.md) for the proposed branch stack and rollout order.
 
 ## Problem
 
@@ -17,7 +17,7 @@ Treat blocking terrain props by class rather than flattening every prop into the
 * **Boulders, bushes, and dense debris.** These props can genuinely block ground corridors. They should remain low-cost debris-clearing `G` nodes when removable, with cleanup designations emitted during materialization.
 * **Non-removable or non-debris blockers.** These remain hard blockers and must not be converted into cleanup `G` unless the game exposes a safe removal designation for them.
 
-The search should still distinguish already-clear `G`, cleanup `G`, and generated `V`: prefer clear `G` first, cleanup/harvest `G` second, and terrain-shaping `V` only when its extra fixed overhead and work cost are justified.
+The search should still distinguish already-clear `G`, cleanup `G`, and generated `V`: prefer clear `G` first, cleanup/harvest `G` second, and terrain-shaping `V` only when its extra fixed overhead and landscaping cost are justified.
 
 ## Existing implementation clues
 
@@ -41,9 +41,9 @@ Treat removable debris as a low-cost property of a ground node, not as a reason 
 The route model therefore has two prop-safe ways through a blocked origin:
 
 1. A ground tile whose only blocker is removable debris may enter the search as a **debris-clearing G node** if the underlying terrain height and slope are otherwise valid for vehicle traversal.
-2. Traversing that node pays normal G traversal length plus a small one-time debris cleanup work cost.
+2. Traversing that node pays normal G traversal length plus a small one-time debris cleanup landscaping cost.
 3. A generated `V` node may overlap removable non-tree props without a separate cleanup action wherever it performs any mining at the prop-occupied sample tiles. It may overlap removable props via dumping, or trees via mining/dumping, only where the planned work meets the verified removal threshold for that prop/work class. Zero-work `V` must not ignore props.
-4. The cleanup cost is equivalent to `0.2` delta-h in the existing work-cost units. With the current cost formula, the incremental cost is `workDistanceScale * 0.2` once per affected debris designation origin, not once per tile step through the same origin.
+4. The cleanup cost is controlled by the public global `accessPropCleanupLandscapingCost` mod parameter. One unit of **landscaping cost** is the equivalent of dumping or digging one unit of rock. The default is `6`, tuned to favor driving around cleanup obstacles when a reasonable detour exists. The incremental cost is `landscapingCostDistanceScale * accessPropCleanupLandscapingCost` once per affected debris designation origin, not once per tile step through the same origin.
 5. Successful path materialization emits debris-removal mining designations for debris origins used by the accepted path, using the same target profile as the standalone cleanup flow: current corner surface height plus one.
 6. Clearing debris makes the affected ground usable; it does **not** create a `V` provider, alter the ground height, consume a generated accessway origin, or participate in accessway geometry checks.
 7. Generated debris cleanup designations are mining protos **in the air**. They remove props; they are not terrain-shaping V mining designations and must not be treated as fixed profiles, fight-invariant neighbors, or durability sources.
@@ -73,6 +73,39 @@ The search state can remain `AccessSearchMode.Ground`; debris is edge/path metad
 
 Prop cleanup designations must stay out of generated-profile compatibility inputs. Do not add their `surfaceHeight + 1` corner targets to fixed profiles, path-history corner maps, durability-corner sources, or fight-invariant checks. A true V mining handoff or generated accessway segment may start adjacent to a debris cleanup origin; it only needs to satisfy the normal V/G or V/V rules against real terrain or real V profiles, not share an edge with the cleanup designation.
 
+### Hard blockers
+
+A vanilla-blocked ground candidate may become cleanup `G` only when **every** current blocker is known cleanup-safe, the whole required footprint is otherwise terrain-valid, and the required cleanup action can be materialized without conflicting with access, ownership, or save-removability constraints. Everything else remains a hard blocker for cleanup routing.
+
+Hard blockers include:
+
+* **Non-removable props.** A vehicle-blocking prop with no verified safe removal path remains impassable. Do not infer removability from visual similarity to bushes, boulders, or trees; require a known cleanup designation, harvest operation, or verified terrain-work removal rule.
+* **Buildings and entity footprints.** Cleanup designations must not pretend that buildings or other occupied entity footprints are removable terrain debris.
+* **Active terrain designations.** An origin that already has a terrain designation is not cleanup-eligible. This avoids fighting player work, ATD-generated V profiles, fixed-profile collection, rollback ownership, and materialization ordering.
+* **Ocean-blocked terrain.** Removing a prop does not make ocean/underwater terrain valid for vehicle access.
+* **Durability-excluded terrain.** A cleanup action does not make landslide-risk or otherwise durability-rejected terrain safe.
+* **Out-of-area cleanup footprints.** ATD should not inject cleanup work for a 4x4 designation origin unless the full cleanup footprint is inside the managed tower area.
+* **Underlying terrain invalid for vehicles.** A removable prop on an otherwise invalid slope, height discontinuity, seam, or clearance footprint is still blocked; cleanup only removes the prop layer.
+* **Unknown or mixed blockers where any blocker is not cleanup-safe.** Mixed tree-plus-debris origins are cleanup `G` only if every relevant blocker has a safe cleanup or harvest action. If any lane or tile in the required footprint contains an unsafe blocker, the candidate remains blocked.
+* **Zero-work generated V over props.** A generated V candidate that does not perform verified prop-removing terrain work, and does not carry cleanup metadata for the occupied prop origins, must not ignore blocking props merely because it is in V mode.
+* **Clearance 2+ footprints with unsafe lanes.** For wide vehicles, every tile/lane in the vehicle footprint or ATD clearance brush must be already clear, cleanup-eligible, or cleared by verified prop-removing terrain work. One cleanup-valid lane does not make the whole footprint valid.
+
+In table form:
+
+| Blocker type | Cleanup `G`? | Reason |
+| --- | --- | --- |
+| Already pathable ground | Yes, ordinary `G` | No cleanup needed. |
+| Tree / forest blocker | Yes, if harvestable and terrain-valid | Carry tree cleanup/harvest metadata. |
+| Removable boulder/bush/debris | Yes, if cleanup-safe and terrain-valid | Carry debris cleanup designation metadata. |
+| Mixed tree + removable debris | Yes, only if all blockers are safe | Carry every cleanup class; prefer dense-debris costing. |
+| Non-removable prop | No | No verified cleanup action. |
+| Building/entity footprint | No | Not terrain debris. |
+| Existing terrain designation | No | Conflict with player/ATD terrain work and fixed-profile handling. |
+| Ocean-blocked tile | No | Cleanup does not solve ocean validity. |
+| Durability-blocked tile | No | Cleanup does not solve durability validity. |
+| Out-of-area origin | No | ATD should not inject cleanup outside the managed footprint. |
+| Clearance 2+ footprint with one unsafe lane | No | The whole vehicle footprint must be valid. |
+
 ## Vanilla pathfinder integration
 
 The vanilla pathability provider remains authoritative for ordinary already-clear `G`, tower seeds, and final post-placement validation, but it should not be asked to pretend that cleanup props are absent. If vanilla exposes a safe query that ignores terrain props while retaining slope, ocean, building, and vehicle-clearance rules, ATD may use it as an optimization. Otherwise the accessway search needs an ATD overlay graph:
@@ -88,11 +121,13 @@ In other words, this amendment does not require replacing vanilla pathfinding wh
 A cleanup origin has cost:
 
 ```text
-debrisCleanupWork = 0.2
-incrementalCost = workDistanceScale * debrisCleanupWork
+debrisCleanupLandscapingCost = accessPropCleanupLandscapingCost
+incrementalCost = landscapingCostDistanceScale * debrisCleanupLandscapingCost
 ```
 
-Apply it the first time the candidate path enters any tile belonging to that debris origin. Subsequent G-to-G movement within the same debris origin pays only traversal length. This keeps a four-tile walk across one boulder from looking four times more expensive than clearing the boulder. If an origin contains both trees and dense removable debris, charge the dense-debris cleanup cost once for that origin rather than adding a second tree-only cost; diagnostics should still record that both cleanup classes were present.
+The Ore composition panel provides the current ATD estimate model: it sums terrain thickness over a 4x4 designation footprint as `countedThick * 16`, then converts that terrain volume to product units through the terrain material's mined quantity per tile-cubed. This `16` factor is an ATD reporting normalization, not a verified vanilla truck-consumption rule for how many dumped rock units build one full layer of a 4x4 cell. If exact vanilla dump/dig material accounting is verified later, update the landscaping-cost conversion helper and leave this public tuning parameter in landscaping-cost units. For pathfinding cost, use **landscaping cost** as the sole measure of dump/dig work. A landscaping-cost unit is pegged to one dumped or dug unit of regular Rock. Rock is a stable reference because most loose materials share the same density; important exceptions such as dirt should not make the route-cost unit itself fluctuate. Disregard global ore-yield modifiers; cleanup routing needs a stable material-work knob, not a difficulty-sensitive production estimate.
+
+`accessPropCleanupLandscapingCost` is a public global mod parameter in `ATDsettings.json` and the mod settings UI. The default value is `6`, but callers and players can tune it without changing the pathfinding implementation. Apply it the first time the candidate path enters any tile belonging to that debris origin. Subsequent G-to-G movement within the same debris origin pays only traversal length. This keeps a four-tile walk across one boulder from looking four times more expensive than clearing the boulder. If an origin contains both trees and dense removable debris, charge the dense-debris cleanup cost once for that origin rather than adding a second tree-only cost; diagnostics should still record that both cleanup classes were present.
 
 This should be cheaper than a G/V/G detour that digs a generated origin only to bypass props, but not free. If the generated origin performs prop-removing terrain work (any mining for removable non-tree props; threshold-clearing dumping for removable non-tree props; threshold-clearing mining/dumping for trees), no separate cleanup cost is needed for that prop because the terrain work itself clears it. If two alternatives are otherwise identical, prefer already-clear ground over tree cleanup, prefer tree cleanup over denser debris cleanup when both preserve `G`, and prefer any cleanup `G` over terrain reshaping. A fixed overhead on newly generated `V` nodes should be high enough that a plausible wiggly `G` route through sparse forest beats a straight generated `V` road, while still allowing `V` when terrain height or true blockers make `G` unreasonable.
 

@@ -1,6 +1,6 @@
-# Accessway Pathfinding Side-Ray Work Cost Amendment
+# Accessway Pathfinding Side-Ray Landscaping Cost Amendment
 
-Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note refines the terrain-work part of the path cost for mountain and cliff approaches where a center-height or corner-height delta is too weak to rank good routes.
+Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note refines the landscaping-cost part of the path cost for mountain and cliff approaches where a center-height or corner-height delta is too weak to rank good routes.
 
 ## Motivation
 
@@ -14,13 +14,13 @@ Use an additive local cost that remains cheap enough for A*/Dijkstra:
 
 ```text
 edgeCost = traversalLength
-         + workDistanceScale * terrainWorkCost
+         + landscapingCostDistanceScale * landscapingCost
 ```
 
-`terrainWorkCost` is no longer only a vertical height delta. It is a lightweight estimate of accessway construction effort:
+`landscapingCost` is no longer only a vertical height delta. It is a lightweight estimate of accessway construction effort:
 
 ```text
-terrainWorkCost = designationOverhead
+landscapingCost = designationOverhead
                 + directWorkCost
                 + lateralSideRayCost
 ```
@@ -31,9 +31,9 @@ The exact weights are tuning parameters. The important behavioral change is that
 
 For an ordered corridor path, score only constructed interior exit edges:
 
-* The starting edge has zero terrain-work cost. Accessways always start from a handoff edge, whose mining/dumping proto does not work the ground-connecting edge, or from an intent-fixed profile that is already determined outside this scorer.
-* Interior generated-to-generated exits are the only edges that need side-ray terrain-work scoring. The predecessor accounted for the shared entry edge, so scoring exits avoids double-counting interior segment boundaries.
-* The terminal edge has zero terrain-work cost. Accessways end through the same kind of 0-work handoff to V/G or at another cluster/fixed designation whose profile is already fixed; do not add side-ray or overhead work for the last handoff segment. Traversal length may still be paid separately by the main edge-cost formula.
+* The starting edge has zero landscaping cost. Accessways always start from a handoff edge, whose mining/dumping proto does not work the ground-connecting edge, or from an intent-fixed profile that is already determined outside this scorer.
+* Interior generated-to-generated exits are the only edges that need side-ray landscaping-cost scoring. The predecessor accounted for the shared entry edge, so scoring exits avoids double-counting interior segment boundaries.
+* The terminal edge has zero landscaping cost. Accessways end through the same kind of 0-work handoff to V/G or at another cluster/fixed designation whose profile is already fixed; do not add side-ray or overhead work for the last handoff segment. Traversal length may still be paid separately by the main edge-cost formula.
 
 For a scored interior segment moving in direction `d`, choose the two corners on the outgoing edge and shoot one lateral ray from each corner:
 
@@ -44,11 +44,11 @@ For a scored interior segment moving in direction `d`, choose the two corners on
 | `Y+` | `Y+` edge | `SW`, `SE` | `X-` from `SW`, `X+` from `SE` |
 | `Y-` | `Y-` edge | `NW`, `NE` | `X-` from `NW`, `X+` from `NE` |
 
-The side-ray cost is therefore direction-aware: the same origin and target profile can have a different work cost depending on whether the corridor runs along the contour or across the hillside.
+The side-ray cost is therefore direction-aware: the same origin and target profile can have a different landscaping cost depending on whether the corridor runs along the contour or across the hillside.
 
 ## Lateral-only ray march
 
-Only lateral rays are sampled. Longitudinal start/end work is represented by handoff or intent-fixed profiles and has zero terrain-work cost in this scorer; generated interior segments connect through shared edges. The missing signal is side exposure, especially on steep terrain.
+Only lateral rays are sampled. Longitudinal start/end work is represented by handoff or intent-fixed profiles and has zero landscaping cost in this scorer; generated interior segments connect through shared edges. The missing signal is side exposure, especially on steep terrain.
 
 Each lateral ray starts at a planned exit corner height and follows an idealized material slope outward until that slope intersects terrain or reaches a fixed maximum distance. This estimates the cross-sectional wedge that must be excavated or filled to make the accessway's side stable/workable.
 
@@ -130,7 +130,7 @@ unresolvedRayPenalty = tuned finite penalty added at max distance
 
 Do not combine side rays with durability or obstruction feasibility in the first implementation. Keep the initial side-ray work scoped to cost estimation until the routing, material-slope selection, and tuning are stable. The existing durability/hourglass and hard-obstacle checks should remain the authoritative feasibility filters during that phase.
 
-Once the cost scorer is stable, the side-ray march is a candidate for a more accurate generated-edge landslide/support check. At that later stage, reuse the same ray samples for scoring and feasibility where possible: one bounded march can return the integrated work cost plus any hard blocker it encountered.
+Once the cost scorer is stable, the side-ray march is a candidate for a more accurate generated-edge landslide/support check. At that later stage, reuse the same ray samples for scoring and feasibility where possible: one bounded march can return the integrated landscaping cost plus any hard blocker it encountered.
 
 Deferred feasibility rules to evaluate later:
 
@@ -140,12 +140,12 @@ Deferred feasibility rules to evaluate later:
 
 The broad durability/hourglass index can remain as a cheap prefilter for sources not represented by the current side ray, for G-node safety, and for diagnostics. Only after the side-ray cost implementation has been validated should generated-edge durability consider preferring the side-ray result, because it follows the actual direction, operation, and material run slope of the candidate edge.
 
-## Relationship to direct work cost
+## Relationship to direct landscaping cost
 
-The side-ray cost does not need to replace all direct work cost. Keep a small direct term and a per-designation overhead so flat terrain and short transitions remain well behaved:
+The side-ray cost does not need to replace all direct landscaping cost. Keep a small direct term and a per-designation overhead so flat terrain and short transitions remain well behaved:
 
 ```text
-terrainWorkCost = overhead
+landscapingCost = overhead
                 + directWorkWeight * directVerticalWork
                 + sideRayWeight * (leftExitRayCost + rightExitRayCost)
 ```
@@ -154,7 +154,7 @@ terrainWorkCost = overhead
 
 ## Turns and special cases
 
-The first implementation should score each constructed interior segment's exit edge in its own direction and leave start/terminal handoff or fixed edges at zero terrain-work cost. Later refinements may add:
+The first implementation should score each constructed interior segment's exit edge in its own direction and leave start/terminal handoff or fixed edges at zero landscaping cost. Later refinements may add:
 
 * an outside-corner ray for sharp turns and switchbacks,
 * unique-edge accounting for branched or reused fixed profiles,

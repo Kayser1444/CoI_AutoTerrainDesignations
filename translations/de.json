@@ -168,12 +168,20 @@
     "Verwenden Sie A* anstelle der Referenz Dijkstra für experimentelle Zufahrts-Trockenläufe. Dijkstra ist die sicherere Validierungsbasislinie."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Arbeitsentfernungsskala"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Landschaftsbaukosten vs. Entfernung"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Kosten für die Kachelentfernung, die einer Einheit der Geländearbeit in mittlerer Höhe zugeordnet sind. Bereich: 0-100; Standard: 1."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Entfernungskosten pro Einheit Landschaftsbaukosten. Eine Einheit Landschaftsbaukosten entspricht dem Aufschütten oder Abtragen einer Einheit Gestein. Bereich: 0-100; Standard: 1. Ein höherer Wert bevorzugt Routen mit weniger Geländeänderung."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Landschaftsbaukosten für Prop-Bereinigung"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Landschaftsbaukosten, die einmal pro Prop-Bereinigungsursprung in der experimentellen Zufahrtssuche berechnet werden. Eine Einheit entspricht einer aufgeschütteten oder abgetragenen Einheit Gestein; Standard 6 bevorzugt Umfahrungen von Bereinigungshindernissen, wenn ein sinnvoller Umweg existiert. Höhere Werte machen Bereinigungsrouten weniger attraktiv."
   ],
   [
     "settings.experimental_access.landslide_run.label",

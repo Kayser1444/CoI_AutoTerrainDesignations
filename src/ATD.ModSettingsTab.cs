@@ -242,12 +242,23 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar,
                 refreshers));
             content.Add(BuildFloatStepRow(
-                AtdLocalization.SettingsAccessWorkScaleLabel.AsFormatted,
-                AtdLocalization.SettingsAccessWorkScaleTooltip.AsFormatted,
-                () => AutoTerrainDesignationsMod.AccessWorkDistanceScale,
+                AtdLocalization.SettingsAccessLandscapingCostScaleLabel.AsFormatted,
+                AtdLocalization.SettingsAccessLandscapingCostScaleTooltip.AsFormatted,
+                () => AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale,
                 value =>
                 {
-                    AutoTerrainDesignationsMod.SetAccessWorkDistanceScale(value);
+                    AutoTerrainDesignationsMod.SetAccessLandscapingCostDistanceScale(value);
+                    return true;
+                },
+                FormatFloat,
+                refreshers));
+            content.Add(BuildFloatStepRow(
+                AtdLocalization.SettingsAccessPropCleanupLandscapingCostLabel.AsFormatted,
+                AtdLocalization.SettingsAccessPropCleanupLandscapingCostTooltip.AsFormatted,
+                () => AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost,
+                value =>
+                {
+                    AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(value);
                     return true;
                 },
                 FormatFloat,

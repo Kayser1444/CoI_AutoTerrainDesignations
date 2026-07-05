@@ -168,12 +168,20 @@
     "Utilice A* en lugar de la referencia Dijkstra para ensayos experimentales de vías de acceso. Dijkstra es la base de validación más segura."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Escala de distancia de trabajo"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Coste de paisajismo vs. distancia"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Costo de distancia de mosaico asignado a una unidad de trabajo de terreno de altura central. Rango: 0-100; predeterminado: 1."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Coste de distancia asignado a una unidad de coste de paisajismo. Una unidad de coste de paisajismo equivale a verter o excavar una unidad de roca. Rango: 0-100; predeterminado: 1. Un valor más alto favorece rutas con menos modificación del terreno."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Coste de paisajismo para limpiar objetos"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Coste de paisajismo cobrado una vez por cada origen de limpieza de objetos usado por la búsqueda experimental de accesos. Una unidad equivale a una unidad de roca vertida o excavada; el valor predeterminado 6 favorece rodear obstáculos de limpieza cuando existe un desvío razonable. Valores más altos hacen menos atractivas las rutas con limpieza."
   ],
   [
     "settings.experimental_access.landslide_run.label",

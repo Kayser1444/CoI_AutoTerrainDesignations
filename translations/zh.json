@@ -168,12 +168,20 @@
     "使用 A* 代替参考 Dijkstra 进行实验通道试运行。 Dijkstra 是更安全的验证基线。"
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "工作距离量表"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "地形成本与距离"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "分配给一个中心高度地形工作单位的平铺距离成本。范围：0-100；默认值：1。"
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "每单位地形成本折算的距离成本。1 单位地形成本等同于倾倒或挖掘 1 单位岩石。范围：0-100；默认值：1。数值越高，越倾向于选择较少改造地形的路线。"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "清理障碍地形成本"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "实验性通路搜索中，每个障碍清理起点只收取一次的地形成本。1 单位等同于倾倒或挖掘 1 单位岩石；默认值 6 会在存在合理绕行时更倾向于绕过清理障碍。数值越高，清理路线的吸引力越低。"
   ],
   [
     "settings.experimental_access.landslide_run.label",

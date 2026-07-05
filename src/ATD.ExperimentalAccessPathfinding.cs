@@ -214,7 +214,7 @@ namespace AutoTerrainDesignations
                 isMining,
                 allowsMixedWork,
                 AutoTerrainDesignationsMod.ExperimentalAccessUseAStar,
-                AutoTerrainDesignationsMod.AccessWorkDistanceScale,
+                AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale,
                 landslideRunPerHeight,
                 groundHeight2,
                 terrainCenterHeight2,

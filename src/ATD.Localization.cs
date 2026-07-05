@@ -130,10 +130,14 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.experimental_access.astar.label", "Use A* search", "Settings toggle label for experimental A* access search.");
         public static LocStr SettingsAccessAStarTooltip =
             Loc.Str("settings.experimental_access.astar.tooltip", "Use A* instead of reference Dijkstra for experimental accessway dry runs. Dijkstra is the safer validation baseline. A* is faster.", "Tooltip for experimental A* access search.");
-        public static LocStr SettingsAccessWorkScaleLabel =
-            Loc.Str("settings.experimental_access.work_scale.label", "Work vs. distance cost", "Settings row label for experimental access work cost scale.");
-        public static LocStr SettingsAccessWorkScaleTooltip =
-            Loc.Str("settings.experimental_access.work_scale.tooltip", "Tile-distance cost assigned to one unit of center-height terrain work. Range: 0-100; default: 1. A higher value will promote routes with less terraforming.", "Tooltip for experimental access work distance scale.");
+        public static LocStr SettingsAccessLandscapingCostScaleLabel =
+            Loc.Str("settings.experimental_access.landscaping_cost_scale.label", "Landscaping cost vs. distance", "Settings row label for experimental access landscaping cost scale.");
+        public static LocStr SettingsAccessLandscapingCostScaleTooltip =
+            Loc.Str("settings.experimental_access.landscaping_cost_scale.tooltip", "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming.", "Tooltip for experimental access landscaping cost distance scale.");
+        public static LocStr SettingsAccessPropCleanupLandscapingCostLabel =
+            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.label", "Prop cleanup landscaping cost", "Settings row label for experimental access prop cleanup cost.");
+        public static LocStr SettingsAccessPropCleanupLandscapingCostTooltip =
+            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.tooltip", "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 6 favors driving around cleanup obstacles when a reasonable detour exists. Higher values make cleanup routes less attractive.", "Tooltip for experimental access prop cleanup cost.");
         public static LocStr SettingsAccessLandslideRunLabel =
             Loc.Str("settings.experimental_access.landslide_run.label", "Landslide protection slope factor", "Settings row label for the experimental landslide envelope scale.");
         public static LocStr SettingsAccessLandslideRunTooltip =

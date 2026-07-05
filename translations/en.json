@@ -168,12 +168,20 @@
     "Use A* instead of reference Dijkstra for experimental accessway dry runs. Dijkstra is the safer validation baseline. A* is faster."
   ],
   [
-    "settings.experimental_access.work_scale.label",
-    "Work vs. distance cost"
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "Landscaping cost vs. distance"
   ],
   [
-    "settings.experimental_access.work_scale.tooltip",
-    "Tile-distance cost assigned to one unit of center-height terrain work. Range: 0-100; default: 1. A higher value will promote routes with less terraforming."
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "Prop cleanup landscaping cost"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 6 favors driving around cleanup obstacles when a reasonable detour exists. Higher values make cleanup routes less attractive."
   ],
   [
     "settings.experimental_access.landslide_run.label",

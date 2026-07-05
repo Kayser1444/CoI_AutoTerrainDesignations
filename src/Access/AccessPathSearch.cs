@@ -773,8 +773,8 @@ namespace AutoTerrainDesignations.Access
                 { Reject(rejections, "PathSelfContact"); continue; }
 
                 var next = new AccessSearchNode(nextOrigin, nextProfile.Center2, mode);
-                float work = EstimateWork(nextProfile.Center2, snapshot.GetTerrainCenterHeight2(nextOrigin));
-                float nextCost = baseCost + 4f + snapshot.WorkDistanceScale * work;
+                float landscapingCost = EstimateLandscapingCost(nextProfile.Center2, snapshot.GetTerrainCenterHeight2(nextOrigin));
+                float nextCost = baseCost + 4f + snapshot.LandscapingCostDistanceScale * landscapingCost;
                 Relax(snapshot, current, next, nextCost, distance, previous, queue, useAStarHeuristic,
                     goalDistance, minGoalHeight2, maxGoalHeight2, hasCurrent);
             }
@@ -809,9 +809,9 @@ namespace AutoTerrainDesignations.Access
                         if (!IsCompatibleWithPathHistory(snapshot, origin, profile, current, previous))
                         { Reject(rejections, "PathSelfContact"); continue; }
                         var next = new AccessSearchNode(origin, profile.Center2, mode);
-                        float work = EstimateWork(profile.Center2, center2);
+                        float landscapingCost = EstimateLandscapingCost(profile.Center2, center2);
                         float cost = currentCost + Manhattan(current.Position, next.CostPosition)
-                            + snapshot.WorkDistanceScale * work;
+                            + snapshot.LandscapingCostDistanceScale * landscapingCost;
                         Relax(snapshot, current, next, cost, distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
                     }
                 }
@@ -1023,10 +1023,13 @@ namespace AutoTerrainDesignations.Access
             return Math.Max(horizontalDistance, verticalDistance);
         }
 
-        private static float EstimateWork(int targetHeight2, int terrainHeight2)
+        private static float EstimateLandscapingCost(int targetHeight2, int terrainHeight2)
         {
             float deltaHeight = Math.Abs(targetHeight2 - terrainHeight2) / 2f;
-            return deltaHeight * deltaHeight;
+            // This uses the same 4x4-cell terrain-volume normalization as the Ore composition
+            // panel's countedThick * 16 estimate. It is not a verified vanilla dump-truck
+            // consumption rule; replace it if/when exact vanilla material consumption is sourced.
+            return 16f * deltaHeight;
         }
 
         private static List<AccessSearchNode> Reconstruct(AccessSearchNode end,
