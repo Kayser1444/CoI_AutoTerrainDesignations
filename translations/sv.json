@@ -157,7 +157,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Inaktivera den äldre rakrampsgeneratorn så att experimentella accesswayresultat och fel kan testas direkt. Lämna av för normalt reservbeteende."
+    "Inaktivera den äldre generatorn för raka ramper så att resultat och fel för experimentella tillfarter kan testas direkt. Lämna avstängt för normalt reservbeteende."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -165,7 +165,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Använd A* istället för referens Dijkstra för experimentella tillfartskörningar. Dijkstra är den säkrare valideringsbaslinjen."
+    "Använd A* i stället för referens-Dijkstra för torrkörningar av experimentella tillfarter. Dijkstra är den säkrare valideringsbasen. A* är snabbare."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -185,11 +185,11 @@
   ],
   [
     "settings.experimental_access.landslide_run.label",
-    "Jordskred horisontellt lopp"
+    "Släntfaktor för skredskydd"
   ],
   [
     "settings.experimental_access.landslide_run.tooltip",
-    "Horisontellt uteslutningsavstånd per vertikal terrängnivå. 1 är en 45-graders lutning; högre värden vidgar uteslutande timglas, medan lägre värden begränsar det. Område: 0,05-4; standard: 1."
+    "Horisontellt uteslutningsavstånd per vertikal terrängnivå. 1 motsvarar en 45-graders lutning; högre värden vidgar uteslutningszonen (t.ex. i ren sand), medan lägre värden gör den smalare. Intervall: 0,05-2; standard: 1."
   ],
   [
     "settings.max_slope.label",
