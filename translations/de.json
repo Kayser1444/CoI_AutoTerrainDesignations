@@ -157,7 +157,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Deaktivieren Sie den alten Straight-Ramp-Generator, damit experimentelle Zugangsergebnisse und Fehler direkt getestet werden können. Lassen Sie es weg, um zum normalen Fallback-Verhalten zu gelangen."
+    "Deaktiviert den alten Generator für gerade Rampen, damit Ergebnisse und Fehler der experimentellen Zugangswege direkt getestet werden können. Für normales Fallback-Verhalten ausgeschaltet lassen."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -165,7 +165,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Verwenden Sie A* anstelle der Referenz Dijkstra für experimentelle Zufahrts-Trockenläufe. Dijkstra ist die sicherere Validierungsbasislinie."
+    "A* statt Referenz-Dijkstra für experimentelle Zugangsweg-Trockenläufe verwenden. Dijkstra ist die sicherere Validierungsbasis. A* ist schneller."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -185,11 +185,11 @@
   ],
   [
     "settings.experimental_access.landslide_run.label",
-    "Erdrutsch-Horizontallauf"
+    "Erdrutschschutz-Neigungsfaktor"
   ],
   [
     "settings.experimental_access.landslide_run.tooltip",
-    "Horizontaler Ausschlussabstand pro vertikaler Geländeebene. 1 ist eine 45-Grad-Neigung; Höhere Werte erweitern die Ausschlusssanduhr, während niedrigere Werte sie verengen. Bereich: 0,05–4; Standard: 1."
+    "Horizontaler Ausschlussabstand pro vertikaler Geländestufe. 1 entspricht einer 45-Grad-Neigung; höhere Werte vergrößern die Ausschlusszone (z. B. bei reinem Sand), niedrigere Werte verkleinern sie. Bereich: 0,05-2; Standard: 1."
   ],
   [
     "settings.max_slope.label",

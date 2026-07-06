@@ -157,7 +157,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Desative o gerador de rampa direta herdado para que os resultados e falhas experimentais da via de acesso possam ser testados diretamente. Deixe para o comportamento normal de reserva."
+    "Desative o gerador legado de rampas retas para que resultados e falhas dos acessos experimentais possam ser testados diretamente. Deixe desativado para o comportamento normal de fallback."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -165,7 +165,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Use A* em vez da referência Dijkstra para ensaios experimentais de vias de acesso. Dijkstra é a linha de base de validação mais segura."
+    "Use A* em vez do Dijkstra de referência para testes a seco de acessos experimentais. Dijkstra é a base de validação mais segura. A* é mais rápido."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -185,11 +185,11 @@
   ],
   [
     "settings.experimental_access.landslide_run.label",
-    "Corrida horizontal de deslizamento de terra"
+    "Fator de inclinação contra deslizamentos"
   ],
   [
     "settings.experimental_access.landslide_run.tooltip",
-    "Distância de exclusão horizontal por nível vertical do terreno. 1 é uma inclinação de 45 graus; valores mais altos ampliam a ampulheta de exclusão, enquanto valores mais baixos a estreitam. Faixa: 0,05-4; padrão: 1."
+    "Distância de exclusão horizontal por nível vertical do terreno. 1 equivale a uma inclinação de 45 graus; valores mais altos ampliam a zona de exclusão (por exemplo, em areia pura), enquanto valores mais baixos a estreitam. Faixa: 0,05-2; padrão: 1."
   ],
   [
     "settings.max_slope.label",

@@ -157,7 +157,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Disabilitare il generatore di rampe diritte legacy in modo che i risultati e i guasti degli accessi sperimentali possano essere testati direttamente. Lasciare fuori per il normale comportamento di fallback."
+    "Disattiva il generatore legacy di rampe diritte per testare direttamente risultati ed errori degli accessi sperimentali. Lascia disattivato per il normale comportamento di fallback."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -165,7 +165,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Utilizzare A* anziché fare riferimento a Dijkstra per i percorsi a secco di accessi sperimentali. Dijkstra è la base di convalida più sicura."
+    "Usa A* invece del Dijkstra di riferimento per le prove a secco degli accessi sperimentali. Dijkstra è la base di convalida più sicura. A* è più veloce."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -185,11 +185,11 @@
   ],
   [
     "settings.experimental_access.landslide_run.label",
-    "Corsa orizzontale della frana"
+    "Fattore pendenza protezione frane"
   ],
   [
     "settings.experimental_access.landslide_run.tooltip",
-    "Distanza di esclusione orizzontale per livello verticale del terreno. 1 è una pendenza di 45 gradi; valori più alti allargano la clessidra di esclusione, mentre valori più bassi la restringono. Intervallo: 0,05-4; predefinito: 1."
+    "Distanza di esclusione orizzontale per livello verticale del terreno. 1 equivale a una pendenza di 45 gradi; valori più alti ampliano la zona di esclusione (ad es. in sabbia pura), mentre valori più bassi la restringono. Intervallo: 0,05-2; predefinito: 1."
   ],
   [
     "settings.max_slope.label",
