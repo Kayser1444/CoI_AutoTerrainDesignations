@@ -174,6 +174,7 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_goalGroundNodes;
         private readonly HashSet<Tile2i> m_occupiedTiles;
         private readonly HashSet<Tile2i> m_oceanTiles;
+        private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByOrigin;
         private readonly HashSet<Tile2i> m_validOrigins;
         private readonly int[] m_anyGoalDistance;
         private readonly int m_minGoalHeight2;
@@ -201,6 +202,7 @@ namespace AutoTerrainDesignations.Access
         public int GoalCount => m_goalGroundNodes.Count;
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
         public int LandslideSourceCount => m_durabilityCorners.Length;
+        public IEnumerable<AccessPropCleanupInfo> PropCleanupOrigins => m_propCleanupByOrigin.Values;
 
         public AccessSearchSnapshot(
             Tile2i boundsMin,
@@ -223,7 +225,8 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i> oceanTiles,
             IEnumerable<AccessDurabilityCorner> durabilityCorners,
             Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
-                IReadOnlyList<AccessGroundHandoff>>? workableHandoffs = null)
+                IReadOnlyList<AccessGroundHandoff>>? workableHandoffs = null,
+            IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -243,6 +246,9 @@ namespace AutoTerrainDesignations.Access
             m_goalGroundNodes = new HashSet<Tile2i>(goalGroundNodes);
             m_occupiedTiles = new HashSet<Tile2i>(occupiedTiles);
             m_oceanTiles = new HashSet<Tile2i>(oceanTiles);
+            m_propCleanupByOrigin = propCleanupByOrigin != null
+                ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
+                : new Dictionary<Tile2i, AccessPropCleanupInfo>();
             m_validOrigins = new HashSet<Tile2i>(m_terrainCenterHeight2.Keys);
             m_goalDistanceWidth = boundsMax.X - boundsMin.X + 1;
             m_goalDistanceHeight = boundsMax.Y - boundsMin.Y + 1;
@@ -310,6 +316,17 @@ namespace AutoTerrainDesignations.Access
         public bool IsWorkOrigin(Tile2i origin) => m_workOrigins.Contains(origin);
         public bool TryGetFixedProfile(Tile2i origin, out AccessHeightProfile profile) => m_fixedProfiles.TryGetValue(origin, out profile);
         public bool IsGroundNode(Tile2i tile) => m_groundNodes.Contains(tile);
+        public bool IsCleanupGroundNode(Tile2i tile)
+            => !m_groundNodes.Contains(tile)
+                && m_propCleanupByOrigin.TryGetValue(TerrainOriginForTile(tile), out AccessPropCleanupInfo info)
+                && info.IsEligible;
+        public bool IsGroundOrCleanupNode(Tile2i tile) => IsGroundNode(tile) || IsCleanupGroundNode(tile);
+        public bool TryGetPropCleanupInfo(Tile2i origin, out AccessPropCleanupInfo info)
+            => m_propCleanupByOrigin.TryGetValue(origin, out info);
+        public bool TryGetCleanupInfoForTile(Tile2i tile, out AccessPropCleanupInfo info)
+            => m_propCleanupByOrigin.TryGetValue(TerrainOriginForTile(tile), out info);
+        private static Tile2i TerrainOriginForTile(Tile2i tile)
+            => new Tile2i(tile.X & -4, tile.Y & -4);
         public bool IsGoalGroundNode(Tile2i tile) => m_goalGroundNodes.Contains(tile);
         internal int[] AnyGoalDistance => m_anyGoalDistance;
         internal int MinGoalHeight2 => m_minGoalHeight2;
@@ -526,10 +543,24 @@ namespace AutoTerrainDesignations.Access
         public float Cost { get; }
         public int VisitedNodes { get; }
         public IReadOnlyDictionary<string, int> Rejections { get; }
+        public float TraversalCost { get; }
+        public float GeneratedWorkCost { get; }
+        public float GeneratedFixedCost { get; }
+        public float TreeCleanupCost { get; }
+        public float DenseDebrisCleanupCost { get; }
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
             IReadOnlyDictionary<string, int> rejections)
+            : this(success, failureReason, startOrigin, path, cost, visitedNodes, rejections, cost, 0f, 0f, 0f, 0f)
+        {
+        }
+
+        public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
+            IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
+            IReadOnlyDictionary<string, int> rejections, float traversalCost,
+            float generatedWorkCost, float generatedFixedCost, float treeCleanupCost,
+            float denseDebrisCleanupCost)
         {
             Success = success;
             FailureReason = failureReason;
@@ -538,6 +569,11 @@ namespace AutoTerrainDesignations.Access
             Cost = cost;
             VisitedNodes = visitedNodes;
             Rejections = rejections;
+            TraversalCost = traversalCost;
+            GeneratedWorkCost = generatedWorkCost;
+            GeneratedFixedCost = generatedFixedCost;
+            TreeCleanupCost = treeCleanupCost;
+            DenseDebrisCleanupCost = denseDebrisCleanupCost;
         }
     }
 }

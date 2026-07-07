@@ -134,6 +134,25 @@ namespace AutoTerrainDesignations.Access
                     0, 1.5f, out AccessHandoffOperation singleOriginOperation)
                 || singleOriginOperation != AccessHandoffOperation.Mining)
             { failure = "single-origin handoff should infer mining from the terminal profile when no predecessor exists"; return false; }
+            var mixedCleanup = AccessPropCleanupPolicy.BuildOriginInfo(
+                new Tile2i(0, 0),
+                new[]
+                {
+                    new AccessPropSample(new Tile2i(0, 0), true, false, true),
+                    new AccessPropSample(new Tile2i(1, 0), false, true, true),
+                });
+            if (!mixedCleanup.IsEligible || !mixedCleanup.HasTreeCleanup || !mixedCleanup.HasDenseDebrisCleanup)
+            { failure = "prop cleanup helper must preserve mixed tree and dense-debris classes"; return false; }
+            var hardCleanup = AccessPropCleanupPolicy.BuildOriginInfo(
+                new Tile2i(0, 0),
+                new[] { new AccessPropSample(new Tile2i(0, 0), false, true, false) });
+            if (hardCleanup.IsEligible || hardCleanup.BlockerKind != AccessPropBlockerKind.HardBlocker)
+            { failure = "non-removable prop sample must classify as a hard blocker"; return false; }
+            if (!AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Mining, 4, 2)
+                || AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Mining, 4, 3)
+                || !AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Dumping, 2, 4)
+                || AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Dumping, 2, 3))
+            { failure = "stubbed one-level prop-removal threshold helper failed"; return false; }
             AccessHeightProfile.TryForMode(AccessSearchMode.YNegative, 1, out AccessHeightProfile edgeContactSlope);
             Tile2i handoffOrigin = new Tile2i(12, 12);
             Tile2i handoffCenter = new Tile2i(14, 14);
@@ -276,6 +295,39 @@ namespace AutoTerrainDesignations.Access
             AccessDesignationPlan reusedPlan = AccessPathMaterializer.Materialize(fixture, fixtureResult);
             if (!reusedPlan.IsValid || reusedPlan.Designations.Count != 0 || reusedPlan.ReusedNodeCount != 1)
             { failure = "synthetic reused-path materialization fixture failed"; return false; }
+
+            Tile2i cleanupGoal = new Tile2i(13, 4);
+            var cleanupFixture = new AccessSearchSnapshot(
+                new Tile2i(0, 0), new Tile2i(20, 20), new Tile2i(18, 18),
+                -2, 2, true, false, false, 1f, 1f,
+                groundHeights,
+                terrainCenters,
+                new Dictionary<Tile2i, AccessHeightProfile> { [fixtureStart] = flat },
+                new[] { fixtureStart },
+                new[] { fixtureGoal, cleanupGoal },
+                new[] { cleanupGoal },
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                propCleanupByOrigin: new Dictionary<Tile2i, AccessPropCleanupInfo>
+                {
+                    [new Tile2i(12, 4)] = new AccessPropCleanupInfo(new Tile2i(12, 4),
+                        AccessPropCleanupClass.DenseDebris, AccessPropBlockerKind.None, true),
+                });
+            if (!cleanupFixture.IsGroundOrCleanupNode(cleanupGoal)
+                || !cleanupFixture.TryGetCleanupInfoForTile(cleanupGoal, out AccessPropCleanupInfo selectedCleanup)
+                || !selectedCleanup.HasDenseDebrisCleanup)
+            { failure = "snapshot cleanup overlay must admit eligible cleanup ground without ordinary G membership"; return false; }
+            var cleanupResult = new AccessSearchResult(true, string.Empty, fixtureStart,
+                new[]
+                {
+                    new AccessSearchNode(cleanupGoal, 0, AccessSearchMode.Ground),
+                }, AccessPropCleanupPolicy.GetCleanupLandscapingCost() + 1f, 1,
+                new Dictionary<string, int>());
+            AccessDesignationPlan cleanupPlan = AccessPathMaterializer.Materialize(cleanupFixture, cleanupResult);
+            if (!cleanupPlan.IsValid || cleanupPlan.CleanupOrigins.Count != 1
+                || !cleanupPlan.CleanupOrigins[0].HasDenseDebrisCleanup)
+            { failure = "cleanup ground metadata must materialize separately from generated V designations"; return false; }
 
             Tile2i alternateGoal = fixtureGoal + new RelTile2i(1, 0);
             var goalContinuationFixture = new AccessSearchSnapshot(
@@ -609,8 +661,7 @@ namespace AutoTerrainDesignations.Access
                     if (isGoal)
                     {
                         List<AccessSearchNode> path = Reconstruct(current, m_startNode, m_previous);
-                        var candidate = new AccessSearchResult(
-                            true, string.Empty, m_startOrigin, path, known, m_visited, m_rejections);
+                        var candidate = BuildResult(true, string.Empty, m_startOrigin, path, known, m_visited, m_rejections, m_snapshot);
                         AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(m_snapshot, candidate);
                         string goalFailure = goalPlan.IsValid
                             ? m_rejectGoal?.Invoke(candidate) ?? string.Empty
@@ -789,9 +840,10 @@ namespace AutoTerrainDesignations.Access
             foreach (RelTile2i direction in s_tileDirections)
             {
                 Tile2i nextTile = current.Position + direction;
-                if (!snapshot.IsGroundNode(nextTile) || !snapshot.TryGetGroundHeight2(nextTile, out int height2)) continue;
+                if (!snapshot.IsGroundOrCleanupNode(nextTile) || !snapshot.TryGetGroundHeight2(nextTile, out int height2)) continue;
                 var next = new AccessSearchNode(nextTile, height2, AccessSearchMode.Ground);
-                Relax(snapshot, current, next, currentCost + 1f, distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
+                float cleanupCost = GetCleanupEntryCost(snapshot, current.Position, nextTile);
+                Relax(snapshot, current, next, currentCost + 1f + cleanupCost, distance, previous, queue, useAStarHeuristic, goalDistance, minGoalHeight2, maxGoalHeight2);
             }
 
             foreach (Tile2i origin in CandidateOriginsAtGroundTile(current.Position))
@@ -910,13 +962,13 @@ namespace AutoTerrainDesignations.Access
             };
             int[] heights = { profile.Nw2, profile.Ne2, profile.Se2, profile.Sw2 };
             bool centerMatches = MatchesGround(snapshot, center, profile.Center2)
-                && snapshot.IsGroundNode(center);
+                && snapshot.IsGroundOrCleanupNode(center);
             var matchingCorners = new bool[corners.Length];
             int matchingCornerCount = 0;
             for (int i = 0; i < corners.Length; i++)
             {
                 matchingCorners[i] = MatchesGround(snapshot, corners[i], heights[i])
-                    && snapshot.IsGroundNode(corners[i]);
+                    && snapshot.IsGroundOrCleanupNode(corners[i]);
                 if (matchingCorners[i]) matchingCornerCount++;
             }
             if (!centerMatches && matchingCornerCount < 2) yield break;
@@ -1030,6 +1082,49 @@ namespace AutoTerrainDesignations.Access
             // panel's countedThick * 16 estimate. It is not a verified vanilla dump-truck
             // consumption rule; replace it if/when exact vanilla material consumption is sourced.
             return 16f * deltaHeight;
+        }
+
+        private static float GetCleanupEntryCost(AccessSearchSnapshot snapshot, Tile2i fromTile, Tile2i toTile)
+        {
+            if (!snapshot.TryGetCleanupInfoForTile(toTile, out AccessPropCleanupInfo info) || !info.IsEligible) return 0f;
+            if (snapshot.TryGetCleanupInfoForTile(fromTile, out AccessPropCleanupInfo fromInfo)
+                && fromInfo.Origin == info.Origin) return 0f;
+            return snapshot.LandscapingCostDistanceScale * AccessPropCleanupPolicy.GetCleanupLandscapingCost();
+        }
+
+        private static AccessSearchResult BuildResult(bool success, string failureReason, Tile2i startOrigin,
+            IReadOnlyList<AccessSearchNode> path, float cost, int visited,
+            IReadOnlyDictionary<string, int> rejections, AccessSearchSnapshot snapshot)
+        {
+            float traversal = 0f, generated = 0f, fixedCost = 0f, tree = 0f, dense = 0f;
+            var chargedCleanup = new HashSet<Tile2i>();
+            foreach (AccessSearchNode node in path)
+            {
+                if (node.IsGround)
+                {
+                    traversal += 1f;
+                    if (snapshot.TryGetCleanupInfoForTile(node.Position, out AccessPropCleanupInfo info)
+                        && info.IsEligible && chargedCleanup.Add(info.Origin))
+                    {
+                        float cleanup = snapshot.LandscapingCostDistanceScale * AccessPropCleanupPolicy.GetCleanupLandscapingCost();
+                        if (info.HasTreeCleanup) tree += cleanup;
+                        if (info.HasDenseDebrisCleanup) dense += cleanup;
+                    }
+                }
+                else if (node.Mode == AccessSearchMode.Existing)
+                {
+                    traversal += 4f;
+                }
+                else
+                {
+                    traversal += 4f;
+                    generated += snapshot.LandscapingCostDistanceScale * EstimateLandscapingCost(
+                        node.Height2, snapshot.GetTerrainCenterHeight2(node.Position));
+                    fixedCost += 0f;
+                }
+            }
+            return new AccessSearchResult(success, failureReason, startOrigin, path, cost, visited, rejections,
+                traversal, generated, fixedCost, tree, dense);
         }
 
         private static List<AccessSearchNode> Reconstruct(AccessSearchNode end,
