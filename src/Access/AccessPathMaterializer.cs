@@ -16,6 +16,7 @@ namespace AutoTerrainDesignations.Access
             var designations = new List<AccessPlannedDesignation>();
             var generatedByOrigin = new Dictionary<Tile2i, AccessPlannedDesignation>();
             var cornerHeights = new Dictionary<Tile2i, int>();
+            var cleanupByOrigin = new Dictionary<Tile2i, AccessPropCleanupInfo>();
             Tile2i previousPosition = result.StartOrigin;
             var previousNode = new AccessSearchNode(
                 result.StartOrigin, previousProfile.Center2, AccessSearchMode.Existing);
@@ -30,8 +31,11 @@ namespace AutoTerrainDesignations.Access
                 AccessSearchNode node = result.Path[pathIndex];
                 if (node.IsGround)
                 {
-                    if (!snapshot.IsGroundNode(node.Position))
+                    if (!snapshot.IsGroundOrCleanupNode(node.Position))
                         return Invalid("PlanGroundUnavailable", result, designations, reusedNodes, groundNodes);
+                    if (snapshot.TryGetCleanupInfoForTile(node.Position, out AccessPropCleanupInfo cleanupInfo)
+                        && cleanupInfo.IsEligible)
+                        cleanupByOrigin[cleanupInfo.Origin] = cleanupInfo;
                     if (previousWasGround)
                     {
                         if (Manhattan(previousPosition, node.Position) != 1)
@@ -130,7 +134,8 @@ namespace AutoTerrainDesignations.Access
 
             return new AccessDesignationPlan(true, string.Empty, result.StartOrigin, handoffGround,
                 handoffOperation,
-                designations, reusedNodes, groundNodes);
+                designations, reusedNodes, groundNodes,
+                new List<AccessPropCleanupInfo>(cleanupByOrigin.Values));
         }
 
         private static AccessDesignationPlan Invalid(string reason, AccessSearchResult result,
