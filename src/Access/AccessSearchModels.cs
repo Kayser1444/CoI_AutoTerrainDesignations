@@ -200,6 +200,7 @@ namespace AutoTerrainDesignations.Access
         public float LandscapingCostDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
         public int GoalCount => m_goalGroundNodes.Count;
+        public int EligibleCleanupOriginCount { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
         public int LandslideSourceCount => m_durabilityCorners.Length;
         public IEnumerable<AccessPropCleanupInfo> PropCleanupOrigins => m_propCleanupByOrigin.Values;
@@ -249,6 +250,11 @@ namespace AutoTerrainDesignations.Access
             m_propCleanupByOrigin = propCleanupByOrigin != null
                 ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
                 : new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            int eligibleCleanupOriginCount = 0;
+            foreach (AccessPropCleanupInfo info in m_propCleanupByOrigin.Values)
+                if (info.IsEligible)
+                    eligibleCleanupOriginCount++;
+            EligibleCleanupOriginCount = eligibleCleanupOriginCount;
             m_validOrigins = new HashSet<Tile2i>(m_terrainCenterHeight2.Keys);
             m_goalDistanceWidth = boundsMax.X - boundsMin.X + 1;
             m_goalDistanceHeight = boundsMax.Y - boundsMin.Y + 1;
@@ -323,6 +329,9 @@ namespace AutoTerrainDesignations.Access
         public bool IsGroundOrCleanupNode(Tile2i tile) => IsGroundNode(tile) || IsCleanupGroundNode(tile);
         public bool TryGetPropCleanupInfo(Tile2i origin, out AccessPropCleanupInfo info)
             => m_propCleanupByOrigin.TryGetValue(origin, out info);
+        public bool IsCleanupOrigin(Tile2i origin)
+            => m_propCleanupByOrigin.TryGetValue(origin, out AccessPropCleanupInfo info)
+                && info.IsEligible;
         public bool TryGetCleanupInfoForTile(Tile2i tile, out AccessPropCleanupInfo info)
             => m_propCleanupByOrigin.TryGetValue(TerrainOriginForTile(tile), out info);
         private static Tile2i TerrainOriginForTile(Tile2i tile)

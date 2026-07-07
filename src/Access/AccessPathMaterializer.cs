@@ -64,6 +64,8 @@ namespace AutoTerrainDesignations.Access
 
                 if (!AccessPathSearch.TryGetProfile(snapshot, node, out AccessHeightProfile profile))
                     return Invalid("PlanMissingProfile", result, designations, reusedNodes, groundNodes);
+                if (node.Mode != AccessSearchMode.Existing && snapshot.IsCleanupOrigin(node.Position))
+                    return Invalid("PlanCleanupOriginGenerated", result, designations, reusedNodes, groundNodes);
 
                 Tile2i stepDirection = default;
                 if (previousWasGround)

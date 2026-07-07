@@ -639,7 +639,17 @@ namespace AutoTerrainDesignations
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
-                        if (accessibleFixedGoals.Count > 0)
+                        bool skipFixedNetworkSearch = ShouldSkipFixedNetworkSearchForExperimentalAccess(
+                            refreshedSnapshot,
+                            accessibleFixedGoals.Count);
+                        if (skipFixedNetworkSearch)
+                        {
+                            LogExperimentalAccessDebug(
+                                $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
+                                $"skipping fixed-network search fixedGoals={accessibleFixedGoals.Count} " +
+                                $"reason=large-cleanup-snapshot");
+                        }
+                        if (accessibleFixedGoals.Count > 0 && !skipFixedNetworkSearch)
                         {
                             AccessPathRequest fixedRequest = BuildFixedProfileAccessRequest(
                                 refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
@@ -841,6 +851,7 @@ namespace AutoTerrainDesignations
                             placedAny = true;
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
+                            ClearLastExperimentalCleanupMaterialization();
                             LogExperimentalAccessDebug($"[ATD Experimental Access] cluster={cluster.ClusterId} selected=true designations={localPlacedOrigins.Count} decidedBy={decidedBy}");
                             AccessDiagnostics.LogAccessProvided(
                                 cluster.ClusterId,
@@ -854,6 +865,7 @@ namespace AutoTerrainDesignations
 
                         existingProviders.Remove(experimentalProvider);
                         RollBackExperimentalDesignations(localPlacedOrigins, tower, accesswayProto, reservedRampTiles);
+                        RollBackLastExperimentalCleanupMaterialization(tower, reservedRampTiles);
                         states = AccessReachability.EvaluateReachability(
                             originClusters,
                             existingProviders,

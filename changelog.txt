@@ -1,4 +1,7 @@
-v0.4.6a | 2026-06-27
+v0.4.6a | Unreleased
+* Added: Mod setting and public API configuration for prop cleanup landscaping cost in experimental access pathfinding, tuned to favor driving around obstacles when detours exist
+* Changed: Renamed the experimental access work cost scale setting to landscaping cost vs. distance scale
+* Updated: Mod settings UI labels and translations across all supported languages
 * Improved: Experimental accessways can connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
 * Improved: Later clusters can reuse newly placed experimental accessways instead of creating duplicate ramps back to the tower
 * Fixed: Experimental routes can hand off to valid ground while still requiring final tower-reachable access, reducing unnecessary accessway designations over drivable terrain

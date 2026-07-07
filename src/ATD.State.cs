@@ -24,6 +24,7 @@ using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Resources;
+using Mafi.Core.Terrain.Trees;
 using Mafi.Core.Vehicles.Excavators;
 using Mafi.Core.Vehicles.Jobs;
 using Mafi.Core.World;
@@ -46,6 +47,7 @@ namespace AutoTerrainDesignations
         private static IInputScheduler? s_inputScheduler;
         private static ConfigSerializationContext? s_configSerializationContext;
         private static TerrainPropsManager? s_terrainPropsManager;
+        private static TreesManager? s_treesManager;
         private static IVehiclePathFindingManager? s_vehiclePathFindingManager;
         private static ParkAndWaitJobFactory? s_parkAndWaitJobFactory;
         private static VehiclePathFindingParams? s_excavatorPathFindingParams;
@@ -513,6 +515,7 @@ namespace AutoTerrainDesignations
             s_worldMapManager = null;
             s_entitiesManager = null;
             s_terrainPropsManager = null;
+            s_treesManager = null;
             s_vehiclePathFindingManager = null;
             s_parkAndWaitJobFactory = null;
             s_excavatorPathFindingParams = null;
@@ -542,6 +545,7 @@ namespace AutoTerrainDesignations
             MonoBehaviour coroutineHost,
             IEntitiesManager entitiesManager,
             TerrainPropsManager terrainPropsManager,
+            TreesManager treesManager,
             IVehiclePathFindingManager? vehiclePathFindingManager = null,
             ParkAndWaitJobFactory? parkAndWaitJobFactory = null,
             INotificationsManager? notificationsManager = null,
@@ -559,6 +563,7 @@ namespace AutoTerrainDesignations
             s_worldMapManager = worldMapManager as WorldMapManager;
             s_entitiesManager = entitiesManager;
             s_terrainPropsManager = terrainPropsManager;
+            s_treesManager = treesManager;
             s_vehiclePathFindingManager = vehiclePathFindingManager;
             s_parkAndWaitJobFactory = parkAndWaitJobFactory;
             s_inputScheduler = inputScheduler;

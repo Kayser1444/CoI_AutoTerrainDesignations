@@ -63,5 +63,6 @@ Investigate placing only the minimum required soil to satisfy farmability (e.g.,
 
 **Solution:** Query and snapshot the entities safely on a main-thread tick or copy them to avoid concurrent enumeration.
 
-Check Wanderer's issues
-
+# Props/Debris clearing
+- Unwire the prop clearing from "Auto" mode. It's just a recipe for confusion.
+- Shift-click Remove debris to force-replace existing designations (terrain or forestry)

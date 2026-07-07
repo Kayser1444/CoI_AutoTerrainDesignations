@@ -39,13 +39,16 @@ namespace AutoTerrainDesignations.Access
         public bool IsTree { get; }
         public bool IsDenseDebris { get; }
         public bool IsRemovable { get; }
+        public string CleanupObjectKey { get; }
 
-        public AccessPropSample(Tile2i tile, bool isTree, bool isDenseDebris, bool isRemovable)
+        public AccessPropSample(Tile2i tile, bool isTree, bool isDenseDebris, bool isRemovable,
+            string? cleanupObjectKey = null)
         {
             Tile = tile;
             IsTree = isTree;
             IsDenseDebris = isDenseDebris;
             IsRemovable = isRemovable;
+            CleanupObjectKey = cleanupObjectKey ?? $"{(isTree ? "tree" : isDenseDebris ? "debris" : "prop")}:{tile.X},{tile.Y}";
         }
     }
 
@@ -55,17 +58,20 @@ namespace AutoTerrainDesignations.Access
         public AccessPropCleanupClass Classes { get; }
         public AccessPropBlockerKind BlockerKind { get; }
         public bool UsesStubbedTerrainRemovalThreshold { get; }
+        public IReadOnlyList<AccessPropSample> Samples { get; }
         public bool IsEligible => BlockerKind == AccessPropBlockerKind.None && Classes != AccessPropCleanupClass.None;
         public bool HasTreeCleanup => (Classes & AccessPropCleanupClass.Tree) != 0;
         public bool HasDenseDebrisCleanup => (Classes & AccessPropCleanupClass.DenseDebris) != 0;
 
         public AccessPropCleanupInfo(Tile2i origin, AccessPropCleanupClass classes,
-            AccessPropBlockerKind blockerKind, bool usesStubbedTerrainRemovalThreshold)
+            AccessPropBlockerKind blockerKind, bool usesStubbedTerrainRemovalThreshold,
+            IReadOnlyList<AccessPropSample>? samples = null)
         {
             Origin = origin;
             Classes = classes;
             BlockerKind = blockerKind;
             UsesStubbedTerrainRemovalThreshold = usesStubbedTerrainRemovalThreshold;
+            Samples = samples ?? Array.Empty<AccessPropSample>();
         }
 
         public static AccessPropCleanupInfo Clear(Tile2i origin)
@@ -109,17 +115,31 @@ namespace AutoTerrainDesignations.Access
                 return AccessPropCleanupInfo.HardBlocked(origin, blockerKind);
 
             AccessPropCleanupClass classes = AccessPropCleanupClass.None;
+            var collectedSamples = new List<AccessPropSample>();
+            var seenSamples = new HashSet<string>(StringComparer.Ordinal);
             foreach (AccessPropSample sample in samples)
             {
                 if (!sample.IsRemovable)
                     return AccessPropCleanupInfo.HardBlocked(origin, AccessPropBlockerKind.HardBlocker);
+                string sampleKey = sample.CleanupObjectKey
+                    + "|"
+                    + sample.Tile.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + ","
+                    + sample.Tile.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + "|"
+                    + sample.IsTree
+                    + "|"
+                    + sample.IsDenseDebris;
+                if (!seenSamples.Add(sampleKey))
+                    continue;
+                collectedSamples.Add(sample);
                 classes |= Classify(sample);
             }
 
             return classes == AccessPropCleanupClass.None
                 ? AccessPropCleanupInfo.Clear(origin)
                 : new AccessPropCleanupInfo(origin, classes, AccessPropBlockerKind.None,
-                    usesStubbedTerrainRemovalThreshold);
+                    usesStubbedTerrainRemovalThreshold, collectedSamples);
         }
 
         public static float GetCleanupLandscapingCost() =>
