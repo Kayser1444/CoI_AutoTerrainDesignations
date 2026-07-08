@@ -337,6 +337,18 @@ namespace AutoTerrainDesignations.Access
         private static Tile2i TerrainOriginForTile(Tile2i tile)
             => new Tile2i(tile.X & -4, tile.Y & -4);
         public bool IsGoalGroundNode(Tile2i tile) => m_goalGroundNodes.Contains(tile);
+        public static bool IsDiagonalGoalTile(Tile2i tile)
+            => (tile.X & 3) == (tile.Y & 3);
+
+        public static HashSet<Tile2i> BuildDiagonalGoalNodes(IEnumerable<Tile2i> groundNodes)
+        {
+            var result = new HashSet<Tile2i>();
+            foreach (Tile2i tile in groundNodes)
+                if (IsDiagonalGoalTile(tile))
+                    result.Add(tile);
+            return result;
+        }
+
         internal int[] AnyGoalDistance => m_anyGoalDistance;
         internal int MinGoalHeight2 => m_minGoalHeight2;
         internal int MaxGoalHeight2 => m_maxGoalHeight2;

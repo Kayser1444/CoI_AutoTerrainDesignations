@@ -155,6 +155,23 @@ namespace AutoTerrainDesignations.Access
                 || !AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Dumping, 2, 4)
                 || AccessPropCleanupPolicy.DoesStubbedTerrainDeltaRemoveProp(AccessHandoffOperation.Dumping, 2, 3))
             { failure = "stubbed one-level prop-removal threshold helper failed"; return false; }
+            for (int fixedCoordinate = -5; fixedCoordinate <= 5; fixedCoordinate++)
+            {
+                for (int start = -5; start <= 5; start++)
+                {
+                    bool horizontalRetained = false;
+                    bool verticalRetained = false;
+                    for (int offset = 0; offset <= 4; offset++)
+                    {
+                        horizontalRetained |= AccessSearchSnapshot.IsDiagonalGoalTile(
+                            new Tile2i(start + offset, fixedCoordinate));
+                        verticalRetained |= AccessSearchSnapshot.IsDiagonalGoalTile(
+                            new Tile2i(fixedCoordinate, start + offset));
+                    }
+                    if (!horizontalRetained || !verticalRetained)
+                    { failure = "every five-tile V/G handoff edge must retain a diagonal goal"; return false; }
+                }
+            }
             AccessHeightProfile.TryForMode(AccessSearchMode.YNegative, 1, out AccessHeightProfile edgeContactSlope);
             Tile2i handoffOrigin = new Tile2i(12, 12);
             Tile2i handoffCenter = new Tile2i(14, 14);

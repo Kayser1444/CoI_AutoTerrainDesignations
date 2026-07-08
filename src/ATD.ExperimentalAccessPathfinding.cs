@@ -278,6 +278,13 @@ namespace AutoTerrainDesignations
                 failureReason = "NoTowerReachableGround";
                 return false;
             }
+            int fullTowerGoalCount = towerReachableGround.Count;
+            towerReachableGround = AccessSearchSnapshot.BuildDiagonalGoalNodes(towerReachableGround);
+            if (towerReachableGround.Count == 0)
+            {
+                failureReason = "NoDiagonalTowerGround";
+                return false;
+            }
             if (minHeight2 == int.MaxValue) { minHeight2 = 0; maxHeight2 = 0; }
 
             snapshot = new AccessSearchSnapshot(
@@ -309,7 +316,7 @@ namespace AutoTerrainDesignations
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} " +
-                $"goals={snapshot.GoalCount} towerGroundStart={groundStart} " +
+                $"goals={snapshot.GoalCount} fullTowerGoals={fullTowerGoalCount} towerGroundStart={groundStart} " +
                 $"landslideSources={snapshot.LandslideSourceCount}");
             LogAccessPropCleanupDiagnostics(cleanupDiagnostics);
             return true;
