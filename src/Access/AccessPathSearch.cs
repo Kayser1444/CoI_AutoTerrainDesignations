@@ -324,6 +324,82 @@ namespace AutoTerrainDesignations.Access
                 || Math.Abs(raySnapshotFixture.DumpingMaterialSlope - 0.4f) > 0.0001f
                 || raySnapshotFixture.DumpingSlopeUsedFallback)
             { failure = "side-ray snapshot must select cut material at planned depth and preserve resolved/fallback slopes"; return false; }
+            AccessSideRayResult noOpRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                AccessSideRayOperation.None, 1f);
+            AccessSideRayResult resolvedFillRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 4f,
+                AccessSideRayOperation.Fill, 1f);
+            AccessSideRayResult resolvedCutRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 4f),
+                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                AccessSideRayOperation.Cut, 1f);
+            if (noOpRay.TotalCost != 0f || noOpRay.SampleCount != 0
+                || noOpRay.IsFatal || noOpRay.IsUnresolved
+                || Math.Abs(resolvedFillRay.TotalCost - 6f) > 0.0001f
+                || resolvedFillRay.SampleCount != 4
+                || resolvedFillRay.IsFatal || resolvedFillRay.IsUnresolved
+                || Math.Abs(resolvedCutRay.TotalCost - 6f) > 0.0001f
+                || resolvedCutRay.SampleCount != 4
+                || resolvedCutRay.IsFatal || resolvedCutRay.IsUnresolved)
+            { failure = "side-ray integrator must preserve no-op and resolved fill/cut rectangle costs"; return false; }
+
+            AccessSideRayResult unresolvedRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 20f,
+                AccessSideRayOperation.Fill, 0.1f,
+                maxRayCost: 1000f,
+                unresolvedPenalty: 7f);
+            AccessSideRayResult cappedRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 100f,
+                AccessSideRayOperation.Fill, 0.1f,
+                maxRayCost: 10f,
+                unresolvedPenalty: 7f);
+            if (!unresolvedRay.IsUnresolved
+                || unresolvedRay.ReachedCostCap
+                || unresolvedRay.SampleCount != 7
+                || Math.Abs(unresolvedRay.UnresolvedPenalty - 7f) > 0.0001f
+                || !cappedRay.IsUnresolved
+                || !cappedRay.ReachedCostCap
+                || Math.Abs(cappedRay.TotalCost - 10f) > 0.0001f)
+            { failure = "side-ray integrator must apply finite unresolved penalties and per-ray caps"; return false; }
+
+            AccessSideRayResult fillMapEdgeRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.PhysicalMapEdge, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 4f,
+                AccessSideRayOperation.Fill, 1f);
+            AccessSideRayResult cutMapEdgeRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.PhysicalMapEdge, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                AccessSideRayOperation.Cut, 1f);
+            AccessSideRayResult missingRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.MissingSnapshot, 0f),
+                Tile2i.Zero, new Tile2i(1, 0), 4f,
+                AccessSideRayOperation.Fill, 1f);
+            if (fillMapEdgeRay.FatalReason != "SideRayFillMapEdge"
+                || cutMapEdgeRay.IsFatal
+                || cutMapEdgeRay.TotalCost != 0f
+                || missingRay.FatalReason != "SideRaySnapshotMissing")
+            { failure = "side-ray integrator must distinguish fill/cut map boundaries and missing snapshot data"; return false; }
+
+            AccessSideRayResult fillOceanRay = AccessSideRayCost.Score(
+                tile => tile.X < 3
+                    ? new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, 0f)
+                    : new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 2f),
+                Tile2i.Zero, new Tile2i(1, 0), 4f,
+                AccessSideRayOperation.Fill, 1f);
+            AccessSideRayResult cutOceanRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, -2f),
+                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                AccessSideRayOperation.Cut, 1f);
+            if (fillOceanRay.IsFatal
+                || fillOceanRay.IsUnresolved
+                || Math.Abs(fillOceanRay.TotalCost - 5f) > 0.0001f
+                || cutOceanRay.FatalReason != "SideRayCutOcean")
+            { failure = "side-ray integrator must continue fill through ocean and reject low-ocean cuts"; return false; }
             AccessSearchResult fixtureResult = FindPath(fixture, new[] { fixtureStart });
             if (!fixtureResult.Success || fixtureResult.Path.Count < 2
                 || fixtureResult.Path[0].Position != fixtureWorkNeighbor

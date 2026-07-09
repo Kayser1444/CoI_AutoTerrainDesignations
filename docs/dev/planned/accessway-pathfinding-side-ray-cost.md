@@ -279,6 +279,8 @@ Acceptance:
 
 ### 3. Implement the bounded ray integrator
 
+Status: implemented.
+
 * Add a pure scorer using distances `1, 2, 3, 5, 8, 13, 16`.
 * Determine fill, cut, or no-op independently at each exit corner.
 * Integrate `stepLength * positiveGap`, stopping at the first supported terrain
