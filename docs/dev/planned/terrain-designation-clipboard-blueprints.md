@@ -215,15 +215,45 @@ Using the Blueprint Designers Toolkit patterns above, then decompiling game asse
 
 Only proceed if the mod-removal behavior is safe.
 
-## Open questions
+## Research Answers to Open Questions
 
-- Where should player-global `TerrainDesignationBlueprints.json` live on each supported platform, and how should it be backed up/migrated?
-- What compact, versioned string format should terrain blueprint export/import use?
-- Can ATD key terrain-pattern records robustly enough to survive BDT-style blueprint-book reorder, rename, recycle-bin copy, and folder restore workflows?
-- Does vanilla expose a stable copy/paste command layer that can be patched without duplicating large UI flows?
-- Are terrain designations managed globally only, or does each tower maintain additional ownership indices that need refresh after paste?
-- Can mixed-proto terrain designation cells exist in one terrain-only blueprint without confusing construction or tower assignment logic?
-- Should pasted patterns preserve source proto IDs, force the currently active designation proto, or offer both modes?
-- Should height rebasing use anchor NW height, minimum copied height, average surface height, or a player-selected origin cell?
-- Which vanilla shortcut identifiers expose terrain-designation up/down and flip on every supported game version?
-- How should queued/assigned excavator or truck work react when a cut removes active designations?
+- **Where should player-global `TerrainDesignationBlueprints.json` live on each supported platform, and how should it be backed up/migrated?**
+  - **Location**: It should reside in the game's global User Data directory under the `Blueprints` folder, which resolves to `C:\Users\<User>\AppData\Roaming\Captain of Industry\Blueprints\TerrainDesignationBlueprints.json` on Windows (resolved at runtime via `IFileSystemHelper.GetDirPath(FileType.Blueprints, ensureExists: true)`). This ensures blueprints are kept with the player's profile and survive mod updates.
+  - **Backups**: Implement a rolling backup mechanism mirroring the game's native backup logic, preserving up to 5 historical copies (`TerrainDesignationBlueprints.json.bak[0-4]`).
+  - **Migration**: Include a `"version"` field in the JSON structure (e.g., starting at `1`) to support future schema migrations during loading.
+
+- **What compact, versioned string format should terrain blueprint export/import use?**
+  - **Format**: A compressed JSON string prefixed with a format version, e.g., `ATD1:<base64-deflated-json>`. Base64-encoded GZip or Deflate compression ensures the text payload remains short, copy-pasteable, and easy to share on Discord or forums, while being straightforward to deserialize.
+
+- **Can ATD key terrain-pattern records robustly enough to survive BDT-style blueprint-book reorder, rename, recycle-bin copy, and folder restore workflows?**
+  - **Identity**: Since vanilla `IBlueprint` does not possess a stable unique GUID (only string `Name` and `Desc` are exposed on `IBlueprintItem`), ATD must map its external records using metadata embedded inside the vanilla blueprint records.
+  - **Approach**: Inject a hidden identifier tag (e.g., `[ATD-ID: <guid>]`) into the vanilla blueprint's description field. Since description fields travel with the blueprint during reorders, copies, and folder restores, ATD can read this tag to find the corresponding terrain pattern in its external library.
+
+- **Does vanilla expose a stable copy/paste command layer that can be patched without duplicating large UI flows?**
+  - **Commands**: Yes! Vanilla uses input commands for designation mutations:
+    - `AddTerrainDesignationsCmd` (takes a single prototype ID and an array of `DesignationData`)
+    - `RemoveDesignationsCmd` (takes an array of tile coordinates)
+  - Mod actions should schedule these through `IInputScheduler.ScheduleInputCmd` to ensure compatibility with multiplayer sync, command processing, and game replay records.
+
+- **Are terrain designations managed globally only, or does each tower maintain additional ownership indices that need refresh after paste?**
+  - **Ownership**: They are managed globally by the `TerrainDesignationsManager`. Individual towers (`MineTower` and `ForestryTower`) observe the manager's global events (`DesignationAdded`, `DesignationRemoved`, and `DesignationFulfilledChanged`) to dynamically link/unlink designations inside their boundaries. No manual tower indexing refresh is required.
+
+- **Can mixed-proto terrain designation cells exist in one terrain-only blueprint without confusing construction or tower assignment logic?**
+  - **Mixed Protos**: Yes. The game engine handles overlapping or mixed designations fine (towers selectively retrieve only the types they manage). However, because `AddTerrainDesignationsCmd` is prototype-specific, pasting a mixed blueprint requires partitioning the paste cells by prototype ID and scheduling one command per prototype.
+
+- **Should pasted patterns preserve source proto IDs, force the currently active designation proto, or offer both modes?**
+  - **UX Recommendation**: Offer both. By default, preserve the source prototype IDs to reconstruct complex multi-tool layouts. If a modifier key (like holding `Ctrl`) is pressed, or a toolbar toggle is selected, force all cells to use the currently active designation tool's prototype.
+
+- **Should height rebasing use anchor NW height, minimum copied height, average surface height, or a player-selected origin cell?**
+  - **Rebasing**: Use the NW height of the anchor cell at copy time as the reference zero baseline. Relative height deltas for all cells are calculated from this level. During paste, the pattern height initially aligns to the target surface height under the cursor, which the player can shift up or down.
+
+- **Which vanilla shortcut identifiers expose terrain-designation up/down and flip on every supported game version?**
+  - **Shortcuts**: They are defined in `ShortcutsMap` / `ShortcutsManager` as:
+    - `RaiseUp` (default keybind: `E`)
+    - `LowerDown` (default keybind: `Q`)
+    - `Rotate` (default keybind: `R`)
+    - `Flip` (default keybind: `F`)
+  - Key bindings should be checked via `m_shortcutsManager.IsDown(m_shortcutsManager.<Name>)`.
+
+- **How should queued/assigned excavator or truck work react when a cut removes active designations?**
+  - **Reactivity**: No special handling is required. Deleting a designation calls `SetDestroyed()`, marking it as `IsDestroyed = true`. Active truck/excavator jobs continuously check for this flag and safely abort or re-evaluate assignments automatically.

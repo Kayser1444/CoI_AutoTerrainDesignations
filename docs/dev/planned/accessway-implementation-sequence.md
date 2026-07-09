@@ -187,8 +187,13 @@ Goal: add the height-aware A* heuristic after combined Dijkstra is stable.
 
 Scope:
 
-* Implement `h = min(ManhattanDistance + 2 * Abs(height2 delta))` against the
-  same legal goal set used by terminal checks.
+* Implement `h = min(max(ManhattanDistance, Abs(height2 delta)))` against the
+  same legal goal set used by terminal checks. Distance and height must come
+  from the same goal.
+* Do not use the earlier proposed additive
+  `ManhattanDistance + 2 * Abs(height2 delta)`: a four-tile ramp step can change
+  `height2` by two at traversal cost four, so that expression can overestimate
+  the real remaining cost and break A* optimality.
 * Use Dijkstra (`h = 0`) as the fallback whenever the heuristic index cannot
   prove a lower bound.
 * Add a debug switch or setting to force Dijkstra for side-by-side comparison.

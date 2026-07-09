@@ -7,7 +7,8 @@ namespace AutoTerrainDesignations.Access
     internal enum AccessPathEndpointKind
     {
         FixedProfiles,
-        GroundTiles
+        GroundTiles,
+        CombinedGoals
     }
 
     internal enum AccessPathIntent
@@ -20,11 +21,33 @@ namespace AutoTerrainDesignations.Access
     {
         public AccessPathEndpointKind Kind { get; }
         public IReadOnlyList<Tile2i> Nodes { get; }
+        public IReadOnlyList<Tile2i> FixedProfileNodes { get; }
+        public IReadOnlyList<Tile2i> GroundTileNodes { get; }
 
         public AccessPathEndpoint(AccessPathEndpointKind kind, IEnumerable<Tile2i> nodes)
         {
             Kind = kind;
             Nodes = new List<Tile2i>(nodes);
+            FixedProfileNodes = kind == AccessPathEndpointKind.FixedProfiles
+                ? Nodes
+                : Array.Empty<Tile2i>();
+            GroundTileNodes = kind == AccessPathEndpointKind.GroundTiles
+                ? Nodes
+                : Array.Empty<Tile2i>();
+        }
+
+        public AccessPathEndpoint(
+            IEnumerable<Tile2i> fixedProfileNodes,
+            IEnumerable<Tile2i> groundTileNodes)
+        {
+            Kind = AccessPathEndpointKind.CombinedGoals;
+            FixedProfileNodes = new List<Tile2i>(fixedProfileNodes);
+            GroundTileNodes = new List<Tile2i>(groundTileNodes);
+            var combined = new List<Tile2i>(
+                FixedProfileNodes.Count + GroundTileNodes.Count);
+            combined.AddRange(FixedProfileNodes);
+            combined.AddRange(GroundTileNodes);
+            Nodes = combined;
         }
     }
 

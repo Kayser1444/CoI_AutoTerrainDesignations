@@ -35,7 +35,7 @@ namespace AutoTerrainDesignations.Access
                         return Invalid("PlanGroundUnavailable", result, designations, reusedNodes, groundNodes);
                     if (snapshot.TryGetCleanupInfoForTile(node.Position, out AccessPropCleanupInfo cleanupInfo)
                         && cleanupInfo.IsEligible)
-                        cleanupByOrigin[cleanupInfo.Origin] = cleanupInfo;
+                        MergeCleanupInfo(cleanupByOrigin, cleanupInfo);
                     if (previousWasGround)
                     {
                         if (Manhattan(previousPosition, node.Position) != 1)
@@ -70,8 +70,13 @@ namespace AutoTerrainDesignations.Access
                 Tile2i stepDirection = default;
                 if (previousWasGround)
                 {
-                    if (!AccessPathSearch.ContainsHandoffTile(snapshot, node.Position, profile, previousPosition))
+                    if (!AccessPathSearch.TryGetGroundToGeneratedHandoff(
+                        snapshot, node.Position, profile, previousPosition,
+                        out AccessHandoffOperation operation)
+                        || operation != node.HandoffOperation)
+                    {
                         return Invalid("PlanGToVHandoff", result, designations, reusedNodes, groundNodes);
+                    }
                 }
                 else
                 {
@@ -81,6 +86,17 @@ namespace AutoTerrainDesignations.Access
                     if (!IsOriginStep(stepDirection)
                         || !AccessPathSearch.EdgesMatch(previousProfile, profile, stepDirection))
                         return Invalid("PlanEdgeMismatch", result, designations, reusedNodes, groundNodes);
+                    if (previousNode.HandoffOperation != AccessHandoffOperation.None
+                        && pathIndex >= 2
+                        && result.Path[pathIndex - 2].IsGround
+                        && !AccessPathSearch.IsGroundToGeneratedContinuation(
+                            snapshot, previousNode.Position, previousProfile,
+                            result.Path[pathIndex - 2].Position,
+                            previousNode.HandoffOperation, node.Position))
+                    {
+                        return Invalid("PlanGToVHandoffDirection", result,
+                            designations, reusedNodes, groundNodes);
+                    }
                 }
 
                 if (node.Mode == AccessSearchMode.Existing)
@@ -140,6 +156,27 @@ namespace AutoTerrainDesignations.Access
                 new List<AccessPropCleanupInfo>(cleanupByOrigin.Values));
         }
 
+        private static void MergeCleanupInfo(
+            Dictionary<Tile2i, AccessPropCleanupInfo> cleanupByOrigin,
+            AccessPropCleanupInfo cleanupInfo)
+        {
+            if (!cleanupByOrigin.TryGetValue(cleanupInfo.Origin, out AccessPropCleanupInfo existing))
+            {
+                cleanupByOrigin.Add(cleanupInfo.Origin, cleanupInfo);
+                return;
+            }
+
+            var samples = new List<AccessPropSample>(existing.Samples.Count + cleanupInfo.Samples.Count);
+            samples.AddRange(existing.Samples);
+            samples.AddRange(cleanupInfo.Samples);
+            cleanupByOrigin[cleanupInfo.Origin] = AccessPropCleanupPolicy.BuildOriginInfo(
+                cleanupInfo.Origin,
+                samples,
+                usesStubbedTerrainRemovalThreshold:
+                    existing.UsesStubbedTerrainRemovalThreshold
+                    || cleanupInfo.UsesStubbedTerrainRemovalThreshold);
+        }
+
         private static AccessDesignationPlan Invalid(string reason, AccessSearchResult result,
             IReadOnlyList<AccessPlannedDesignation> designations, int reusedNodes, int groundNodes)
             => new AccessDesignationPlan(false, reason, result.StartOrigin, default,
@@ -167,26 +204,17 @@ namespace AutoTerrainDesignations.Access
             predPosition = result.StartOrigin;
             snapshot.TryGetFixedProfile(result.StartOrigin, out predProfile);
 
-            if (currentIndex == 0) return;
+            int handoffIndex = currentIndex - 1;
+            int predecessorIndex = handoffIndex - 1;
+            if (predecessorIndex < 0)
+                return;
 
-            predPosition = result.Path[currentIndex - 1].Position;
-            if (!AccessPathSearch.TryGetProfile(snapshot, result.Path[currentIndex - 1], out predProfile))
+            AccessSearchNode predecessor = result.Path[predecessorIndex];
+            if (!predecessor.IsGround
+                && AccessPathSearch.TryGetProfile(snapshot, predecessor, out AccessHeightProfile profile))
             {
-                predPosition = result.StartOrigin;
-                snapshot.TryGetFixedProfile(result.StartOrigin, out predProfile);
-            }
-
-            for (int i = currentIndex - 2; i >= 0; i--)
-            {
-                AccessSearchNode node = result.Path[i];
-                if (!node.IsGround && node.Mode != AccessSearchMode.Existing)
-                {
-                    if (AccessPathSearch.TryGetProfile(snapshot, node, out AccessHeightProfile p))
-                    {
-                        predPosition = node.Position;
-                        predProfile = p;
-                    }
-                }
+                predPosition = predecessor.Position;
+                predProfile = profile;
             }
         }
     }

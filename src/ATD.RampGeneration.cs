@@ -633,100 +633,42 @@ namespace AutoTerrainDesignations
 
                         List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
                             originClusters, states, cluster);
-                        bool skippedDueToExistingFixedRoute = false;
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
-                        bool skipFixedNetworkSearch = ShouldSkipFixedNetworkSearchForExperimentalAccess(
-                            refreshedSnapshot,
-                            accessibleFixedGoals.Count);
-                        if (skipFixedNetworkSearch)
+                        AccessPathRequest request = BuildMergedGoalAccessRequest(
+                            refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
+                        var experimentalDryRun = new ExperimentalAccessDryRunResult();
+                        IEnumerator mergedSearch = RunExperimentalAccessDryRunSliced(
+                            request, cluster, currentClusterOrdinal, unreachableClusterCount,
+                            experimentalDryRun);
+                        while (mergedSearch.MoveNext())
+                            yield return mergedSearch.Current;
+                        experimentalResult = experimentalDryRun.Result!;
+                        experimentalPlan = LastExperimentalAccessPlan;
+
+                        if (experimentalResult.Success
+                            && experimentalPlan != null
+                            && experimentalPlan.IsValid
+                            && experimentalPlan.Designations.Count == 0)
                         {
+                            states[cluster] = AccessClusterState.AccessibleViaProvider;
+                            validatedExistingRoute = true;
                             LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
-                                $"skipping fixed-network search fixedGoals={accessibleFixedGoals.Count} " +
-                                $"reason=large-cleanup-snapshot");
-                        }
-                        if (accessibleFixedGoals.Count > 0 && !skipFixedNetworkSearch)
-                        {
-                            AccessPathRequest fixedRequest = BuildFixedProfileAccessRequest(
-                                refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
-                            var fixedDryRun = new ExperimentalAccessDryRunResult();
-                            IEnumerator fixedSearch = RunExperimentalAccessDryRunSliced(
-                                fixedRequest, cluster, currentClusterOrdinal, unreachableClusterCount, fixedDryRun);
-                            while (fixedSearch.MoveNext())
-                                yield return fixedSearch.Current;
-                            AccessSearchResult fixedResult = fixedDryRun.Result!;
-                            AccessDesignationPlan? fixedPlan = LastExperimentalAccessPlan;
-                            if (fixedResult.Success
-                                && fixedPlan != null
-                                && fixedPlan.IsValid
-                                && fixedPlan.Designations.Count == 0)
-                            {
-                                states[cluster] = AccessClusterState.AccessibleViaProvider;
-                                validatedExistingRoute = true;
-                                LogExperimentalAccessDebug(
-                                    $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
-                                    $"selected=existing-fixed-route reused={fixedPlan.ReusedNodeCount}");
-                                skippedDueToExistingFixedRoute = true;
-                            }
-                            else
-                            {
-                                experimentalResult = fixedResult;
-                                experimentalPlan = fixedPlan;
-                                experimentalCandidate = EvaluateExperimentalAccessCandidate(
-                                    fixedResult, fixedPlan, towerPos, terrMgr);
-                            }
-                        }
-
-                        if (!skippedDueToExistingFixedRoute)
-                        {
-                            float costLimit = (experimentalCandidate != null) ? experimentalResult.Cost : float.MaxValue;
-                            AccessPathRequest request = BuildTowerRootedAccessRequest(
-                                refreshedSnapshot, cluster, configuredRampWidth, costLimit);
-                            var experimentalDryRun = new ExperimentalAccessDryRunResult();
-                            IEnumerator rootedSearch = RunExperimentalAccessDryRunSliced(
-                                request, cluster, currentClusterOrdinal, unreachableClusterCount, experimentalDryRun);
-                            while (rootedSearch.MoveNext())
-                                yield return rootedSearch.Current;
-                            AccessSearchResult rootedResult = experimentalDryRun.Result!;
-                            AccessDesignationPlan? rootedPlan = LastExperimentalAccessPlan;
-
-                            if (rootedResult.Success
-                                && rootedPlan != null
-                                && rootedPlan.IsValid
-                                && rootedPlan.Designations.Count == 0)
-                            {
-                                states[cluster] = AccessClusterState.AccessibleViaProvider;
-                                validatedExistingRoute = true;
-                                LogExperimentalAccessDebug(
-                                    $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
-                                    $"selected=existing-route reused={rootedPlan.ReusedNodeCount}");
-                                continue;
-                            }
-
-                            if (!rootedResult.Success)
-                            {
-                                experimentalFailureSummary = FormatExperimentalFailureSummary(rootedResult);
-                            }
-
-                            EvaluatedAccessCandidate? rootedCandidate = EvaluateExperimentalAccessCandidate(
-                                rootedResult, rootedPlan, towerPos, terrMgr);
-                            if (rootedCandidate != null
-                                && (experimentalCandidate == null
-                                    || EvaluatedAccessCandidate.Compare(rootedCandidate, experimentalCandidate) < 0))
-                            {
-                                experimentalResult = rootedResult;
-                                experimentalPlan = rootedPlan;
-                                experimentalCandidate = rootedCandidate;
-                            }
-                        }
-                        else
-                        {
+                                $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
+                                $"selected=existing-route goal={experimentalResult.ReachedGoalKind} " +
+                                $"reused={experimentalPlan.ReusedNodeCount}");
                             continue;
                         }
+
+                        if (!experimentalResult.Success)
+                            experimentalFailureSummary =
+                                FormatExperimentalFailureSummary(experimentalResult);
+
+                        experimentalCandidate = EvaluateExperimentalAccessCandidate(
+                            experimentalResult, experimentalPlan, towerPos, terrMgr);
                     }
                     else
                     {
@@ -2031,17 +1973,35 @@ namespace AutoTerrainDesignations
             {
                 for (int x = 0; x <= 4; x++)
                 {
-                    Tile2i tile = data.OriginTile + new RelTile2i(x, y);
-                    Tile2iAndIndex tileAndIndex = terrMgr.ExtendTileIndex(tile);
-                    HeightTilesF targetHeight = GetDesignationTargetHeightAt(data, x, y);
-                    bool upperEdge = x == 4 || y == 4;
-                    bool fulfilled = operation == AccessHandoffOperation.Mining
-                        ? proto.IsFulfilledMiningFn.Value(s_desigManager, tileAndIndex, targetHeight, upperEdge)
-                        : proto.IsFulfilledDumpingFn.Value(s_desigManager, tileAndIndex, targetHeight, upperEdge);
-                    if (fulfilled) fulfilledBitmap |= GetDesignationMask(x, y);
+                    if (IsProspectiveDesignationTileFulfilled(proto, terrMgr, data, operation, x, y))
+                        fulfilledBitmap |= GetDesignationMask(x, y);
                 }
             }
             return true;
+        }
+
+        private static bool IsProspectiveDesignationTileFulfilled(
+            TerrainDesignationProto proto,
+            TerrainManager terrMgr,
+            DesignationData data,
+            AccessHandoffOperation operation,
+            int x,
+            int y)
+        {
+            if (s_desigManager == null) return false;
+            if (operation == AccessHandoffOperation.Mining && !proto.IsFulfilledMiningFn.HasValue)
+                return false;
+            if (operation == AccessHandoffOperation.Dumping && !proto.IsFulfilledDumpingFn.HasValue)
+                return false;
+            if (operation == AccessHandoffOperation.None) return false;
+
+            Tile2i tile = data.OriginTile + new RelTile2i(x, y);
+            Tile2iAndIndex tileAndIndex = terrMgr.ExtendTileIndex(tile);
+            HeightTilesF targetHeight = GetDesignationTargetHeightAt(data, x, y);
+            bool upperEdge = x == 4 || y == 4;
+            return operation == AccessHandoffOperation.Mining
+                ? proto.IsFulfilledMiningFn.Value(s_desigManager, tileAndIndex, targetHeight, upperEdge)
+                : proto.IsFulfilledDumpingFn.Value(s_desigManager, tileAndIndex, targetHeight, upperEdge);
         }
 
         private static HeightTilesF GetDesignationTargetHeightAt(DesignationData data, int x, int y)

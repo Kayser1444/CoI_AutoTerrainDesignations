@@ -826,7 +826,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
             sb.AppendLine($"  \"suppressLegacyAccessRamps\": {BoolToJsonStr(AutoTerrainDesignationsMod.SuppressLegacyAccessRamps)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use A* instead of reference Dijkstra for experimental turning ramps. Fixed-profile provider-join searches still use Dijkstra until their own admissible heuristic is added. Default: true.\",");
+            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for experimental access search. Set false for route and cost comparison. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");

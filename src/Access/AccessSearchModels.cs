@@ -4,6 +4,13 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
+    internal enum AccessReachedGoalKind
+    {
+        None,
+        TowerGround,
+        FixedNetwork
+    }
+
     internal enum AccessSearchMode
     {
         Ground,
@@ -18,6 +25,7 @@ namespace AutoTerrainDesignations.Access
     internal enum AccessHandoffOperation
     {
         None,
+        Leveling,
         Mining,
         Dumping
     }
@@ -175,6 +183,7 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_occupiedTiles;
         private readonly HashSet<Tile2i> m_oceanTiles;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByOrigin;
+        private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByTile;
         private readonly HashSet<Tile2i> m_validOrigins;
         private readonly int[] m_anyGoalDistance;
         private readonly int m_minGoalHeight2;
@@ -250,6 +259,7 @@ namespace AutoTerrainDesignations.Access
             m_propCleanupByOrigin = propCleanupByOrigin != null
                 ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
                 : new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            m_propCleanupByTile = BuildCleanupByTile(m_propCleanupByOrigin);
             int eligibleCleanupOriginCount = 0;
             foreach (AccessPropCleanupInfo info in m_propCleanupByOrigin.Values)
                 if (info.IsEligible)
@@ -324,7 +334,7 @@ namespace AutoTerrainDesignations.Access
         public bool IsGroundNode(Tile2i tile) => m_groundNodes.Contains(tile);
         public bool IsCleanupGroundNode(Tile2i tile)
             => !m_groundNodes.Contains(tile)
-                && m_propCleanupByOrigin.TryGetValue(TerrainOriginForTile(tile), out AccessPropCleanupInfo info)
+                && m_propCleanupByTile.TryGetValue(tile, out AccessPropCleanupInfo info)
                 && info.IsEligible;
         public bool IsGroundOrCleanupNode(Tile2i tile) => IsGroundNode(tile) || IsCleanupGroundNode(tile);
         public bool TryGetPropCleanupInfo(Tile2i origin, out AccessPropCleanupInfo info)
@@ -333,9 +343,56 @@ namespace AutoTerrainDesignations.Access
             => m_propCleanupByOrigin.TryGetValue(origin, out AccessPropCleanupInfo info)
                 && info.IsEligible;
         public bool TryGetCleanupInfoForTile(Tile2i tile, out AccessPropCleanupInfo info)
-            => m_propCleanupByOrigin.TryGetValue(TerrainOriginForTile(tile), out info);
+            => m_propCleanupByTile.TryGetValue(tile, out info);
         private static Tile2i TerrainOriginForTile(Tile2i tile)
             => new Tile2i(tile.X & -4, tile.Y & -4);
+
+        private static Dictionary<Tile2i, AccessPropCleanupInfo> BuildCleanupByTile(
+            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> cleanupByOrigin)
+        {
+            var samplesByTile = new Dictionary<Tile2i, List<AccessPropSample>>();
+            foreach (AccessPropCleanupInfo info in cleanupByOrigin.Values)
+            {
+                if (!info.IsEligible)
+                    continue;
+                if (info.Samples.Count == 0)
+                {
+                    for (int y = 0; y < 4; y++)
+                        for (int x = 0; x < 4; x++)
+                            AddSamples(info.Origin + new RelTile2i(x, y), Array.Empty<AccessPropSample>());
+                    continue;
+                }
+                foreach (AccessPropSample sample in info.Samples)
+                    AddSamples(sample.Tile, new[] { sample });
+            }
+
+            var result = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            foreach (KeyValuePair<Tile2i, List<AccessPropSample>> pair in samplesByTile)
+            {
+                Tile2i origin = TerrainOriginForTile(pair.Key);
+                if (pair.Value.Count == 0
+                    && cleanupByOrigin.TryGetValue(origin, out AccessPropCleanupInfo fallback))
+                {
+                    result[pair.Key] = fallback;
+                }
+                else
+                {
+                    result[pair.Key] = AccessPropCleanupPolicy.BuildOriginInfo(origin, pair.Value);
+                }
+            }
+            return result;
+
+            void AddSamples(Tile2i tile, IReadOnlyList<AccessPropSample> samples)
+            {
+                if (!samplesByTile.TryGetValue(tile, out List<AccessPropSample> collected))
+                {
+                    collected = new List<AccessPropSample>();
+                    samplesByTile.Add(tile, collected);
+                }
+                for (int i = 0; i < samples.Count; i++)
+                    collected.Add(samples[i]);
+            }
+        }
         public bool IsGoalGroundNode(Tile2i tile) => m_goalGroundNodes.Contains(tile);
         public static bool IsDiagonalGoalTile(Tile2i tile)
             => (tile.X & 3) == (tile.Y & 3);
@@ -569,11 +626,13 @@ namespace AutoTerrainDesignations.Access
         public float GeneratedFixedCost { get; }
         public float TreeCleanupCost { get; }
         public float DenseDebrisCleanupCost { get; }
+        public AccessReachedGoalKind ReachedGoalKind { get; }
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
             IReadOnlyDictionary<string, int> rejections)
-            : this(success, failureReason, startOrigin, path, cost, visitedNodes, rejections, cost, 0f, 0f, 0f, 0f)
+            : this(success, failureReason, startOrigin, path, cost, visitedNodes,
+                rejections, cost, 0f, 0f, 0f, 0f, AccessReachedGoalKind.None)
         {
         }
 
@@ -581,7 +640,8 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
             IReadOnlyDictionary<string, int> rejections, float traversalCost,
             float generatedWorkCost, float generatedFixedCost, float treeCleanupCost,
-            float denseDebrisCleanupCost)
+            float denseDebrisCleanupCost,
+            AccessReachedGoalKind reachedGoalKind = AccessReachedGoalKind.None)
         {
             Success = success;
             FailureReason = failureReason;
@@ -595,6 +655,7 @@ namespace AutoTerrainDesignations.Access
             GeneratedFixedCost = generatedFixedCost;
             TreeCleanupCost = treeCleanupCost;
             DenseDebrisCleanupCost = denseDebrisCleanupCost;
+            ReachedGoalKind = reachedGoalKind;
         }
     }
 }
