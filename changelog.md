@@ -3,6 +3,7 @@ v0.4.6a [unreleased]
 * Fixed: experimental accessway cost diagnostics now reconstruct the actual predecessor-to-node traversal distance, including zero-length profile-to-ground handoffs, instead of assuming every ground node costs one tile.
 * Added: experimental access snapshots now capture precise side-ray terrain heights, depth-specific cut-material layers, physical map bounds, ocean state, and a tower-wide conservative dumping-material slope for the planned landscaping scorer.
 * Added: a bounded side-ray landscaping integrator with accelerating samples, finite caps and unresolved penalties, and operation-specific map-edge and ocean behavior.
+* Added: experimental access search now charges direction-aware side-ray landscaping cost when entering generated cells, filters corner work by mining/dumping/leveling operation, rejects fatal boundary cases, and reports separate direct/ray cost diagnostics.
 * Added: Mod setting and API methods (`GetAccessPropCleanupLandscapingCost`, `SetAccessPropCleanupLandscapingCost`) to configure prop cleanup landscaping cost.
   - Defaults to `6` to favor driving around trees or debris when a reasonable detour exists.
 * Changed: Renamed setting `accessWorkDistanceScale` to `accessLandscapingCostDistanceScale` (and its UI row to **Landscaping cost vs. distance**) to better reflect that one unit of landscaping cost equals one unit of digging/dumping rock.

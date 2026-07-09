@@ -941,7 +941,23 @@ namespace AutoTerrainDesignations
                 materializeTimer.Stop();
                 LastExperimentalAccessPlan = plan;
                 string materializeMs = materializeTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
-                LogExperimentalAccessDebug($"[ATD Experimental Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} reason={(string.IsNullOrEmpty(plan.FailureReason) ? "none" : plan.FailureReason)} designations={plan.Designations.Count} reused={plan.ReusedNodeCount} groundNodes={plan.GroundNodeCount} cleanupOrigins={plan.CleanupOrigins.Count} traversalCost={result.TraversalCost.ToString("0.##", CultureInfo.InvariantCulture)} generatedWorkCost={result.GeneratedWorkCost.ToString("0.##", CultureInfo.InvariantCulture)} generatedFixedCost={result.GeneratedFixedCost.ToString("0.##", CultureInfo.InvariantCulture)} treeCleanupCost={result.TreeCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} denseDebrisCleanupCost={result.DenseDebrisCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} handoff=({plan.HandoffGround.X},{plan.HandoffGround.Y}) handoffOperation={plan.HandoffOperation} materializeMs={materializeMs}");
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} " +
+                    $"reason={(string.IsNullOrEmpty(plan.FailureReason) ? "none" : plan.FailureReason)} " +
+                    $"designations={plan.Designations.Count} reused={plan.ReusedNodeCount} " +
+                    $"groundNodes={plan.GroundNodeCount} cleanupOrigins={plan.CleanupOrigins.Count} " +
+                    $"traversalCost={result.TraversalCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"generatedWorkCost={result.GeneratedWorkCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"generatedDirectCost={result.GeneratedDirectWorkCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"leftRayCost={result.LeftSideRayCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"rightRayCost={result.RightSideRayCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"unresolvedRayPenalty={result.SideRayUnresolvedPenalty.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"raySamples={result.SideRaySampleCount} " +
+                    $"generatedFixedCost={result.GeneratedFixedCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"treeCleanupCost={result.TreeCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"denseDebrisCleanupCost={result.DenseDebrisCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"handoff=({plan.HandoffGround.X},{plan.HandoffGround.Y}) " +
+                    $"handoffOperation={plan.HandoffOperation} materializeMs={materializeMs}");
                 if (plan.IsValid)
                 {
                     LogExperimentalAccessDebug($"[ATD Experimental Access Plan Tiles] cluster={cluster.ClusterId} {FormatExperimentalPlan(plan)}");

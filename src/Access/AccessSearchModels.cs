@@ -48,14 +48,17 @@ namespace AutoTerrainDesignations.Access
         public int Height2 { get; }
         public AccessSearchMode Mode { get; }
         public AccessHandoffOperation HandoffOperation { get; }
+        public Tile2i EntryDirection { get; }
 
         public AccessSearchNode(Tile2i position, int height2, AccessSearchMode mode,
-            AccessHandoffOperation handoffOperation = AccessHandoffOperation.None)
+            AccessHandoffOperation handoffOperation = AccessHandoffOperation.None,
+            Tile2i entryDirection = default)
         {
             Position = position;
             Height2 = height2;
             Mode = mode;
             HandoffOperation = handoffOperation;
+            EntryDirection = entryDirection;
         }
 
         public bool IsGround => Mode == AccessSearchMode.Ground;
@@ -63,7 +66,8 @@ namespace AutoTerrainDesignations.Access
 
         public bool Equals(AccessSearchNode other)
             => Position == other.Position && Height2 == other.Height2 && Mode == other.Mode
-                && HandoffOperation == other.HandoffOperation;
+                && HandoffOperation == other.HandoffOperation
+                && EntryDirection == other.EntryDirection;
 
         public override bool Equals(object? obj) => obj is AccessSearchNode other && Equals(other);
 
@@ -75,11 +79,13 @@ namespace AutoTerrainDesignations.Access
                 hash = (hash * 397) ^ Height2;
                 hash = (hash * 397) ^ (int)Mode;
                 hash = (hash * 397) ^ (int)HandoffOperation;
+                hash = (hash * 397) ^ EntryDirection.GetHashCode();
                 return hash;
             }
         }
 
-        public override string ToString() => $"{Mode}@{Position}/h2={Height2}/handoff={HandoffOperation}";
+        public override string ToString()
+            => $"{Mode}@{Position}/h2={Height2}/handoff={HandoffOperation}/entry={EntryDirection}";
     }
 
     internal readonly struct AccessHeightProfile
@@ -753,6 +759,7 @@ namespace AutoTerrainDesignations.Access
         public float LeftSideRayCost { get; }
         public float RightSideRayCost { get; }
         public float UnresolvedPenalty { get; }
+        public int RaySampleCount { get; }
         public string? FatalReason { get; }
         public float TotalCost =>
             DirectWorkCost + LeftSideRayCost + RightSideRayCost + UnresolvedPenalty;
@@ -763,12 +770,14 @@ namespace AutoTerrainDesignations.Access
             float leftSideRayCost = 0f,
             float rightSideRayCost = 0f,
             float unresolvedPenalty = 0f,
+            int raySampleCount = 0,
             string? fatalReason = null)
         {
             DirectWorkCost = directWorkCost;
             LeftSideRayCost = leftSideRayCost;
             RightSideRayCost = rightSideRayCost;
             UnresolvedPenalty = unresolvedPenalty;
+            RaySampleCount = raySampleCount;
             FatalReason = fatalReason;
         }
     }
@@ -787,6 +796,11 @@ namespace AutoTerrainDesignations.Access
         public float GeneratedFixedCost { get; }
         public float TreeCleanupCost { get; }
         public float DenseDebrisCleanupCost { get; }
+        public float GeneratedDirectWorkCost { get; }
+        public float LeftSideRayCost { get; }
+        public float RightSideRayCost { get; }
+        public float SideRayUnresolvedPenalty { get; }
+        public int SideRaySampleCount { get; }
         public AccessReachedGoalKind ReachedGoalKind { get; }
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
@@ -802,7 +816,12 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyDictionary<string, int> rejections, float traversalCost,
             float generatedWorkCost, float generatedFixedCost, float treeCleanupCost,
             float denseDebrisCleanupCost,
-            AccessReachedGoalKind reachedGoalKind = AccessReachedGoalKind.None)
+            AccessReachedGoalKind reachedGoalKind = AccessReachedGoalKind.None,
+            float generatedDirectWorkCost = 0f,
+            float leftSideRayCost = 0f,
+            float rightSideRayCost = 0f,
+            float sideRayUnresolvedPenalty = 0f,
+            int sideRaySampleCount = 0)
         {
             Success = success;
             FailureReason = failureReason;
@@ -816,6 +835,11 @@ namespace AutoTerrainDesignations.Access
             GeneratedFixedCost = generatedFixedCost;
             TreeCleanupCost = treeCleanupCost;
             DenseDebrisCleanupCost = denseDebrisCleanupCost;
+            GeneratedDirectWorkCost = generatedDirectWorkCost;
+            LeftSideRayCost = leftSideRayCost;
+            RightSideRayCost = rightSideRayCost;
+            SideRayUnresolvedPenalty = sideRayUnresolvedPenalty;
+            SideRaySampleCount = sideRaySampleCount;
             ReachedGoalKind = reachedGoalKind;
         }
     }

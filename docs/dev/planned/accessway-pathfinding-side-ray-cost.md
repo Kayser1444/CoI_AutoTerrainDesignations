@@ -300,6 +300,8 @@ Acceptance:
 
 ### 4. Integrate predecessor-direction scoring
 
+Status: implemented.
+
 * Whenever expansion enters a new generated node, derive its forward direction
   from the predecessor and score the new profile's outgoing corners.
 * For `G`-to-`V`, use the matched handoff geometry to determine the same

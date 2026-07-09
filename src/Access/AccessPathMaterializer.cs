@@ -72,8 +72,10 @@ namespace AutoTerrainDesignations.Access
                 {
                     if (!AccessPathSearch.TryGetGroundToGeneratedHandoff(
                         snapshot, node.Position, profile, previousPosition,
-                        out AccessHandoffOperation operation)
-                        || operation != node.HandoffOperation)
+                        out AccessHandoffOperation operation,
+                        out Tile2i entryDirection)
+                        || operation != node.HandoffOperation
+                        || entryDirection != node.EntryDirection)
                     {
                         return Invalid("PlanGToVHandoff", result, designations, reusedNodes, groundNodes);
                     }
