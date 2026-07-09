@@ -172,9 +172,72 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    internal enum AccessTerrainSampleKind
+    {
+        Terrain,
+        Ocean,
+        PhysicalMapEdge,
+        MissingSnapshot,
+    }
+
+    internal readonly struct AccessTerrainLayer
+    {
+        public float TopHeight { get; }
+        public float BottomHeight { get; }
+        public float NormalSlope { get; }
+        public string MaterialId { get; }
+
+        public AccessTerrainLayer(
+            float topHeight,
+            float bottomHeight,
+            float normalSlope,
+            string materialId)
+        {
+            TopHeight = topHeight;
+            BottomHeight = bottomHeight;
+            NormalSlope = normalSlope;
+            MaterialId = materialId;
+        }
+    }
+
+    internal sealed class AccessTerrainColumn
+    {
+        private readonly AccessTerrainLayer[] m_layers;
+
+        public AccessTerrainColumn(IEnumerable<AccessTerrainLayer> layers)
+        {
+            m_layers = new List<AccessTerrainLayer>(layers).ToArray();
+        }
+
+        public bool TryGetNormalSlopeAt(
+            float elevation,
+            out float slope,
+            out string materialId)
+        {
+            const float epsilon = 0.0001f;
+            for (int i = 0; i < m_layers.Length; i++)
+            {
+                AccessTerrainLayer layer = m_layers[i];
+                if (elevation > layer.TopHeight + epsilon
+                    || (elevation <= layer.BottomHeight + epsilon
+                        && i < m_layers.Length - 1))
+                    continue;
+                slope = layer.NormalSlope;
+                materialId = layer.MaterialId;
+                return true;
+            }
+
+            slope = 0f;
+            materialId = string.Empty;
+            return false;
+        }
+    }
+
     internal sealed class AccessSearchSnapshot
     {
         private readonly Dictionary<Tile2i, int> m_groundHeight2;
+        private readonly Dictionary<Tile2i, float> m_preciseTerrainHeights;
+        private readonly Dictionary<Tile2i, AccessTerrainColumn> m_terrainColumns;
         private readonly Dictionary<Tile2i, int> m_terrainCenterHeight2;
         private readonly Dictionary<Tile2i, AccessHeightProfile> m_fixedProfiles;
         private readonly HashSet<Tile2i> m_workOrigins;
@@ -208,6 +271,11 @@ namespace AutoTerrainDesignations.Access
         public bool UseAStar { get; }
         public float LandscapingCostDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
+        public Tile2i PhysicalTerrainMin { get; }
+        public Tile2i PhysicalTerrainMax { get; }
+        public float DumpingMaterialSlope { get; }
+        public float FallbackMiningSlope { get; }
+        public bool DumpingSlopeUsedFallback { get; }
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
@@ -236,7 +304,14 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<AccessDurabilityCorner> durabilityCorners,
             Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
                 IReadOnlyList<AccessGroundHandoff>>? workableHandoffs = null,
-            IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin = null)
+            IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin = null,
+            IDictionary<Tile2i, float>? preciseTerrainHeights = null,
+            IDictionary<Tile2i, AccessTerrainColumn>? terrainColumns = null,
+            Tile2i? physicalTerrainMin = null,
+            Tile2i? physicalTerrainMax = null,
+            float dumpingMaterialSlope = 1f,
+            float fallbackMiningSlope = 1f,
+            bool dumpingSlopeUsedFallback = false)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -249,6 +324,17 @@ namespace AutoTerrainDesignations.Access
             LandscapingCostDistanceScale = landscapingCostDistanceScale;
             LandslideRunPerHeight = landslideRunPerHeight;
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
+            m_preciseTerrainHeights = preciseTerrainHeights != null
+                ? new Dictionary<Tile2i, float>(preciseTerrainHeights)
+                : BuildPreciseTerrainHeights(groundHeight2);
+            m_terrainColumns = terrainColumns != null
+                ? new Dictionary<Tile2i, AccessTerrainColumn>(terrainColumns)
+                : new Dictionary<Tile2i, AccessTerrainColumn>();
+            PhysicalTerrainMin = physicalTerrainMin ?? boundsMin;
+            PhysicalTerrainMax = physicalTerrainMax ?? boundsMax;
+            DumpingMaterialSlope = dumpingMaterialSlope;
+            FallbackMiningSlope = fallbackMiningSlope;
+            DumpingSlopeUsedFallback = dumpingSlopeUsedFallback;
             m_terrainCenterHeight2 = new Dictionary<Tile2i, int>(terrainCenterHeight2);
             m_fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>(fixedProfiles);
             m_workOrigins = new HashSet<Tile2i>(workOrigins);
@@ -321,6 +407,15 @@ namespace AutoTerrainDesignations.Access
             }
 
             m_workableHandoffs = workableHandoffs;
+        }
+
+        private static Dictionary<Tile2i, float> BuildPreciseTerrainHeights(
+            IDictionary<Tile2i, int> groundHeight2)
+        {
+            var result = new Dictionary<Tile2i, float>(groundHeight2.Count);
+            foreach (KeyValuePair<Tile2i, int> pair in groundHeight2)
+                result[pair.Key] = pair.Value / 2f;
+            return result;
         }
 
         public bool IsOriginInside(Tile2i origin) => m_validOrigins.Contains(origin);
@@ -427,6 +522,46 @@ namespace AutoTerrainDesignations.Access
             return Math.Max(horizontalDistance, verticalDistance);
         }
         public bool TryGetGroundHeight2(Tile2i tile, out int height2) => m_groundHeight2.TryGetValue(tile, out height2);
+        public AccessTerrainSampleKind GetSideRayTerrainSample(
+            Tile2i tile,
+            out float terrainHeight)
+        {
+            if (tile.X < PhysicalTerrainMin.X
+                || tile.Y < PhysicalTerrainMin.Y
+                || tile.X > PhysicalTerrainMax.X
+                || tile.Y > PhysicalTerrainMax.Y)
+            {
+                terrainHeight = 0f;
+                return AccessTerrainSampleKind.PhysicalMapEdge;
+            }
+            if (!m_preciseTerrainHeights.TryGetValue(tile, out terrainHeight))
+                return AccessTerrainSampleKind.MissingSnapshot;
+            return m_oceanTiles.Contains(tile)
+                ? AccessTerrainSampleKind.Ocean
+                : AccessTerrainSampleKind.Terrain;
+        }
+
+        public bool TryGetMiningMaterialSlope(
+            Tile2i tile,
+            float plannedElevation,
+            out float slope,
+            out string materialId,
+            out bool usedFallback)
+        {
+            if (m_terrainColumns.TryGetValue(tile, out AccessTerrainColumn column)
+                && column.TryGetNormalSlopeAt(
+                    plannedElevation, out slope, out materialId))
+            {
+                usedFallback = false;
+                return true;
+            }
+
+            slope = FallbackMiningSlope;
+            materialId = string.Empty;
+            usedFallback = true;
+            return slope > 0f;
+        }
+
         public int GetTerrainCenterHeight2(Tile2i origin) => m_terrainCenterHeight2.TryGetValue(origin, out int h2) ? h2 : 0;
         public bool HasWorkableHandoffEvaluator => m_workableHandoffs != null;
         public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffs(

@@ -259,6 +259,71 @@ namespace AutoTerrainDesignations.Access
                 || Math.Abs(baselineGeneratedEntryCost
                     - (16f * fixture.LandscapingCostDistanceScale + GENERATED_V_FIXED_OVERHEAD)) > 0.0001f)
             { failure = "stage-one generated entry cost must reproduce center-height baseline with zero side-ray cost"; return false; }
+            Tile2i preciseTerrainTile = new Tile2i(2, 2);
+            Tile2i preciseOceanTile = new Tile2i(2, 3);
+            var raySnapshotFixture = new AccessSearchSnapshot(
+                new Tile2i(0, 0), new Tile2i(20, 20), new Tile2i(18, 18),
+                -4, 8, true, true, false, 1f, 1f,
+                groundHeights,
+                terrainCenters,
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                new[] { preciseOceanTile },
+                Array.Empty<AccessDurabilityCorner>(),
+                null,
+                null,
+                new Dictionary<Tile2i, float>
+                {
+                    [preciseTerrainTile] = 0.375f,
+                    [preciseOceanTile] = -2.25f,
+                },
+                new Dictionary<Tile2i, AccessTerrainColumn>
+                {
+                    [preciseTerrainTile] = new AccessTerrainColumn(new[]
+                    {
+                        new AccessTerrainLayer(4f, 2f, 0.5f, "Topsoil"),
+                        new AccessTerrainLayer(2f, -20f, 1.5f, "Rock"),
+                    }),
+                },
+                new Tile2i(0, 0),
+                new Tile2i(20, 20),
+                0.4f,
+                0.3f,
+                false);
+            if (raySnapshotFixture.GetSideRayTerrainSample(
+                    new Tile2i(-1, 2), out _) != AccessTerrainSampleKind.PhysicalMapEdge
+                || raySnapshotFixture.GetSideRayTerrainSample(
+                    new Tile2i(3, 3), out _) != AccessTerrainSampleKind.MissingSnapshot
+                || raySnapshotFixture.GetSideRayTerrainSample(
+                    preciseOceanTile, out float oceanHeight) != AccessTerrainSampleKind.Ocean
+                || Math.Abs(oceanHeight - -2.25f) > 0.0001f
+                || raySnapshotFixture.GetSideRayTerrainSample(
+                    preciseTerrainTile, out float preciseHeight) != AccessTerrainSampleKind.Terrain
+                || Math.Abs(preciseHeight - 0.375f) > 0.0001f)
+            { failure = "side-ray snapshot must distinguish physical edge, missing capture, ocean, and precise terrain"; return false; }
+            if (!raySnapshotFixture.TryGetMiningMaterialSlope(
+                    preciseTerrainTile, 1f,
+                    out float deepSlope, out string deepMaterial, out bool deepFallback)
+                || deepFallback
+                || Math.Abs(deepSlope - 1.5f) > 0.0001f
+                || deepMaterial != "Rock"
+                || !raySnapshotFixture.TryGetMiningMaterialSlope(
+                    preciseTerrainTile, 3f,
+                    out float surfaceSlope, out string surfaceMaterial, out bool surfaceFallback)
+                || surfaceFallback
+                || Math.Abs(surfaceSlope - 0.5f) > 0.0001f
+                || surfaceMaterial != "Topsoil"
+                || !raySnapshotFixture.TryGetMiningMaterialSlope(
+                    new Tile2i(4, 4), 0f,
+                    out float fallbackSlope, out _, out bool usedFallback)
+                || !usedFallback
+                || Math.Abs(fallbackSlope - 0.3f) > 0.0001f
+                || Math.Abs(raySnapshotFixture.DumpingMaterialSlope - 0.4f) > 0.0001f
+                || raySnapshotFixture.DumpingSlopeUsedFallback)
+            { failure = "side-ray snapshot must select cut material at planned depth and preserve resolved/fallback slopes"; return false; }
             AccessSearchResult fixtureResult = FindPath(fixture, new[] { fixtureStart });
             if (!fixtureResult.Success || fixtureResult.Path.Count < 2
                 || fixtureResult.Path[0].Position != fixtureWorkNeighbor

@@ -255,6 +255,8 @@ Acceptance:
 
 ### 2. Extend the immutable search snapshot
 
+Status: implemented.
+
 * Capture precise terrain heights for the searchable area plus a 16-tile ray
   halo, clipped to physical terrain bounds.
 * Capture ocean state separately from terrain support state; ocean remains

@@ -11,6 +11,7 @@ using Mafi.Core.Buildings.Mine;
 using Mafi.Core.Buildings.Towers;
 using Mafi.Core.Entities;
 using Mafi.Core.PathFinding;
+using Mafi.Core.Products;
 using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
@@ -32,6 +33,7 @@ namespace AutoTerrainDesignations
         internal static AccessDesignationPlan? LastExperimentalAccessPlan { get; private set; }
         private const int EXPERIMENTAL_ACCESS_SEARCH_FRAME_BUDGET_MS = 30;
         private const int EXPERIMENTAL_ACCESS_SEARCH_TOTAL_LIMIT_SECONDS = 60;
+        private const int ACCESS_SIDE_RAY_CAPTURE_DISTANCE = 16;
         private static readonly bool s_enableVerboseHandoffDiagnostics = false;
         private static UiRoot? s_uiRoot;
         private static readonly List<PlacedExperimentalDesignation> s_lastExperimentalCleanupDesignations =
@@ -219,8 +221,20 @@ namespace AutoTerrainDesignations
             Tile2i groundCaptureMax = new Tile2i(
                 Math.Max(boundsMax.X, towerCenter.X) + RAMP_ACCESS_SEARCH_MARGIN_TILES,
                 Math.Max(boundsMax.Y, towerCenter.Y) + RAMP_ACCESS_SEARCH_MARGIN_TILES);
+            Tile2i physicalTerrainMin = Tile2i.Zero;
+            Tile2i physicalTerrainMax = new Tile2i(
+                terrMgr.TerrainSize.X - 1,
+                terrMgr.TerrainSize.Y - 1);
+            groundCaptureMin = new Tile2i(
+                Math.Max(physicalTerrainMin.X, groundCaptureMin.X - ACCESS_SIDE_RAY_CAPTURE_DISTANCE),
+                Math.Max(physicalTerrainMin.Y, groundCaptureMin.Y - ACCESS_SIDE_RAY_CAPTURE_DISTANCE));
+            groundCaptureMax = new Tile2i(
+                Math.Min(physicalTerrainMax.X, groundCaptureMax.X + ACCESS_SIDE_RAY_CAPTURE_DISTANCE),
+                Math.Min(physicalTerrainMax.Y, groundCaptureMax.Y + ACCESS_SIDE_RAY_CAPTURE_DISTANCE));
 
             var groundHeight2 = new Dictionary<Tile2i, int>();
+            var preciseTerrainHeights = new Dictionary<Tile2i, float>();
+            var terrainColumns = new Dictionary<Tile2i, AccessTerrainColumn>();
             var terrainCenterHeight2 = new Dictionary<Tile2i, int>();
             var oceanTiles = new HashSet<Tile2i>();
             var fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>();
@@ -254,8 +268,10 @@ namespace AutoTerrainDesignations
                 for (int y = groundCaptureMin.Y; y <= groundCaptureMax.Y; y++)
                 {
                     Tile2i tile = new Tile2i(x, y);
-                    int height2 = ToHeight2(terrMgr.GetHeight(tile).Value.ToFloat());
+                    float preciseHeight = terrMgr.GetHeight(tile).Value.ToFloat();
+                    int height2 = ToHeight2(preciseHeight);
                     groundHeight2[tile] = height2;
+                    preciseTerrainHeights[tile] = preciseHeight;
                     if (terrMgr.IsOcean(tile)) oceanTiles.Add(tile);
                     minHeight2 = Math.Min(minHeight2, height2);
                     maxHeight2 = Math.Max(maxHeight2, height2);
@@ -276,6 +292,22 @@ namespace AutoTerrainDesignations
                         : ToHeight2(terrMgr.GetHeight(center).Value.ToFloat());
                 }
             }
+            for (int x = firstOriginX; x <= boundsMax.X + 4; x += 4)
+            {
+                for (int y = firstOriginY; y <= boundsMax.Y + 4; y += 4)
+                {
+                    Tile2i corner = new Tile2i(x, y);
+                    if (!terrMgr.IsValidCoord(corner))
+                        continue;
+                    terrainColumns[corner] = CaptureAccessTerrainColumn(terrMgr, corner);
+                }
+            }
+            ResolveAccessMaterialSlopes(
+                tower,
+                out float dumpingMaterialSlope,
+                out float fallbackMiningSlope,
+                out bool dumpingSlopeUsedFallback,
+                out string materialSlopeDiagnostic);
 
             foreach (AccessHeightProfile profile in fixedProfiles.Values)
             {
@@ -362,16 +394,112 @@ namespace AutoTerrainDesignations
                         origin, profile, predecessorOrigin, predecessorProfile,
                         terrMgr, groundNodes, towerReachableGround,
                         propCleanupByOrigin, prospectiveHandoffCache),
-                propCleanupByOrigin);
+                propCleanupByOrigin,
+                preciseTerrainHeights,
+                terrainColumns,
+                physicalTerrainMin,
+                physicalTerrainMax,
+                dumpingMaterialSlope,
+                fallbackMiningSlope,
+                dumpingSlopeUsedFallback);
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} " +
                 $"goals={snapshot.GoalCount} fullTowerGoals={fullTowerGoalCount} towerGroundStart={groundStart} " +
+                $"rayHeightSamples={preciseTerrainHeights.Count} rayMaterialColumns={terrainColumns.Count} " +
+                $"dumpingSlope={dumpingMaterialSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"fallbackMiningSlope={fallbackMiningSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"materialSlopeSource={materialSlopeDiagnostic} " +
                 $"landslideSources={snapshot.LandslideSourceCount}");
             LogAccessPropCleanupDiagnostics(cleanupDiagnostics);
             return true;
         }
+
+        private static AccessTerrainColumn CaptureAccessTerrainColumn(
+            TerrainManager terrainManager,
+            Tile2i tile)
+        {
+            var layers = new List<AccessTerrainLayer>();
+            float topHeight = terrainManager.GetHeight(tile).Value.ToFloat();
+            TerrainLayerEnumerator enumerator =
+                terrainManager.EnumerateLayers(terrainManager.GetTileIndex(tile));
+            while (enumerator.MoveNext())
+            {
+                TerrainMaterialThicknessSlim layer = enumerator.Current;
+                float thickness = layer.Thickness.Value.ToFloat();
+                TerrainMaterialProto material = layer.SlimId.ToFull(terrainManager);
+                float bottomHeight = topHeight - thickness;
+                layers.Add(new AccessTerrainLayer(
+                    topHeight,
+                    bottomHeight,
+                    GetNormalMaterialSlope(material),
+                    material.Id.ToString()));
+                topHeight = bottomHeight;
+            }
+            return new AccessTerrainColumn(layers);
+        }
+
+        private static void ResolveAccessMaterialSlopes(
+            IAreaManagingTower tower,
+            out float dumpingMaterialSlope,
+            out float fallbackMiningSlope,
+            out bool dumpingSlopeUsedFallback,
+            out string diagnostic)
+        {
+            float fallbackDumpingSlope = float.MaxValue;
+            fallbackMiningSlope = float.MaxValue;
+            if (s_protosDb != null)
+            {
+                foreach (TerrainMaterialProto material in s_protosDb.All<TerrainMaterialProto>())
+                {
+                    fallbackDumpingSlope = Math.Min(
+                        fallbackDumpingSlope,
+                        material.GetApproxSlopeSteepness().ToFloat());
+                    fallbackMiningSlope = Math.Min(
+                        fallbackMiningSlope,
+                        GetNormalMaterialSlope(material));
+                }
+            }
+            if (fallbackDumpingSlope == float.MaxValue)
+                fallbackDumpingSlope = 0.5f;
+            if (fallbackMiningSlope == float.MaxValue)
+                fallbackMiningSlope = 0.5f;
+
+            dumpingMaterialSlope = float.MaxValue;
+            int resolvedProducts = 0;
+            if (TryGetTowerDumpableProducts(
+                    tower,
+                    out List<LooseProductProto> dumpableProducts,
+                    out string error))
+            {
+                foreach (LooseProductProto product in dumpableProducts)
+                {
+                    if (!product.TerrainMaterial.HasValue)
+                        continue;
+                    dumpingMaterialSlope = Math.Min(
+                        dumpingMaterialSlope,
+                        product.TerrainMaterial.Value
+                            .GetApproxSlopeSteepness().ToFloat());
+                    resolvedProducts++;
+                }
+                diagnostic = resolvedProducts > 0
+                    ? $"tower-rules:{resolvedProducts}"
+                    : "fallback:no-terrain-products";
+            }
+            else
+            {
+                diagnostic = "fallback:" + error.Replace(' ', '-');
+            }
+
+            dumpingSlopeUsedFallback = dumpingMaterialSlope == float.MaxValue;
+            if (dumpingSlopeUsedFallback)
+                dumpingMaterialSlope = fallbackDumpingSlope;
+        }
+
+        private static float GetNormalMaterialSlope(TerrainMaterialProto material)
+            => (material.MinCollapseHeightDiff.Value
+                + material.MaxCollapseHeightDiff.Value).ToFloat() / 3f;
 
         private static Dictionary<Tile2i, AccessPropCleanupInfo> BuildAccessPropCleanupByOrigin(
             IAreaManagingTower tower,
