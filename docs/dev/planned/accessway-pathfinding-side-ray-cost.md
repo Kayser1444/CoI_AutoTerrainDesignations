@@ -100,6 +100,12 @@ the work:
 
 If a material lookup fails, fall back to the conservative runniest known terrain-material slope and include diagnostics so the scorer does not silently become optimistic.
 
+An explicitly empty tower dumping-rule set is not a lookup failure. It means no
+fill material is available: reject every generated candidate with a fill corner,
+including leveling cells, and continue searching for a cut-only or no-work
+route. Use the conservative fallback only when the rule or material lookup
+itself fails.
+
 ## Discrete cost integration
 
 Use the actual sampled gap at each step. Do not average away the terrain samples for the first version.
@@ -146,7 +152,14 @@ unresolvedRayPenalty = tuned finite penalty added at max distance
 
 ## Deferred durability and obstruction integration
 
-Do not combine side rays with durability or obstruction feasibility in the first implementation. Keep the initial side-ray work scoped to cost estimation until the routing, material-slope selection, and tuning are stable. The existing durability/hourglass and hard-obstacle checks should remain the authoritative feasibility filters during that phase.
+Do not replace durability or external-obstruction feasibility with side rays in
+the first implementation. The existing durability/hourglass and hard-obstacle
+checks remain authoritative. One path-local exception is required for
+correctness: later `G` traversal may not reuse terrain that this same candidate
+path will disturb. Generated V footprints and the positive-work spans of their
+side rays are therefore retained in generated-path history and exclude later
+ground nodes. The immediate V-to-G handoff may overlap the current V footprint,
+but not an earlier V footprint or any recorded ray wedge.
 
 Once the cost scorer is stable, the side-ray march is a candidate for a more accurate generated-edge landslide/support check. At that later stage, reuse the same ray samples for scoring and feasibility where possible: one bounded march can return the integrated landscaping cost plus any hard blocker it encountered.
 
@@ -154,7 +167,7 @@ Deferred feasibility rules to evaluate later:
 
 * **Buildings:** if the ray/wedge crosses an occupied or planned building footprint, reject the candidate edge. Buildings remain hard obstacles, not soft cost.
 * **Other designations:** if the ray/wedge crosses an active or fixed designation that is not the predecessor/successor profile already accounted for by the accessway, reject unless that designation's fixed target profile is explicitly compatible with the ray side. Do not assume future landslides may consume or overwrite unrelated work.
-* **Current candidate designations:** compatible generated neighbours in the same candidate path are allowed; shared edges are already accounted for by the entry-time, outgoing-edge scoring rule.
+* **Current candidate designations:** compatible generated V neighbours in the same candidate path are allowed; shared edges are already accounted for by the entry-time, outgoing-edge scoring rule. Ground traversal through any earlier generated footprint or ray wedge is not allowed.
 
 The broad durability/hourglass index can remain as a cheap prefilter for sources not represented by the current side ray, for G-node safety, and for diagnostics. Only after the side-ray cost implementation has been validated should generated-edge durability consider preferring the side-ray result, because it follows the actual direction, operation, and material run slope of the candidate edge.
 
@@ -330,12 +343,17 @@ Acceptance:
 
 ### 5. Add settings and tuning diagnostics
 
+Status: implemented.
+
 * Introduce internal first-pass constants for ray distances, per-ray cap,
   unresolved penalty, direct-work weight, and side-ray weight. Expose only
   weights that prove necessary during save testing; avoid expanding public
   settings before stable defaults exist.
-* Log aggregate ray timing, cache/hit counts, unresolved counts, fatal counts,
-  and the selected dumping/fallback slopes in experimental diagnostics.
+* Log total search timing, selected-route ray samples and cost components,
+  unresolved counts, fatal rejection counts, and the selected dumping/fallback
+  slopes in experimental diagnostics. The first pass deliberately remains
+  uncached; add cache/hit diagnostics only if representative profiling shows
+  repeated ray scoring is material.
 * Add a temporary comparison mode or diagnostic that reports the selected route
   under center-only and side-ray costs without materializing both.
 
@@ -365,6 +383,16 @@ search time. Tune caps and weights only after these cases preserve A*/Dijkstra
 cost equality and show the intended route ordering.
 
 ### Deferred follow-up
+
+V/G handoff feasibility is now conservatively tightened separately from
+side-ray costing. A prospective handoff must expose an operation-fulfilled
+contact on the interior of the free edge that is target-vehicle-pathable or
+cleanup-eligible, and that contact must have a matching outward ground
+neighbour. Corner-only contact is rejected. Vanilla's live pathability provider
+cannot evaluate the future
+post-operation terrain profile without mutating the world, so a full
+prospective vehicle-path query remains a possible later refinement if this
+conservative edge-crossing rule proves insufficient.
 
 After cost behavior is stable, evaluate reusing the ray result for directional
 durability and obstruction feasibility. That work should be a separate change:

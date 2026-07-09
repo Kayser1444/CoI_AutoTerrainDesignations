@@ -282,6 +282,7 @@ namespace AutoTerrainDesignations.Access
         public float DumpingMaterialSlope { get; }
         public float FallbackMiningSlope { get; }
         public bool DumpingSlopeUsedFallback { get; }
+        public bool HasDumpingMaterial { get; }
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
@@ -317,7 +318,8 @@ namespace AutoTerrainDesignations.Access
             Tile2i? physicalTerrainMax = null,
             float dumpingMaterialSlope = 1f,
             float fallbackMiningSlope = 1f,
-            bool dumpingSlopeUsedFallback = false)
+            bool dumpingSlopeUsedFallback = false,
+            bool hasDumpingMaterial = true)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -341,6 +343,7 @@ namespace AutoTerrainDesignations.Access
             DumpingMaterialSlope = dumpingMaterialSlope;
             FallbackMiningSlope = fallbackMiningSlope;
             DumpingSlopeUsedFallback = dumpingSlopeUsedFallback;
+            HasDumpingMaterial = hasDumpingMaterial;
             m_terrainCenterHeight2 = new Dictionary<Tile2i, int>(terrainCenterHeight2);
             m_fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>(fixedProfiles);
             m_workOrigins = new HashSet<Tile2i>(workOrigins);
@@ -760,6 +763,7 @@ namespace AutoTerrainDesignations.Access
         public float RightSideRayCost { get; }
         public float UnresolvedPenalty { get; }
         public int RaySampleCount { get; }
+        public IReadOnlyList<Tile2i> DisturbedRayTiles { get; }
         public string? FatalReason { get; }
         public float TotalCost =>
             DirectWorkCost + LeftSideRayCost + RightSideRayCost + UnresolvedPenalty;
@@ -771,13 +775,17 @@ namespace AutoTerrainDesignations.Access
             float rightSideRayCost = 0f,
             float unresolvedPenalty = 0f,
             int raySampleCount = 0,
-            string? fatalReason = null)
+            string? fatalReason = null,
+            IEnumerable<Tile2i>? disturbedRayTiles = null)
         {
             DirectWorkCost = directWorkCost;
             LeftSideRayCost = leftSideRayCost;
             RightSideRayCost = rightSideRayCost;
             UnresolvedPenalty = unresolvedPenalty;
             RaySampleCount = raySampleCount;
+            DisturbedRayTiles = disturbedRayTiles != null
+                ? new List<Tile2i>(disturbedRayTiles).ToArray()
+                : Array.Empty<Tile2i>();
             FatalReason = fatalReason;
         }
     }

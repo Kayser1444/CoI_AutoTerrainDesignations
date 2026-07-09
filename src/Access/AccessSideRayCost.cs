@@ -32,6 +32,7 @@ namespace AutoTerrainDesignations.Access
         public bool IsUnresolved { get; }
         public bool ReachedCostCap { get; }
         public string? FatalReason { get; }
+        public int DisturbedDistance { get; }
         public float TotalCost => IntegratedCost + UnresolvedPenalty;
         public bool IsFatal => !string.IsNullOrEmpty(FatalReason);
 
@@ -41,7 +42,8 @@ namespace AutoTerrainDesignations.Access
             int sampleCount,
             bool isUnresolved,
             bool reachedCostCap,
-            string? fatalReason = null)
+            string? fatalReason = null,
+            int disturbedDistance = 0)
         {
             IntegratedCost = integratedCost;
             UnresolvedPenalty = unresolvedPenalty;
@@ -49,6 +51,7 @@ namespace AutoTerrainDesignations.Access
             IsUnresolved = isUnresolved;
             ReachedCostCap = reachedCostCap;
             FatalReason = fatalReason;
+            DisturbedDistance = disturbedDistance;
         }
     }
 
@@ -106,6 +109,7 @@ namespace AutoTerrainDesignations.Access
             float integratedCost = 0f;
             int previousDistance = 0;
             int sampleCount = 0;
+            int disturbedDistance = 0;
             for (int i = 0; i < s_sampleDistances.Length; i++)
             {
                 int distance = s_sampleDistances[i];
@@ -122,7 +126,8 @@ namespace AutoTerrainDesignations.Access
                     if (operation == AccessSideRayOperation.Fill)
                         return Fatal("SideRayFillMapEdge", sampleCount, integratedCost);
                     return new AccessSideRayResult(
-                        integratedCost, 0f, sampleCount, false, false);
+                        integratedCost, 0f, sampleCount, false, false,
+                        disturbedDistance: disturbedDistance);
                 }
                 if (operation == AccessSideRayOperation.Cut
                     && sample.Kind == AccessTerrainSampleKind.Ocean
@@ -137,15 +142,18 @@ namespace AutoTerrainDesignations.Access
                     : sample.TerrainHeight - rayHeight;
                 if (gap <= 0f)
                     return new AccessSideRayResult(
-                        integratedCost, 0f, sampleCount, false, false);
+                        integratedCost, 0f, sampleCount, false, false,
+                        disturbedDistance: disturbedDistance);
 
                 int stepLength = distance - previousDistance;
                 integratedCost = Math.Min(
                     maxRayCost,
                     integratedCost + stepLength * gap);
+                disturbedDistance = distance;
                 if (integratedCost >= maxRayCost)
                     return new AccessSideRayResult(
-                        maxRayCost, 0f, sampleCount, true, true);
+                        maxRayCost, 0f, sampleCount, true, true,
+                        disturbedDistance: disturbedDistance);
                 previousDistance = distance;
             }
 
@@ -157,7 +165,8 @@ namespace AutoTerrainDesignations.Access
                 appliedPenalty,
                 sampleCount,
                 true,
-                integratedCost + appliedPenalty >= maxRayCost);
+                integratedCost + appliedPenalty >= maxRayCost,
+                disturbedDistance: disturbedDistance);
         }
 
         private static AccessSideRayResult Fatal(

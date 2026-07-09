@@ -307,6 +307,7 @@ namespace AutoTerrainDesignations
                 out float dumpingMaterialSlope,
                 out float fallbackMiningSlope,
                 out bool dumpingSlopeUsedFallback,
+                out bool hasDumpingMaterial,
                 out string materialSlopeDiagnostic);
 
             foreach (AccessHeightProfile profile in fixedProfiles.Values)
@@ -401,7 +402,8 @@ namespace AutoTerrainDesignations
                 physicalTerrainMax,
                 dumpingMaterialSlope,
                 fallbackMiningSlope,
-                dumpingSlopeUsedFallback);
+                dumpingSlopeUsedFallback,
+                hasDumpingMaterial);
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -410,6 +412,7 @@ namespace AutoTerrainDesignations
                 $"rayHeightSamples={preciseTerrainHeights.Count} rayMaterialColumns={terrainColumns.Count} " +
                 $"dumpingSlope={dumpingMaterialSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
                 $"fallbackMiningSlope={fallbackMiningSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"hasDumpingMaterial={hasDumpingMaterial} " +
                 $"materialSlopeSource={materialSlopeDiagnostic} " +
                 $"landslideSources={snapshot.LandslideSourceCount}");
             LogAccessPropCleanupDiagnostics(cleanupDiagnostics);
@@ -445,6 +448,7 @@ namespace AutoTerrainDesignations
             out float dumpingMaterialSlope,
             out float fallbackMiningSlope,
             out bool dumpingSlopeUsedFallback,
+            out bool hasDumpingMaterial,
             out string diagnostic)
         {
             float fallbackDumpingSlope = float.MaxValue;
@@ -485,11 +489,13 @@ namespace AutoTerrainDesignations
                 }
                 diagnostic = resolvedProducts > 0
                     ? $"tower-rules:{resolvedProducts}"
-                    : "fallback:no-terrain-products";
+                    : "blocked:no-terrain-products";
+                hasDumpingMaterial = resolvedProducts > 0;
             }
             else
             {
                 diagnostic = "fallback:" + error.Replace(' ', '-');
+                hasDumpingMaterial = true;
             }
 
             dumpingSlopeUsedFallback = dumpingMaterialSlope == float.MaxValue;
@@ -941,6 +947,11 @@ namespace AutoTerrainDesignations
                 materializeTimer.Stop();
                 LastExperimentalAccessPlan = plan;
                 string materializeMs = materializeTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+                float selectedSideRayCost = result.LeftSideRayCost
+                    + result.RightSideRayCost
+                    + result.SideRayUnresolvedPenalty;
+                float selectedCenterOnlyCost = result.Cost
+                    - AccessPathSearch.SideRayWeight * selectedSideRayCost;
                 LogExperimentalAccessDebug(
                     $"[ATD Experimental Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} " +
                     $"reason={(string.IsNullOrEmpty(plan.FailureReason) ? "none" : plan.FailureReason)} " +
@@ -953,6 +964,11 @@ namespace AutoTerrainDesignations
                     $"rightRayCost={result.RightSideRayCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"unresolvedRayPenalty={result.SideRayUnresolvedPenalty.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"raySamples={result.SideRaySampleCount} " +
+                    $"selectedCenterOnlyCost={selectedCenterOnlyCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"directWeight={AccessPathSearch.DirectWorkWeight.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"sideRayWeight={AccessPathSearch.SideRayWeight.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"maxRayCost={AccessSideRayCost.DefaultMaxRayCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                    $"unresolvedRayCap={AccessSideRayCost.DefaultUnresolvedPenalty.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"generatedFixedCost={result.GeneratedFixedCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"treeCleanupCost={result.TreeCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"denseDebrisCleanupCost={result.DenseDebrisCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
@@ -1023,6 +1039,8 @@ namespace AutoTerrainDesignations
             var candidateDiagnostics = new List<string>();
             int groundCandidateCount = 0;
             int connectedCandidateCount = 0;
+            int cornerOnlyCandidateCount = 0;
+            int missingOutwardGroundCount = 0;
 
             var data = new DesignationData(origin,
                 new HeightTilesI(profile.Nw2 / 2),
@@ -1054,8 +1072,23 @@ namespace AutoTerrainDesignations
                         || emitted.Contains(tile))
                         continue;
                     groundCandidateCount++;
-                    bool connected = IsProspectiveHandoffTileConnected(
-                        terrMgr, data, operation, x, y);
+                    bool interiorEdgeTile = IsInteriorHandoffEdgeTile(
+                        x, y, handoffEdge);
+                    if (!interiorEdgeTile)
+                        cornerOnlyCandidateCount++;
+                    RelTile2i outwardDirection =
+                        GetHandoffOutwardDirection(handoffEdge);
+                    Tile2i outwardTile = tile + outwardDirection;
+                    bool outwardGround =
+                        IsExperimentalAccessGroundOrCleanupNode(
+                            groundNodes, propCleanupByOrigin, outwardTile);
+                    if (!outwardGround)
+                        missingOutwardGroundCount++;
+                    bool fulfilled = IsProspectiveHandoffTileConnected(
+                        proto, terrMgr, data, operation, x, y);
+                    bool connected = interiorEdgeTile
+                        && outwardGround
+                        && fulfilled;
                     int adjacentGroundCount = 0;
                     var adjacentDirections = new[]
                     {
@@ -1066,7 +1099,9 @@ namespace AutoTerrainDesignations
                         if (groundNodes.Contains(tile + adjacentDirections[i]))
                             adjacentGroundCount++;
                     candidateDiagnostics.Add(
-                        $"({tile.X},{tile.Y}):connected={connected},goal={goalGroundNodes.Contains(tile)},adjacentGround={adjacentGroundCount}");
+                        $"({tile.X},{tile.Y}):connected={connected},interior={interiorEdgeTile}," +
+                        $"outwardGround={outwardGround},fulfilled={fulfilled}," +
+                        $"goal={goalGroundNodes.Contains(tile)},adjacentGround={adjacentGroundCount}");
                     if (connected)
                     {
                         connectedCandidateCount++;
@@ -1081,6 +1116,8 @@ namespace AutoTerrainDesignations
                 + " edge=" + handoffEdge.ToString(CultureInfo.InvariantCulture)
                 + " groundCandidates=" + groundCandidateCount.ToString(CultureInfo.InvariantCulture)
                 + " connectedCandidates=" + connectedCandidateCount.ToString(CultureInfo.InvariantCulture)
+                + " cornerOnlyCandidates=" + cornerOnlyCandidateCount.ToString(CultureInfo.InvariantCulture)
+                + " missingOutwardGround=" + missingOutwardGroundCount.ToString(CultureInfo.InvariantCulture)
                 + " candidates=[" + string.Join(";", candidateDiagnostics) + "]");
             handoffCache[cacheKey] = result.ToArray();
             return handoffCache[cacheKey];
@@ -1111,6 +1148,7 @@ namespace AutoTerrainDesignations
         }
 
         private static bool IsProspectiveHandoffTileConnected(
+            TerrainDesignationProto proto,
             TerrainManager terrMgr,
             DesignationData data,
             AccessHandoffOperation operation,
@@ -1125,10 +1163,30 @@ namespace AutoTerrainDesignations
             return operation == AccessHandoffOperation.Leveling
                 ? Math.Abs(delta) <= exactLevelEpsilon
                 : operation == AccessHandoffOperation.Mining
-                    ? delta >= -exactLevelEpsilon
+                    ? IsProspectiveDesignationTileFulfilled(
+                        proto, terrMgr, data, operation, x, y)
                     : operation == AccessHandoffOperation.Dumping
-                        && delta <= exactLevelEpsilon;
+                        && IsProspectiveDesignationTileFulfilled(
+                            proto, terrMgr, data, operation, x, y);
         }
+
+        internal static bool IsInteriorHandoffEdgeTile(
+            int x,
+            int y,
+            int handoffEdge)
+        {
+            int offset = handoffEdge == 0 || handoffEdge == 1 ? y : x;
+            return offset > 0 && offset < 4;
+        }
+
+        private static RelTile2i GetHandoffOutwardDirection(int handoffEdge)
+            => handoffEdge == 0
+                ? new RelTile2i(-1, 0)
+                : handoffEdge == 1
+                    ? new RelTile2i(1, 0)
+                    : handoffEdge == 2
+                        ? new RelTile2i(0, -1)
+                        : new RelTile2i(0, 1);
 
         private static bool TryGetDirectionalHandoff(
             Tile2i origin,

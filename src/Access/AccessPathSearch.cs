@@ -27,6 +27,8 @@ namespace AutoTerrainDesignations.Access
 
         private const int MAX_VISITED_NODES = 250000;
         private const float GENERATED_V_FIXED_OVERHEAD = 0.25f;
+        internal const float DirectWorkWeight = 1f;
+        internal const float SideRayWeight = 1f;
 
         public static bool ValidateCoreTransitions(out string failure)
         {
@@ -158,6 +160,13 @@ namespace AutoTerrainDesignations.Access
                 || AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
                     0, 0, 1, 1, out _))
             { failure = "directional handoff must be level at the ground face or workable toward V and non-workable toward ground"; return false; }
+            if (AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 0, 0)
+                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 4, 0)
+                || !AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 2, 0)
+                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 0, 2)
+                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(4, 0, 2)
+                || !AutoDepthDesignation.IsInteriorHandoffEdgeTile(2, 0, 2))
+            { failure = "handoff contact must cross the interior of an edge, not touch only a corner"; return false; }
             var mixedCleanup = AccessPropCleanupPolicy.BuildOriginInfo(
                 new Tile2i(0, 0),
                 new[]
@@ -293,6 +302,7 @@ namespace AutoTerrainDesignations.Access
                 new Tile2i(20, 20),
                 0.4f,
                 0.3f,
+                false,
                 false);
             if (raySnapshotFixture.GetSideRayTerrainSample(
                     new Tile2i(-1, 2), out _) != AccessTerrainSampleKind.PhysicalMapEdge
@@ -325,6 +335,15 @@ namespace AutoTerrainDesignations.Access
                 || Math.Abs(raySnapshotFixture.DumpingMaterialSlope - 0.4f) > 0.0001f
                 || raySnapshotFixture.DumpingSlopeUsedFallback)
             { failure = "side-ray snapshot must select cut material at planned depth and preserve resolved/fallback slopes"; return false; }
+            AccessSideRayResult noDumpingMaterial = ScoreExitCorner(
+                raySnapshotFixture,
+                preciseTerrainTile,
+                1f,
+                new Tile2i(1, 0),
+                AccessHandoffOperation.Leveling);
+            if (raySnapshotFixture.HasDumpingMaterial
+                || noDumpingMaterial.FatalReason != "SideRayNoDumpingMaterial")
+            { failure = "an explicit empty dumping rule set must reject fill, including leveling fill"; return false; }
             AccessSideRayResult noOpRay = AccessSideRayCost.Score(
                 _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 0f),
                 Tile2i.Zero, new Tile2i(1, 0), 0f,
@@ -482,6 +501,21 @@ namespace AutoTerrainDesignations.Access
                 entryDirection: new Tile2i(0, 4));
             if (directionStateX.Equals(directionStateY))
             { failure = "generated search state must retain entry direction for direction-dependent cost"; return false; }
+            Tile2i historyOrigin = new Tile2i(8, 8);
+            Tile2i historyRayTile = new Tile2i(14, 10);
+            GeneratedPathHistory disturbanceHistory =
+                GeneratedPathHistory.Empty.WithGenerated(
+                    historyOrigin,
+                    highFlat,
+                    new[] { historyRayTile });
+            if (!disturbanceHistory.IsGroundDisturbed(new Tile2i(10, 10))
+                || !disturbanceHistory.IsGroundDisturbed(historyRayTile)
+                || disturbanceHistory.IsGroundDisturbed(
+                    new Tile2i(12, 10), historyOrigin)
+                || !disturbanceHistory.IsGroundDisturbed(
+                    historyRayTile, historyOrigin)
+                || disturbanceHistory.IsGroundDisturbed(new Tile2i(20, 20)))
+            { failure = "generated history must block V footprints and ray wedges while exempting only the current V footprint at handoff"; return false; }
             AccessSearchResult fixtureResult = FindPath(fixture, new[] { fixtureStart });
             if (!fixtureResult.Success || fixtureResult.Path.Count < 2
                 || fixtureResult.Path[0].Position != fixtureWorkNeighbor
@@ -1157,6 +1191,9 @@ namespace AutoTerrainDesignations.Access
         {
             var handoffs = new List<AccessGroundHandoff>();
             var emittedHandoffs = new HashSet<(Tile2i Tile, AccessHandoffOperation Operation)>();
+            if (!generatedHistory.TryGetValue(
+                    current, out GeneratedPathHistory currentHistory))
+                currentHistory = GeneratedPathHistory.Empty;
             if (previous.TryGetValue(current, out AccessSearchNode immediatePredecessor))
             {
                 AccessHeightProfile predecessorProfile = !immediatePredecessor.IsGround
@@ -1176,6 +1213,12 @@ namespace AutoTerrainDesignations.Access
             foreach (AccessGroundHandoff handoff in handoffs)
             {
                 if (!snapshot.TryGetGroundHeight2(handoff.Tile, out int groundHeight2)) continue;
+                if (currentHistory.IsGroundDisturbed(
+                    handoff.Tile, current.Position))
+                {
+                    Reject(rejections, "GroundOverlapsPriorGeneratedWork");
+                    continue;
+                }
                 var ground = new AccessSearchNode(handoff.Tile, groundHeight2,
                     AccessSearchMode.Ground, handoff.Operation);
                 Relax(snapshot, current, ground, currentCost + Manhattan(current.CostPosition, handoff.Tile),
@@ -1277,10 +1320,18 @@ namespace AutoTerrainDesignations.Access
             MinQueue queue, Dictionary<string, int> rejections,
             bool useAStarHeuristic, HeightAwareGoalIndex goalIndex)
         {
+            if (!generatedHistory.TryGetValue(
+                    current, out GeneratedPathHistory currentHistory))
+                currentHistory = GeneratedPathHistory.Empty;
             foreach (RelTile2i direction in s_tileDirections)
             {
                 Tile2i nextTile = current.Position + direction;
                 if (!snapshot.IsGroundOrCleanupNode(nextTile) || !snapshot.TryGetGroundHeight2(nextTile, out int height2)) continue;
+                if (currentHistory.IsGroundDisturbed(nextTile))
+                {
+                    Reject(rejections, "GroundOverlapsGeneratedWork");
+                    continue;
+                }
                 var next = new AccessSearchNode(nextTile, height2, AccessSearchMode.Ground);
                 float cleanupCost = GetCleanupEntryCost(snapshot, current.Position, nextTile);
                 Relax(snapshot, current, next, currentCost + 1f + cleanupCost,
@@ -1572,7 +1623,19 @@ namespace AutoTerrainDesignations.Access
                 return currentHistory;
             if (!TryGetProfile(snapshot, next, out AccessHeightProfile profile))
                 return currentHistory;
-            return currentHistory.WithGenerated(next.Position, profile);
+            CalculateGeneratedEntryCost(
+                snapshot,
+                next.Position,
+                profile,
+                next.EntryDirection,
+                next.HandoffOperation,
+                out AccessLandscapingCost landscapingCost,
+                out _,
+                out _);
+            return currentHistory.WithGenerated(
+                next.Position,
+                profile,
+                landscapingCost.DisturbedRayTiles);
         }
 
         private static float GetHeuristic(
@@ -1683,7 +1746,7 @@ namespace AutoTerrainDesignations.Access
             {
                 landscapingCost = new AccessLandscapingCost(directWorkCost);
                 return snapshot.LandscapingCostDistanceScale
-                    * landscapingCost.TotalCost + fixedCost;
+                    * GetWeightedLandscapingCost(landscapingCost) + fixedCost;
             }
             if (!TryGetExitRayGeometry(
                     origin, profile, entryDirection,
@@ -1732,10 +1795,46 @@ namespace AutoTerrainDesignations.Access
                 left.IntegratedCost,
                 right.IntegratedCost,
                 left.UnresolvedPenalty + right.UnresolvedPenalty,
-                left.SampleCount + right.SampleCount);
-            return snapshot.LandscapingCostDistanceScale * landscapingCost.TotalCost
+                left.SampleCount + right.SampleCount,
+                disturbedRayTiles: BuildDisturbedRayTiles(
+                    leftCorner, leftDirection, left.DisturbedDistance,
+                    rightCorner, rightDirection, right.DisturbedDistance));
+            return snapshot.LandscapingCostDistanceScale
+                * GetWeightedLandscapingCost(landscapingCost)
                 + fixedCost;
         }
+
+        private static IReadOnlyList<Tile2i> BuildDisturbedRayTiles(
+            Tile2i leftCorner,
+            Tile2i leftDirection,
+            int leftDistance,
+            Tile2i rightCorner,
+            Tile2i rightDirection,
+            int rightDistance)
+        {
+            var tiles = new HashSet<Tile2i>();
+            Add(leftCorner, leftDirection, leftDistance);
+            Add(rightCorner, rightDirection, rightDistance);
+            return new List<Tile2i>(tiles).ToArray();
+
+            void Add(Tile2i corner, Tile2i direction, int distance)
+            {
+                for (int step = 1; step <= distance; step++)
+                {
+                    tiles.Add(new Tile2i(
+                        corner.X + direction.X * step,
+                        corner.Y + direction.Y * step));
+                }
+            }
+        }
+
+        private static float GetWeightedLandscapingCost(
+            AccessLandscapingCost landscapingCost)
+            => DirectWorkWeight * landscapingCost.DirectWorkCost
+                + SideRayWeight
+                    * (landscapingCost.LeftSideRayCost
+                        + landscapingCost.RightSideRayCost
+                        + landscapingCost.UnresolvedPenalty);
 
         private static AccessSideRayResult ScoreExitCorner(
             AccessSearchSnapshot snapshot,
@@ -1770,6 +1869,12 @@ namespace AutoTerrainDesignations.Access
             float materialSlope;
             if (operation == AccessSideRayOperation.Fill)
             {
+                if (!snapshot.HasDumpingMaterial)
+                {
+                    return new AccessSideRayResult(
+                        0f, 0f, 0, false, false,
+                        "SideRayNoDumpingMaterial");
+                }
                 materialSlope = snapshot.DumpingMaterialSlope;
             }
             else if (!snapshot.TryGetMiningMaterialSlope(
@@ -1946,7 +2051,7 @@ namespace AutoTerrainDesignations.Access
                             out AccessLandscapingCost landscapingCost,
                             out float generatedFixedCost, out _);
                         generated += snapshot.LandscapingCostDistanceScale
-                            * landscapingCost.TotalCost;
+                            * GetWeightedLandscapingCost(landscapingCost);
                         generatedDirect += snapshot.LandscapingCostDistanceScale
                             * landscapingCost.DirectWorkCost;
                         leftRay += snapshot.LandscapingCostDistanceScale
@@ -2035,15 +2140,21 @@ namespace AutoTerrainDesignations.Access
         {
             public static readonly GeneratedPathHistory Empty = new GeneratedPathHistory(
                 new HashSet<Tile2i>(),
-                new Dictionary<Tile2i, int>());
+                new Dictionary<Tile2i, int>(),
+                new HashSet<Tile2i>());
 
             private readonly HashSet<Tile2i> m_origins;
             private readonly Dictionary<Tile2i, int> m_cornerHeights;
+            private readonly HashSet<Tile2i> m_rayDisturbedTiles;
 
-            private GeneratedPathHistory(HashSet<Tile2i> origins, Dictionary<Tile2i, int> cornerHeights)
+            private GeneratedPathHistory(
+                HashSet<Tile2i> origins,
+                Dictionary<Tile2i, int> cornerHeights,
+                HashSet<Tile2i> rayDisturbedTiles)
             {
                 m_origins = origins;
                 m_cornerHeights = cornerHeights;
+                m_rayDisturbedTiles = rayDisturbedTiles;
             }
 
             public bool ContainsOrigin(Tile2i origin) => m_origins.Contains(origin);
@@ -2051,12 +2162,36 @@ namespace AutoTerrainDesignations.Access
             public bool TryGetCornerHeight(Tile2i corner, out int height2)
                 => m_cornerHeights.TryGetValue(corner, out height2);
 
-            public GeneratedPathHistory WithGenerated(Tile2i origin, AccessHeightProfile profile)
+            public bool IsGroundDisturbed(
+                Tile2i tile,
+                Tile2i? exceptGeneratedOrigin = null)
+            {
+                if (m_rayDisturbedTiles.Contains(tile))
+                    return true;
+                foreach (Tile2i origin in m_origins)
+                {
+                    if (exceptGeneratedOrigin.HasValue
+                        && origin == exceptGeneratedOrigin.Value)
+                        continue;
+                    if (tile.X >= origin.X && tile.X <= origin.X + 4
+                        && tile.Y >= origin.Y && tile.Y <= origin.Y + 4)
+                        return true;
+                }
+                return false;
+            }
+
+            public GeneratedPathHistory WithGenerated(
+                Tile2i origin,
+                AccessHeightProfile profile,
+                IEnumerable<Tile2i> disturbedRayTiles)
             {
                 var origins = new HashSet<Tile2i>(m_origins) { origin };
                 var cornerHeights = new Dictionary<Tile2i, int>(m_cornerHeights);
                 profile.AddWorldCorners(origin, (corner, height2) => cornerHeights[corner] = height2);
-                return new GeneratedPathHistory(origins, cornerHeights);
+                var rayTiles = new HashSet<Tile2i>(m_rayDisturbedTiles);
+                foreach (Tile2i tile in disturbedRayTiles)
+                    rayTiles.Add(tile);
+                return new GeneratedPathHistory(origins, cornerHeights, rayTiles);
             }
         }
 
