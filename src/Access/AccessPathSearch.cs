@@ -246,6 +246,19 @@ namespace AutoTerrainDesignations.Access
             if (dumpingFixture.IsCandidateProfileFeasible(new Tile2i(12, 12), loweredFlat, out string dumpingMismatch)
                 || dumpingMismatch != "RequiresMining")
             { failure = "dumping candidate must reject profiles that require mining"; return false; }
+            float baselineGeneratedEntryCost = CalculateGeneratedEntryCost(
+                fixture, new Tile2i(12, 12), raisedFlat,
+                out AccessLandscapingCost baselineLandscapingCost,
+                out float baselineFixedCost);
+            if (Math.Abs(baselineLandscapingCost.DirectWorkCost - 16f) > 0.0001f
+                || baselineLandscapingCost.LeftSideRayCost != 0f
+                || baselineLandscapingCost.RightSideRayCost != 0f
+                || baselineLandscapingCost.UnresolvedPenalty != 0f
+                || baselineLandscapingCost.IsFatal
+                || Math.Abs(baselineFixedCost - GENERATED_V_FIXED_OVERHEAD) > 0.0001f
+                || Math.Abs(baselineGeneratedEntryCost
+                    - (16f * fixture.LandscapingCostDistanceScale + GENERATED_V_FIXED_OVERHEAD)) > 0.0001f)
+            { failure = "stage-one generated entry cost must reproduce center-height baseline with zero side-ray cost"; return false; }
             AccessSearchResult fixtureResult = FindPath(fixture, new[] { fixtureStart });
             if (!fixtureResult.Success || fixtureResult.Path.Count < 2
                 || fixtureResult.Path[0].Position != fixtureWorkNeighbor
@@ -300,8 +313,11 @@ namespace AutoTerrainDesignations.Access
             AccessSearchResult astarResult = FindPath(astarRequest);
             if (!astarResult.Success
                 || Math.Abs(astarResult.Cost - requestResult.Cost) > 0.0001f
+                || !CostBreakdownsMatch(astarResult, requestResult)
+                || !CostBreakdownSumsToTotal(astarResult)
+                || !CostBreakdownSumsToTotal(requestResult)
                 || astarResult.Path.Count != requestResult.Path.Count)
-            { failure = "height-aware A* must match Dijkstra fixture cost and path length"; return false; }
+            { failure = "height-aware A* must match Dijkstra fixture route, cost, and cost breakdown"; return false; }
             for (int i = 0; i < astarResult.Path.Count; i++)
             {
                 if (!astarResult.Path[i].Equals(requestResult.Path[i]))
@@ -551,6 +567,23 @@ namespace AutoTerrainDesignations.Access
             failure = string.Empty;
             return true;
         }
+
+        private static bool CostBreakdownsMatch(
+            AccessSearchResult left,
+            AccessSearchResult right)
+            => Math.Abs(left.TraversalCost - right.TraversalCost) <= 0.0001f
+                && Math.Abs(left.GeneratedWorkCost - right.GeneratedWorkCost) <= 0.0001f
+                && Math.Abs(left.GeneratedFixedCost - right.GeneratedFixedCost) <= 0.0001f
+                && Math.Abs(left.TreeCleanupCost - right.TreeCleanupCost) <= 0.0001f
+                && Math.Abs(left.DenseDebrisCleanupCost - right.DenseDebrisCleanupCost) <= 0.0001f;
+
+        private static bool CostBreakdownSumsToTotal(AccessSearchResult result)
+            => Math.Abs(result.Cost
+                - (result.TraversalCost
+                    + result.GeneratedWorkCost
+                    + result.GeneratedFixedCost
+                    + result.TreeCleanupCost
+                    + result.DenseDebrisCleanupCost)) <= 0.0001f;
 
         public static AccessSearchResult FindPath(
             AccessSearchSnapshot snapshot,
@@ -809,7 +842,7 @@ namespace AutoTerrainDesignations.Access
                     {
                         List<AccessSearchNode> path = Reconstruct(current, m_startNode, m_previous);
                         var candidate = BuildResult(
-                            true, string.Empty, m_startOrigin, path, known,
+                            true, string.Empty, m_startOrigin, m_startNode, path, known,
                             m_visited, m_rejections, m_snapshot, reachedGoalKind);
                         AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(m_snapshot, candidate);
                         string goalFailure = goalPlan.IsValid
@@ -995,10 +1028,9 @@ namespace AutoTerrainDesignations.Access
                 { Reject(rejections, "PathSelfContact"); continue; }
 
                 var next = new AccessSearchNode(nextOrigin, nextProfile.Center2, mode);
-                float landscapingCost = EstimateLandscapingCost(nextProfile.Center2, snapshot.GetTerrainCenterHeight2(nextOrigin));
-                float nextCost = baseCost + 4f
-                    + snapshot.LandscapingCostDistanceScale * landscapingCost
-                    + GENERATED_V_FIXED_OVERHEAD;
+                float generatedEntryCost = CalculateGeneratedEntryCost(
+                    snapshot, nextOrigin, nextProfile, out _, out _);
+                float nextCost = baseCost + 4f + generatedEntryCost;
                 Relax(snapshot, current, next, nextCost, distance, previous, generatedHistory, queue, useAStarHeuristic,
                     goalIndex, hasCurrent);
             }
@@ -1048,10 +1080,10 @@ namespace AutoTerrainDesignations.Access
                         { Reject(rejections, "PathSelfContact"); continue; }
                         var next = new AccessSearchNode(
                             origin, profile.Center2, mode, handoffOperation);
-                        float landscapingCost = EstimateLandscapingCost(profile.Center2, center2);
+                        float generatedEntryCost = CalculateGeneratedEntryCost(
+                            snapshot, origin, profile, out _, out _);
                         float cost = currentCost + Manhattan(current.Position, next.CostPosition)
-                            + snapshot.LandscapingCostDistanceScale * landscapingCost
-                            + GENERATED_V_FIXED_OVERHEAD;
+                            + generatedEntryCost;
                         Relax(snapshot, current, next, cost,
                             distance, previous, generatedHistory, queue,
                             useAStarHeuristic, goalIndex);
@@ -1389,7 +1421,23 @@ namespace AutoTerrainDesignations.Access
             }
         }
 
-        private static float EstimateLandscapingCost(int targetHeight2, int terrainHeight2)
+        private static float CalculateGeneratedEntryCost(
+            AccessSearchSnapshot snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            out AccessLandscapingCost landscapingCost,
+            out float fixedCost)
+        {
+            landscapingCost = new AccessLandscapingCost(
+                EstimateDirectWorkCost(
+                    profile.Center2,
+                    snapshot.GetTerrainCenterHeight2(origin)));
+            fixedCost = GENERATED_V_FIXED_OVERHEAD;
+            return snapshot.LandscapingCostDistanceScale * landscapingCost.TotalCost
+                + fixedCost;
+        }
+
+        private static float EstimateDirectWorkCost(int targetHeight2, int terrainHeight2)
         {
             float deltaHeight = Math.Abs(targetHeight2 - terrainHeight2) / 2f;
             // This uses the same 4x4-cell terrain-volume normalization as the Ore composition
@@ -1446,17 +1494,19 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static AccessSearchResult BuildResult(bool success, string failureReason, Tile2i startOrigin,
+            AccessSearchNode startNode,
             IReadOnlyList<AccessSearchNode> path, float cost, int visited,
             IReadOnlyDictionary<string, int> rejections, AccessSearchSnapshot snapshot,
             AccessReachedGoalKind reachedGoalKind = AccessReachedGoalKind.None)
         {
             float traversal = 0f, generated = 0f, fixedCost = 0f, tree = 0f, dense = 0f;
             var chargedCleanup = new HashSet<string>(StringComparer.Ordinal);
+            AccessSearchNode predecessor = startNode;
             foreach (AccessSearchNode node in path)
             {
+                traversal += Manhattan(predecessor.CostPosition, node.CostPosition);
                 if (node.IsGround)
                 {
-                    traversal += 1f;
                     if (snapshot.TryGetCleanupInfoForTile(node.Position, out AccessPropCleanupInfo info)
                         && info.IsEligible)
                     {
@@ -1472,17 +1522,20 @@ namespace AutoTerrainDesignations.Access
                         }
                     }
                 }
-                else if (node.Mode == AccessSearchMode.Existing)
+                else if (node.Mode != AccessSearchMode.Existing)
                 {
-                    traversal += 4f;
+                    if (TryGetProfile(snapshot, node, out AccessHeightProfile profile))
+                    {
+                        CalculateGeneratedEntryCost(
+                            snapshot, node.Position, profile,
+                            out AccessLandscapingCost landscapingCost,
+                            out float generatedFixedCost);
+                        generated += snapshot.LandscapingCostDistanceScale
+                            * landscapingCost.TotalCost;
+                        fixedCost += generatedFixedCost;
+                    }
                 }
-                else
-                {
-                    traversal += 4f;
-                    generated += snapshot.LandscapingCostDistanceScale * EstimateLandscapingCost(
-                        node.Height2, snapshot.GetTerrainCenterHeight2(node.Position));
-                    fixedCost += GENERATED_V_FIXED_OVERHEAD;
-                }
+                predecessor = node;
             }
             return new AccessSearchResult(success, failureReason, startOrigin, path, cost, visited, rejections,
                 traversal, generated, fixedCost, tree, dense, reachedGoalKind);

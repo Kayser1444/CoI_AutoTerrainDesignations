@@ -612,6 +612,32 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    internal readonly struct AccessLandscapingCost
+    {
+        public float DirectWorkCost { get; }
+        public float LeftSideRayCost { get; }
+        public float RightSideRayCost { get; }
+        public float UnresolvedPenalty { get; }
+        public string? FatalReason { get; }
+        public float TotalCost =>
+            DirectWorkCost + LeftSideRayCost + RightSideRayCost + UnresolvedPenalty;
+        public bool IsFatal => !string.IsNullOrEmpty(FatalReason);
+
+        public AccessLandscapingCost(
+            float directWorkCost,
+            float leftSideRayCost = 0f,
+            float rightSideRayCost = 0f,
+            float unresolvedPenalty = 0f,
+            string? fatalReason = null)
+        {
+            DirectWorkCost = directWorkCost;
+            LeftSideRayCost = leftSideRayCost;
+            RightSideRayCost = rightSideRayCost;
+            UnresolvedPenalty = unresolvedPenalty;
+            FatalReason = fatalReason;
+        }
+    }
+
     internal sealed class AccessSearchResult
     {
         public bool Success { get; }

@@ -29,13 +29,22 @@ The exact weights are tuning parameters. The important behavioral change is that
 
 ## Exit-corner sampling
 
-For an ordered corridor path, score only constructed interior exit edges:
+For an ordered corridor path, charge each newly generated cell when the search
+enters it. The predecessor determines travel direction `d`; score the entered
+cell's opposite, outgoing edge:
 
-* The starting edge has zero landscaping cost. Accessways always start from a handoff edge, whose mining/dumping proto does not work the ground-connecting edge, or from an intent-fixed profile that is already determined outside this scorer.
-* Interior generated-to-generated exits are the only edges that need side-ray landscaping-cost scoring. The predecessor accounted for the shared entry edge, so scoring exits avoids double-counting interior segment boundaries.
-* The terminal edge has zero landscaping cost. Accessways end through the same kind of 0-work handoff to V/G or at another cluster/fixed designation whose profile is already fixed; do not add side-ray or overhead work for the last handoff segment. Traversal length may still be paid separately by the main edge-cost formula.
+* The shared edge through which the path enters the cell has zero landscaping
+  cost. The predecessor already accounted for its own working edge, or it is a
+  no-work handoff edge.
+* A `G -> V1` handoff does pay side-ray cost for `V1`: its outgoing edge is a
+  working edge, and direction is known from the ground predecessor and matched
+  handoff geometry.
+* A terminal `V2 -> G` handoff adds no further side-ray cost. `V2` was already
+  scored when entered, while its outgoing ground-connecting edge is a no-work
+  edge.
 
-For a scored interior segment moving in direction `d`, choose the two corners on the outgoing edge and shoot one lateral ray from each corner:
+For a generated cell entered in direction `d`, choose the two corners on the
+outgoing edge and shoot one lateral ray from each corner:
 
 | Move direction | Exit edge | Exit corners | Lateral rays |
 |---|---|---|---|
@@ -74,6 +83,13 @@ The sign of the ray slope depends on whether the side is fill or cut. Determine 
 
 * **Fill side:** planned corner is above terrain; the side ray slopes downward/outward until it reaches ground.
 * **Cut side:** planned corner is below terrain; the side ray slopes upward/outward until it reaches ground/open terrain.
+
+Filter those corner operations through the designation proto that will perform
+the work:
+
+* a mining proto scores cut corners and ignores fill corners;
+* a dumping proto scores fill corners and ignores cut corners;
+* a leveling proto may score both cut and fill corners independently.
 
 ## Material run-slope selection
 
@@ -138,7 +154,7 @@ Deferred feasibility rules to evaluate later:
 
 * **Buildings:** if the ray/wedge crosses an occupied or planned building footprint, reject the candidate edge. Buildings remain hard obstacles, not soft cost.
 * **Other designations:** if the ray/wedge crosses an active or fixed designation that is not the predecessor/successor profile already accounted for by the accessway, reject unless that designation's fixed target profile is explicitly compatible with the ray side. Do not assume future landslides may consume or overwrite unrelated work.
-* **Current candidate designations:** compatible generated neighbours in the same candidate path are allowed; shared interior edges are already accounted for by the exit-only scoring rule.
+* **Current candidate designations:** compatible generated neighbours in the same candidate path are allowed; shared edges are already accounted for by the entry-time, outgoing-edge scoring rule.
 
 The broad durability/hourglass index can remain as a cheap prefilter for sources not represented by the current side ray, for G-node safety, and for diagnostics. Only after the side-ray cost implementation has been validated should generated-edge durability consider preferring the side-ray result, because it follows the actual direction, operation, and material run slope of the candidate edge.
 
@@ -156,7 +172,12 @@ landscapingCost = overhead
 
 ## Turns and special cases
 
-The first implementation should score each constructed interior segment's exit edge in its own direction and leave start/terminal handoff or fixed edges at zero landscaping cost. Later refinements may add:
+The first implementation should score a generated cell's exit edge when the cell
+is entered, using the predecessor-derived direction. If the path later turns,
+that earlier score is not revised to model the newly exposed outside corner.
+This is an accepted first-pass inaccuracy: V1 turns require flat cells and
+usually add enough cells and total cost that excessive turning is already
+suppressed. Later refinements may add:
 
 * an outside-corner ray for sharp turns and switchbacks,
 * unique-edge accounting for branched or reused fixed profiles,
@@ -165,3 +186,181 @@ The first implementation should score each constructed interior segment's exit e
 ## Expected behavior
 
 This amendment should make the pathfinder prefer routes that are longer but materially easier, such as contour-following paths and switchbacks, over short routes that slice across a mountainside. On hills, the side-ray scorer should also bias the route shape toward more filling near the base of the hill and more mining near the top: low routes that cut deeply into the uphill face should lose to modest fills/shoulders, while high routes that would require large exposed dumping shoulders should lose to controlled excavation into the hillside. The cost remains local, non-negative, bounded, and additive, preserving the shortest-path requirements while giving the search a much better signal for hillside work.
+
+## Review resolutions
+
+The current search charges center-height work and fixed overhead when it enters a
+new generated `V` node. Side-ray work uses that same accounting point: the
+predecessor identifies the entered cell's forward direction and therefore its
+outgoing edge. Implement the new terms with these ownership rules:
+
+* Keep `directVerticalWork` and generated-`V` fixed overhead charged once when a
+  new generated node is entered. A generated node does not become free merely
+  because its outgoing edge is a terminal handoff.
+* Charge side-ray work when entering any newly generated `V` from a predecessor
+  whose handoff geometry establishes direction. `G`-to-`V` and
+  generated-to-`V` transitions can therefore carry side-ray cost.
+* Therefore a path `G -> V1 -> V2 -> G` scores `V1` on `G -> V1`, scores `V2`
+  on `V1 -> V2`, and adds no new side-ray cost on `V2 -> G`.
+* Apply the material operation only where the selected proto can perform it:
+  mining counts cut corners, dumping counts fill corners, and leveling counts
+  both.
+* A corner whose planned and existing heights are equal within the scorer's
+  epsilon has no lateral side operation and contributes zero ray cost.
+
+The scorer must use immutable snapshot data. Search bounds, snapshot capture
+bounds, and physical map bounds are different concepts: an absent snapshot
+sample must never be treated as the map edge. Capture a ray halo of at least
+`maxRayDistance` around every searchable generated origin, clipped to the real
+terrain bounds, and represent sample results explicitly as terrain, ocean,
+physical map edge, or missing snapshot data. Missing snapshot data is a
+diagnostic failure, not a successful cut boundary.
+
+Do not derive ray gaps from the existing half-level `groundHeight2` pathing
+cache. Preserve terrain height with enough precision for cost integration,
+while continuing to use `height2` for graph/profile compatibility. Likewise,
+capture terrain-layer material data needed to resolve the normal in-ground
+material at a cut corner's planned elevation; selecting only the current top
+material is wrong for deep cuts.
+
+Resolve the allowed dumping materials once while building the snapshot; their
+conservative slope is location-independent for that search.
+`TerrainMaterialProto.GetApproxSlopeSteepness()` already resolves through
+`DisruptedMaterialProto`, so it is suitable for this snapshot-wide dumping slope.
+Mining must deliberately use the normal collapse properties of the in-ground
+material intersected at the planned corner elevation instead of that helper,
+because the helper switches to the disrupted form. Put these conversions behind
+one narrow material-slope resolver and cover them with fixtures.
+
+## Implementation plan
+
+### 1. Extract the cost model and preserve baseline behavior
+
+Status: implemented.
+
+* Add an `AccessLandscapingCost` value/result type with separate direct,
+  left-ray, right-ray, unresolved-penalty, and fatal-reason fields.
+* Move the current `16 * abs(center delta)` calculation and generated fixed
+  overhead behind one transition-cost helper in `AccessPathSearch`.
+* Make both relaxation and result-cost breakdown use the same helper, removing
+  the current duplicated reconstruction logic.
+* Add baseline fixtures proving A* and Dijkstra still return the same route,
+  total cost, and cost breakdown before side rays are enabled.
+
+Acceptance:
+
+* Side-ray weight zero reproduces the current route and cost exactly.
+* Summed cost-breakdown fields equal the search result's total cost within the
+  existing float epsilon.
+
+### 2. Extend the immutable search snapshot
+
+* Capture precise terrain heights for the searchable area plus a 16-tile ray
+  halo, clipped to physical terrain bounds.
+* Capture ocean state separately from terrain support state; ocean remains
+  unsupported for fill rays even though a terrain height can be queried there.
+* Capture per-column terrain layers in a compact form sufficient to select the
+  normal material at a planned cut elevation.
+* Resolve the tower's allowed dumpable products using the existing
+  `DumpableProducts` configuration access, map them to terrain materials, and
+  store the most conservative disrupted dumping slope.
+* Store the conservative fallback slopes and material-resolution diagnostics in
+  the snapshot. Do not retain live manager/proto callbacks in the search loop.
+
+Acceptance:
+
+* Synthetic snapshot tests distinguish physical map edge, ocean, and uncaptured
+  data.
+* Deep-cut fixtures select the material intersected at planned elevation rather
+  than the surface layer.
+* Mixed dumping rules select the lowest stable disrupted-material slope.
+
+### 3. Implement the bounded ray integrator
+
+* Add a pure scorer using distances `1, 2, 3, 5, 8, 13, 16`.
+* Determine fill, cut, or no-op independently at each exit corner.
+* Integrate `stepLength * positiveGap`, stopping at the first supported terrain
+  intersection.
+* Apply the operation-specific ocean and physical-map-edge rules from this
+  document.
+* Cap each ray contribution and add the finite unresolved penalty when the
+  16-tile sample is still open. Return fatal status for fill-to-map-edge and
+  cut-to-ocean.
+
+Acceptance:
+
+* Pure fixtures cover flat/no-op, resolved fill, resolved cut, unresolved cap,
+  fill map edge, cut map edge, fill over ocean, cut into ocean, and fallback
+  material resolution.
+* Every non-fatal contribution is finite and non-negative.
+
+### 4. Integrate predecessor-direction scoring
+
+* Whenever expansion enters a new generated node, derive its forward direction
+  from the predecessor and score the new profile's outgoing corners.
+* For `G`-to-`V`, use the matched handoff geometry to determine the same
+  predecessor-to-generated direction; reject ambiguous direction rather than
+  silently omitting cost.
+* Filter corner work through the proto operation selected for that generated
+  cell: mining=cut only, dumping=fill only, leveling=both.
+* Reject fatal ray results with stable rejection keys such as
+  `SideRayFillMapEdge`, `SideRayCutOcean`, and `SideRaySnapshotMissing`.
+* Do not add side-ray cost when leaving a generated node for `G` or an existing
+  fixed profile.
+* Extend result diagnostics with direct work, left/right side-ray work,
+  unresolved penalties, fatal rejection counts, and ray sample counts.
+
+Acceptance:
+
+* Directional fixtures prove the same profile has different cost along-contour
+  and across-slope.
+* `G -> V1 -> V2 -> G` charges `V1` on entry, charges `V2` on entry, and
+  charges nothing on the terminal handoff.
+* A mining handoff ignores a would-be fill corner, and a dumping handoff ignores
+  a would-be cut corner.
+* A* and Dijkstra choose the same path and total cost with side rays enabled;
+  the existing heuristic remains admissible because it ignores the new
+  non-negative term.
+
+### 5. Add settings and tuning diagnostics
+
+* Introduce internal first-pass constants for ray distances, per-ray cap,
+  unresolved penalty, direct-work weight, and side-ray weight. Expose only
+  weights that prove necessary during save testing; avoid expanding public
+  settings before stable defaults exist.
+* Log aggregate ray timing, cache/hit counts, unresolved counts, fatal counts,
+  and the selected dumping/fallback slopes in experimental diagnostics.
+* Add a temporary comparison mode or diagnostic that reports the selected route
+  under center-only and side-ray costs without materializing both.
+
+Acceptance:
+
+* Side-ray scoring has a bounded number of terrain samples per generated-node
+  entry.
+* Diagnostics identify whether route changes came from direct work, resolved
+  side wedges, unresolved penalties, or fatal boundaries.
+
+### 6. Validate on representative terrain
+
+Run Debug build verification, core synthetic fixtures, and manual dry-run
+comparisons on:
+
+* flat terrain, where the route should remain unchanged;
+* a uniform sidehill, where contour-following should beat a direct cross-slope
+  cut when the extra travel is reasonable;
+* a convex hill, where lower routes prefer controlled fill and upper routes
+  prefer controlled cut;
+* a cliff and map boundary, exercising unresolved and fatal outcomes;
+* coastal terrain, exercising cut/fill ocean asymmetry;
+* mixed rock/dirt layers and multiple allowed dumping materials.
+
+Record route cost breakdowns, visited-node counts, ray samples, and elapsed
+search time. Tune caps and weights only after these cases preserve A*/Dijkstra
+cost equality and show the intended route ordering.
+
+### Deferred follow-up
+
+After cost behavior is stable, evaluate reusing the ray result for directional
+durability and obstruction feasibility. That work should be a separate change:
+it alters graph admissibility, whereas this plan changes only non-negative edge
+cost and fatal environmental boundaries already defined above.

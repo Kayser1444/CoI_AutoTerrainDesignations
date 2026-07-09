@@ -1,4 +1,6 @@
 v0.4.6a [unreleased]
+* Refactored: experimental accessway generated-node entry costs now use one structured landscaping-cost calculation for search relaxation and result diagnostics, with baseline A*/Dijkstra cost-breakdown checks ahead of side-ray scoring.
+* Fixed: experimental accessway cost diagnostics now reconstruct the actual predecessor-to-node traversal distance, including zero-length profile-to-ground handoffs, instead of assuming every ground node costs one tile.
 * Added: Mod setting and API methods (`GetAccessPropCleanupLandscapingCost`, `SetAccessPropCleanupLandscapingCost`) to configure prop cleanup landscaping cost.
   - Defaults to `6` to favor driving around trees or debris when a reasonable detour exists.
 * Changed: Renamed setting `accessWorkDistanceScale` to `accessLandscapingCostDistanceScale` (and its UI row to **Landscaping cost vs. distance**) to better reflect that one unit of landscaping cost equals one unit of digging/dumping rock.
