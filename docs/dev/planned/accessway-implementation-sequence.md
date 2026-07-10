@@ -45,7 +45,7 @@ Scope:
   cleanup material-cost knob instead of hard-coding the default `6`
   landscaping-cost value in the route search.
 * Add diagnostics names for `ClearGround`, `TreeCleanup`, `DenseDebrisCleanup`,
-  `HardBlocker`, and `StubbedTerrainRemovalThreshold`.
+  `HardBlocker`, and `TerrainRemovalPolicy`.
 
 Acceptance:
 

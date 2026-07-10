@@ -30,7 +30,7 @@ namespace AutoTerrainDesignations.Access
         TreeCleanup,
         DenseDebrisCleanup,
         HardBlocker,
-        StubbedTerrainRemovalThreshold
+        TerrainRemovalPolicy
     }
 
     internal readonly struct AccessPropSample
@@ -57,20 +57,20 @@ namespace AutoTerrainDesignations.Access
         public Tile2i Origin { get; }
         public AccessPropCleanupClass Classes { get; }
         public AccessPropBlockerKind BlockerKind { get; }
-        public bool UsesStubbedTerrainRemovalThreshold { get; }
+        public bool UsesTerrainRemovalPolicy { get; }
         public IReadOnlyList<AccessPropSample> Samples { get; }
         public bool IsEligible => BlockerKind == AccessPropBlockerKind.None && Classes != AccessPropCleanupClass.None;
         public bool HasTreeCleanup => (Classes & AccessPropCleanupClass.Tree) != 0;
         public bool HasDenseDebrisCleanup => (Classes & AccessPropCleanupClass.DenseDebris) != 0;
 
         public AccessPropCleanupInfo(Tile2i origin, AccessPropCleanupClass classes,
-            AccessPropBlockerKind blockerKind, bool usesStubbedTerrainRemovalThreshold,
+            AccessPropBlockerKind blockerKind, bool usesTerrainRemovalPolicy,
             IReadOnlyList<AccessPropSample>? samples = null)
         {
             Origin = origin;
             Classes = classes;
             BlockerKind = blockerKind;
-            UsesStubbedTerrainRemovalThreshold = usesStubbedTerrainRemovalThreshold;
+            UsesTerrainRemovalPolicy = usesTerrainRemovalPolicy;
             Samples = samples ?? Array.Empty<AccessPropSample>();
         }
 
@@ -85,7 +85,9 @@ namespace AutoTerrainDesignations.Access
 
     internal static class AccessPropCleanupPolicy
     {
-        public const int StubbedRemovalThresholdHeight2 = 2;
+        public const int NonTreeDumpRemovalThresholdHeight2 = 1;
+        public const int TreeMiningRemovalThresholdHeight2 = 1;
+        public const int TreeDumpingRemovalThresholdHeight2 = 2;
 
         public static AccessPropCleanupClass Classify(AccessPropSample sample)
         {
@@ -95,21 +97,41 @@ namespace AutoTerrainDesignations.Access
             return classes;
         }
 
-        public static bool DoesStubbedTerrainDeltaRemoveProp(
+        public static bool DoesTerrainDeltaDestroyTree(
             AccessHandoffOperation operation, int terrainHeight2, int targetHeight2)
         {
             int delta = targetHeight2 - terrainHeight2;
             if (operation == AccessHandoffOperation.Mining)
-                return delta <= -StubbedRemovalThresholdHeight2;
+                return delta <= -TreeMiningRemovalThresholdHeight2;
             if (operation == AccessHandoffOperation.Dumping)
-                return delta >= StubbedRemovalThresholdHeight2;
+                return delta >= TreeDumpingRemovalThresholdHeight2;
+            if (operation == AccessHandoffOperation.Leveling)
+                return delta <= -TreeMiningRemovalThresholdHeight2
+                    || delta >= TreeDumpingRemovalThresholdHeight2;
+            return false;
+        }
+
+        public static bool DoesDumpingDestroyNonTreeProp(int terrainHeight2, int targetHeight2)
+        {
+            int delta = targetHeight2 - terrainHeight2;
+            return delta > NonTreeDumpRemovalThresholdHeight2;
+        }
+
+        public static bool OperationRemovesNonTreeProp(
+            AccessHandoffOperation operation, int terrainHeight2, int targetHeight2)
+        {
+            if (operation == AccessHandoffOperation.Mining
+                || operation == AccessHandoffOperation.Leveling)
+                return true;
+            if (operation == AccessHandoffOperation.Dumping)
+                return DoesDumpingDestroyNonTreeProp(terrainHeight2, targetHeight2);
             return false;
         }
 
         public static AccessPropCleanupInfo BuildOriginInfo(Tile2i origin,
             IEnumerable<AccessPropSample> samples,
             AccessPropBlockerKind blockerKind = AccessPropBlockerKind.None,
-            bool usesStubbedTerrainRemovalThreshold = true)
+            bool usesTerrainRemovalPolicy = true)
         {
             if (blockerKind != AccessPropBlockerKind.None)
                 return AccessPropCleanupInfo.HardBlocked(origin, blockerKind);
@@ -139,7 +161,7 @@ namespace AutoTerrainDesignations.Access
             return classes == AccessPropCleanupClass.None
                 ? AccessPropCleanupInfo.Clear(origin)
                 : new AccessPropCleanupInfo(origin, classes, AccessPropBlockerKind.None,
-                    usesStubbedTerrainRemovalThreshold, collectedSamples);
+                    usesTerrainRemovalPolicy, collectedSamples);
         }
 
         public static float GetCleanupLandscapingCost() =>

@@ -83,7 +83,6 @@ namespace AutoTerrainDesignations
 
             AddScanBehaviorSection(content, refreshers);
             AddExperimentalAccessSection(content, refreshers);
-            AddPerformanceSection(content, refreshers);
             AddKeyboardShortcutsSection(content, refreshers);
             AddNotificationsSection(content, refreshers);
 
@@ -207,18 +206,6 @@ namespace AutoTerrainDesignations
                 refreshers));
         }
 
-        private static void AddPerformanceSection(Column content, List<Action> refreshers)
-        {
-            content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingScanPerformance.AsFormatted));
-
-            content.Add(BuildIntStepRow(
-                AtdLocalization.SettingsBatchSizeLabel.AsFormatted,
-                AtdLocalization.SettingsBatchSizeTooltip.AsFormatted,
-                () => AutoDepthDesignation.BatchSize,
-                value => AutoDepthDesignation.SetBatchSize(value),
-                value => value.ToString(CultureInfo.InvariantCulture),
-                refreshers));
-        }
 
         private static void AddExperimentalAccessSection(Column content, List<Action> refreshers)
         {

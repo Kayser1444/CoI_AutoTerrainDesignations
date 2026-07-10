@@ -3,6 +3,47 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
+    internal readonly struct AccessSideRayCacheKey : IEquatable<AccessSideRayCacheKey>
+    {
+        private readonly Tile2i m_corner;
+        private readonly int m_plannedHeight2;
+        private readonly Tile2i m_direction;
+        private readonly AccessHandoffOperation m_workOperation;
+
+        public AccessSideRayCacheKey(
+            Tile2i corner,
+            int plannedHeight2,
+            Tile2i direction,
+            AccessHandoffOperation workOperation)
+        {
+            m_corner = corner;
+            m_plannedHeight2 = plannedHeight2;
+            m_direction = direction;
+            m_workOperation = workOperation;
+        }
+
+        public bool Equals(AccessSideRayCacheKey other)
+            => m_corner == other.m_corner
+                && m_plannedHeight2 == other.m_plannedHeight2
+                && m_direction == other.m_direction
+                && m_workOperation == other.m_workOperation;
+
+        public override bool Equals(object? obj)
+            => obj is AccessSideRayCacheKey other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = m_corner.GetHashCode();
+                hash = (hash * 397) ^ m_plannedHeight2;
+                hash = (hash * 397) ^ m_direction.GetHashCode();
+                hash = (hash * 397) ^ (int)m_workOperation;
+                return hash;
+            }
+        }
+    }
+
     internal enum AccessSideRayOperation
     {
         None,
@@ -14,13 +55,16 @@ namespace AutoTerrainDesignations.Access
     {
         public AccessTerrainSampleKind Kind { get; }
         public float TerrainHeight { get; }
+        public string? BlockerReason { get; }
 
         public AccessSideRayTerrainSample(
             AccessTerrainSampleKind kind,
-            float terrainHeight)
+            float terrainHeight,
+            string? blockerReason = null)
         {
             Kind = kind;
             TerrainHeight = terrainHeight;
+            BlockerReason = blockerReason;
         }
     }
 
@@ -70,13 +114,15 @@ namespace AutoTerrainDesignations.Access
             AccessSideRayOperation operation,
             float materialSlope,
             float maxRayCost = DefaultMaxRayCost,
-            float unresolvedPenalty = DefaultUnresolvedPenalty)
+            float unresolvedPenalty = DefaultUnresolvedPenalty,
+            int postTerminationSafetyMargin = 0)
             => Score(
                 tile =>
                 {
                     AccessTerrainSampleKind kind =
                         snapshot.GetSideRayTerrainSample(tile, out float height);
-                    return new AccessSideRayTerrainSample(kind, height);
+                    return new AccessSideRayTerrainSample(
+                        kind, height, snapshot.GetSideRayBlockerReason(tile, operation));
                 },
                 corner,
                 lateralDirection,
@@ -84,7 +130,8 @@ namespace AutoTerrainDesignations.Access
                 operation,
                 materialSlope,
                 maxRayCost,
-                unresolvedPenalty);
+                unresolvedPenalty,
+                postTerminationSafetyMargin);
 
         internal static AccessSideRayResult Score(
             Func<Tile2i, AccessSideRayTerrainSample> sampleTerrain,
@@ -94,7 +141,8 @@ namespace AutoTerrainDesignations.Access
             AccessSideRayOperation operation,
             float materialSlope,
             float maxRayCost = DefaultMaxRayCost,
-            float unresolvedPenalty = DefaultUnresolvedPenalty)
+            float unresolvedPenalty = DefaultUnresolvedPenalty,
+            int postTerminationSafetyMargin = 0)
         {
             if (operation == AccessSideRayOperation.None)
                 return new AccessSideRayResult(0f, 0f, 0, false, false);
@@ -103,16 +151,16 @@ namespace AutoTerrainDesignations.Access
             if (materialSlope <= 0f || float.IsNaN(materialSlope)
                 || float.IsInfinity(materialSlope))
                 return Fatal("SideRayInvalidMaterialSlope", 0, 0f);
-            if (maxRayCost < 0f || unresolvedPenalty < 0f)
+            if (maxRayCost < 0f || unresolvedPenalty < 0f || postTerminationSafetyMargin < 0)
                 return Fatal("SideRayInvalidCostLimit", 0, 0f);
 
             float integratedCost = 0f;
             int previousDistance = 0;
             int sampleCount = 0;
             int disturbedDistance = 0;
-            for (int i = 0; i < s_sampleDistances.Length; i++)
+            int maxDistance = s_sampleDistances[s_sampleDistances.Length - 1];
+            for (int distance = 1; distance <= maxDistance; distance++)
             {
-                int distance = s_sampleDistances[i];
                 Tile2i tile = new Tile2i(
                     corner.X + lateralDirection.X * distance,
                     corner.Y + lateralDirection.Y * distance);
@@ -141,9 +189,48 @@ namespace AutoTerrainDesignations.Access
                     ? rayHeight - sample.TerrainHeight
                     : sample.TerrainHeight - rayHeight;
                 if (gap <= 0f)
+                {
+                    for (int safetyDistance = distance + 1;
+                        safetyDistance <= Math.Min(maxDistance, distance + postTerminationSafetyMargin);
+                        safetyDistance++)
+                    {
+                        Tile2i safetyTile = new Tile2i(
+                            corner.X + lateralDirection.X * safetyDistance,
+                            corner.Y + lateralDirection.Y * safetyDistance);
+                        AccessSideRayTerrainSample safetySample = sampleTerrain(safetyTile);
+                        sampleCount++;
+                        if (safetySample.Kind == AccessTerrainSampleKind.MissingSnapshot)
+                            return Fatal("SideRaySnapshotMissing", sampleCount, integratedCost);
+                        if (safetySample.Kind == AccessTerrainSampleKind.PhysicalMapEdge)
+                        {
+                            if (operation == AccessSideRayOperation.Fill)
+                                return Fatal("SideRayFillMapEdge", sampleCount, integratedCost);
+                            continue;
+                        }
+                        if (operation == AccessSideRayOperation.Cut
+                            && safetySample.Kind == AccessTerrainSampleKind.Ocean
+                            && safetySample.TerrainHeight < MinimumDryCutOceanHeight)
+                            return Fatal("SideRayCutOcean", sampleCount, integratedCost);
+                        if (!string.IsNullOrEmpty(safetySample.BlockerReason))
+                            return Fatal(safetySample.BlockerReason!, sampleCount, integratedCost);
+                    }
                     return new AccessSideRayResult(
                         integratedCost, 0f, sampleCount, false, false,
                         disturbedDistance: disturbedDistance);
+                }
+                if (!string.IsNullOrEmpty(sample.BlockerReason))
+                    return Fatal(sample.BlockerReason!, sampleCount, integratedCost);
+
+                // Feasibility is dense: an ocean, building, designation, or
+                // terrain intersection at a skipped Fibonacci distance must
+                // not be invisible to the ray.  Cost remains sampled at the
+                // original accelerating distances so this safety change does
+                // not retune the established cost model.
+                if (!IsCostSampleDistance(distance))
+                {
+                    disturbedDistance = distance;
+                    continue;
+                }
 
                 int stepLength = distance - previousDistance;
                 integratedCost = Math.Min(
@@ -167,6 +254,14 @@ namespace AutoTerrainDesignations.Access
                 true,
                 integratedCost + appliedPenalty >= maxRayCost,
                 disturbedDistance: disturbedDistance);
+        }
+
+        private static bool IsCostSampleDistance(int distance)
+        {
+            for (int index = 0; index < s_sampleDistances.Length; index++)
+                if (s_sampleDistances[index] == distance)
+                    return true;
+            return false;
         }
 
         private static AccessSideRayResult Fatal(

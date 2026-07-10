@@ -66,3 +66,5 @@ Investigate placing only the minimum required soil to satisfy farmability (e.g.,
 # Props/Debris clearing
 - Unwire the prop clearing from "Auto" mode. It's just a recipe for confusion.
 - Shift-click Remove debris to force-replace existing designations (terrain or forestry)
+
+## When constructing snapshot and materalizing path, mark trees at risk of destruction for harvesting.

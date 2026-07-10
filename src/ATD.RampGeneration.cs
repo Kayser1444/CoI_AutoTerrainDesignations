@@ -623,16 +623,16 @@ namespace AutoTerrainDesignations
                 string experimentalFailureSummary = string.Empty;
                 if (experimentalSearchEnabled)
                 {
+                    List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
+                        originClusters, states, cluster);
                     if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,
-                        experimentalIsMining, accesswayAllowsMixedWork,
+                        experimentalIsMining, accesswayAllowsMixedWork, accessibleFixedGoals,
                         out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
                     {
                         experimentalSnapshot = refreshedSnapshot;
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
 
-                        List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
-                            originClusters, states, cluster);
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +

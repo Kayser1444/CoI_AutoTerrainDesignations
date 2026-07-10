@@ -33,9 +33,22 @@ namespace AutoTerrainDesignations.Access
                 {
                     if (!snapshot.IsGroundOrCleanupNode(node.Position))
                         return Invalid("PlanGroundUnavailable", result, designations, reusedNodes, groundNodes);
-                    if (snapshot.TryGetCleanupInfoForTile(node.Position, out AccessPropCleanupInfo cleanupInfo)
-                        && cleanupInfo.IsEligible)
-                        MergeCleanupInfo(cleanupByOrigin, cleanupInfo);
+                    if (snapshot.TryGetRequiredCleanupInfoForTile(
+                        node.Position, out AccessPropCleanupInfo cleanupInfo))
+                    {
+                        bool previousGeneratedSameOrigin = !previousWasGround
+                            && previousNode.Mode != AccessSearchMode.Existing
+                            && previousNode.Position == cleanupInfo.Origin;
+                        if (previousGeneratedSameOrigin)
+                        {
+                            if (TryBuildTreeOnlyCleanupInfo(cleanupInfo, out AccessPropCleanupInfo treeCleanup))
+                                MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                        }
+                        else
+                        {
+                            MergeCleanupInfo(cleanupByOrigin, cleanupInfo);
+                        }
+                    }
                     if (previousWasGround)
                     {
                         if (Manhattan(previousPosition, node.Position) != 1)
@@ -64,8 +77,6 @@ namespace AutoTerrainDesignations.Access
 
                 if (!AccessPathSearch.TryGetProfile(snapshot, node, out AccessHeightProfile profile))
                     return Invalid("PlanMissingProfile", result, designations, reusedNodes, groundNodes);
-                if (node.Mode != AccessSearchMode.Existing && snapshot.IsCleanupOrigin(node.Position))
-                    return Invalid("PlanCleanupOriginGenerated", result, designations, reusedNodes, groundNodes);
 
                 Tile2i stepDirection = default;
                 if (previousWasGround)
@@ -110,8 +121,12 @@ namespace AutoTerrainDesignations.Access
                 else
                 {
                     if (!AccessPathSearch.IsGeneratedProfileFeasible(
-                        snapshot, node.Position, profile, previousNode, stepDirection, out string reason))
+                        snapshot, node.Position, profile, previousNode, stepDirection,
+                        out string reason))
                         return Invalid("Plan" + reason, result, designations, reusedNodes, groundNodes);
+                    if (snapshot.TryGetPropCleanupInfo(node.Position, out AccessPropCleanupInfo generatedCleanup)
+                        && TryBuildTreeOnlyCleanupInfo(generatedCleanup, out AccessPropCleanupInfo treeCleanup))
+                        MergeCleanupInfo(cleanupByOrigin, treeCleanup);
 
                     var planned = new AccessPlannedDesignation(node.Position, node.Mode, profile);
                     if (generatedByOrigin.TryGetValue(node.Position, out AccessPlannedDesignation existing))
@@ -174,9 +189,39 @@ namespace AutoTerrainDesignations.Access
             cleanupByOrigin[cleanupInfo.Origin] = AccessPropCleanupPolicy.BuildOriginInfo(
                 cleanupInfo.Origin,
                 samples,
-                usesStubbedTerrainRemovalThreshold:
-                    existing.UsesStubbedTerrainRemovalThreshold
-                    || cleanupInfo.UsesStubbedTerrainRemovalThreshold);
+                usesTerrainRemovalPolicy:
+                    existing.UsesTerrainRemovalPolicy
+                    || cleanupInfo.UsesTerrainRemovalPolicy);
+        }
+
+        private static bool TryBuildTreeOnlyCleanupInfo(
+            AccessPropCleanupInfo cleanupInfo,
+            out AccessPropCleanupInfo treeCleanupInfo)
+        {
+            if (!cleanupInfo.HasTreeCleanup)
+            {
+                treeCleanupInfo = AccessPropCleanupInfo.Clear(cleanupInfo.Origin);
+                return false;
+            }
+
+            var treeSamples = new List<AccessPropSample>();
+            foreach (AccessPropSample sample in cleanupInfo.Samples)
+                if (sample.IsTree)
+                    treeSamples.Add(sample);
+
+            if (treeSamples.Count == 0)
+                treeCleanupInfo = new AccessPropCleanupInfo(
+                    cleanupInfo.Origin,
+                    AccessPropCleanupClass.Tree,
+                    AccessPropBlockerKind.None,
+                    cleanupInfo.UsesTerrainRemovalPolicy);
+            else
+                treeCleanupInfo = AccessPropCleanupPolicy.BuildOriginInfo(
+                    cleanupInfo.Origin,
+                    treeSamples,
+                    usesTerrainRemovalPolicy:
+                        cleanupInfo.UsesTerrainRemovalPolicy);
+            return treeCleanupInfo.IsEligible;
         }
 
         private static AccessDesignationPlan Invalid(string reason, AccessSearchResult result,

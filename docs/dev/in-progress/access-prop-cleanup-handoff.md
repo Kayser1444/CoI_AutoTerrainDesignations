@@ -46,7 +46,7 @@ Status: draft patch implementing the planned props/debris scaffolding from `docs
 * Does vanilla remove props at exactly one full level of terrain delta, or are there additional direction/material/footprint thresholds?
 * Should tree cleanup and dense-debris cleanup share one configured cost or eventually split into independent knobs?
 * Should cleanup-origin cost remain charged once per path, once per contiguous entry, or once per materialized origin if future topology allows loops?
-* What dry-run UI/log format should expose `StubbedTerrainRemovalThreshold` strongly enough that users do not mistake it for verified vanilla behavior?
+* What dry-run UI/log format should expose `TerrainRemovalPolicy` strongly enough that users understand generated V is applying ATD's operation-level prop policy rather than a separate cleanup designation?
 
 ## Next suggested steps
 

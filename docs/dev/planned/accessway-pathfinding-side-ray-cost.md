@@ -63,7 +63,7 @@ Each lateral ray starts at a planned exit corner height and follows an idealized
 
 ## Accelerating samples
 
-Use a short fixed step table rather than dense linear sampling, for example:
+Use a short fixed step table for **cost integration**, for example:
 
 ```text
 1, 2, 3, 5, 8, 13, 16
@@ -71,7 +71,14 @@ Use a short fixed step table rather than dense linear sampling, for example:
 
 This is Fibonacci-like at short range, then deliberately caps at `16` terrain tiles instead of continuing to `21`. The cap is tied to the terrain/designation scale: `16` tiles is four 4x4 designation widths, which is already a very large side wedge for an accessway scorer. Continuing to `21` may be useful as an experiment on extreme cliffs, but it should be a tuning variant rather than the first-pass default because it increases each unresolved ray's search radius by another full designation width plus one tile and can make far-away terrain dominate candidate ranking.
 
-For each sample distance:
+Feasibility is nevertheless checked densely at every tile from 1 through the
+same maximum range.  A ray must terminate at the first actual terrain
+intersection, and any reached ocean, building, opposing designation, map edge,
+or missing snapshot tile is handled immediately.  In particular, an ocean at a
+non-Fibonacci distance is still fatal for a cut ray.  Only the non-negative
+cost integration remains accelerated.
+
+For each cost sample distance:
 
 ```text
 stepLength = distance - previousDistance
@@ -150,7 +157,24 @@ maxRayCost          = tuned finite cap
 unresolvedRayPenalty = tuned finite penalty added at max distance
 ```
 
-## Deferred durability and obstruction integration
+## Material-aware durability and obstruction integration
+
+Generated `V` retains a waist-preserving durability envelope around existing designation providers so routes can enter, leave, and pass through compatible fixed profiles. The old envelope's global run is replaced per designation corner with `1 / (materialSlope * 0.85)`, using the depth-selected mining material or snapshot dumping material. This keeps rock envelopes narrow, loose-material envelopes wide, and matching-height waists open. Building durability corners retain the configured fallback run. Ordinary `G` capture and cleanup-ground admission continue to use projected blocked tiles plus their existing durability protection.
+
+Each side-ray sample also consults immutable obstruction masks. Building occupied tiles are expanded by two terrain tiles in every direction, producing at least a 5-by-5 obstacle even for a single occupied tile; this guarantees that the sparse distance sequence cannot step over a building that intersects the disturbed ray span. Terrain-designation footprints and projected disturbance are classified as cut or fill. A candidate cut ray may mix with existing/projected cut work but is blocked by fill work; a fill ray may mix with fill work but is blocked by cut work. Leveling footprints remain conservative hard blockers, while their projected rays are classified by the actual local operation. A blocker is fatal only while the sampled material slope still has positive cut/fill work at that distance; blockers beyond the resolved slope are irrelevant. Individual ray results, including obstruction failures, are cached by corner, planned half-level height, lateral direction, and work operation.
+
+Candidate side-ray feasibility uses 85% of the selected material slope, extending
+its predicted run by roughly 18% before it tests for termination or fatal
+ocean/obstruction.  After the first terrain intersection it tests one further
+tile as a safety buffer.  This is deliberately conservative for loose/runny
+materials such as sand; a nearby ocean cannot become safe merely because the
+nominal ray resolved one tile before it.
+
+Snapshot construction projects the future terrain disturbance of existing mining, dumping, and leveling designations before searching. For every exposed designation edge, its two corner rays are traced with the same operation-aware, depth-selected material selection used by candidate `V` costing. Internal edges between adjacent snapshot designations are skipped. Unlike candidate cost rays, existing-designation projection samples every terrain tile rather than the sparse Fibonacci distances. Its effective slope is 85% of the selected material slope, deliberately extending the predicted horizontal run by roughly 18%, and its independent projection limit is 48 tiles. It blocks through the first tile where the slope resolves and one additional tile beyond that termination as a safety margin; an unresolved projection blocks through tile 49. Tiles in the resulting projected disturbance spans are removed from speculative `G` and added to the immutable designation obstruction mask seen by later candidate rays. This prevents a candidate from resolving against present-day ground that an existing designation will later destroy. The legacy durability envelope remains temporarily active for `G` as a validation guard; after projected-designation blocking is regression-tested, `G` can rely on the blocked snapshot tiles instead of the fixed-run envelope.
+
+Convex outside corners receive an additional filled-quadrant projection rather than only the two orthogonal boundary rays. Every tile in the outward quadrant through the 48-tile projection limit is evaluated against the corner target height and safety-adjusted material slope using conservative Chebyshev distance. Predicted disturbed tiles are expanded by one tile in every direction. This intentionally over-approximates the rounded/fanned collapse around an outside corner and prevents routes from slipping diagonally between the two edge rays. Concave or designation-internal corners do not emit this quadrant.
+
+The rules below describe the original staged rollout and the constraints retained by the implemented replacement.
 
 Do not replace durability or external-obstruction feasibility with side rays in
 the first implementation. The existing durability/hourglass and hard-obstacle
@@ -384,15 +408,47 @@ cost equality and show the intended route ordering.
 
 ### Deferred follow-up
 
-V/G handoff feasibility is now conservatively tightened separately from
-side-ray costing. A prospective handoff must expose an operation-fulfilled
-contact on the interior of the free edge that is target-vehicle-pathable or
-cleanup-eligible, and that contact must have a matching outward ground
-neighbour. Corner-only contact is rejected. Vanilla's live pathability provider
-cannot evaluate the future
-post-operation terrain profile without mutating the world, so a full
-prospective vehicle-path query remains a possible later refinement if this
-conservative edge-crossing rule proves insufficient.
+V/G handoff feasibility is separate from side-ray costing.  A handoff cell has
+two distinct faces:
+
+* Its **V-facing / working edge** connects to the predecessor or successor V
+  cell and must be mutually traversible after both cells finish.  For a mining
+  handoff its planned height is at or below natural ground; for a dumping
+  handoff it is at or above natural ground.
+* Its opposite **G-facing / handoff edge** must be level with ground or lie on
+  the opposite side of natural ground from the V-facing edge.  The profile then
+  cuts the natural terrain somewhere in the cell, creating the bridge between
+  artificial `V` terrain and natural `G` terrain.  It is incorrect to require
+  the G-facing edge itself to be level.
+
+The candidate must prove that this ground-crossing is adjacent to at least one
+target-vehicle-mask-pathable `G` tile.  That tile may be immediately outside
+the handoff cell (a conventional edge handoff), or it may lie within the
+handoff cell where the final profile crosses rough natural terrain.  The latter
+case is essential when entering or leaving a slope.  An in-cell `G` tile alone
+is not sufficient: it must have a cardinal path out of the handoff cell after
+the cell's work is accounted for.  The local path-out test treats every tile
+the handoff designation will alter as blocked—mining: `target < ground`;
+dumping: `target > ground`; leveling: either non-zero delta—and must reach a
+target-vehicle-mask-pathable `G` tile outside the V corridor.  In particular,
+the predecessor/successor V footprint that determines the working-edge
+direction is also V, not a valid natural-G exit merely because its pre-work
+snapshot terrain was green.  This prevents an apparent green crossing from
+being accepted when its dumping/mining face seals it inside the handoff cell.
+
+Only clearance-valid frontage lanes may establish the handoff.  For the
+current one-cell V corridor, normal 3-wide excavators exclude one tile next to
+each side.  The four terrain lanes are 0..3, so only middle lanes 1 and 2 are
+drivable; lanes 0 and 3 provide clearance.  A Mega/T3 vehicle requires five
+*terrain tiles* of clearance and therefore cannot use a single 4-tile-wide V
+cell at all; the five sample positions on a profile are boundaries/samples, not
+five traversible lanes.  The one-cell graph must reject such requests until a
+separate 2+ V-cell-wide corridor design exists.  Corner-only contact is never
+enough.  The returned search `G` node is still an actual pathable ground tile,
+not an abstract contour intersection.  Vanilla's live pathability provider
+cannot evaluate the future post-operation terrain profile without mutating the
+world, so the crossing test is the conservative proxy until a prospective
+vehicle profile query is available.
 
 After cost behavior is stable, evaluate reusing the ray result for directional
 durability and obstruction feasibility. That work should be a separate change:

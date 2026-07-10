@@ -611,5 +611,124 @@ namespace AutoTerrainDesignations
             return VehiclePathFindingParams.DEFAULT;
         }
 
+        private static VehiclePathFindingParams GetExcavatorPathFindingParamsForTower(
+            IAreaManagingTower tower,
+            out string source)
+        {
+            int targetClearance = Math.Max(1, GetTowerCorridorClearance(tower));
+            if (tower is MineTower mineTower)
+            {
+                var excavators = mineTower.AllAssignedExcavators;
+                if (excavators != null)
+                {
+                    List<VehiclePathabilityCandidate> assignedCandidates = new List<VehiclePathabilityCandidate>();
+                    foreach (Excavator excavator in excavators)
+                        if (excavator != null && !excavator.IsDestroyed)
+                            assignedCandidates.Add(new VehiclePathabilityCandidate(
+                                excavator.PathFindingParams,
+                                $"assignedExcavator:{excavator.Prototype.Id}",
+                                GetVehicleClearance(excavator.PathFindingParams),
+                                excavator.Prototype.Id.ToString()));
+
+                    if (TrySelectPathabilityCandidate(assignedCandidates, targetClearance, out VehiclePathabilityCandidate selected))
+                    {
+                        source = $"{selected.Source}:clearance={selected.Clearance}:targetClearance={targetClearance}";
+                        return selected.Params;
+                    }
+                }
+            }
+
+            if (s_protosDb != null)
+            {
+                var protoCandidates = new List<VehiclePathabilityCandidate>();
+                foreach (ExcavatorProto proto in s_protosDb.All<ExcavatorProto>())
+                    protoCandidates.Add(new VehiclePathabilityCandidate(
+                        proto.PathFindingParams,
+                        $"excavatorProto:{proto.Id}",
+                        GetVehicleClearance(proto.PathFindingParams),
+                        proto.Id.ToString()));
+
+                if (TrySelectPathabilityCandidate(protoCandidates, targetClearance, out VehiclePathabilityCandidate selected))
+                {
+                    source = $"{selected.Source}:clearance={selected.Clearance}:targetClearance={targetClearance}";
+                    return selected.Params;
+                }
+            }
+
+            source = $"globalExcavatorProtoFallback:targetClearance={targetClearance}";
+            return s_excavatorPathFindingParams ?? VehiclePathFindingParams.DEFAULT;
+        }
+
+        private readonly struct VehiclePathabilityCandidate
+        {
+            public VehiclePathFindingParams Params { get; }
+            public string Source { get; }
+            public int Clearance { get; }
+            public string SortKey { get; }
+
+            public VehiclePathabilityCandidate(
+                VehiclePathFindingParams pathFindingParams,
+                string source,
+                int clearance,
+                string sortKey)
+            {
+                Params = pathFindingParams;
+                Source = source;
+                Clearance = clearance;
+                SortKey = sortKey;
+            }
+        }
+
+        private static bool TrySelectPathabilityCandidate(
+            IEnumerable<VehiclePathabilityCandidate> candidates,
+            int targetClearance,
+            out VehiclePathabilityCandidate selected)
+        {
+            selected = default;
+            bool foundAtOrBelowTarget = false;
+            VehiclePathabilityCandidate fallbackAboveTarget = default;
+            bool foundAboveTarget = false;
+            foreach (VehiclePathabilityCandidate candidate in candidates)
+            {
+                if (candidate.Clearance > targetClearance)
+                {
+                    if (!foundAboveTarget
+                        || candidate.Clearance < fallbackAboveTarget.Clearance
+                        || (candidate.Clearance == fallbackAboveTarget.Clearance
+                            && string.CompareOrdinal(candidate.SortKey, fallbackAboveTarget.SortKey) > 0))
+                    {
+                        fallbackAboveTarget = candidate;
+                        foundAboveTarget = true;
+                    }
+                    continue;
+                }
+
+                if (!foundAtOrBelowTarget
+                    || candidate.Clearance > selected.Clearance
+                    || (candidate.Clearance == selected.Clearance
+                        && string.CompareOrdinal(candidate.SortKey, selected.SortKey) > 0))
+                {
+                    selected = candidate;
+                    foundAtOrBelowTarget = true;
+                }
+            }
+            if (foundAtOrBelowTarget)
+                return true;
+
+            if (foundAboveTarget)
+            {
+                selected = fallbackAboveTarget;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int GetVehicleClearance(VehiclePathFindingParams pathFindingParams)
+        {
+            var mask = pathFindingParams.PathabilityQueryMask;
+            return Math.Max(1, ClearancePathabilityProvider.ExtractClearanceFromMask(ref mask).Value);
+        }
+
     }
 }
