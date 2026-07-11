@@ -123,7 +123,7 @@ namespace AutoTerrainDesignations
         {
             // K (or configured key): only activates when the player is in M-mode (mining designation tool active).
             // If already in corner mode, K toggles inner/outer regardless.
-            if (Input.GetKeyDown(AutoTerrainDesignationsMod.CornerDesignationKey))
+            if (AutoTerrainDesignationsMod.IsPressed(AutoTerrainDesignationsMod.CornerDesignationMode))
             {
                 if (s_cornerModeActive)
                 {
@@ -881,7 +881,7 @@ namespace AutoTerrainDesignations
 
                     // Outer corner button — ExpandScreen as-is, keybind K.
                     var outerItem = new ToolboxItem(
-                        _ => KeyBindings.FromKey(KbCategory.Designation, ShortcutMode.Game, AutoTerrainDesignationsMod.CornerDesignationKey),
+                        _ => AutoTerrainDesignationsMod.CornerDesignationMode,
                         iconPath,
                         () =>
                         {
@@ -900,7 +900,7 @@ namespace AutoTerrainDesignations
 
                     // Inner corner button — ExpandScreen rotated 180°, keybind K (label only).
                     var innerItem = new ToolboxItem(
-                        _ => KeyBindings.FromKey(KbCategory.Designation, ShortcutMode.Game, AutoTerrainDesignationsMod.CornerDesignationKey),
+                        _ => AutoTerrainDesignationsMod.CornerDesignationMode,
                         iconPath,
                         () =>
                         {

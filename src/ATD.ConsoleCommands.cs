@@ -44,7 +44,7 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
-        sb.AppendLine($"  CornerDesignationKey  = {AutoTerrainDesignationsMod.CornerDesignationKey}");
+        sb.AppendLine($"  CornerDesignationMode = {AutoTerrainDesignationsMod.CornerDesignationMode.ToNiceStringLong()}");
         sb.Append(AutoDepthDesignation.FormatPurityArrays());
         return sb.ToString();
     }
@@ -239,8 +239,8 @@ public sealed class AtdConsoleCommands
         if (!System.Enum.TryParse<KeyCode>(value, true, out KeyCode parsed))
             return $"[ATD] Unknown key '{value}'. Use a valid Unity KeyCode name (e.g. K, Alpha1, F1).";
 
-        AutoTerrainDesignationsMod.SetCornerDesignationKey(parsed);
-        return $"[ATD] CornerDesignationKey set to {AutoTerrainDesignationsMod.CornerDesignationKey}.";
+        AutoTerrainDesignationsMod.SetCornerDesignationMode(AutoTerrainDesignationsMod.FromPrimaryKeys(parsed));
+        return $"[ATD] CornerDesignationMode set to {AutoTerrainDesignationsMod.CornerDesignationMode.ToNiceStringLong()}.";
     }
 
     [ConsoleCommand(false, false, "Enables/disables the legacy straight-ramp generator fallback (true/false, on/off, 1/0).", null)]

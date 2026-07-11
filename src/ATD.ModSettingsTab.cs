@@ -28,6 +28,7 @@ namespace AutoTerrainDesignations
         private const string DEFAULTS_ICON = "Assets/Unity/UserInterface/Toolbar/Copy.svg";
         private const string GAME_SETTINGS_ICON = "Assets/Unity/UserInterface/EntityIcons/Gears.png";
         private const string ORE_QUALITY_ICON = "Assets/Unity/UserInterface/General/SwapVertical.svg";
+        private const string PATHFINDER_ICON = "Assets/Unity/UserInterface/General/Connect128.png";
 
         internal static ModSettingsTab BuildDefaultsTab()
         {
@@ -63,6 +64,17 @@ namespace AutoTerrainDesignations
                 GAME_SETTINGS_ICON);
         }
 
+        internal static ModSettingsTab BuildPathfinderTab()
+        {
+            return new ModSettingsTab(
+                MOD_ID,
+                AtdLocalization.SettingsModName.AsFormatted,
+                Loc.Str("settings.tab.pathfinder", "Pathfinder", "Settings tab title for ATD pathfinding.").AsFormatted,
+                130,
+                BuildPathfinderContent,
+                PATHFINDER_ICON);
+        }
+
         private static UiComponent BuildDefaultsContent()
         {
             var refreshers = new List<Action>();
@@ -82,12 +94,19 @@ namespace AutoTerrainDesignations
             var content = BuildSettingsColumn();
 
             AddScanBehaviorSection(content, refreshers);
-            AddExperimentalAccessSection(content, refreshers);
-            AddKeyboardShortcutsSection(content, refreshers);
             AddNotificationsSection(content, refreshers);
 
             content.Add(BuildFooter(refreshers));
 
+            return content;
+        }
+
+        private static UiComponent BuildPathfinderContent()
+        {
+            var refreshers = new List<Action>();
+            var content = BuildSettingsColumn();
+            AddExperimentalAccessSection(content, refreshers);
+            content.Add(BuildFooter(refreshers));
             return content;
         }
 
@@ -261,13 +280,43 @@ namespace AutoTerrainDesignations
                 },
                 FormatFloat,
                 refreshers));
+            AddPathfinderFloat(content, refreshers, "tree_cleanup", "Tree harvest cost", "Cost charged for each tree that must be harvested rather than destroyed by terrain work. Lower values favor forest routes.", () => AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost, AutoTerrainDesignationsMod.SetAccessTreeCleanupLandscapingCost);
+
+            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.costs", "Route costs", "Pathfinder cost settings heading.").AsFormatted));
+            AddPathfinderFloat(content, refreshers, "generated_v_fixed", "Generated V cell cost", "Fixed cost charged for every generated V cell. Higher values favor shorter paths and earlier handoffs.", () => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
+            AddPathfinderFloat(content, refreshers, "direct_work_weight", "Direct terrain-work weight", "Weight applied to center-cell digging and dumping.", () => AutoTerrainDesignationsMod.AccessDirectWorkWeight, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
+            AddPathfinderFloat(content, refreshers, "side_ray_weight", "Side-ray work weight", "Weight applied to lateral and turn-corner landscaping rays.", () => AutoTerrainDesignationsMod.AccessSideRayWeight, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
+            AddPathfinderFloat(content, refreshers, "ray_max_cost", "Maximum cost per ray", "Caps the landscaping cost contributed by one unresolved ray.", () => AutoTerrainDesignationsMod.AccessRayMaxCost, AutoTerrainDesignationsMod.SetAccessRayMaxCost);
+            AddPathfinderFloat(content, refreshers, "ray_unresolved", "Unresolved-ray penalty", "Penalty when a ray does not meet terrain inside its trace range.", () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
+
+            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.safety", "Ray and terrain safety", "Pathfinder safety settings heading.").AsFormatted));
+            AddPathfinderFloat(content, refreshers, "candidate_slope", "Candidate ray slope factor", "Material-slope multiplier. Lower values extend the predicted run and are more conservative. Default: 0.8.", () => AutoTerrainDesignationsMod.AccessCandidateRaySlopeFactor, AutoTerrainDesignationsMod.SetAccessCandidateRaySlopeFactor);
+            AddPathfinderInt(content, refreshers, "candidate_buffer", "Candidate ray end buffer", "Extra tiles checked after a candidate ray meets terrain. Default: 2.", () => AutoTerrainDesignationsMod.AccessCandidateRayEndBuffer, AutoTerrainDesignationsMod.SetAccessCandidateRayEndBuffer);
+            AddPathfinderInt(content, refreshers, "candidate_distance", "Candidate ray distance", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
+            AddPathfinderFloat(content, refreshers, "projected_slope", "Existing-work slope factor", "Slope multiplier used when projecting future disturbance from existing designations. Default: 0.85.", () => AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor, AutoTerrainDesignationsMod.SetAccessProjectedRaySlopeFactor);
+            AddPathfinderInt(content, refreshers, "projected_buffer", "Existing-work end buffer", "Extra blocked tiles beyond projected existing-designation disturbance. Default: 1.", () => AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer, AutoTerrainDesignationsMod.SetAccessProjectedRayEndBuffer);
+            AddPathfinderInt(content, refreshers, "projected_distance", "Existing-work ray distance", "Maximum projection distance for existing designations. Default: 48.", () => AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance, AutoTerrainDesignationsMod.SetAccessProjectedRayMaxDistance);
+
+            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.").AsFormatted));
+            AddPathfinderInt(content, refreshers, "visited", "Maximum visited nodes", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000);
+            AddPathfinderInt(content, refreshers, "timeout", "Search timeout (seconds)", "Maximum wall-clock time for one accessway search.", () => AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds, 5);
+            AddPathfinderInt(content, refreshers, "frame_budget", "Frame budget (ms)", "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls.", () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 5);
         }
 
-        private static void AddKeyboardShortcutsSection(Column content, List<Action> refreshers)
-        {
-            content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingKeyboardShortcuts.AsFormatted));
-            content.Add(BuildCornerKeyRow(refreshers));
-        }
+        private static void AddPathfinderFloat(Column content, List<Action> refreshers,
+            string key, string label, string tooltip, Func<float> getter, Action<float> setter)
+            => content.Add(BuildFloatStepRow(
+                Loc.Str("settings.pathfinder." + key + ".label", label, label).AsFormatted,
+                Loc.Str("settings.pathfinder." + key + ".tooltip", tooltip, tooltip).AsFormatted,
+                getter, value => { setter(value); return true; }, FormatFloat, refreshers));
+
+        private static void AddPathfinderInt(Column content, List<Action> refreshers,
+            string key, string label, string tooltip, Func<int> getter, Action<int> setter,
+            int baseStep = 1)
+            => content.Add(BuildIntStepRow(
+                Loc.Str("settings.pathfinder." + key + ".label", label, label).AsFormatted,
+                Loc.Str("settings.pathfinder." + key + ".tooltip", tooltip, tooltip).AsFormatted,
+                getter, setter, value => value.ToString(CultureInfo.InvariantCulture), refreshers, baseStep));
 
         private static void AddPanelDefaultsSection(Column content, List<Action> refreshers)
         {
@@ -329,7 +378,8 @@ namespace AutoTerrainDesignations
             Func<int> getValue,
             Action<int> setValue,
             Func<int, string> format,
-            List<Action> refreshers)
+            List<Action> refreshers,
+            int baseStep = 1)
         {
             var display = new Display(L(format(getValue()))).MinDigits(4).AlignSelfStretch().MarginTopBottom(2.px());
             void Refresh() => display.SetValue(L(format(getValue())));
@@ -341,12 +391,12 @@ namespace AutoTerrainDesignations
                 display,
                 () =>
                 {
-                    setValue(getValue() + ModifierStepSize());
+                    setValue(getValue() + baseStep * ModifierStepSize());
                     Refresh();
                 },
                 () =>
                 {
-                    setValue(getValue() - ModifierStepSize());
+                    setValue(getValue() - baseStep * ModifierStepSize());
                     Refresh();
                 });
         }
@@ -424,47 +474,6 @@ namespace AutoTerrainDesignations
                     Refresh();
                 });
 
-            return row;
-        }
-
-        private static Row BuildCornerKeyRow(List<Action> refreshers)
-        {
-            var field = new TextField()
-                .Text(FormatKeyCodeForPlayer(AutoTerrainDesignationsMod.CornerDesignationKey))
-                .CharLimit(24)
-                .ClearFocusOnEscape();
-            var status = new Label(L(string.Empty)).MarginTopBottom(2.px());
-
-            void Refresh()
-            {
-                field.Text(FormatKeyCodeForPlayer(AutoTerrainDesignationsMod.CornerDesignationKey));
-                status.Value(L(string.Empty));
-            }
-
-            refreshers.Add(Refresh);
-
-            field.OnEditEnd(text =>
-            {
-                if (TryParsePlayerKeyCode(text, out KeyCode parsed))
-                {
-                    AutoTerrainDesignationsMod.SetCornerDesignationKey(parsed);
-                    field.Text(FormatKeyCodeForPlayer(parsed));
-                    field.MarkAsError(false);
-                    status.Value(AtdLocalization.SettingsApplied.AsFormatted);
-                }
-                else
-                {
-                    field.MarkAsError(true, AtdLocalization.SettingsCornerModeInvalidTooltip.AsFormatted);
-                    status.Value(AtdLocalization.SettingsInvalidKey.AsFormatted);
-                }
-            });
-
-            var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
-            row.Add(new Label(AtdLocalization.SettingsCornerModeLabel.AsFormatted)
-                .Tooltip(AtdLocalization.SettingsCornerModeTooltip.AsFormatted));
-            row.Add(new UiComponent().FlexGrow(1f));
-            row.Add(field.Width(120.px()));
-            row.Add(status);
             return row;
         }
 
@@ -587,51 +596,6 @@ namespace AutoTerrainDesignations
         private static string FormatRatio(float value)
         {
             return value.ToString("0.##", CultureInfo.InvariantCulture);
-        }
-
-        private static string FormatKeyCodeForPlayer(KeyCode key)
-        {
-            int keyValue = (int)key;
-            int alpha0 = (int)KeyCode.Alpha0;
-            int keypad0 = (int)KeyCode.Keypad0;
-
-            if (keyValue >= alpha0 && keyValue <= alpha0 + 9)
-                return (keyValue - alpha0).ToString(CultureInfo.InvariantCulture);
-            if (keyValue >= keypad0 && keyValue <= keypad0 + 9)
-                return "Numpad " + (keyValue - keypad0).ToString(CultureInfo.InvariantCulture);
-            if (key == KeyCode.Escape)
-                return "Escape";
-            if (key == KeyCode.Space)
-                return "Space";
-            return key.ToString();
-        }
-
-        private static bool TryParsePlayerKeyCode(string text, out KeyCode key)
-        {
-            string normalized = (text ?? string.Empty).Trim();
-            if (normalized.Length == 1 && normalized[0] >= '0' && normalized[0] <= '9')
-            {
-                key = KeyCode.Alpha0 + (normalized[0] - '0');
-                return true;
-            }
-
-            string compact = normalized.Replace(" ", string.Empty);
-            if (compact.StartsWith("Numpad", StringComparison.OrdinalIgnoreCase)
-                && compact.Length == 7
-                && compact[6] >= '0'
-                && compact[6] <= '9')
-            {
-                key = KeyCode.Keypad0 + (compact[6] - '0');
-                return true;
-            }
-
-            if (string.Equals(normalized, "Esc", StringComparison.OrdinalIgnoreCase))
-            {
-                key = KeyCode.Escape;
-                return true;
-            }
-
-            return Enum.TryParse(normalized, true, out key);
         }
 
         private static string LevelName(int level)

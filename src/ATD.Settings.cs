@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Mafi;
+using UnityEngine;
 
 namespace AutoTerrainDesignations
 {
@@ -492,15 +493,41 @@ namespace AutoTerrainDesignations
                 if (accessPropCleanupLandscapingCost.HasValue && ShouldPreserveFloat(accessPropCleanupLandscapingCost.Value, migrateGeneratedDefaults, 6f))
                     AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(accessPropCleanupLandscapingCost.Value);
 
+                ApplyFloat("accessTreeCleanupLandscapingCost", 6f, AutoTerrainDesignationsMod.SetAccessTreeCleanupLandscapingCost);
+
                 float? accessLandslideRunPerHeight = ParseFloat(json, "accessLandslideRunPerHeight");
                 if (accessLandslideRunPerHeight.HasValue && ShouldPreserveFloat(accessLandslideRunPerHeight.Value, migrateGeneratedDefaults, 1f))
                     AutoTerrainDesignationsMod.SetAccessLandslideRunPerHeight(accessLandslideRunPerHeight.Value);
 
-                string? cornerKeyStr = ParseString(json, "cornerDesignationKey");
-                if (!string.IsNullOrWhiteSpace(cornerKeyStr)
-                    && System.Enum.TryParse<UnityEngine.KeyCode>(cornerKeyStr, true, out var cornerKey)
-                    && ShouldPreserveString(cornerKeyStr, migrateGeneratedDefaults, "K"))
-                    AutoTerrainDesignationsMod.SetCornerDesignationKey(cornerKey);
+                ApplyFloat("accessGeneratedVFixedCost", 1f, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
+                ApplyFloat("accessDirectWorkWeight", 1f, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
+                ApplyFloat("accessSideRayWeight", 1f, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
+                ApplyFloat("accessCandidateRaySlopeFactor", 0.8f, AutoTerrainDesignationsMod.SetAccessCandidateRaySlopeFactor);
+                ApplyInt("accessCandidateRayEndBuffer", 2, AutoTerrainDesignationsMod.SetAccessCandidateRayEndBuffer);
+                ApplyInt("accessCandidateRayMaxDistance", 16, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
+                ApplyFloat("accessRayMaxCost", 512f, AutoTerrainDesignationsMod.SetAccessRayMaxCost);
+                ApplyFloat("accessRayUnresolvedPenalty", 128f, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
+                ApplyFloat("accessProjectedRaySlopeFactor", 0.85f, AutoTerrainDesignationsMod.SetAccessProjectedRaySlopeFactor);
+                ApplyInt("accessProjectedRayEndBuffer", 1, AutoTerrainDesignationsMod.SetAccessProjectedRayEndBuffer);
+                ApplyInt("accessProjectedRayMaxDistance", 48, AutoTerrainDesignationsMod.SetAccessProjectedRayMaxDistance);
+                ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
+                ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
+                ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
+
+                void ApplyFloat(string key, float defaultValue, Action<float> setter)
+                {
+                    float? parsed = ParseFloat(json, key);
+                    if (parsed.HasValue && ShouldPreserveFloat(parsed.Value, migrateGeneratedDefaults, defaultValue))
+                        setter(parsed.Value);
+                }
+
+                void ApplyInt(string key, int defaultValue, Action<int> setter)
+                {
+                    int? parsed = ParseInt(json, key);
+                    if (parsed.HasValue && ShouldPreserveInt(parsed.Value, migrateGeneratedDefaults, defaultValue))
+                        setter(parsed.Value);
+                }
+
             }
             catch (Exception ex)
             {
@@ -722,6 +749,33 @@ namespace AutoTerrainDesignations
             catch { return null; }
         }
 
+        internal static bool TryLoadCornerDesignationKeyFromSettings(out KeyCode key)
+        {
+            key = KeyCode.K;
+
+            try
+            {
+                string? settingsPath = ResolveSettingsPath(out bool isLegacySettingsPath);
+                if (string.IsNullOrWhiteSpace(settingsPath) || !File.Exists(settingsPath))
+                    return false;
+
+                string json = File.ReadAllText(settingsPath);
+                string? cornerKeyStr = ParseString(json, "cornerDesignationKey");
+                if (string.IsNullOrWhiteSpace(cornerKeyStr))
+                    return false;
+
+                if (!System.Enum.TryParse(cornerKeyStr, true, out key))
+                    return false;
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                s_log.Warning($"Failed to read legacy corner designation key: {ex.Message}");
+                return false;
+            }
+        }
+
         // -----------------------------------------------------------------------
         // Settings serialisation helpers
         // -----------------------------------------------------------------------
@@ -834,12 +888,25 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 6, tuned to favor driving around cleanup obstacles when a reasonable detour exists. Range: 0-100.\",");
             sb.AppendLine($"  \"accessPropCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)},");
+            sb.AppendLine($"  \"accessTreeCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the experimental landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
             sb.AppendLine($"  \"accessLandslideRunPerHeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandslideRunPerHeight)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_cornerDesignationKey\": \"Key used to enter and toggle corner designation mode. Use a Unity KeyCode name (e.g. K, Alpha1, F1). Default: K.\",");
-            sb.AppendLine($"  \"cornerDesignationKey\": \"{AutoTerrainDesignationsMod.CornerDesignationKey}\",");
+            sb.AppendLine($"  \"accessGeneratedVFixedCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessGeneratedVFixedCost)},");
+            sb.AppendLine($"  \"accessDirectWorkWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessDirectWorkWeight)},");
+            sb.AppendLine($"  \"accessSideRayWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessSideRayWeight)},");
+            sb.AppendLine($"  \"accessCandidateRaySlopeFactor\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessCandidateRaySlopeFactor)},");
+            sb.AppendLine($"  \"accessCandidateRayEndBuffer\": {AutoTerrainDesignationsMod.AccessCandidateRayEndBuffer},");
+            sb.AppendLine($"  \"accessCandidateRayMaxDistance\": {AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance},");
+            sb.AppendLine($"  \"accessRayMaxCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayMaxCost)},");
+            sb.AppendLine($"  \"accessRayUnresolvedPenalty\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty)},");
+            sb.AppendLine($"  \"accessProjectedRaySlopeFactor\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor)},");
+            sb.AppendLine($"  \"accessProjectedRayEndBuffer\": {AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer},");
+            sb.AppendLine($"  \"accessProjectedRayMaxDistance\": {AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance},");
+            sb.AppendLine($"  \"accessMaxVisitedNodes\": {AutoTerrainDesignationsMod.AccessMaxVisitedNodes},");
+            sb.AppendLine($"  \"accessSearchTimeoutSeconds\": {AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds},");
+            sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");
             sb.AppendLine();
             sb.AppendLine("  \"purityLevels\": {");
             sb.AppendLine("    \"_comment\": \"Thresholds applied at each Ore Purity Level. Arrays have 5 entries: [Off, Low, Med, High, Max]. Off (index 0) should always be 0 / no filtering. These define what each level means \u2014 edit if you want to retune the purity steps.\",");

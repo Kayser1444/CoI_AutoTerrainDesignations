@@ -1,4 +1,9 @@
 v0.4.6a [unreleased]
+* Changed: corner designation mode is now configured in the vanilla **Controls** settings under **Kayser's Automatic Terrain Designations (Mod)** instead of the ATD Mod Settings tab.
+* Migrated: existing `cornerDesignationKey` values from `ATDsettings.json` are used as a fallback on first startup and persisted into the vanilla controls store. Persisted vanilla controls values take precedence, followed by the legacy JSON value and then the code default (`K`).
+* Fixed: changing the corner designation mode binding in vanilla Controls now persists across game restarts instead of being overwritten by the legacy JSON setting.
+* Changed: Ore composition card priority button icon to the standard Priority icon
+* Changed: Pathfinder settings tab icon to Connect128
 * Refactored: experimental accessway generated-node entry costs now use one structured landscaping-cost calculation for search relaxation and result diagnostics, with baseline A*/Dijkstra cost-breakdown checks ahead of side-ray scoring.
 * Fixed: experimental accessway cost diagnostics now reconstruct the actual predecessor-to-node traversal distance, including zero-length profile-to-ground handoffs, instead of assuming every ground node costs one tile.
 * Added: experimental access snapshots now capture precise side-ray terrain heights, depth-specific cut-material layers, physical map bounds, ocean state, and a tower-wide conservative dumping-material slope for the planned landscaping scorer.

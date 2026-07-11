@@ -27,7 +27,9 @@ using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Trees;
 using Mafi.Core.Vehicles.Jobs;
 using Mafi.Core.World;
+using Mafi.Collections.ImmutableCollections;
 using Mafi.Unity.InputControl;
+using Mafi.Unity.InputControl.GameMenu.Settings;
 using Mafi.Unity.Terrain.Designation;
 using Mafi.Localization;
 using Mafi.Unity.UiStatic;
@@ -81,10 +83,20 @@ public static string Tt(string text) => text;
     public void RegisterPrototypes(ProtoRegistrator registrator)
     {
         m_harmony = new Harmony("com.auto-terrain-designations.mod");
+        bool migrateLegacyCornerKey = AutoDepthDesignation.TryLoadCornerDesignationKeyFromSettings(out KeyCode cornerKey);
+        if (migrateLegacyCornerKey)
+        {
+            SetCornerDesignationMode(FromPrimaryKeys(cornerKey));
+        }
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
         AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
+        CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
+            m_harmony,
+            Manifest.DisplayName,
+            typeof(AutoTerrainDesignationsMod),
+            persistInitialBindings: migrateLegacyCornerKey);
 
         AtdNotifications.RegisterPrototypes(registrator);
     }
@@ -120,8 +132,23 @@ public static string Tt(string text) => text;
         SetExperimentalAccessUseAStar(true);
         SetAccessLandscapingCostDistanceScale(1f);
         SetAccessPropCleanupLandscapingCost(6f);
+        SetAccessTreeCleanupLandscapingCost(6f);
         SetAccessLandslideRunPerHeight(1f);
-        SetCornerDesignationKey(KeyCode.K);
+        SetAccessGeneratedVFixedCost(1f);
+        SetAccessDirectWorkWeight(1f);
+        SetAccessSideRayWeight(1f);
+        SetAccessCandidateRaySlopeFactor(0.8f);
+        SetAccessCandidateRayEndBuffer(2);
+        SetAccessCandidateRayMaxDistance(16);
+        SetAccessRayMaxCost(512f);
+        SetAccessRayUnresolvedPenalty(128f);
+        SetAccessProjectedRaySlopeFactor(0.85f);
+        SetAccessProjectedRayEndBuffer(1);
+        SetAccessProjectedRayMaxDistance(48);
+        SetAccessMaxVisitedNodes(250000);
+        SetAccessSearchTimeoutSeconds(60);
+        SetAccessSearchFrameBudgetMs(30);
+        SetCornerDesignationMode(FromPrimaryKeys(KeyCode.K));
     }
 
     public static void SetMaxHeightDiff(int value)
@@ -308,6 +335,10 @@ public static string Tt(string text) => text;
         AccessPropCleanupLandscapingCost = Math.Max(0f, Math.Min(100f, value));
     }
 
+    public static float AccessTreeCleanupLandscapingCost { get; private set; } = 6f;
+    public static void SetAccessTreeCleanupLandscapingCost(float value)
+        => AccessTreeCleanupLandscapingCost = Math.Max(0f, Math.Min(100f, value));
+
     /// <summary>Horizontal landslide-envelope run per vertical terrain level. 1 = 45 degrees.</summary>
     public static float AccessLandslideRunPerHeight { get; private set; } = 1f;
 
@@ -316,12 +347,77 @@ public static string Tt(string text) => text;
         AccessLandslideRunPerHeight = Math.Max(0.05f, Math.Min(2f, value));
     }
 
-    /// <summary>Key used to enter and toggle corner designation mode. Default: K.</summary>
-    public static KeyCode CornerDesignationKey { get; private set; } = KeyCode.K;
+    public static float AccessGeneratedVFixedCost { get; private set; } = 1f;
+    public static void SetAccessGeneratedVFixedCost(float value) => AccessGeneratedVFixedCost = Math.Max(0f, Math.Min(100f, value));
+    public static float AccessDirectWorkWeight { get; private set; } = 1f;
+    public static void SetAccessDirectWorkWeight(float value) => AccessDirectWorkWeight = Math.Max(0f, Math.Min(100f, value));
+    public static float AccessSideRayWeight { get; private set; } = 1f;
+    public static void SetAccessSideRayWeight(float value) => AccessSideRayWeight = Math.Max(0f, Math.Min(100f, value));
+    public static float AccessCandidateRaySlopeFactor { get; private set; } = 0.8f;
+    public static void SetAccessCandidateRaySlopeFactor(float value) => AccessCandidateRaySlopeFactor = Math.Max(0.1f, Math.Min(1f, value));
+    public static int AccessCandidateRayEndBuffer { get; private set; } = 2;
+    public static void SetAccessCandidateRayEndBuffer(int value) => AccessCandidateRayEndBuffer = Math.Max(0, Math.Min(16, value));
+    public static int AccessCandidateRayMaxDistance { get; private set; } = 16;
+    public static void SetAccessCandidateRayMaxDistance(int value) => AccessCandidateRayMaxDistance = Math.Max(4, Math.Min(128, value));
+    public static float AccessRayMaxCost { get; private set; } = 512f;
+    public static void SetAccessRayMaxCost(float value) => AccessRayMaxCost = Math.Max(1f, Math.Min(10000f, value));
+    public static float AccessRayUnresolvedPenalty { get; private set; } = 128f;
+    public static void SetAccessRayUnresolvedPenalty(float value) => AccessRayUnresolvedPenalty = Math.Max(0f, Math.Min(10000f, value));
+    public static float AccessProjectedRaySlopeFactor { get; private set; } = 0.85f;
+    public static void SetAccessProjectedRaySlopeFactor(float value) => AccessProjectedRaySlopeFactor = Math.Max(0.1f, Math.Min(1f, value));
+    public static int AccessProjectedRayEndBuffer { get; private set; } = 1;
+    public static void SetAccessProjectedRayEndBuffer(int value) => AccessProjectedRayEndBuffer = Math.Max(0, Math.Min(16, value));
+    public static int AccessProjectedRayMaxDistance { get; private set; } = 48;
+    public static void SetAccessProjectedRayMaxDistance(int value) => AccessProjectedRayMaxDistance = Math.Max(4, Math.Min(128, value));
+    public static int AccessMaxVisitedNodes { get; private set; } = 250000;
+    public static void SetAccessMaxVisitedNodes(int value) => AccessMaxVisitedNodes = Math.Max(1000, Math.Min(2000000, value));
+    public static int AccessSearchTimeoutSeconds { get; private set; } = 60;
+    public static void SetAccessSearchTimeoutSeconds(int value) => AccessSearchTimeoutSeconds = Math.Max(5, Math.Min(600, value));
+    public static int AccessSearchFrameBudgetMs { get; private set; } = 30;
+    public static void SetAccessSearchFrameBudgetMs(int value) => AccessSearchFrameBudgetMs = Math.Max(1, Math.Min(100, value));
 
-    public static void SetCornerDesignationKey(KeyCode value)
+    /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
+    [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
+    public static KeyBindings CornerDesignationMode { get; set; } = FromPrimaryKeys(KeyCode.K);
+
+    public static void SetCornerDesignationMode(KeyBindings value)
     {
-        CornerDesignationKey = value;
+        CornerDesignationMode = value;
+    }
+
+    public static bool IsPressed(KeyBindings bindings)
+    {
+        return IsPressed(bindings.Primary) || IsPressed(bindings.Secondary);
+    }
+
+    private static bool IsPressed(KeyBinding binding)
+    {
+        if (binding.IsEmpty)
+            return false;
+
+        ImmutableArray<KeyCode> keys = binding.Keys;
+        if (keys.Length == 0)
+            return false;
+
+        KeyCode trigger = keys[keys.Length - 1];
+        if (!Input.GetKeyDown(trigger))
+            return false;
+
+        for (int i = 0; i < keys.Length - 1; i++)
+        {
+            if (!Input.GetKey(keys[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    internal static KeyBindings FromPrimaryKeys(params KeyCode[] keys)
+    {
+        return new KeyBindings(
+            ShortcutMode.Game,
+            new KeyBinding(KbCategory.Designation, keys.ToImmutableArray()),
+            KeyBinding.Empty(KbCategory.Designation));
     }
 
     public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
@@ -358,7 +454,6 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
-
             // Corner designation mode — TerrainCursor, TerrainDesignationsRenderer and
             // CursorManager may only be available on the Unity side; fail gracefully if not resolvable.
             TerrainCursor? terrainCursor = null;
@@ -476,6 +571,7 @@ public static string Tt(string text) => text;
             ModSettings.RegisterTab(AtdModSettingsTab.BuildDefaultsTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildGameSettingsTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildOreQualityTab());
+            ModSettings.RegisterTab(AtdModSettingsTab.BuildPathfinderTab());
         }
         catch (Exception ex)
         {

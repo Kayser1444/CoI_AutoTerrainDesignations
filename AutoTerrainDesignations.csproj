@@ -104,6 +104,8 @@ is included by mistake, I intend to correct it promptly upon discovery or notice
              Link="CoI.AutoHelpers\Logging\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Persistence\**\*.cs"
              Link="CoI.AutoHelpers\Persistence\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\InputControl\**\*.cs"
+             Link="CoI.AutoHelpers\InputControl\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Runtime\**\*.cs"
              Link="CoI.AutoHelpers\Runtime\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Settings\**\*.cs"
