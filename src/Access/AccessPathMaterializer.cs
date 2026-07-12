@@ -17,6 +17,7 @@ namespace AutoTerrainDesignations.Access
             var generatedByOrigin = new Dictionary<Tile2i, AccessPlannedDesignation>();
             var cornerHeights = new Dictionary<Tile2i, int>();
             var cleanupByOrigin = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            var cleanupOriginsCoveredByGeneratedV = new HashSet<Tile2i>();
             Tile2i previousPosition = result.StartOrigin;
             var previousNode = new AccessSearchNode(
                 result.StartOrigin, previousProfile.Center2, AccessSearchMode.Existing);
@@ -40,6 +41,12 @@ namespace AutoTerrainDesignations.Access
                             && previousNode.Mode != AccessSearchMode.Existing
                             && previousNode.Position == cleanupInfo.Origin;
                         if (previousGeneratedSameOrigin)
+                        {
+                            cleanupOriginsCoveredByGeneratedV.Add(cleanupInfo.Origin);
+                            if (TryBuildTreeOnlyCleanupInfo(cleanupInfo, out AccessPropCleanupInfo treeCleanup))
+                                MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                        }
+                        else if (cleanupOriginsCoveredByGeneratedV.Contains(cleanupInfo.Origin))
                         {
                             if (TryBuildTreeOnlyCleanupInfo(cleanupInfo, out AccessPropCleanupInfo treeCleanup))
                                 MergeCleanupInfo(cleanupByOrigin, treeCleanup);

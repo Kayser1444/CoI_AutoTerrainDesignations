@@ -34,11 +34,16 @@ namespace AutoTerrainDesignations.Access
     {
         public Tile2i Tile { get; }
         public AccessHandoffOperation Operation { get; }
+        public IReadOnlyList<Tile2i> EscapeTiles { get; }
 
-        public AccessGroundHandoff(Tile2i tile, AccessHandoffOperation operation)
+        public AccessGroundHandoff(
+            Tile2i tile,
+            AccessHandoffOperation operation,
+            IReadOnlyList<Tile2i>? escapeTiles = null)
         {
             Tile = tile;
             Operation = operation;
+            EscapeTiles = escapeTiles ?? Array.Empty<Tile2i>();
         }
     }
 
@@ -183,6 +188,21 @@ namespace AutoTerrainDesignations.Access
                 && Math.Abs(position.X - Position.X) * 2 < delta2 * horizontalRunPerHeight
                 && Math.Abs(position.Y - Position.Y) * 2 < delta2 * horizontalRunPerHeight;
         }
+
+        public bool BlocksVehicleFootprint(
+            Tile2i center,
+            int height2,
+            float horizontalRunPerHeight,
+            int clearanceRadius)
+        {
+            int delta2 = Math.Abs(height2 - Height2);
+            horizontalRunPerHeight = GetHorizontalRunPerHeight(horizontalRunPerHeight);
+            int nearestDx = Math.Max(0, Math.Abs(center.X - Position.X) - clearanceRadius);
+            int nearestDy = Math.Max(0, Math.Abs(center.Y - Position.Y) - clearanceRadius);
+            return delta2 > 0
+                && nearestDx * 2 < delta2 * horizontalRunPerHeight
+                && nearestDy * 2 < delta2 * horizontalRunPerHeight;
+        }
     }
 
     internal enum AccessTerrainSampleKind
@@ -289,8 +309,11 @@ namespace AutoTerrainDesignations.Access
         public bool IsMining { get; }
         public bool AllowsMixedWork { get; }
         public bool UseAStar { get; }
+        public bool AvoidOcean { get; }
+        public bool AvoidBuildings { get; }
         public float LandscapingCostDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
+        public int VehicleClearanceRadius { get; }
         public Tile2i PhysicalTerrainMin { get; }
         public Tile2i PhysicalTerrainMax { get; }
         public float DumpingMaterialSlope { get; }
@@ -339,7 +362,10 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i>? rayDumpingDesignationOrigins = null,
             IEnumerable<Tile2i>? rayLevelingDesignationOrigins = null,
             IEnumerable<Tile2i>? projectedCutDisturbedTiles = null,
-            IEnumerable<Tile2i>? projectedFillDisturbedTiles = null)
+            IEnumerable<Tile2i>? projectedFillDisturbedTiles = null,
+            int vehicleClearanceRadius = 1,
+            bool avoidOcean = true,
+            bool avoidBuildings = true)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -349,8 +375,11 @@ namespace AutoTerrainDesignations.Access
             IsMining = isMining;
             AllowsMixedWork = allowsMixedWork;
             UseAStar = useAStar;
+            AvoidOcean = avoidOcean;
+            AvoidBuildings = avoidBuildings;
             LandscapingCostDistanceScale = landscapingCostDistanceScale;
             LandslideRunPerHeight = landslideRunPerHeight;
+            VehicleClearanceRadius = Math.Max(0, vehicleClearanceRadius);
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
             m_preciseTerrainHeights = preciseTerrainHeights != null
                 ? new Dictionary<Tile2i, float>(preciseTerrainHeights)
@@ -662,7 +691,7 @@ namespace AutoTerrainDesignations.Access
         public int GetTerrainCenterHeight2(Tile2i origin) => m_terrainCenterHeight2.TryGetValue(origin, out int h2) ? h2 : 0;
         public string? GetSideRayBlockerReason(
             Tile2i tile, AccessSideRayOperation rayOperation)
-            => m_expandedBuildingRayBlockers.Contains(tile)
+            => AvoidBuildings && m_expandedBuildingRayBlockers.Contains(tile)
                 ? "SideRayBuilding"
                 : m_hardDesignationRayBlockers.Contains(tile)
                     ? "SideRayDesignation"
@@ -964,6 +993,16 @@ namespace AutoTerrainDesignations.Access
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
+            IReadOnlyDictionary<string, int> rejections,
+            AccessSearchDiagnostics diagnostics)
+            : this(success, failureReason, startOrigin, path, cost, visitedNodes,
+                rejections, cost, 0f, 0f, 0f, 0f,
+                AccessReachedGoalKind.None, diagnostics: diagnostics)
+        {
+        }
+
+        public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
+            IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
             IReadOnlyDictionary<string, int> rejections, float traversalCost,
             float generatedWorkCost, float generatedFixedCost, float treeCleanupCost,
             float denseDebrisCleanupCost,
@@ -1033,7 +1072,13 @@ namespace AutoTerrainDesignations.Access
         public int GoalAcceptedAtVisited;
         public int QueueRelaxations;
         public int QueueStalePops;
-
+        public long GroundExpansionTicks;
+        public long OriginExpansionTicks;
+        public long ProfileFeasibilityTicks;
+        public long HandoffValidationTicks;
+        public long PathHistoryTicks;
+        public long SideRayCostTicks;
+        public long PropCleanupTicks;
         public AccessSearchDiagnostics Clone()
         {
             return (AccessSearchDiagnostics)MemberwiseClone();

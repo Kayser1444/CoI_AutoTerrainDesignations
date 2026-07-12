@@ -79,7 +79,7 @@ Controls whether ATD connects separated ore regions with passable corridors.
 
 Forces the scan to target one specific product.
 
-When left on Auto, ATD prefers useful ore products first, then falls back to debris cleanup, then dirt-like cleanup when appropriate.
+When left on AUTO, ATD scans for useful products only if the tower area has no terrain designations. If terrain designations already exist, ATD creates no new mining field and instead treats the existing work as pathfinding goals. Debris cleanup and dirt scanning are manual-only selections.
 
 ## Ore composition panel
 

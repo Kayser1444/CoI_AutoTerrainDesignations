@@ -59,6 +59,17 @@ The side-ray cost is therefore direction-aware: the same origin and target profi
 
 Only lateral rays are sampled. Longitudinal start/end work is represented by handoff or intent-fixed profiles and has zero landscaping cost in this scorer; generated interior segments connect through shared edges. The missing signal is side exposure, especially on steep terrain.
 
+A 90-degree V-to-V turn is the exception to the normal shared-edge ownership
+rule.  The previous cell's formerly forward face is no longer covered by a
+straight successor.  Emit one frontal ray from that face's convex outer corner
+in the previous travel direction; the corner touching the inside of the turn
+remains covered by the successor and does not emit a second frontal ray.  The
+turn-owned ray uses the previous cell's operation/material, the same slope
+safety factor and termination buffer as lateral rays, contributes cost, and
+records its disturbed span for path-history exclusion.  This prevents turns
+from slipping past ocean or other fatal boundaries through an untraced exposed
+face.
+
 Each lateral ray starts at a planned exit corner height and follows an idealized material slope outward until that slope intersects terrain or reaches a fixed maximum distance. This estimates the cross-sectional wedge that must be excavated or filled to make the accessway's side stable/workable.
 
 ## Accelerating samples
@@ -163,10 +174,10 @@ Generated `V` retains a waist-preserving durability envelope around existing des
 
 Each side-ray sample also consults immutable obstruction masks. Building occupied tiles are expanded by two terrain tiles in every direction, producing at least a 5-by-5 obstacle even for a single occupied tile; this guarantees that the sparse distance sequence cannot step over a building that intersects the disturbed ray span. Terrain-designation footprints and projected disturbance are classified as cut or fill. A candidate cut ray may mix with existing/projected cut work but is blocked by fill work; a fill ray may mix with fill work but is blocked by cut work. Leveling footprints remain conservative hard blockers, while their projected rays are classified by the actual local operation. A blocker is fatal only while the sampled material slope still has positive cut/fill work at that distance; blockers beyond the resolved slope are irrelevant. Individual ray results, including obstruction failures, are cached by corner, planned half-level height, lateral direction, and work operation.
 
-Candidate side-ray feasibility uses 85% of the selected material slope, extending
-its predicted run by roughly 18% before it tests for termination or fatal
-ocean/obstruction.  After the first terrain intersection it tests one further
-tile as a safety buffer.  This is deliberately conservative for loose/runny
+Candidate side-ray feasibility uses 80% of the selected material slope, extending
+its predicted run by 25% before it tests for termination or fatal
+ocean/obstruction.  After the first terrain intersection it tests two further
+tiles as a safety buffer.  This is deliberately conservative for loose/runny
 materials such as sand; a nearby ocean cannot become safe merely because the
 nominal ray resolved one tile before it.
 
@@ -205,7 +216,7 @@ landscapingCost = overhead
                 + sideRayWeight * (leftExitRayCost + rightExitRayCost)
 ```
 
-`directVerticalWork` may initially reuse the MVP center-height approximation. Later, it can be replaced with a small sample-grid estimate if necessary.
+`directVerticalWork` uses the four designation corners as a quarter-footprint quadrature: each operation-aware corner gap is weighted by four. This preserves a cost of 16 for a uniform one-level 4x4 cut or fill while capturing both cross-slope and longitudinal terrain changes. Exterior side rays begin at distance 1.
 
 ## Turns and special cases
 
@@ -436,6 +447,15 @@ direction is also V, not a valid natural-G exit merely because its pre-work
 snapshot terrain was green.  This prevents an apparent green crossing from
 being accepted when its dumping/mining face seals it inside the handoff cell.
 
+The search may provisionally score a generated V cell as leveling before it
+knows that the cell will terminate at G.  Once a V-to-G transition resolves the
+terminal proto as mining or dumping, the path-history disturbance for that
+latest V cell must be rebuilt with the resolved operation: mining retains only
+cut rays and dumping retains only fill rays.  Turn-corner disturbance inherited
+from the preceding transition remains intact.  The provisional leveling cost
+may remain as a small conservative overestimate; it must not leave impossible
+cut/fill disturbance that the resolved terminal proto cannot create.
+
 Only clearance-valid frontage lanes may establish the handoff.  For the
 current one-cell V corridor, normal 3-wide excavators exclude one tile next to
 each side.  The four terrain lanes are 0..3, so only middle lanes 1 and 2 are
@@ -449,6 +469,17 @@ not an abstract contour intersection.  Vanilla's live pathability provider
 cannot evaluate the future post-operation terrain profile without mutating the
 world, so the crossing test is the conservative proxy until a prospective
 vehicle profile query is available.
+
+Future `V2+` corridors must derive eligible handoff lanes from the corridor's
+total frontage in terrain tiles, not apply the single-cell rule independently
+to each 4-tile V cell.  They are assumed to target Mega/T3 vehicles requiring
+five-tile-wide clearance: two lanes at each outside edge of the complete
+corridor are clearance-only.  The remaining middle frontage is eligible for
+handoff.  Thus an 8-tile-wide, two-cell corridor has lanes 0..7, blocks lanes
+0..1 and 6..7, and permits handoff through its four middle lanes 2..5.  Wider
+corridors generalize in the same way.  Internal boundaries between constituent
+V cells are not corridor sidelines and must not receive their own clearance
+exclusion.
 
 After cost behavior is stable, evaluate reusing the ray result for directional
 durability and obstruction feasibility. That work should be a separate change:

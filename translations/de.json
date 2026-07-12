@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Platziert Bergbaugebiete für allen Schutt im Bereich. Überschreibt alle Forstgebiete."
+    "Platziere Bezeichnungen zum Entfernen von Trümmern auf erreichbaren freien Feldern. Strg-Klick, um nicht erreichbare Trümmer einzuschließen. Shift-Klick, um bestehende Gelände- und Forstgebiete zu ersetzen."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms."
+    "Löschen Sie die ATD-generierten Bezeichnungen dieses Turms. Klicken Sie bei gedrückter Umschalttaste, um alle Geländebezeichnungen im Bereich des Turms zu löschen."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms. (Umschalttaste gedrückt halten, um nur generierte Geländebezeichnungen zu löschen.)"
+    "Löschen Sie die ATD-generierten Bezeichnungen dieses Turms. Klicken Sie bei gedrückter Umschalttaste, um alle Geländebezeichnungen im Bereich des Turms zu löschen."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (nützlich -> Schutt -> Erde)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Erzwingt, dass der Scan ein bestimmtes Produkt sucht. Keine = zuerst nützliche Produkte, dann Schutt, dann Erde."
+    "Wählt ein Produkt für Abbau-Markierungen. AUTO sucht nach nützlichen Produkten, wenn keine Gelände-Markierungen vorhanden sind; andernfalls werden vorhandene Gelände-Markierungen zu Wegfindungszielen. Schutt und Erde sind nur manuell wählbar."
   ],
   [
     "settings.mod.name",

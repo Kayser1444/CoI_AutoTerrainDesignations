@@ -25,7 +25,7 @@ float GetAccessPropCleanupLandscapingCost()
 void SetAccessPropCleanupLandscapingCost(float value)
 ```
 
-Gets or sets the landscaping cost charged once per prop cleanup origin used by experimental access routing. One landscaping-cost unit is equivalent to dumping or digging one unit of rock; the default is `6`, tuned to favor driving around cleanup obstacles when a reasonable detour exists. The pathfinder multiplies landscaping cost by the global landscaping cost-to-distance scale when computing route cost. Values are clamped to the same `0–100` range used by the mod settings UI.
+Gets or sets the landscaping cost charged once per prop cleanup origin used by experimental access routing. One landscaping-cost unit is equivalent to dumping or digging one unit of rock; the default is `8`, calibrated from observed excavator cleanup effort. The pathfinder multiplies landscaping cost by the global landscaping cost-to-distance scale when computing route cost. Values are clamped to the same `0–100` range used by the mod settings UI.
 
 ---
 

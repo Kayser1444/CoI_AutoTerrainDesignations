@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "标记区域内的所有碎片以供挖掘/清除。会覆盖林业区。"
+    "将道具移除标记放置在可触及的未占用单元格上。按住 Ctrl 键单击以包含无法访问的 props。按住 Shift 键并单击以替换现有地形和林业名称。"
   ],
   [
     "panel.designations.clear_tooltip",
-    "清除该塔区域内的所有地形标记。"
+    "清除该塔由 ATD 生成的名称。按住 Shift 键并单击可清除塔区域内的所有地形指定。"
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "清除该塔区域内的所有地形标记。 （按住 Shift 键单击仅可清除生成的地形名称。）"
+    "清除该塔由 ATD 生成的名称。按住 Shift 键并单击可清除塔区域内的所有地形指定。"
   ],
   [
     "panel.designations.ore_filter.auto",
-    "自动(矿石->碎片->土)"
+    "自动"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "指定扫描的材料类型。\n无 = 矿物优先，其次碎片，再次土壤。"
+    "选择要生成采矿规划的产品。区域内没有地形规划时，自动模式扫描有用产品；否则将现有地形规划作为寻路目标。碎片和泥土仅支持手动选择。"
   ],
   [
     "settings.mod.name",

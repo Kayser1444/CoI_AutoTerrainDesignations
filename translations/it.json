@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Indicare tutti i detriti presenti nell'area da sottoporre a estrazione/rimozione. Questa indicazione prevale su qualsiasi altra designazione forestale."
+    "Posiziona le designazioni per la rimozione degli oggetti sulle celle non occupate raggiungibili. Fare clic tenendo premuto Ctrl per includere oggetti di scena irraggiungibili. Fare clic tenendo premuto il tasto Maiusc per sostituire le designazioni del terreno e della silvicoltura esistenti."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Cancella tutte le designazioni del terreno nell'area di questa torre."
+    "Cancella le designazioni generate dall'ATD di questa torre. Fai clic tenendo premuto il tasto Maiusc per cancellare tutte le designazioni del terreno nell'area della torre."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Cancella tutte le designazioni del terreno nell'area di questa torre. (Fare clic tenendo premuto il tasto Maiusc per cancellare solo le designazioni del terreno generate.)"
+    "Cancella le designazioni generate dall'ATD di questa torre. Fai clic tenendo premuto il tasto Maiusc per cancellare tutte le designazioni del terreno nell'area della torre."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (utile -> detriti -> terra)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Forza la scansione su un prodotto specifico. Nessuno = prima i prodotti utili, poi i detriti, infine la terra."
+    "Seleziona un prodotto per generare designazioni minerarie. AUTO cerca prodotti utili se non ci sono designazioni del terreno; altrimenti usa quelle esistenti come obiettivi del percorso. Detriti e terra sono solo manuali."
   ],
   [
     "settings.mod.name",

@@ -9,8 +9,10 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using CoI.AutoHelpers.Persistence;
+using Mafi;
 using Mafi.Collections;
 using Mafi.Core;
 using Mafi.Core.Products;
@@ -77,6 +79,11 @@ namespace AutoTerrainDesignations
             var sb = new StringBuilder();
             sb.Append("{\"schemaVersion\":");
             sb.Append(TowerSettingsConfigSchemaVersion.ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\"worldSettings\":{\"avoidOcean\":");
+            AppendJsonBool(sb, AccessAvoidOcean);
+            sb.Append(",\"avoidBuildings\":");
+            AppendJsonBool(sb, AccessAvoidBuildings);
+            sb.Append('}');
             sb.Append(",\"towerSettings\":[");
 
             bool first = true;
@@ -99,6 +106,8 @@ namespace AutoTerrainDesignations
                 allEntityIds.Add(pair.Key);
             foreach (var pair in s_farmingPanelCollapsedByEntityId)
                 allEntityIds.Add(pair.Key);
+            foreach (var pair in s_generatedDesignationOriginsByTowerEntityId)
+                if (pair.Value.Count > 0) allEntityIds.Add(pair.Key);
 
             foreach (EntityId entityId in allEntityIds)
             {
@@ -116,9 +125,11 @@ namespace AutoTerrainDesignations
                 bool hasTerrainCollapsed = s_terrainPanelCollapsedByEntityId.TryGetValue(entityId, out bool terrainCollapsed);
                 bool hasOreCollapsed = s_orePanelCollapsedByEntityId.TryGetValue(entityId, out bool oreCollapsed);
                 bool hasFarmingCollapsed = s_farmingPanelCollapsedByEntityId.TryGetValue(entityId, out bool farmingCollapsed);
+                bool hasGeneratedOrigins = s_generatedDesignationOriginsByTowerEntityId.TryGetValue(entityId, out System.Collections.Generic.HashSet<Tile2i> generatedOrigins)
+                    && generatedOrigins.Count > 0;
 
                 // Skip towers with no non-default state to persist.
-                if ((!hasSettings || settings.MatchesGlobalDefaults()) && (!hasOre || ore == null) && (!hasPriority || priority == null) && !hasFarmingState && !hasTerrainCollapsed && !hasOreCollapsed && !hasFarmingCollapsed)
+                if ((!hasSettings || settings.MatchesGlobalDefaults()) && (!hasOre || ore == null) && (!hasPriority || priority == null) && !hasFarmingState && !hasTerrainCollapsed && !hasOreCollapsed && !hasFarmingCollapsed && !hasGeneratedOrigins)
                 {
                     continue;
                 }
@@ -136,11 +147,10 @@ namespace AutoTerrainDesignations
                 if (hasSettings)
                 {
                     AppendIntOverride(sb, "maxHeightDiff", settings.MaxHeightDiff, AutoTerrainDesignationsMod.MaxHeightDiff);
-                    AppendIntOverride(sb, "rampWidth", settings.RampWidth, AutoTerrainDesignationsMod.RampWidth);
+                    AppendIntOverride(sb, "vehicleClearance", (int)settings.VehicleClearance, (int)AccessVehicleClearanceMode.Auto);
                     AppendIntOverride(sb, "maxLayersToExcavate", settings.MaxLayersToExcavate, AutoTerrainDesignationsMod.MaxLayersToExcavate);
                     AppendNullableIntOverride(sb, "maxDepthToDigTo", settings.MaxDepthToDigTo, AutoTerrainDesignationsMod.MaxDepthToDigTo);
                     AppendIntOverride(sb, "orePurityLevel", settings.OrePurityLevel, AutoTerrainDesignationsMod.OrePurityLevel);
-                    AppendIntOverride(sb, "corridorClearance", settings.CorridorClearance, AutoTerrainDesignationsMod.MinCorridorClearance);
                     AppendBoolOverride(sb, "autoReleaseExcavatorsWhenIdle", settings.AutoReleaseExcavatorsWhenIdle, AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle);
                     AppendBoolOverride(sb, "autoReleaseTrucksWhenIdle", settings.AutoReleaseTrucksWhenIdle, AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle);
                 }
@@ -183,6 +193,9 @@ namespace AutoTerrainDesignations
                     AppendJsonBool(sb, farmingCollapsed);
                 }
 
+                if (hasGeneratedOrigins)
+                    AppendTileOrigins(sb, "generatedDesignationOrigins", generatedOrigins);
+
                 sb.Append('}');
             }
 
@@ -208,6 +221,15 @@ namespace AutoTerrainDesignations
             {
                 s_log.Warning($"Persistence: unsupported tower settings schema version '{schemaVersion}'.");
                 return false;
+            }
+
+            if (root.TryGetValue("worldSettings", out object rawWorldSettings)
+                && rawWorldSettings is Dict<string, object> worldSettings)
+            {
+                if (TryGetBool(worldSettings, "avoidOcean", out bool avoidOcean))
+                    SetAccessAvoidOcean(avoidOcean);
+                if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))
+                    SetAccessAvoidBuildings(avoidBuildings);
             }
 
             if (!root.TryGetValue("towerSettings", out object rawEntries)
@@ -237,6 +259,8 @@ namespace AutoTerrainDesignations
             s_terrainPanelCollapsedByEntityId.Clear();
             s_orePanelCollapsedByEntityId.Clear();
             s_farmingPanelCollapsedByEntityId.Clear();
+            s_generatedDesignationOriginsByTowerEntityId.Clear();
+            s_generatedAccesswayOriginsByTowerEntityId.Clear();
 
             foreach (object rawEntry in entries)
             {
@@ -253,7 +277,9 @@ namespace AutoTerrainDesignations
                 var settings = ATDTowerSettings.FromGlobalDefaults();
                 if (TryGetInt(entry, "maxHeightDiff", out int maxHeightDiff))
                     settings.SetMaxHeightDiff(maxHeightDiff);
-                if (TryGetInt(entry, "rampWidth", out int rampWidth))
+                if (TryGetInt(entry, "vehicleClearance", out int vehicleClearance))
+                    settings.SetVehicleClearance((AccessVehicleClearanceMode)vehicleClearance);
+                else if (TryGetInt(entry, "rampWidth", out int rampWidth))
                     settings.SetRampWidth(rampWidth);
                 if (TryGetInt(entry, "maxLayersToExcavate", out int maxLayersToExcavate))
                     settings.SetMaxLayersToExcavate(maxLayersToExcavate);
@@ -261,8 +287,6 @@ namespace AutoTerrainDesignations
                     settings.SetMaxDepthToDigTo(maxDepthToDigTo);
                 if (TryGetInt(entry, "orePurityLevel", out int orePurityLevel))
                     settings.SetOrePurityLevel(orePurityLevel);
-                if (TryGetInt(entry, "corridorClearance", out int corridorClearance))
-                    settings.SetCorridorClearance(corridorClearance);
                 if (TryGetBool(entry, "autoReleaseVehiclesWhenIdle", out bool autoRelease))
                     settings.SetAutoReleaseWhenIdle(autoRelease);
                 if (TryGetBool(entry, "autoReleaseExcavatorsWhenIdle", out bool autoReleaseExcavators))
@@ -315,6 +339,7 @@ namespace AutoTerrainDesignations
                     s_orePanelCollapsedByEntityId[entityId] = orePanelCollapsed;
                 if (TryGetBool(entry, "farmingPanelCollapsed", out bool farmingPanelCollapsed))
                     s_farmingPanelCollapsedByEntityId[entityId] = farmingPanelCollapsed;
+                RestoreTileOrigins(entry, "generatedDesignationOrigins", entityId);
 
                 loadedCount++;
             }
@@ -333,6 +358,46 @@ namespace AutoTerrainDesignations
             sb.Append(name);
             sb.Append("\":");
             AppendJsonBool(sb, value);
+        }
+
+        private static void AppendTileOrigins(
+            StringBuilder sb,
+            string name,
+            System.Collections.Generic.IEnumerable<Tile2i> origins)
+        {
+            sb.Append(",\"");
+            sb.Append(name);
+            sb.Append("\":[");
+            bool first = true;
+            foreach (Tile2i origin in origins.OrderBy(tile => tile.Y).ThenBy(tile => tile.X))
+            {
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append("{\"x\":");
+                sb.Append(origin.X.ToString(CultureInfo.InvariantCulture));
+                sb.Append(",\"y\":");
+                sb.Append(origin.Y.ToString(CultureInfo.InvariantCulture));
+                sb.Append('}');
+            }
+            sb.Append(']');
+        }
+
+        private static void RestoreTileOrigins(Dict<string, object> entry, string name, EntityId entityId)
+        {
+            if (!entry.TryGetValue(name, out object rawOrigins) || !(rawOrigins is object[] origins))
+                return;
+
+            var restored = new System.Collections.Generic.HashSet<Tile2i>();
+            foreach (object rawOrigin in origins)
+            {
+                if (rawOrigin is Dict<string, object> origin
+                    && TryGetInt(origin, "x", out int x)
+                    && TryGetInt(origin, "y", out int y))
+                    restored.Add(new Tile2i(x, y));
+            }
+
+            if (restored.Count > 0)
+                s_generatedDesignationOriginsByTowerEntityId[entityId] = restored;
         }
 
         private static void AppendIntOverride(StringBuilder sb, string name, int value, int defaultValue)

@@ -429,7 +429,6 @@ namespace AutoTerrainDesignations
         {
             result.TopRowTile = default;
             result.Outcome = RampPlacementOutcome.Failed;
-
             if (s_desigManager == null || rampProto == null)
             {
                 result.Outcome = RampPlacementOutcome.Failed;
@@ -648,6 +647,14 @@ namespace AutoTerrainDesignations
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.Result!;
                         experimentalPlan = LastExperimentalAccessPlan;
+
+                        if (s_cancelExperimentalAccessSearch)
+                        {
+                            LogExperimentalAccessDebug(
+                                $"[ATD Experimental Access] cluster={cluster.ClusterId} search cancelled by user");
+                            result.Outcome = RampPlacementOutcome.Failed;
+                            yield break;
+                        }
 
                         if (experimentalResult.Success
                             && experimentalPlan != null

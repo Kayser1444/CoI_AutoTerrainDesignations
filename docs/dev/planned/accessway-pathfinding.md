@@ -327,7 +327,16 @@ So the horizontal node set shifts by half an origin with width parity: origin-ce
 * **Turns require a flat brush.** A V2 route may change slope axis only through `FF`. The flat 2x2 brush is the required 8x8-tile landing that lets the two-lane corridor turn without narrowing below clearance 2.
 * **Edges compare shared strips, not just shared edges.** Moving a V2 brush by one origin creates a 1x2-origin overlap with the previous brush. The old and new profiles over that overlap must agree exactly. The two newly exposed origins are then checked for construction slope, fight invariants, durability, bounds, and workability.
 
-Auto clearance derives the width from vanilla vehicle research/availability and assigned/global vehicles exactly as the framework's *Corridor width* describes. If mega excavators are relevant or available, Auto maps to clearance 2 and the V2 search uses the matching vanilla mega-vehicle pathing parameters; otherwise it remains at the narrower available requirement. The search just consumes the resulting integer width, vehicle pathing parameters, and lattice parity.
+The unified vehicle-clearance setting is `[OFF, Auto, T1, T2, T3]`. `OFF`
+disables generated accessways. Auto derives the tier from vanilla vehicle
+research/availability and assigned/global vehicles exactly as the framework's
+*Corridor width* describes. Explicit tiers select their concrete vanilla
+pathing parameters: T1 and T2 share three-tile horizontal clearance but retain
+different height-clearance masks; T3 uses five-tile clearance and the V2
+search. The search consumes the resulting corridor width, vehicle pathing
+parameters, clearance radius, and lattice parity. Legacy settings migrate as
+`RampWidth == 0 -> OFF`, otherwise `Auto`; old width and corridor-clearance
+numbers are not preserved.
 
 ## Width handling strategy
 

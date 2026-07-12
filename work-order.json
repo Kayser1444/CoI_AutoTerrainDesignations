@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 105,
+  "total_keys": 107,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
@@ -20,18 +20,7 @@
       "pt": "Máx.",
       "ru": "Макс",
       "zh": "最大限度"
-    },
-    "panel.designations.clear_tooltip": {
-      "en": "Clear all terrain designations in this tower's area.",
-      "context": "Tooltip on the Clear button.",
-      "de": "Löschen Sie alle Geländebezeichnungen im Bereich dieses Turms.",
-      "es": "Elimina todas las designaciones de terreno en el área de esta torre.",
-      "it": "Cancella tutte le designazioni del terreno nell'area di questa torre.",
-      "pt": "Limpe todas as designações de terreno na área desta torre.",
-      "ru": "Удалите все обозначения местности в районе этой башни.",
-      "sv": "Rensa alla terrängbeteckningar i detta torns område.",
-      "zh": "清除该塔区域内的所有地形标记。"
     }
   },
-  "keys_needing_translation": 2
+  "keys_needing_translation": 1
 }

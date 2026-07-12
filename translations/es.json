@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Designa todos los escombros del área para minería/eliminación. Anula cualquier designación forestal."
+    "Coloque designaciones de eliminación de accesorios en celdas desocupadas accesibles. Ctrl-clic para incluir accesorios inalcanzables. Presione Mayús y haga clic para reemplazar las designaciones de terreno y bosques existentes."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Elimina todas las designaciones de terreno en el área de esta torre."
+    "Elimina las designaciones generadas por ATD de esta torre. Presione Mayús y haga clic para borrar todas las designaciones de terreno en el área de la torre."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Elimina todas las designaciones de terreno en el área de esta torre. (Presione Mayús y haga clic para borrar solo las designaciones de terreno generadas)."
+    "Elimina las designaciones generadas por ATD de esta torre. Presione Mayús y haga clic para borrar todas las designaciones de terreno en el área de la torre."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (útiles -> escombros -> tierra)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Fuerza el escaneo a buscar un producto específico. Ninguno = productos útiles primero, luego escombros y después tierra."
+    "Selecciona un producto para generar designaciones de minería. AUTO busca productos útiles si no hay designaciones de terreno; de lo contrario, usa las designaciones existentes como objetivos de ruta. Los escombros y la tierra son solo manuales."
   ],
   [
     "settings.mod.name",

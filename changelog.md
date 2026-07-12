@@ -1,7 +1,7 @@
 v0.4.6a [unreleased]
 * Changed: when the Ore composition refresh button is clicked, if no minable designations are found, clear the tower priority.
 * Added: per-world **Avoid ocean** and **Avoid buildings** Pathfinder settings persisted in the removable state blob. `ATDsettings.json` supplies their enabled-by-default values for new games; Mining Designations generation does not use them yet.
-* Changed: **Scanning filter: None** now skips mining, dirt, and debris generation and runs accessway generation only; the previous useful-product, debris, then dirt fallback has been removed pending a replacement automatic-selection mode.
+* Changed: **Scanning filter: AUTO** scans only for useful products when the tower area has no terrain designations. When terrain designations already exist, AUTO creates no new mining field and treats the existing work as pathfinding goals. Debris and dirt remain manual-only selections.
 * Changed: the designations trashcan now clears only that tower's ATD-generated designations on normal click and clears all terrain designations in the tower area on Shift-click.
 * Added: ATD-generated designation ownership is persisted as primitive tile coordinates in the existing removable tower-state JSON, so generated-only clearing remains precise after save/load.
 * Changed: the debris button now places prop-removal designations only on cells without existing terrain or forestry designations; Shift-click explicitly replaces existing designations.
@@ -9,6 +9,8 @@ v0.4.6a [unreleased]
 * Fixed: generated disturbance rays account for the selected vehicle footprint: one tile around T1/T2 ground cells and two tiles around T3 ground cells. Ground traversal uses the material-aware projected disturbance of existing designations, while generated/fixed V feasibility uses the designation hourglass so accessways can still enter the waist and connect. Buildings are handled only as hard footprint-plus-vehicle-clearance obstacles and no longer contribute terrain-disturbance hourglasses.
 * Fixed: V-to-G handoffs now revalidate the first ground cell after replacing the terminal generated node's provisional leveling rays with its finalized mining or dumping rays; the accumulated ray envelopes from every generated predecessor remain active throughout the ground route.
 * Fixed: completed generated/fixed V networks no longer act as ground-flood conduits when rebuilding tower-reachable G goals for later clusters. They remain separate reusable V goals, preventing ramps from incorrectly making disconnected upper shelves valid ground goals.
+* Improved: generated V interior work cost now samples all four profile corners with quarter-footprint weights and operation-aware cut/fill gaps, replacing the center-height approximation while preserving the established flat-cell normalization. Exterior disturbance rays continue from distance 1.
+* Fixed: Create Designations is now globally single-flight. A newer request cancels the active operation at its next yield boundary, waits for cleanup, and starts from a fresh snapshot; superseded queued requests are discarded so shared pathfinder and materialization state cannot overlap.
 * Changed: corner designation mode is now configured in the vanilla **Controls** settings under **Kayser's Automatic Terrain Designations (Mod)** instead of the ATD Mod Settings tab.
 * Migrated: existing `cornerDesignationKey` values from `ATDsettings.json` are used as a fallback on first startup and persisted into the vanilla controls store. Persisted vanilla controls values take precedence, followed by the legacy JSON value and then the code default (`K`).
 * Fixed: changing the corner designation mode binding in vanilla Controls now persists across game restarts instead of being overwritten by the legacy JSON setting.
@@ -24,7 +26,7 @@ v0.4.6a [unreleased]
 * Fixed: prospective V/G handoffs now require an operation-fulfilled, pathable or cleanup-eligible contact through the interior of the free edge with matching ground immediately outside; corner-only green contact no longer qualifies.
 * Fixed: access routes can no longer U-turn through ground that their own generated designations or positive-work side-ray wedges will disturb; only the immediate exit through the current V footprint is exempted.
 * Added: Mod setting and API methods (`GetAccessPropCleanupLandscapingCost`, `SetAccessPropCleanupLandscapingCost`) to configure prop cleanup landscaping cost.
-  - Defaults to `6` to favor driving around trees or debris when a reasonable detour exists.
+  - Non-tree prop cleanup defaults to `8`, calibrated from observed excavator cleanup effort; tree cleanup remains separately configurable and defaults to `6`.
 * Changed: Renamed setting `accessWorkDistanceScale` to `accessLandscapingCostDistanceScale` (and its UI row to **Landscaping cost vs. distance**) to better reflect that one unit of landscaping cost equals one unit of digging/dumping rock.
 * Updated: Mod settings UI layout, descriptions, and translations for experimental access settings across German, Spanish, Italian, Portuguese, Russian, Swedish, and Chinese.
 * Added: Extensive planned pathfinding documentation covering debris handling, side-ray cost functions, and implementation sequence.

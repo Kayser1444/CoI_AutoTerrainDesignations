@@ -103,7 +103,6 @@ namespace AutoTerrainDesignations.Access
     {
         internal const float DefaultMaxRayCost = 512f;
         internal const float DefaultUnresolvedPenalty = 128f;
-        private const float MinimumDryCutOceanHeight = 1f;
         private static readonly int[] s_sampleDistances = { 1, 2, 3, 5, 8, 13, 16 };
 
         public static AccessSideRayResult Score(
@@ -115,7 +114,8 @@ namespace AutoTerrainDesignations.Access
             float materialSlope,
             float maxRayCost = DefaultMaxRayCost,
             float unresolvedPenalty = DefaultUnresolvedPenalty,
-            int postTerminationSafetyMargin = 0)
+            int postTerminationSafetyMargin = 0,
+            int? maxTraceDistance = null)
             => Score(
                 tile =>
                 {
@@ -131,7 +131,9 @@ namespace AutoTerrainDesignations.Access
                 materialSlope,
                 maxRayCost,
                 unresolvedPenalty,
-                postTerminationSafetyMargin);
+                postTerminationSafetyMargin,
+                maxTraceDistance,
+                snapshot.AvoidOcean);
 
         internal static AccessSideRayResult Score(
             Func<Tile2i, AccessSideRayTerrainSample> sampleTerrain,
@@ -142,7 +144,9 @@ namespace AutoTerrainDesignations.Access
             float materialSlope,
             float maxRayCost = DefaultMaxRayCost,
             float unresolvedPenalty = DefaultUnresolvedPenalty,
-            int postTerminationSafetyMargin = 0)
+            int postTerminationSafetyMargin = 0,
+            int? maxTraceDistance = null,
+            bool avoidOcean = true)
         {
             if (operation == AccessSideRayOperation.None)
                 return new AccessSideRayResult(0f, 0f, 0, false, false);
@@ -151,14 +155,16 @@ namespace AutoTerrainDesignations.Access
             if (materialSlope <= 0f || float.IsNaN(materialSlope)
                 || float.IsInfinity(materialSlope))
                 return Fatal("SideRayInvalidMaterialSlope", 0, 0f);
-            if (maxRayCost < 0f || unresolvedPenalty < 0f || postTerminationSafetyMargin < 0)
+            if (maxRayCost < 0f || unresolvedPenalty < 0f || postTerminationSafetyMargin < 0
+                || (maxTraceDistance.HasValue && maxTraceDistance.Value < 1))
                 return Fatal("SideRayInvalidCostLimit", 0, 0f);
 
             float integratedCost = 0f;
             int previousDistance = 0;
             int sampleCount = 0;
             int disturbedDistance = 0;
-            int maxDistance = s_sampleDistances[s_sampleDistances.Length - 1];
+            int maxDistance = maxTraceDistance
+                ?? s_sampleDistances[s_sampleDistances.Length - 1];
             for (int distance = 1; distance <= maxDistance; distance++)
             {
                 Tile2i tile = new Tile2i(
@@ -177,10 +183,10 @@ namespace AutoTerrainDesignations.Access
                         integratedCost, 0f, sampleCount, false, false,
                         disturbedDistance: disturbedDistance);
                 }
-                if (operation == AccessSideRayOperation.Cut
-                    && sample.Kind == AccessTerrainSampleKind.Ocean
-                    && sample.TerrainHeight < MinimumDryCutOceanHeight)
-                    return Fatal("SideRayCutOcean", sampleCount, integratedCost);
+                if (avoidOcean && sample.Kind == AccessTerrainSampleKind.Ocean)
+                    return Fatal(operation == AccessSideRayOperation.Cut
+                        ? "SideRayCutOcean"
+                        : "SideRayFillOcean", sampleCount, integratedCost);
 
                 float rayHeight = operation == AccessSideRayOperation.Fill
                     ? plannedCornerHeight - distance * materialSlope
@@ -190,6 +196,9 @@ namespace AutoTerrainDesignations.Access
                     : sample.TerrainHeight - rayHeight;
                 if (gap <= 0f)
                 {
+                    disturbedDistance = Math.Min(
+                        maxDistance,
+                        distance + postTerminationSafetyMargin);
                     for (int safetyDistance = distance + 1;
                         safetyDistance <= Math.Min(maxDistance, distance + postTerminationSafetyMargin);
                         safetyDistance++)
@@ -207,10 +216,10 @@ namespace AutoTerrainDesignations.Access
                                 return Fatal("SideRayFillMapEdge", sampleCount, integratedCost);
                             continue;
                         }
-                        if (operation == AccessSideRayOperation.Cut
-                            && safetySample.Kind == AccessTerrainSampleKind.Ocean
-                            && safetySample.TerrainHeight < MinimumDryCutOceanHeight)
-                            return Fatal("SideRayCutOcean", sampleCount, integratedCost);
+                        if (avoidOcean && safetySample.Kind == AccessTerrainSampleKind.Ocean)
+                            return Fatal(operation == AccessSideRayOperation.Cut
+                                ? "SideRayCutOcean"
+                                : "SideRayFillOcean", sampleCount, integratedCost);
                         if (!string.IsNullOrEmpty(safetySample.BlockerReason))
                             return Fatal(safetySample.BlockerReason!, sampleCount, integratedCost);
                     }

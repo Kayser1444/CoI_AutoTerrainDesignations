@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Designar todos os detritos na área para mineração/remoção. Substitui quaisquer designações florestais."
+    "Coloque designações de remoção de prop em células desocupadas acessíveis. Ctrl-clique para incluir adereços inacessíveis. Clique com a tecla Shift pressionada para substituir designações de terreno e florestais existentes."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Limpe todas as designações de terreno na área desta torre."
+    "Limpe as designações geradas pelo ATD desta torre. Clique com a tecla Shift pressionada para limpar todas as designações de terreno na área da torre."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Limpe todas as designações de terreno na área desta torre. (Clique com a tecla Shift pressionada para limpar apenas as designações de terreno geradas.)"
+    "Limpe as designações geradas pelo ATD desta torre. Clique com a tecla Shift pressionada para limpar todas as designações de terreno na área da torre."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (úteis -> detritos -> terra)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Forçar o scan a mirar um produto específico. Nenhum = produtos úteis primeiro, depois detritos, depois terra."
+    "Selecione um produto para gerar designações de mineração. AUTO procura produtos úteis se não houver designações de terreno; caso contrário, usa as existentes como objetivos de rota. Detritos e terra são apenas manuais."
   ],
   [
     "settings.mod.name",

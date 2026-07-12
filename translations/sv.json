@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Placera grävanvisningar för allt skräp i området. Åsidosätter eventuella skogsbruksanvisningar."
+    "Placera proppröjningsanvisningar på nåbara lediga rutor. Ctrl-klicka för att inkludera onåbara props. Skift-klicka för att ersätta befintliga terräng- och skogsbruksanvisningar."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Rensa alla terrängbeteckningar i detta torns område."
+    "Rensa detta torns ATD-genererade beteckningar. Skift-klicka för att rensa alla terrängbeteckningar i tornets område."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Rensa alla terrängbeteckningar i detta torns område. (Skift-klicka endast för att rensa genererade terrängbeteckningar.)"
+    "Rensa detta torns ATD-genererade beteckningar. Skift-klicka för att rensa alla terrängbeteckningar i tornets område."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (nyttigt -> skräp -> jord)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Tvinga skanningen att rikta in sig på en specifik produkt. Ingen = nyttiga produkter först, sedan skräp och jord."
+    "Välj en produkt att skapa grävanvisningar för. AUTO söker efter användbara produkter när området saknar terränganvisningar; annars blir befintliga terränganvisningar mål för vägletningen. Skräp och jord väljs endast manuellt."
   ],
   [
     "settings.mod.name",

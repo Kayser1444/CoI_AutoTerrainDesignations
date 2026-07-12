@@ -29,33 +29,98 @@ namespace AutoTerrainDesignations
 {
     public static partial class AutoDepthDesignation
     {
-        private static IEnumerator RunCreateDesignationsWithDebugGate(IEnumerator routine)
+        private static int s_latestCreateDesignationsRequestId;
+        private static bool s_createDesignationsOperationActive;
+
+        private static IEnumerator RunCreateDesignationsWithDebugGate(
+            IEnumerator routine,
+            int requestId)
         {
-            while (true)
+            try
             {
-                bool movedNext;
-                object? current = null;
-
-                s_createDesignationsDebugContext = true;
-                try
+                while (requestId == s_latestCreateDesignationsRequestId)
                 {
-                    movedNext = routine.MoveNext();
-                    if (movedNext)
-                        current = routine.Current;
-                }
-                finally
-                {
-                    s_createDesignationsDebugContext = false;
-                }
+                    bool movedNext;
+                    object? current = null;
 
-                if (!movedNext)
+                    s_createDesignationsDebugContext = true;
+                    try
+                    {
+                        movedNext = routine.MoveNext();
+                        if (movedNext)
+                            current = routine.Current;
+                    }
+                    finally
+                    {
+                        s_createDesignationsDebugContext = false;
+                    }
+
+                    if (!movedNext)
+                        yield break;
+
+                    // Unity advances nested enumerators separately. Wrap them as well
+                    // so cancellation and the debug gate cover the complete operation.
+                    yield return current is IEnumerator nested
+                        ? RunCreateDesignationsWithDebugGate(nested, requestId)
+                        : current;
+                }
+            }
+            finally
+            {
+                (routine as IDisposable)?.Dispose();
+            }
+        }
+
+        private static void QueueCreateDesignations(
+            IAreaManagingTower tower,
+            object? panelKey)
+        {
+            int requestId = ++s_latestCreateDesignationsRequestId;
+            if (s_createDesignationsOperationActive)
+            {
+                s_cancelExperimentalAccessSearch = true;
+                LogDebug($"Create Designations request {requestId} supersedes the active operation.");
+            }
+            s_coroutineHost?.StartCoroutine(
+                RunCreateDesignationsSingleFlight(tower, panelKey, requestId));
+        }
+
+        private static IEnumerator RunCreateDesignationsSingleFlight(
+            IAreaManagingTower tower,
+            object? panelKey,
+            int requestId)
+        {
+            while (s_createDesignationsOperationActive)
+            {
+                if (requestId != s_latestCreateDesignationsRequestId)
                     yield break;
+                yield return null;
+            }
 
-                // Unity advances nested enumerators separately. Wrap them as well
-                // so the gate covers the complete Create Designations operation.
-                yield return current is IEnumerator nested
-                    ? RunCreateDesignationsWithDebugGate(nested)
-                    : current;
+            if (requestId != s_latestCreateDesignationsRequestId)
+                yield break;
+
+            s_createDesignationsOperationActive = true;
+            s_cancelExperimentalAccessSearch = false;
+            LogDebug($"Create Designations request {requestId} started.");
+            var towerSettings = GetOrCreateTowerSettings(tower);
+            IEnumerator guarded = RunCreateDesignationsWithDebugGate(
+                CreateDesignationsCoroutine(
+                    tower, towerSettings.RampWidth > 0, panelKey),
+                requestId);
+            try
+            {
+                while (guarded.MoveNext())
+                    yield return guarded.Current;
+            }
+            finally
+            {
+                (guarded as IDisposable)?.Dispose();
+                HideTerrainAnalysisProgressToast();
+                s_createDesignationsOperationActive = false;
+                if (requestId == s_latestCreateDesignationsRequestId)
+                    s_cancelExperimentalAccessSearch = false;
+                LogDebug($"Create Designations request {requestId} finished or was superseded.");
             }
         }
 
@@ -69,11 +134,26 @@ namespace AutoTerrainDesignations
             var terrMgr = s_desigManager.TerrainManager;
             var towerSettings = GetOrCreateTowerSettings(tower);
             string miningPlanFingerprint = BuildMiningPlanFingerprint(tower, towerSettings);
+            bool autoScan = GetSelectedOre(tower) == null;
+
+            if (autoScan && HasTerrainDesignationsInTowerArea(tower))
+            {
+                LogDebug("AUTO scanning found existing terrain designations; treating them as access-pathfinding goals.");
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                yield return RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps);
+                if (inspectorInstance != null)
+                {
+                    OreCompositionPanel.ResetContent(inspectorInstance);
+                    DesignationPanel.RefreshDisplays(inspectorInstance);
+                }
+                yield break;
+            }
 
             if (IsTowerMiningPlanCurrent(tower, miningPlanFingerprint))
             {
                 LogDebug("Mining plan parameters are unchanged; skipping mining designation regeneration.");
-                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
                 if (inspectorInstance != null)
                 {
                     OreCompositionPanel.ResetContent(inspectorInstance);
@@ -85,14 +165,17 @@ namespace AutoTerrainDesignations
 
             var bbMin = TerrainDesignation.GetOrigin(area.BoundingBoxMin);
             var bbMax = TerrainDesignation.GetOrigin(area.BoundingBoxMax);
-            HashSet<Tile2i> debrisOrigins = CollectDebrisDesignationOrigins(tower, area, terrMgr);
-            bool hasSelectedProduct = GetSelectedOre(tower) != null;
-
             List<LooseProductProto> scanProducts = GetCandidateScanProducts(tower);
             if (scanProducts.Count == 0)
             {
                 MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
-                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                yield return RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps);
+                if (inspectorInstance != null)
+                {
+                    OreCompositionPanel.ResetContent(inspectorInstance);
+                    DesignationPanel.RefreshDisplays(inspectorInstance);
+                }
                 yield break;
             }
 
@@ -169,16 +252,15 @@ namespace AutoTerrainDesignations
                 }
             }
 
-            List<LooseProductProto> targetProducts = ResolveTargetScanProducts(hasSelectedProduct, scanProducts, productCounts, debrisOrigins.Count > 0);
+            List<LooseProductProto> targetProducts = scanProducts
+                .Where(product => productCounts.ContainsKey(product))
+                .ToList();
 
             if (targetProducts.Count == 0)
             {
-                if (!hasSelectedProduct && debrisOrigins.Count > 0)
-                {
-                    yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
-                }
                 MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
-                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                yield return RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -237,12 +319,9 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                if (!hasSelectedProduct && debrisOrigins.Count > 0)
-                {
-                    yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
-                }
                 MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
-                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                yield return RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -251,12 +330,9 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                if (!hasSelectedProduct && debrisOrigins.Count > 0)
-                {
-                    yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
-                }
                 MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
-                TryRepairExistingTerrainWorkAccess(tower, terrMgr, towerSettings, generateRamps);
+                yield return RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps);
                 yield break;
             }
 
@@ -274,9 +350,7 @@ namespace AutoTerrainDesignations
             }
 
             LogDebug(string.Format("After filtering+connecting: {0} tiles in designations", maxOreDepths.Count));
-            LogDebug(selectedProduct != null
-                ? "Selected product: " + selectedProduct.Id
-                : "Selected product mode: None (useful products, then debris, then dirt)");
+            LogDebug("Selected product: " + selectedProduct?.Id);
 
             var maxOreDepthOverall = maxOreDepths.Values.Min();
 
@@ -342,7 +416,7 @@ namespace AutoTerrainDesignations
                     null,
                     useLocalSurfaceReference: false,
                     allowExistingPlannedRampShortcut: true,
-                    rampResult);
+                    result: rampResult);
                 RampPlacementOutcome rampOutcome = rampResult.Outcome;
                 SetTowerLastRampOutcome(tower, rampOutcome);
 
@@ -370,7 +444,7 @@ namespace AutoTerrainDesignations
         private static string BuildMiningPlanFingerprint(IAreaManagingTower tower, ATDTowerSettings towerSettings)
         {
             var area = tower.Area;
-            string selectedOreId = GetSelectedOre(tower)?.Id.Value ?? "<auto>";
+            string selectedOreId = GetSelectedOre(tower)?.Id.Value ?? "<none>";
             return string.Join("|",
                 area.BoundingBoxMin.X,
                 area.BoundingBoxMin.Y,
@@ -386,7 +460,7 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.BottomFlatteningStrength);
         }
 
-        private static bool TryRepairExistingTerrainWorkAccess(
+        private static IEnumerator RepairExistingTerrainWorkAccessCoroutine(
             IAreaManagingTower tower,
             TerrainManager terrMgr,
             ATDTowerSettings towerSettings,
@@ -397,12 +471,13 @@ namespace AutoTerrainDesignations
                 || towerSettings.RampWidth != 1
                 || s_miningProto == null
                 || !HasExistingTerrainWorkEndpoint(tower))
-                return false;
+                yield break;
 
             var emptyGeneratedPlan = new Dict<Tile2i, int>();
             var endpointCornerHeights = new Dict<Tile2i, int>();
             var placedAccesswayOrigins = new List<Tile2i>();
-            RampPlacementOutcome outcome = CreateAccessRamp(
+            var rampResult = new RampGenerationResult();
+            yield return CreateAccessRampCoroutine(
                 tower,
                 emptyGeneratedPlan,
                 endpointCornerHeights,
@@ -411,9 +486,10 @@ namespace AutoTerrainDesignations
                 s_miningProto,
                 placedAccesswayOrigins,
                 null,
-                out _);
-            SetTowerLastRampOutcome(tower, outcome);
-            return true;
+                useLocalSurfaceReference: false,
+                allowExistingPlannedRampShortcut: true,
+                result: rampResult);
+            SetTowerLastRampOutcome(tower, rampResult.Outcome);
         }
 
         private const int RAMP_ACCESS_SEARCH_MARGIN_TILES = 48;
@@ -691,9 +767,7 @@ namespace AutoTerrainDesignations
 
         internal static void CreateDesignationsForTower(IAreaManagingTower tower)
         {
-            var towerSettings = GetOrCreateTowerSettings(tower);
-            s_coroutineHost?.StartCoroutine(RunCreateDesignationsWithDebugGate(
-                CreateDesignationsCoroutine(tower, towerSettings.RampWidth > 0, null)));
+            QueueCreateDesignations(tower, null);
         }
 
         /// <summary>
@@ -703,17 +777,15 @@ namespace AutoTerrainDesignations
         /// </summary>
         internal static void CreateDesignationsForTower(IAreaManagingTower tower, object? panelKey)
         {
-            var towerSettings = GetOrCreateTowerSettings(tower);
-            s_coroutineHost?.StartCoroutine(RunCreateDesignationsWithDebugGate(
-                CreateDesignationsCoroutine(tower, towerSettings.RampWidth > 0, panelKey)));
+            QueueCreateDesignations(tower, panelKey);
         }
 
-        internal static void MarkDebrisForRemovalForTower(IAreaManagingTower tower)
+        internal static void MarkDebrisForRemovalForTower(IAreaManagingTower tower, bool overrideExisting, bool markUnreachable)
         {
-            s_coroutineHost?.StartCoroutine(MarkDebrisForRemovalCoroutine(tower));
+            s_coroutineHost?.StartCoroutine(MarkDebrisForRemovalCoroutine(tower, overrideExisting, markUnreachable));
         }
 
-        private static IEnumerator MarkDebrisForRemovalCoroutine(IAreaManagingTower tower)
+        private static IEnumerator MarkDebrisForRemovalCoroutine(IAreaManagingTower tower, bool overrideExisting, bool markUnreachable)
         {
             if (s_desigManager == null || s_miningProto == null)
                 yield break;
@@ -724,7 +796,90 @@ namespace AutoTerrainDesignations
 
             TerrainManager terrMgr = s_desigManager.TerrainManager;
             HashSet<Tile2i> debrisOrigins = CollectDebrisDesignationOrigins(tower, area, terrMgr);
-            yield return CreateDebrisRemovalDesignationsCoroutine(tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>());
+            if (!markUnreachable)
+            {
+                FilterReachableDebrisOrigins(tower, debrisOrigins);
+            }
+            yield return CreateDebrisRemovalDesignationsCoroutine(
+                tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>(), overrideExisting);
+        }
+
+        private static void FilterReachableDebrisOrigins(IAreaManagingTower tower, HashSet<Tile2i> debrisOrigins)
+        {
+            if (s_vehiclePathFindingManager == null || debrisOrigins.Count == 0)
+            {
+                return;
+            }
+
+            IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;
+            VehiclePathFindingParams pfParams = GetExcavatorPathFindingParamsForTower(tower, out _);
+
+            Tile2i bbMin = tower.Area.BoundingBoxMin;
+            Tile2i bbMax = tower.Area.BoundingBoxMax;
+            Tile2i towerPosition = GetTowerPosition(tower, bbMin, bbMax);
+
+            if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
+            {
+                debrisOrigins.Clear();
+                return;
+            }
+
+            int minX = Math.Min(Math.Min(bbMin.X, towerPosition.X), debrisOrigins.Min(t => t.X)) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int minY = Math.Min(Math.Min(bbMin.Y, towerPosition.Y), debrisOrigins.Min(t => t.Y)) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int maxX = Math.Max(Math.Max(bbMax.X, towerPosition.X), debrisOrigins.Max(t => t.X)) + 4 + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            int maxY = Math.Max(Math.Max(bbMax.Y, towerPosition.Y), debrisOrigins.Max(t => t.Y)) + 4 + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+
+            var visited = new HashSet<Tile2i>();
+            var queue = new Queue<Tile2i>();
+            visited.Add(start);
+            queue.Enqueue(start);
+
+            while (queue.Count > 0 && visited.Count < MAX_RAMP_ACCESS_SEARCH_TILES)
+            {
+                Tile2i current = queue.Dequeue();
+
+                foreach (RelTile2i direction in s_rampAccessSearchDirections)
+                {
+                    Tile2i next = current + direction;
+                    if (next.X < minX || next.X > maxX || next.Y < minY || next.Y > maxY)
+                        continue;
+                    if (visited.Contains(next))
+                        continue;
+                    if (!pathabilityProvider.IsPathable(next, pfParams.PathabilityQueryMask))
+                        continue;
+                    visited.Add(next);
+                    queue.Enqueue(next);
+                }
+            }
+
+            var unreachable = new List<Tile2i>();
+            foreach (Tile2i origin in debrisOrigins)
+            {
+                bool isReachable = false;
+                for (int y = 0; y < 4; y++)
+                {
+                    for (int x = 0; x < 4; x++)
+                    {
+                        Tile2i cell = origin + new RelTile2i(x, y);
+                        if (visited.Contains(cell))
+                        {
+                            isReachable = true;
+                            break;
+                        }
+                    }
+                    if (isReachable) break;
+                }
+
+                if (!isReachable)
+                {
+                    unreachable.Add(origin);
+                }
+            }
+
+            foreach (Tile2i origin in unreachable)
+            {
+                debrisOrigins.Remove(origin);
+            }
         }
 
         private static List<LooseProductProto> GetCandidateScanProducts(IAreaManagingTower tower)
@@ -734,6 +889,8 @@ namespace AutoTerrainDesignations
                 return new List<LooseProductProto>();
             }
 
+            var selectedOre = GetSelectedOre(tower);
+
             // Get all available ores first
             var allOres = s_protosDb.All<LooseProductProto>()
                 .Where(product => product != LooseProductProto.Phantom)
@@ -742,15 +899,29 @@ namespace AutoTerrainDesignations
                 .Distinct()
                 .ToList();
 
-            // Check if a specific ore is selected for this tower
-            var selectedOre = GetSelectedOre(tower);
-            if (selectedOre != null && selectedOre is LooseProductProto selectedLoose)
+            if (selectedOre is LooseProductProto selectedLoose)
             {
-                // Return only the selected product if it is available (dirt is allowed explicitly).
-                return allOres.Contains(selectedLoose) ? new List<LooseProductProto> { selectedLoose } : new List<LooseProductProto>();
+                // Explicit selections may target dirt; AUTO never falls through to dirt.
+                return allOres.Contains(selectedLoose)
+                    ? new List<LooseProductProto> { selectedLoose }
+                    : new List<LooseProductProto>();
             }
 
-            return allOres;
+            // AUTO on an area without terrain designations restores only the old
+            // useful-product stage. Debris and dirt remain manual selections.
+            return allOres.Where(product => !IsDirtProduct(product)).ToList();
+        }
+
+        private static bool HasTerrainDesignationsInTowerArea(IAreaManagingTower tower)
+        {
+            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
+                tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax))
+            {
+                if (IsOriginInsideTower(tower, designation.OriginTileCoord)
+                    && IsTerrainWorkDesignationProto(designation.Prototype))
+                    return true;
+            }
+            return false;
         }
 
         private static List<LooseProductProto> ResolveTargetScanProducts(
@@ -896,7 +1067,8 @@ namespace AutoTerrainDesignations
             PolygonTerrainArea2i area,
             TerrainManager terrMgr,
             HashSet<Tile2i> debrisOrigins,
-            HashSet<Tile2i> oreOrigins)
+            HashSet<Tile2i> oreOrigins,
+            bool overrideExisting = false)
         {
             if (s_desigManager == null || s_miningProto == null)
             {
@@ -907,7 +1079,7 @@ namespace AutoTerrainDesignations
             foreach (Tile2i origin in debrisOrigins)
             {
                 if (oreOrigins.Contains(origin) ||
-                    HasTerrainDesignationAtOrigin(tower, origin) ||
+                    (!overrideExisting && s_desigManager.GetDesignationAt(origin).HasValue) ||
                     !IsDesignatableTileFullyInsideArea(area, origin))
                 {
                     continue;

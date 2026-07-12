@@ -33,6 +33,8 @@ using UnityEngine;
 
 namespace AutoTerrainDesignations
 {
+    internal enum AccessVehicleClearanceMode { Off = 0, Auto = 1, T1 = 2, T2 = 3, T3 = 4 }
+
     public static partial class AutoDepthDesignation
     {
         private static TerrainDesignationsManager? s_desigManager;
@@ -63,11 +65,14 @@ namespace AutoTerrainDesignations
         private sealed class ATDTowerSettings
         {
             public int MaxHeightDiff { get; private set; }
-            public int RampWidth { get; private set; }
+            public AccessVehicleClearanceMode VehicleClearance { get; private set; }
+            public int RampWidth => VehicleClearance == AccessVehicleClearanceMode.Off
+                ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
             public int MaxLayersToExcavate { get; private set; }
             public int? MaxDepthToDigTo { get; private set; }
             public int OrePurityLevel { get; private set; }
-            public int CorridorClearance { get; private set; }
+            public int CorridorClearance => VehicleClearance == AccessVehicleClearanceMode.Off
+                ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
             public bool AutoReleaseExcavatorsWhenIdle { get; private set; }
             public bool AutoReleaseTrucksWhenIdle { get; private set; }
             public bool MiningPlanDirty { get; private set; } = true;
@@ -83,12 +88,13 @@ namespace AutoTerrainDesignations
                 SetMaxLayersToExcavate(maxLayersToExcavate);
                 SetMaxDepthToDigTo(maxDepthToDigTo);
                 SetOrePurityLevel(orePurityLevel);
-                SetCorridorClearance(corridorClearance);
                 SetAutoReleaseExcavatorsWhenIdle(autoReleaseExcavatorsWhenIdle);
                 SetAutoReleaseTrucksWhenIdle(autoReleaseTrucksWhenIdle);
             }
 
-            public static ATDTowerSettings FromGlobalDefaults() => new ATDTowerSettings(
+            public static ATDTowerSettings FromGlobalDefaults()
+            {
+                var settings = new ATDTowerSettings(
                 AutoTerrainDesignationsMod.MaxHeightDiff,
                 AutoTerrainDesignationsMod.RampWidth,
                 AutoTerrainDesignationsMod.MaxLayersToExcavate,
@@ -97,6 +103,9 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.MinCorridorClearance,
                 AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle,
                 AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle);
+                settings.SetVehicleClearance(AutoTerrainDesignationsMod.VehicleClearance);
+                return settings;
+            }
 
             public void SetMaxHeightDiff(int value)
             {
@@ -106,7 +115,17 @@ namespace AutoTerrainDesignations
                 MaxHeightDiff = clamped;
             }
 
-            public void SetRampWidth(int value) => RampWidth = Math.Max(0, Math.Min(5, value));
+            public void SetRampWidth(int value) => SetVehicleClearance(
+                value == 0 ? AccessVehicleClearanceMode.Off : AccessVehicleClearanceMode.Auto);
+
+            public void SetVehicleClearance(AccessVehicleClearanceMode value)
+            {
+                AccessVehicleClearanceMode clamped = value < AccessVehicleClearanceMode.Off
+                    || value > AccessVehicleClearanceMode.T3
+                        ? AccessVehicleClearanceMode.Auto : value;
+                if (VehicleClearance != clamped) MiningPlanDirty = true;
+                VehicleClearance = clamped;
+            }
 
             public void SetMaxLayersToExcavate(int value)
             {
@@ -131,13 +150,7 @@ namespace AutoTerrainDesignations
                 OrePurityLevel = clamped;
             }
 
-            public void SetCorridorClearance(int value)
-            {
-                int clamped = Math.Max(0, Math.Min(2, value));
-                if (CorridorClearance != clamped)
-                    MiningPlanDirty = true;
-                CorridorClearance = clamped;
-            }
+            public void SetCorridorClearance(int value) { }
 
             public void SetAutoReleaseExcavatorsWhenIdle(bool value) => AutoReleaseExcavatorsWhenIdle = value;
 
@@ -181,7 +194,7 @@ namespace AutoTerrainDesignations
             new Tile2i(0, -4),
         };
 
-        // Per-tower ore selection: entityId -> selected ore (null = "Auto" = all ores)
+        // Per-tower ore selection: entityId -> selected ore (missing/null = AUTO)
         private static readonly Dictionary<EntityId, ProductProto?> s_selectedOrePerTower =
             new Dictionary<EntityId, ProductProto?>();
         private static readonly Dictionary<EntityId, ATDTowerSettings> s_towerSettingsByEntityId =
@@ -201,6 +214,26 @@ namespace AutoTerrainDesignations
             new Dictionary<EntityId, HashSet<Tile2i>>();
         private static bool s_startupTowerPrioritySyncCompleted;
         private static int s_startupTowerPrioritySyncAttempts;
+        private static bool s_accessAvoidOcean = true;
+        private static bool s_accessAvoidBuildings = true;
+
+        internal static bool AccessAvoidOcean => s_accessAvoidOcean;
+        internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
+
+        internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
+        internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
+
+        internal static void ResetWorldPathfinderSettingsToDefaults()
+        {
+            s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
+            s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
+        }
+
+        internal static void SaveWorldPathfinderSettingsAsGlobalDefaults()
+        {
+            AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
+            AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
+        }
 
         // Reserved for a future public diagnostics toggle. Keep command-scoped
         // tracing off by default without suppressing warnings or unrelated logs.
@@ -284,6 +317,8 @@ namespace AutoTerrainDesignations
 
         internal static int GetTowerRampWidth(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).RampWidth;
         internal static void SetTowerRampWidth(IAreaManagingTower tower, int value) => GetOrCreateTowerSettings(tower).SetRampWidth(value);
+        internal static AccessVehicleClearanceMode GetTowerVehicleClearance(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).VehicleClearance;
+        internal static void SetTowerVehicleClearance(IAreaManagingTower tower, AccessVehicleClearanceMode value) => GetOrCreateTowerSettings(tower).SetVehicleClearance(value);
 
         internal static int GetTowerMaxLayersToExcavate(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).MaxLayersToExcavate;
         internal static void SetTowerMaxLayersToExcavate(IAreaManagingTower tower, int value) => GetOrCreateTowerSettings(tower).SetMaxLayersToExcavate(value);
@@ -504,6 +539,9 @@ namespace AutoTerrainDesignations
         internal static void ResetWorldRuntimeState()
         {
             s_worldGeneration++;
+            s_latestCreateDesignationsRequestId++;
+            s_cancelExperimentalAccessSearch = true;
+            s_createDesignationsOperationActive = false;
 
             s_desigManager = null;
             s_miningProto = null;
@@ -522,6 +560,7 @@ namespace AutoTerrainDesignations
             s_inputScheduler = null;
             s_configSerializationContext = null;
             s_batchSize = BATCH_SIZE;
+            ResetWorldPathfinderSettingsToDefaults();
 
             s_selectedOrePerTower.Clear();
             s_towerSettingsByEntityId.Clear();
@@ -556,6 +595,7 @@ namespace AutoTerrainDesignations
 
             // Load defaults after logging is initialized so diagnostics are visible.
             LoadSettingsFromJson();
+            ResetWorldPathfinderSettingsToDefaults();
 
             s_desigManager = desigManager as TerrainDesignationsManager;
             s_coroutineHost = coroutineHost;
@@ -615,6 +655,26 @@ namespace AutoTerrainDesignations
             IAreaManagingTower tower,
             out string source)
         {
+            AccessVehicleClearanceMode requestedMode = GetTowerVehicleClearance(tower);
+            if (requestedMode == AccessVehicleClearanceMode.T1
+                || requestedMode == AccessVehicleClearanceMode.T2
+                || requestedMode == AccessVehicleClearanceMode.T3)
+            {
+                string tierToken = requestedMode.ToString();
+                if (s_protosDb != null)
+                {
+                    foreach (ExcavatorProto proto in s_protosDb.All<ExcavatorProto>()
+                        .OrderBy(candidate => candidate.Id.Value, StringComparer.Ordinal))
+                    {
+                        if (proto.Id.Value.IndexOf(tierToken, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            int explicitClearance = GetVehicleClearance(proto.PathFindingParams);
+                            source = $"explicit{tierToken}:{proto.Id}:clearance={explicitClearance}";
+                            return proto.PathFindingParams;
+                        }
+                    }
+                }
+            }
             int targetClearance = Math.Max(1, GetTowerCorridorClearance(tower));
             if (tower is MineTower mineTower)
             {

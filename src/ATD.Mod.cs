@@ -130,8 +130,10 @@ public static string Tt(string text) => text;
         SetTurningRampsExperimental(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
+        SetAccessAvoidOcean(true);
+        SetAccessAvoidBuildings(true);
         SetAccessLandscapingCostDistanceScale(1f);
-        SetAccessPropCleanupLandscapingCost(6f);
+        SetAccessPropCleanupLandscapingCost(8f);
         SetAccessTreeCleanupLandscapingCost(6f);
         SetAccessLandslideRunPerHeight(1f);
         SetAccessGeneratedVFixedCost(1f);
@@ -158,10 +160,17 @@ public static string Tt(string text) => text;
 
     /// <summary>Ramp width in tiles. Allowed range: 0..5. 0 disables ramp generation.</summary>
     public static int RampWidth { get; private set; } = 1;
+    internal static AccessVehicleClearanceMode VehicleClearance { get; private set; } = AccessVehicleClearanceMode.Auto;
+    internal static void SetVehicleClearance(AccessVehicleClearanceMode value)
+    {
+        VehicleClearance = value < AccessVehicleClearanceMode.Off || value > AccessVehicleClearanceMode.T3 ? AccessVehicleClearanceMode.Auto : value;
+        RampWidth = VehicleClearance == AccessVehicleClearanceMode.Off ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
+        MinCorridorClearance = VehicleClearance == AccessVehicleClearanceMode.Off ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
+    }
 
     public static void SetRampWidth(int value)
     {
-        RampWidth = Math.Max(0, Math.Min(5, value));
+        SetVehicleClearance(value == 0 ? AccessVehicleClearanceMode.Off : AccessVehicleClearanceMode.Auto);
     }
 
     /// <summary>Maximum number of layers to excavate from the surface. 0 = no limit.</summary>
@@ -223,11 +232,11 @@ public static string Tt(string text) => text;
     /// 1 = 1-tile corridors (small/medium vehicles);
     /// 2 = 2-tile corridors (mega vehicles, current default).
     /// </summary>
-    public static int MinCorridorClearance { get; private set; } = 2;
+    public static int MinCorridorClearance { get; private set; } = 1;
 
     public static void SetMinCorridorClearance(int value)
     {
-        MinCorridorClearance = Math.Max(0, Math.Min(2, value));
+        // Superseded by VehicleClearance. Retained as a no-op for source/API compatibility.
     }
 
     /// <summary>Default collapsed state for the Mining designations inspector panel.</summary>
@@ -319,6 +328,22 @@ public static string Tt(string text) => text;
         ExperimentalAccessUseAStar = value;
     }
 
+    /// <summary>Rejects accessway rays whose projected disturbance reaches ocean.</summary>
+    public static bool AccessAvoidOcean { get; private set; } = true;
+
+    public static void SetAccessAvoidOcean(bool value)
+    {
+        AccessAvoidOcean = value;
+    }
+
+    /// <summary>Rejects accessway rays whose projected disturbance reaches a building safety footprint.</summary>
+    public static bool AccessAvoidBuildings { get; private set; } = true;
+
+    public static void SetAccessAvoidBuildings(bool value)
+    {
+        AccessAvoidBuildings = value;
+    }
+
     /// <summary>Tile-distance cost assigned to one unit of landscaping cost.</summary>
     public static float AccessLandscapingCostDistanceScale { get; private set; } = 1f;
 
@@ -328,7 +353,7 @@ public static string Tt(string text) => text;
     }
 
     /// <summary>Landscaping cost charged once per cleanup origin used by experimental access routing.</summary>
-    public static float AccessPropCleanupLandscapingCost { get; private set; } = 6f;
+    public static float AccessPropCleanupLandscapingCost { get; private set; } = 8f;
 
     public static void SetAccessPropCleanupLandscapingCost(float value)
     {

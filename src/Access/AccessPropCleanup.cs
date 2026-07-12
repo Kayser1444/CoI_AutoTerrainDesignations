@@ -166,5 +166,10 @@ namespace AutoTerrainDesignations.Access
 
         public static float GetCleanupLandscapingCost() =>
             AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
+
+        public static float GetCleanupLandscapingCost(bool isTree) =>
+            isTree
+                ? AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost
+                : AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
     }
 }

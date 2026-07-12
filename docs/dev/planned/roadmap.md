@@ -6,7 +6,15 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
 * Climb cliff? (i.e. path A->B)
 * Cut/Copy/Paste/Blueprint designations?
 * rail incline (12.5%) designations
-* Avoid ocean toggle, including landslide predictor
+
+## Configurable hazard avoidance for accessways and mine designations
+
+Two per-world Pathfinder parameters now exist and are enforced by accessway candidate rays. Their new-game defaults come from `ATDsettings.json`:
+
+* **Avoid ocean** — reject accessway and mining-designation plans whose projected cut/fill disturbance reaches the ocean.
+* **Avoid buildings** — reject accessway and mining-designation plans whose projected cut/fill disturbance reaches an existing, planned, or ghost building, including the mine control tower.
+
+Remaining work: reuse the material-aware disturbance ray tracer for both parameters when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
 
 ## Ramp safety margin — low priority
 

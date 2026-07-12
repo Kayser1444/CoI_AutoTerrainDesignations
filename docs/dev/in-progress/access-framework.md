@@ -89,7 +89,13 @@ It does not require mining and farming to use identical generation rules. They m
   * **Regular tier** - standard excavators, trucks, and dumpers. Narrower clearance.
   * **Mega tier** - mega excavator, mega dumper, and other oversized variants. Same climb ability, but wider clearance, so they set a larger Auto corridor width when assigned.
 
-  Tier governs *width only*. The **type of work** present in a cluster - not the designation proto - governs which vehicles are *required* and whether they must be assigned to the tower:
+  Tier selects the concrete vanilla vehicle pathability parameters as well as
+  accessway width. T1 and T2 both require three terrain tiles horizontally, but
+  remain distinct because their different vehicle heights can produce different
+  pathability below transports, ramps, bridges, pipes, and other overhead
+  obstructions. T3/Mega requires five terrain tiles horizontally. The **type of
+  work** present in a cluster - not the designation proto - governs which
+  vehicles are *required* and whether they must be assigned to the tower:
 
   | Work type | Required vehicle role | Tower assignment |
   |---|---|---|
@@ -132,7 +138,9 @@ It does not require mining and farming to use identical generation rules. They m
 **Corridor width** (`corridorWidth`)
 : The effective clearance, measured in origin tiles (4x4 units), that an accessway or provider edge must offer for vehicles to move through it. Because ramps, flat cuts, bridges, and corridors are all **accessways**, they obey this single clearance rule - there is no separate ramp-width parameter. The **same value** also serves the "complete enough" threshold in *Origin cluster as provider* (how many consecutive workable designations along an edge let a still-incomplete cluster act as a provider).
 
-  The effective width comes from the world-level **`accessWayClearance`** setting (see below). When that setting is **Auto**, ATD derives the clearance from the game rather than using a fixed number:
+  The effective width comes from the **`accessVehicleClearance`** setting (see
+  below). When that setting is **Auto**, ATD derives the clearance and concrete
+  vehicle pathability parameters from the game rather than using a fixed tier:
 
   * Use the widest clearance required by any vehicle assigned to the tower, including soft-released vehicles.
   * If no vehicles are assigned to the tower, use the widest clearance required by any truck or excavator in the global vehicle pool.
@@ -140,8 +148,25 @@ It does not require mining and farming to use identical generation rules. They m
 
   Corridor width covers only horizontal clearance; slope/climb ability is a separate, vehicle-generic concern (see *Edge-compatible*).
 
-**Accessway clearance setting** (`accessWayClearance`)
-: The single, **world-level** player setting that controls `corridorWidth` for every accessway in the world (ramps, corridors, flat cuts, bridges alike). Range is `[Auto, 0-2]`, with **`-1` as the sentinel for Auto** and Auto as the default. The live value is persisted in the **vanilla save** (the published game setting / state blob); `config.json` only supplies the **new-game default** used when a world is first created. Auto derives clearance from the required vehicles as described under *Corridor width*; an explicit `0`, `1`, or `2` overrides that derivation for the whole world. Because Auto handles essentially every real case (an estimated 99% of use), this is a world-level setting rather than a per-tower one, which keeps the tower inspector simple. The previous per-tower clearance/ramp-width controls are **superseded**: their old saved values are intentionally ignored and not migrated, since Auto reproduces the intended behavior without them.
+**Vehicle clearance setting** (`accessVehicleClearance`)
+: The single player setting that replaces separate ramp-width and corridor-
+clearance controls for every accessway (ramps, corridors, flat cuts, and
+bridges). Its values are `[OFF, Auto, T1, T2, T3]`, with `Auto` as the default.
+`OFF` disables generated accessways and corresponds to the former
+`RampWidth = 0`. `Auto` derives the required vehicle from assignments and the
+global pool as described under *Corridor width*. Explicit `T1`, `T2`, and `T3`
+select the corresponding vanilla `VehiclePathFindingParams`; T1 and T2 both map
+to V1/three-tile horizontal clearance but retain their distinct height-
+clearance masks, while T3 maps to V2/five-tile clearance. Until V2 is
+implemented, explicit or Auto-resolved T3 must report/fall back through the
+normal unsupported-width path rather than silently using V1.
+
+  Migration from the superseded per-tower controls is deliberately simple:
+  legacy `RampWidth == 0` becomes `OFF`; every legacy tower with a nonzero ramp
+  width becomes `Auto`. Old explicit ramp widths and corridor-clearance values
+  are otherwise ignored. This preserves the player's deliberate opt-out while
+  avoiding false precision from settings whose meanings no longer match the
+  vehicle-driven model.
 
 **Waiting for provider completion**
 : An origin cluster has a valid, complete provider chain (planned or partially built) that is not yet usable because one or more providers still need vehicle work. This is the `WaitingForProviderCompletion` state; see *Origin Cluster States* for how it is reached and exited.
@@ -576,14 +601,13 @@ The following are explicitly outside the V1 rollout and require their own design
 The V1 implementation deliberately keeps cost and durability parameters simple. The following refinements are candidates once correctness and rollout behavior are stable:
 
 * Split work-vs-distance weighting between mining work and dumping work. A player or local situation may prefer spending excavator work to avoid dumping, or spending dumping work to avoid mining.
-* Estimate accessway work from corner deltas instead of the center-height delta, for example `sum(dh_c^2)` over the relevant outer footprint corners. This should better represent mixed cut/fill origins, tilted terminal tiles, and hillside routing; it applies to V1 as well as V2.
+* Consider whether the implemented four-corner, quarter-footprint direct-work estimate needs nonlinear weighting such as `sum(dh_c^2)`. The current operation-aware corner quadrature already replaces the former center-height approximation and represents mixed cut/fill origins, tilted terminal tiles, and hillside routing consistently for V1 and future V2 footprints.
 * Check landslide/durability exclusion from corner geometry instead of center-height geometry, for the same reason: slides are driven by the actual edge/corner profile, not only by the origin center.
 * For dumping durability, use the slope factor of the most slippery selected dumping material. This lets the player influence expected stability by selecting, for example, rock when a steeper protected slope is acceptable.
 * Split landslide-protection work factors into separate mining and dumping parameters. Mining through hard rock and dumping disturbed material may justify different assumed stability.
 * Replace the raw landslide-protection factor with a loose material/proto selector, so the setting is expressed as an assumed material class rather than an abstract number.
 * Add an Auto mode that inspects the material being mined and derives the landslide-protection factor from that material when possible.
-* Add an **Avoid buildings** toggle for access and mining designation generation. When enabled, building footprints and their collapse-risk envelopes remain hard constraints.
-* When **Avoid buildings** is disabled, emit a warning if ATD places mining/access designations whose completion could undermine or slide material onto an existing, planned, or ghost building, including the mine control tower itself.
+* Extend the now-available per-world **Avoid ocean** and **Avoid buildings** Pathfinder parameters to ordinary mining-designation generation. Their new-game defaults come from `ATDsettings.json`, while current values persist in the removable state blob. Accessway candidate rays already enforce them with the material-aware tracer. Mining generation should evaluate projected cut/fill rather than a coarse hourglass. Keep direct building footprint/vehicle-clearance checks separate. When an option is disabled, allow the plan but warn if projected work reaches the corresponding hazard; building warnings cover existing, planned, or ghost buildings, including the mine control tower itself.
 
 ### V2 implementation direction
 
@@ -612,7 +636,16 @@ Implementation order:
 
 * **Height Tolerance / Edge Compatibility**: Use the game's verified rule (`ClearancePathabilityProvider.getEncodedSteepness`). Two relations: **slope-traverse** allows a per-step height delta `<= MAX_STEEPNESS_DELTA = 0.5` tiles (used for ramps and all general vehicle movement); **flat-connect** requires delta `< FLAT_STEEPNESS_DELTA = 0.1` tiles (used for level-to-level joins). The earlier "strict 0 difference" rule was incorrect and is replaced by this. A 1-tile climb spans at least two horizontal tiles.
 * **Designation Protos**: Accessway components are restricted to leveling protos to handle both mining and dumping requirements safely.
-* **Vehicle Pathability**: Pathing accounts for **corridor width**, which scales with vehicle size tier - mega vehicles require wider corridors (see *Corridor width* and *Vehicle / required vehicle type*). The same width governs ramps, which are just sloped accessways; there is no separate ramp-width parameter. Corridor width is set by the world-level **`accessWayClearance`** setting (range `[Auto, 0-2]`, sentinel `-1` for Auto, default Auto); the live value persists in the vanilla save, while `config.json` only supplies the new-game default. Auto derives clearance from the widest required vehicle. Old per-tower clearance/ramp-width values are superseded and ignored, not migrated. The slope cap is vehicle-generic: every land vehicle uses `SteepnessPathability.SlightSlopeAllowed` (`<= 0.5` tiles per step); it is a global constant, not a per-proto climb angle.
+* **Vehicle Pathability**: Pathing accounts for **corridor width**, vehicle
+  width, and vehicle height. The same resolved tier governs ramps, corridors,
+  handoffs, G pathability, cleanup footprints, and disturbance-clearance
+  expansion. The `accessVehicleClearance` setting is
+  `[OFF, Auto, T1, T2, T3]`, default Auto. Auto derives the widest required
+  concrete vehicle parameters; T1/T2 use V1 but distinct vanilla height masks,
+  and T3 uses V2. Legacy `RampWidth == 0` migrates to OFF and every other legacy
+  value migrates to Auto. The slope cap remains vehicle-generic: every land
+  vehicle uses `SteepnessPathability.SlightSlopeAllowed` (`<= 0.5` tiles per
+  step); it is a global constant, not a per-proto climb angle.
 * **Ramp Slope Budget**: The game's hard cap is `0.5` tiles per step (`MAX_STEEPNESS_DELTA`), but ATD's generated ramps target a more conservative **`0.25` tiles per step (1 height per 4 tiles, a 25% grade)**, matching vanilla ramp slope. Early ATD allowed `2` per 4 tiles (`0.5`/step); that proved too aggressive for mining operations and was tightened to `1` per 4 tiles. This slope budget is currently a hidden state parameter; keep it overridable but default it to `0.25`/step. The budget must never exceed the `0.5`/step hard cap.
 * **Saddle Designation (future, not implemented)**: A possible future *manual* designation is a "saddle": a single 4x4 designation whose corner heights are
 

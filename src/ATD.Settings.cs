@@ -56,6 +56,7 @@ namespace AutoTerrainDesignations
         internal static void ResetSettingsToDefaults()
         {
             AutoTerrainDesignationsMod.ResetGlobalDefaults();
+            ResetWorldPathfinderSettingsToDefaults();
             s_batchSize = BATCH_SIZE;
             ResetPurityLevelDefaults();
         }
@@ -415,6 +416,9 @@ namespace AutoTerrainDesignations
                 int? rampWidth = ParseInt(json, "rampWidth");
                 if (rampWidth.HasValue && ShouldPreserveInt(rampWidth.Value, migrateGeneratedDefaults, 1))
                     AutoTerrainDesignationsMod.SetRampWidth(rampWidth.Value);
+                int? vehicleClearance = ParseInt(json, "vehicleClearance");
+                if (vehicleClearance.HasValue)
+                    AutoTerrainDesignationsMod.SetVehicleClearance((AccessVehicleClearanceMode)vehicleClearance.Value);
 
                 int? maxLayers = ParseInt(json, "maxLayersToExcavate");
                 if (maxLayers.HasValue && ShouldPreserveInt(maxLayers.Value, migrateGeneratedDefaults, 30))
@@ -484,13 +488,21 @@ namespace AutoTerrainDesignations
                 if (experimentalAccessUseAStar.HasValue && ShouldPreserveBool(experimentalAccessUseAStar.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(experimentalAccessUseAStar.Value);
 
+                bool? accessAvoidOcean = ParseBool(json, "accessAvoidOcean");
+                if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetAccessAvoidOcean(accessAvoidOcean.Value);
+
+                bool? accessAvoidBuildings = ParseBool(json, "accessAvoidBuildings");
+                if (accessAvoidBuildings.HasValue && ShouldPreserveBool(accessAvoidBuildings.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetAccessAvoidBuildings(accessAvoidBuildings.Value);
+
                 float? accessLandscapingCostDistanceScale = ParseFloat(json, "accessLandscapingCostDistanceScale")
                     ?? ParseFloat(json, "accessWorkDistanceScale");
                 if (accessLandscapingCostDistanceScale.HasValue && ShouldPreserveFloat(accessLandscapingCostDistanceScale.Value, migrateGeneratedDefaults, 1f))
                     AutoTerrainDesignationsMod.SetAccessLandscapingCostDistanceScale(accessLandscapingCostDistanceScale.Value);
 
                 float? accessPropCleanupLandscapingCost = ParseFloat(json, "accessPropCleanupLandscapingCost");
-                if (accessPropCleanupLandscapingCost.HasValue && ShouldPreserveFloat(accessPropCleanupLandscapingCost.Value, migrateGeneratedDefaults, 6f))
+                if (accessPropCleanupLandscapingCost.HasValue && ShouldPreserveFloat(accessPropCleanupLandscapingCost.Value, migrateGeneratedDefaults, 6f, 8f))
                     AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(accessPropCleanupLandscapingCost.Value);
 
                 ApplyFloat("accessTreeCleanupLandscapingCost", 6f, AutoTerrainDesignationsMod.SetAccessTreeCleanupLandscapingCost);
@@ -834,6 +846,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_rampWidth\": \"Default starting value for the Ramp Width setting on each mine tower. Width of access ramps generated at the edge of designations, in tiles. 0 disables ramp generation entirely. Can be adjusted per tower in-game. Allowed range: 0-5. Default: 1.\",");
             sb.AppendLine($"  \"rampWidth\": {AutoTerrainDesignationsMod.RampWidth},");
+            sb.AppendLine($"  \"vehicleClearance\": {(int)AutoTerrainDesignationsMod.VehicleClearance},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_maxLayersToExcavate\": \"Default starting value for the Max Layers setting on each mine tower. Maximum number of terrain layers to excavate from the surface downward. 0 = no limit. Can be adjusted per tower in-game. Default: 30.\",");
             sb.AppendLine($"  \"maxLayersToExcavate\": {AutoTerrainDesignationsMod.MaxLayersToExcavate},");
@@ -883,10 +896,16 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for experimental access search. Set false for route and cost comparison. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that rejects pathfinder routes whose projected terrain disturbance reaches ocean. Currently applies only to accessway pathfinding, not Mining Designations generation. Default: true.\",");
+            sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that rejects pathfinder routes whose projected terrain disturbance reaches a building safety footprint. Currently applies only to accessway pathfinding, not Mining Designations generation. Default: true.\",");
+            sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
+            sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
             sb.AppendLine($"  \"accessLandscapingCostDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 6, tuned to favor driving around cleanup obstacles when a reasonable detour exists. Range: 0-100.\",");
+            sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 8, calibrated from observed excavator cleanup effort. Range: 0-100.\",");
             sb.AppendLine($"  \"accessPropCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)},");
             sb.AppendLine($"  \"accessTreeCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost)},");
             sb.AppendLine();

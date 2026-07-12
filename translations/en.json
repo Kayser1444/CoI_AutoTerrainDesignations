@@ -37,19 +37,19 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Designate all debris in the area for mining/removal. Overrides any forestry designations."
+    "Place prop-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable props. Shift-click to replace existing terrain and forestry designations."
   ],
   [
     "panel.designations.clear_tooltip",
-    "Clear all terrain designations in this tower's area."
+    "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Clear all terrain designations in this tower's area. (Shift-click to clear generated terrain designations only.)"
+    "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area."
   ],
   [
     "panel.designations.ore_filter.auto",
-    "Auto (useful -> debris -> dirt)"
+    "AUTO"
   ],
   [
     "panel.designations.ramp_width.label",
@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Force the scan to target a specific product. None = useful products first, then debris, then dirt."
+    "Choose what Create Designations scans for.\n\nAUTO:\n• If the tower area has no terrain designations, scan for useful products and generate their mining plan.\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted."
   ],
   [
     "settings.mod.name",
@@ -181,7 +181,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 6 favors driving around cleanup obstacles when a reasonable detour exists. Higher values make cleanup routes less attractive."
+    "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive."
   ],
   [
     "settings.experimental_access.landslide_run.label",

@@ -175,11 +175,11 @@ namespace AutoTerrainDesignations
             content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingMiningDefaults.AsFormatted));
 
             content.Add(BuildIntStepRow(
-                AtdLocalization.DesigRampWidthLabel.AsFormatted,
-                AtdLocalization.DesigRampWidthTip.AsFormatted,
-                () => AutoTerrainDesignationsMod.RampWidth,
-                value => AutoTerrainDesignationsMod.SetRampWidth(value),
-                value => value.ToString(CultureInfo.InvariantCulture),
+                new LocStrFormatted("Vehicle clearance"),
+                new LocStrFormatted("AUTO derives pathability from an assigned excavator, falling back to an available excavator type. OFF disables accessways; T1/T2/T3 select explicit pathability."),
+                () => (int)AutoTerrainDesignationsMod.VehicleClearance,
+                value => AutoTerrainDesignationsMod.SetVehicleClearance((AccessVehicleClearanceMode)Math.Max(0, Math.Min(4, value))),
+                value => value == 0 ? "OFF" : ((AccessVehicleClearanceMode)value).ToString(),
                 refreshers));
             content.Add(BuildIntStepRow(
                 AtdLocalization.DesigMaxLayersLabel.AsFormatted,
@@ -195,13 +195,6 @@ namespace AutoTerrainDesignations
                 () => AutoTerrainDesignationsMod.OrePurityLevel,
                 value => AutoTerrainDesignationsMod.SetOrePurityLevel(value),
                 FormatOrePurityLevel,
-                refreshers));
-            content.Add(BuildIntStepRow(
-                AtdLocalization.DesigCorridorClearanceLabel.AsFormatted,
-                AtdLocalization.DesigCorridorClearanceTip.AsFormatted,
-                () => AutoTerrainDesignationsMod.MinCorridorClearance,
-                value => AutoTerrainDesignationsMod.SetMinCorridorClearance(value),
-                FormatClearance,
                 refreshers));
         }
 
@@ -290,6 +283,18 @@ namespace AutoTerrainDesignations
             AddPathfinderFloat(content, refreshers, "ray_unresolved", "Unresolved-ray penalty", "Penalty when a ray does not meet terrain inside its trace range.", () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
 
             content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.safety", "Ray and terrain safety", "Pathfinder safety settings heading.").AsFormatted));
+            content.Add(BuildToggleRow(
+                Loc.Str("settings.pathfinder.avoid_ocean.label", "Avoid ocean", "Pathfinder avoid-ocean setting label.").AsFormatted,
+                Loc.Str("settings.pathfinder.avoid_ocean.tooltip", "For this world, reject routes whose projected terrain disturbance reaches the ocean. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-ocean setting tooltip.").AsFormatted,
+                () => AutoDepthDesignation.AccessAvoidOcean,
+                AutoDepthDesignation.SetAccessAvoidOcean,
+                refreshers));
+            content.Add(BuildToggleRow(
+                Loc.Str("settings.pathfinder.avoid_buildings.label", "Avoid buildings", "Pathfinder avoid-buildings setting label.").AsFormatted,
+                Loc.Str("settings.pathfinder.avoid_buildings.tooltip", "For this world, reject routes whose projected terrain disturbance reaches a building safety footprint. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-buildings setting tooltip.").AsFormatted,
+                () => AutoDepthDesignation.AccessAvoidBuildings,
+                AutoDepthDesignation.SetAccessAvoidBuildings,
+                refreshers));
             AddPathfinderFloat(content, refreshers, "candidate_slope", "Candidate ray slope factor", "Material-slope multiplier. Lower values extend the predicted run and are more conservative. Default: 0.8.", () => AutoTerrainDesignationsMod.AccessCandidateRaySlopeFactor, AutoTerrainDesignationsMod.SetAccessCandidateRaySlopeFactor);
             AddPathfinderInt(content, refreshers, "candidate_buffer", "Candidate ray end buffer", "Extra tiles checked after a candidate ray meets terrain. Default: 2.", () => AutoTerrainDesignationsMod.AccessCandidateRayEndBuffer, AutoTerrainDesignationsMod.SetAccessCandidateRayEndBuffer);
             AddPathfinderInt(content, refreshers, "candidate_distance", "Candidate ray distance", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
@@ -520,6 +525,7 @@ namespace AutoTerrainDesignations
             var status = new Label(L(string.Empty)).MarginTopBottom(1.pt());
             var save = new ButtonText(Button.Primary, AtdLocalization.SettingsSaveAsGlobal.AsFormatted, () =>
             {
+                AutoDepthDesignation.SaveWorldPathfinderSettingsAsGlobalDefaults();
                 if (AutoDepthDesignation.TrySaveSettings(out string _))
                     status.Value(AtdLocalization.SettingsSavedToFile.AsFormatted);
                 else

@@ -49,13 +49,13 @@ namespace AutoTerrainDesignations
         public static LocStr DesigCreateTip =
             Loc.Str("panel.designations.create_tooltip", "Scan and place mining designations in this tower's area.", "Tooltip on the Create Designations button.");
         public static LocStr DesigDebrisTip =
-            Loc.Str("panel.designations.debris_tooltip", "Designate all debris in the area for mining/removal. Overrides any forestry designations.", "Tooltip on the Debris button.");
+            Loc.Str("panel.designations.debris_tooltip", "Place prop-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable props. Shift-click to replace existing terrain and forestry designations.", "Tooltip on the Debris button.");
         public static LocStr DesigClearTip =
-            Loc.Str("panel.designations.clear_tooltip", "Clear all terrain designations in this tower's area.", "Tooltip on the Clear button.");
+            Loc.Str("panel.designations.clear_tooltip", "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area.", "Tooltip on the Clear button.");
         public static LocStr DesigClearTipWithShiftClick =
-            Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear all terrain designations in this tower's area. (Shift-click to clear generated terrain designations only.)", "Tooltip on the Clear button when generated designations exist.");
+            Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area.", "Tooltip on the Clear button when generated designations exist.");
         public static LocStr DesigOreFilterAuto =
-            Loc.Str("panel.designations.ore_filter.auto", "Auto (useful -> debris -> dirt)", "Label for the automatic ore filter option in the ore picker.");
+            Loc.Str("panel.designations.ore_filter.auto", "AUTO", "Label for automatic scanning behavior in the ore picker.");
         public static LocStr DesigRampWidthLabel =
             Loc.Str("panel.designations.ramp_width.label", "Ramp width", "Label for the ramp width setting row.");
         public static LocStr DesigRampWidthTip =
@@ -91,7 +91,7 @@ namespace AutoTerrainDesignations
         public static LocStr DesigScanningFilterLabel =
             Loc.Str("panel.designations.scanning_filter.label", "Scanning filter:", "Label for the scanning filter ore picker row.");
         public static LocStr DesigScanningFilterTip =
-            Loc.Str("panel.designations.scanning_filter.tooltip", "Force the scan to target a specific product. None = useful products first, then debris, then dirt.", "Tooltip for the scanning filter ore picker.");
+            Loc.Str("panel.designations.scanning_filter.tooltip", "Choose what Create Designations scans for.\n\nAUTO:\n• If the tower area has no terrain designations, scan for useful products and generate their mining plan.\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted.", "Tooltip for the scanning filter ore picker.");
 
         // ------------------------------------------------------------------ //
         // Mod settings window
@@ -137,7 +137,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsAccessPropCleanupLandscapingCostLabel =
             Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.label", "Prop cleanup landscaping cost", "Settings row label for experimental access prop cleanup cost.");
         public static LocStr SettingsAccessPropCleanupLandscapingCostTooltip =
-            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.tooltip", "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 6 favors driving around cleanup obstacles when a reasonable detour exists. Higher values make cleanup routes less attractive.", "Tooltip for experimental access prop cleanup cost.");
+            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.tooltip", "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive.", "Tooltip for experimental access prop cleanup cost.");
         public static LocStr SettingsAccessLandslideRunLabel =
             Loc.Str("settings.experimental_access.landslide_run.label", "Landslide protection slope factor", "Settings row label for the experimental landslide envelope scale.");
         public static LocStr SettingsAccessLandslideRunTooltip =
