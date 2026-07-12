@@ -141,7 +141,7 @@ namespace AutoTerrainDesignations
                     (Action)delegate
                     {
                         var t = entityProp.GetValue(inspector) as IAreaManagingTower;
-                        PopulateContent(contentCol, t);
+                        PopulateContent(contentCol, t, clearPriorityIfEmpty: true);
                     })
                     .Compact()
                     .IconSize(14.px())
@@ -200,7 +200,7 @@ namespace AutoTerrainDesignations
                 "Assets/Unity/UserInterface/General/Repeat.svg",
                 (Action)delegate
                 {
-                    PopulateContent(contentCol, getTower());
+                    PopulateContent(contentCol, getTower(), clearPriorityIfEmpty: true);
                 })
                 .Compact()
                 .IconSize(14.px())
@@ -215,7 +215,7 @@ namespace AutoTerrainDesignations
         // Private helpers
         // ------------------------------------------------------------------
 
-        private static void PopulateContent(Column col, IAreaManagingTower? tower)
+        private static void PopulateContent(Column col, IAreaManagingTower? tower, bool clearPriorityIfEmpty = false)
         {
             col.Clear();
 
@@ -286,6 +286,10 @@ namespace AutoTerrainDesignations
 
             if (results.Count == 0)
             {
+                if (clearPriorityIfEmpty && mineTower != null)
+                {
+                    SetExcavatorMiningFocus(mineTower, null);
+                }
                 col.Add(new Label(AtdLocalization.OreNoMinableDesig));
                 return;
             }
@@ -355,7 +359,7 @@ namespace AutoTerrainDesignations
                 {
                     // Priority button - centered
                     var priorityBtn = new ButtonIcon(Button.General,
-                        "Assets/Unity/UserInterface/General/Upgrade.svg",
+                        "Assets/Unity/UserInterface/General/Priority.svg",
                         (Action)delegate
                         {
                             bool clearFocus = selectedPriorityProduct == cardProduct;
