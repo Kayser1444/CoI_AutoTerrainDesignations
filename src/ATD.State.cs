@@ -15,6 +15,7 @@ using Mafi.Core;
 using Mafi.Core.Buildings.Mine;
 using Mafi.Core.Buildings.Towers;
 using Mafi.Core.Entities;
+using Mafi.Core.Entities.Dynamic;
 using Mafi.Core.Input;
 using Mafi.Core.Notifications;
 using Mafi.Core.PathFinding;
@@ -26,6 +27,7 @@ using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Resources;
 using Mafi.Core.Terrain.Trees;
 using Mafi.Core.Vehicles.Excavators;
+using Mafi.Core.Vehicles;
 using Mafi.Core.Vehicles.Jobs;
 using Mafi.Core.World;
 using CoI.AutoHelpers.Logging;
@@ -50,9 +52,11 @@ namespace AutoTerrainDesignations
         private static ConfigSerializationContext? s_configSerializationContext;
         private static TerrainPropsManager? s_terrainPropsManager;
         private static TreesManager? s_treesManager;
-        private static IVehiclePathFindingManager? s_vehiclePathFindingManager;
+        internal static IVehiclePathFindingManager? s_vehiclePathFindingManager;
+        private static IVehiclesManager? s_vehiclesManager;
         private static ParkAndWaitJobFactory? s_parkAndWaitJobFactory;
         private static VehiclePathFindingParams? s_excavatorPathFindingParams;
+        internal static VehiclePathFindingParams? s_standardVehiclePathFindingParams;
         private static string? s_modRootDirectoryPath;
         private static int s_worldGeneration;
         internal static readonly ModLogger s_log = new ModLogger("ATD");
@@ -398,6 +402,26 @@ namespace AutoTerrainDesignations
                 && registered.Contains(origin);
         }
 
+        private static IReadOnlyList<Tile2i> GetRegisteredGeneratedAccesswayOrigins(
+            IAreaManagingTower tower)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId)
+                || !s_generatedAccesswayOriginsByTowerEntityId.TryGetValue(
+                    entityId, out HashSet<Tile2i> registered))
+                return Array.Empty<Tile2i>();
+            return registered.ToArray();
+        }
+
+        private static IReadOnlyList<Tile2i> GetRegisteredGeneratedDesignationOrigins(
+            IAreaManagingTower tower)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId)
+                || !s_generatedDesignationOriginsByTowerEntityId.TryGetValue(
+                    entityId, out HashSet<Tile2i> registered))
+                return Array.Empty<Tile2i>();
+            return registered.ToArray();
+        }
+
         private static void ClearRegisteredGeneratedDesignations(IAreaManagingTower tower)
         {
             if (TryGetTowerEntityId(tower, out EntityId entityId))
@@ -555,8 +579,10 @@ namespace AutoTerrainDesignations
             s_terrainPropsManager = null;
             s_treesManager = null;
             s_vehiclePathFindingManager = null;
+            s_vehiclesManager = null;
             s_parkAndWaitJobFactory = null;
             s_excavatorPathFindingParams = null;
+            s_standardVehiclePathFindingParams = null;
             s_inputScheduler = null;
             s_configSerializationContext = null;
             s_batchSize = BATCH_SIZE;
@@ -589,7 +615,8 @@ namespace AutoTerrainDesignations
             ParkAndWaitJobFactory? parkAndWaitJobFactory = null,
             INotificationsManager? notificationsManager = null,
             IInputScheduler? inputScheduler = null,
-            ConfigSerializationContext? configSerializationContext = null)
+            ConfigSerializationContext? configSerializationContext = null,
+            IVehiclesManager? vehiclesManager = null)
         {
             ResetWorldRuntimeState();
 
@@ -605,10 +632,12 @@ namespace AutoTerrainDesignations
             s_terrainPropsManager = terrainPropsManager;
             s_treesManager = treesManager;
             s_vehiclePathFindingManager = vehiclePathFindingManager;
+            s_vehiclesManager = vehiclesManager;
             s_parkAndWaitJobFactory = parkAndWaitJobFactory;
             s_inputScheduler = inputScheduler;
             s_configSerializationContext = configSerializationContext;
             s_excavatorPathFindingParams = FindExcavatorPathFindingParams(protosDb);
+            s_standardVehiclePathFindingParams = s_excavatorPathFindingParams;
 
             if (protosDb.TryGetProto(new Proto.ID("MiningDesignator"), out TerrainDesignationProto proto))
                 s_miningProto = proto;
@@ -675,48 +704,78 @@ namespace AutoTerrainDesignations
                     }
                 }
             }
-            int targetClearance = Math.Max(1, GetTowerCorridorClearance(tower));
+            var towerCandidates = new List<VehiclePathabilityCandidate>();
             if (tower is MineTower mineTower)
             {
                 var excavators = mineTower.AllAssignedExcavators;
                 if (excavators != null)
                 {
-                    List<VehiclePathabilityCandidate> assignedCandidates = new List<VehiclePathabilityCandidate>();
                     foreach (Excavator excavator in excavators)
                         if (excavator != null && !excavator.IsDestroyed)
-                            assignedCandidates.Add(new VehiclePathabilityCandidate(
+                            towerCandidates.Add(new VehiclePathabilityCandidate(
                                 excavator.PathFindingParams,
                                 $"assignedExcavator:{excavator.Prototype.Id}",
                                 GetVehicleClearance(excavator.PathFindingParams),
                                 excavator.Prototype.Id.ToString()));
+                }
 
-                    if (TrySelectPathabilityCandidate(assignedCandidates, targetClearance, out VehiclePathabilityCandidate selected))
-                    {
-                        source = $"{selected.Source}:clearance={selected.Clearance}:targetClearance={targetClearance}";
-                        return selected.Params;
-                    }
+                if (TryGetTowerEntityId(tower, out EntityId towerId))
+                {
+                    if (s_idleReleasedVehiclesByTower.TryGetValue(towerId, out List<Vehicle> released))
+                        foreach (Vehicle vehicle in released)
+                            if (vehicle is Excavator excavator && !excavator.IsDestroyed)
+                                towerCandidates.Add(new VehiclePathabilityCandidate(
+                                    excavator.PathFindingParams,
+                                    $"releasedExcavator:{excavator.Prototype.Id}",
+                                    GetVehicleClearance(excavator.PathFindingParams),
+                                    excavator.Prototype.Id.ToString()));
+
+                    if (s_protosDb != null)
+                        foreach (DynamicEntityProto.ID protoId in PendingVehicleAllocations.GetQueuedProtoIdsForTower(towerId))
+                            if (s_protosDb.TryGetProto(protoId, out ExcavatorProto proto))
+                                towerCandidates.Add(new VehiclePathabilityCandidate(
+                                    proto.PathFindingParams,
+                                    $"preAssignedExcavator:{proto.Id}",
+                                    GetVehicleClearance(proto.PathFindingParams),
+                                    proto.Id.ToString()));
                 }
             }
 
-            if (s_protosDb != null)
+            if (TrySelectPathabilityCandidate(towerCandidates, int.MaxValue, out VehiclePathabilityCandidate towerSelected))
             {
-                var protoCandidates = new List<VehiclePathabilityCandidate>();
-                foreach (ExcavatorProto proto in s_protosDb.All<ExcavatorProto>())
-                    protoCandidates.Add(new VehiclePathabilityCandidate(
-                        proto.PathFindingParams,
-                        $"excavatorProto:{proto.Id}",
-                        GetVehicleClearance(proto.PathFindingParams),
-                        proto.Id.ToString()));
+                source = $"{towerSelected.Source}:clearance={towerSelected.Clearance}";
+                return towerSelected.Params;
+            }
 
-                if (TrySelectPathabilityCandidate(protoCandidates, targetClearance, out VehiclePathabilityCandidate selected))
+            if (s_vehiclesManager != null)
+            {
+                var fleetCandidates = new List<VehiclePathabilityCandidate>();
+                foreach (Excavator excavator in s_vehiclesManager.Excavators)
+                    if (excavator != null && !excavator.IsDestroyed)
+                        fleetCandidates.Add(new VehiclePathabilityCandidate(
+                            excavator.PathFindingParams,
+                            $"fleetExcavator:{excavator.Prototype.Id}",
+                            GetVehicleClearance(excavator.PathFindingParams),
+                            excavator.Prototype.Id.ToString()));
+
+                if (TrySelectPathabilityCandidate(fleetCandidates, int.MaxValue, out VehiclePathabilityCandidate selected))
                 {
-                    source = $"{selected.Source}:clearance={selected.Clearance}:targetClearance={targetClearance}";
+                    source = $"{selected.Source}:clearance={selected.Clearance}";
                     return selected.Params;
                 }
             }
 
-            source = $"globalExcavatorProtoFallback:targetClearance={targetClearance}";
+            source = "autoOff:noExcavatorsOnMap";
             return s_excavatorPathFindingParams ?? VehiclePathFindingParams.DEFAULT;
+        }
+
+        internal static bool ShouldGenerateAccessways(IAreaManagingTower tower)
+        {
+            AccessVehicleClearanceMode mode = GetTowerVehicleClearance(tower);
+            if (mode == AccessVehicleClearanceMode.Off) return false;
+            if (mode != AccessVehicleClearanceMode.Auto) return true;
+            GetExcavatorPathFindingParamsForTower(tower, out string source);
+            return !source.StartsWith("autoOff:", StringComparison.Ordinal);
         }
 
         private readonly struct VehiclePathabilityCandidate
@@ -724,6 +783,7 @@ namespace AutoTerrainDesignations
             public VehiclePathFindingParams Params { get; }
             public string Source { get; }
             public int Clearance { get; }
+            public int HeightClearance { get; }
             public string SortKey { get; }
 
             public VehiclePathabilityCandidate(
@@ -735,6 +795,7 @@ namespace AutoTerrainDesignations
                 Params = pathFindingParams;
                 Source = source;
                 Clearance = clearance;
+                HeightClearance = pathFindingParams.MinHeightClearance.Value;
                 SortKey = sortKey;
             }
         }
@@ -755,7 +816,9 @@ namespace AutoTerrainDesignations
                     if (!foundAboveTarget
                         || candidate.Clearance < fallbackAboveTarget.Clearance
                         || (candidate.Clearance == fallbackAboveTarget.Clearance
-                            && string.CompareOrdinal(candidate.SortKey, fallbackAboveTarget.SortKey) > 0))
+                            && (candidate.HeightClearance > fallbackAboveTarget.HeightClearance
+                                || (candidate.HeightClearance == fallbackAboveTarget.HeightClearance
+                                    && string.CompareOrdinal(candidate.SortKey, fallbackAboveTarget.SortKey) < 0))))
                     {
                         fallbackAboveTarget = candidate;
                         foundAboveTarget = true;
@@ -766,7 +829,9 @@ namespace AutoTerrainDesignations
                 if (!foundAtOrBelowTarget
                     || candidate.Clearance > selected.Clearance
                     || (candidate.Clearance == selected.Clearance
-                        && string.CompareOrdinal(candidate.SortKey, selected.SortKey) > 0))
+                        && (candidate.HeightClearance > selected.HeightClearance
+                            || (candidate.HeightClearance == selected.HeightClearance
+                                && string.CompareOrdinal(candidate.SortKey, selected.SortKey) < 0))))
                 {
                     selected = candidate;
                     foundAtOrBelowTarget = true;

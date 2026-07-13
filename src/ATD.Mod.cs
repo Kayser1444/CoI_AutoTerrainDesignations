@@ -12,6 +12,7 @@ using HarmonyLib;
 using Mafi;
 using Mafi.Collections;
 using Mafi.Core.Entities;
+using Mafi.Core.Buildings.VehicleDepots;
 using Mafi.Core.Game;
 using Mafi.Core.GameLoop;
 using Mafi.Core.Mods;
@@ -53,6 +54,8 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
     private ISaveManager? m_saveManager;
     private SimStep m_lastSimTick;
     private IModStateJsonStore? m_towerSettingsStateStore;
+    private IModStateJsonStore? m_preAllocationsStateStore;
+    private IEntitiesManager? m_entitiesManager;
 
     public string Name => "Auto Terrain Designations";
 
@@ -91,6 +94,7 @@ public static string Tt(string text) => text;
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
         AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
+        PreAllocationPatches.Apply(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
         CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
             m_harmony,
@@ -467,6 +471,7 @@ public static string Tt(string text) => text;
             ProtosDb protosDb = resolver.Resolve<ProtosDb>();
             IWorldMapManager worldMapManager = resolver.Resolve<IWorldMapManager>();
             IEntitiesManager entitiesManager = resolver.Resolve<IEntitiesManager>();
+            Mafi.Core.Vehicles.IVehiclesManager vehiclesManager = resolver.Resolve<Mafi.Core.Vehicles.IVehiclesManager>();
             TerrainPropsManager terrainPropsManager = resolver.Resolve<TerrainPropsManager>();
             TreesManager treesManager = resolver.Resolve<TreesManager>();
             IVehiclePathFindingManager vehiclePathFindingManager = resolver.Resolve<IVehiclePathFindingManager>();
@@ -476,9 +481,14 @@ public static string Tt(string text) => text;
             ConfigSerializationContext configSerializationContext = resolver.Resolve<ConfigSerializationContext>();
             AutoTerrainDesignationsTicker ticker = AutoTerrainDesignationsTicker.CreateForWorld(AutoDepthDesignation.CurrentWorldGeneration + 1);
             AutoDepthDesignation.SetModRootDirectoryPath(Manifest.RootDirectoryPath);
-            AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext);
+            m_entitiesManager = entitiesManager;
+            m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
+            AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
+            m_preAllocationsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, "atdPendingVehicleAllocations");
+            PendingVehicleAllocations.LoadFromJsonStore(m_preAllocationsStateStore);
+            PendingVehicleAllocations.ReconcileQueues(entitiesManager);
             // Corner designation mode — TerrainCursor, TerrainDesignationsRenderer and
             // CursorManager may only be available on the Unity side; fail gracefully if not resolvable.
             TerrainCursor? terrainCursor = null;
@@ -526,6 +536,12 @@ public static string Tt(string text) => text;
             ?? ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
         m_towerSettingsStateStore = store;
         AutoDepthDesignation.SaveTowerSettingsToJsonStore(store);
+        if (m_preAllocationsStateStore != null)
+        {
+            if (m_entitiesManager != null)
+                PendingVehicleAllocations.ReconcileQueues(m_entitiesManager);
+            PendingVehicleAllocations.SaveToJsonStore(m_preAllocationsStateStore);
+        }
         AutoDepthDesignation.PurgeTransientNotificationsForSave();
         AutoDepthDesignation.RestoreFarmingRuntimeForSave();
         AutoDepthDesignation.RestoreIdleReleasedVehiclesForSave();
@@ -543,6 +559,7 @@ public static string Tt(string text) => text;
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();
         AutoDepthDesignation.ResetWorldRuntimeState();
+        PendingVehicleAllocations.ClearAll();
     }
 
     private void unsubscribeWorldEvents()
@@ -569,6 +586,20 @@ public static string Tt(string text) => text;
             catch { }
             m_saveManager = null;
         }
+        if (m_entitiesManager != null)
+        {
+            try { m_entitiesManager.EntityRemoved.RemoveNonSaveable(this, onEntityRemoved); }
+            catch { }
+            m_entitiesManager = null;
+        }
+    }
+
+    private void onEntityRemoved(IEntity entity)
+    {
+        if (entity is IEntityAssignedWithVehicles)
+            PendingVehicleAllocations.OnTowerDestroyed(entity.Id);
+        else if (entity is VehicleDepotBase)
+            PendingVehicleAllocations.OnDepotDestroyed(entity.Id);
     }
 
     private void RegisterAutoHelpersLocalizationLateApply(DependencyResolver resolver)

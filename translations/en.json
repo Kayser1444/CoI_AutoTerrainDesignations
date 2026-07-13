@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Place prop-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable props. Shift-click to replace existing terrain and forestry designations."
+    "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations."
   ],
   [
     "panel.designations.clear_tooltip",

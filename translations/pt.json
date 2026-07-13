@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Coloque designações de remoção de prop em células desocupadas acessíveis. Ctrl-clique para incluir adereços inacessíveis. Clique com a tecla Shift pressionada para substituir designações de terreno e florestais existentes."
+    "Coloque designações de remoção de detritos em células desocupadas acessíveis. Ctrl-clique para incluir detritos inacessíveis. Clique com a tecla Shift pressionada para substituir também as designações de terreno e florestais existentes."
   ],
   [
     "panel.designations.clear_tooltip",

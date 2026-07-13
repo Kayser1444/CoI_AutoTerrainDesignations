@@ -49,7 +49,7 @@ namespace AutoTerrainDesignations
         public static LocStr DesigCreateTip =
             Loc.Str("panel.designations.create_tooltip", "Scan and place mining designations in this tower's area.", "Tooltip on the Create Designations button.");
         public static LocStr DesigDebrisTip =
-            Loc.Str("panel.designations.debris_tooltip", "Place prop-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable props. Shift-click to replace existing terrain and forestry designations.", "Tooltip on the Debris button.");
+            Loc.Str("panel.designations.debris_tooltip", "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations.", "Tooltip on the Debris button.");
         public static LocStr DesigClearTip =
             Loc.Str("panel.designations.clear_tooltip", "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area.", "Tooltip on the Clear button.");
         public static LocStr DesigClearTipWithShiftClick =
@@ -281,6 +281,17 @@ namespace AutoTerrainDesignations
             Loc.Str("notification.farming_complete", "[ATD] {entity} farming preparation and filling complete", "Notification: farming complete. {entity} is substituted by the game.");
         public static LocStr NotifExcavatorCompleted =
             Loc.Str("notification.excavator_completed", "[ATD] {entity} completed an excavator", "Notification: excavator built. {entity} is substituted by the game.");
+
+        public static LocStr EnqueueConfirmPromptSingular =
+            Loc.Str("vehicle_order.confirm.singular", "Build {0} at {1} and pre-assign it to {2}?", "Vehicle construction confirmation. Vehicle, depot, tower.");
+        public static LocStr EnqueueConfirmPromptPlural =
+            Loc.Str("vehicle_order.confirm.plural", "Build {0} × {1} at {2} and pre-assign them to {3}?", "Vehicle construction confirmation. Count, vehicle, depot, tower.");
+        public static LocStr EnqueueConfirmBtnText =
+            Loc.Str("vehicle_order.confirm.button", "Build", "Vehicle construction confirmation button.");
+        public static LocStr ZoomToDepotTooltip =
+            Loc.Str("vehicle_order.zoom.tooltip", "Go to {0}", "Tooltip for zooming to the selected vehicle depot.");
+        public static LocStr PreAssignedTooltipFmt =
+            Loc.Str("vehicle_order.preassigned.tooltip", "Pre-assigned to {0}", "Tooltip for a queued vehicle pre-assigned to a tower.");
 
     }
 }

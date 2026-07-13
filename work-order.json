@@ -20,7 +20,29 @@
       "pt": "Máx.",
       "ru": "Макс",
       "zh": "最大限度"
+    },
+    "panel.designations.debris_tooltip": {
+      "en": "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations.",
+      "context": "Tooltip on the Debris button.",
+      "de": "Platzieren Sie Markierungen zur Trümmerentfernung auf erreichbaren, unbesetzten Zellen. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen. Klicken Sie bei gedrückter Umschalttaste, um auch vorhandene Gelände- und Forstbezeichnungen zu ersetzen.",
+      "es": "Coloque designaciones de eliminación de escombros en celdas desocupadas accesibles. Ctrl-clic para incluir escombros inalcanzables. Presione Mayús y haga clic para reemplazar también las designaciones de terreno y bosques existentes.",
+      "it": "Posiziona le designazioni per la rimozione dei detriti sulle celle non occupate raggiungibili. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili. Fare clic tenendo premuto il tasto Maiusc per sostituire anche le designazioni di terreno e silvicoltura esistenti.",
+      "pt": "Coloque designações de remoção de detritos em células desocupadas acessíveis. Ctrl-clique para incluir detritos inacessíveis. Clique com a tecla Shift pressionada para substituir também as designações de terreno e florestais existentes.",
+      "ru": "Разместите обозначения удаления мусора на доступных незанятых ячейках. Удерживая клавишу Ctrl, щелкните, чтобы включить недоступные обломки. Щелкните, удерживая клавишу Shift, чтобы также заменить существующие обозначения местности и лесного хозяйства.",
+      "sv": "Placera skräpborttagningsbeteckningar på lediga celler som kan nås. Ctrl-klicka för att ta med oåtkomliga skräp. Skift-klicka för att även ersätta befintliga terräng- och skogsbruksbeteckningar.",
+      "zh": "将碎片清除标记放置在可触及的未占用单元格上。按住 Ctrl 键单击以包含无法到达的碎片。按住 Shift 键并单击也可以替换现有的地形和林业名称。"
+    },
+    "panel.designations.ore_filter.auto": {
+      "en": "AUTO",
+      "context": "Label for automatic scanning behavior in the ore picker.",
+      "de": "AUTO",
+      "es": "AUTO",
+      "it": "AUTO",
+      "pt": "AUTO",
+      "ru": "АВТО",
+      "sv": "BIL",
+      "zh": "汽车"
     }
   },
-  "keys_needing_translation": 1
+  "keys_needing_translation": 3
 }

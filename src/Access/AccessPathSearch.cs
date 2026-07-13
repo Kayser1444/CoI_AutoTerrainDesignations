@@ -254,6 +254,10 @@ namespace AutoTerrainDesignations.Access
                 || !ContainsHandoffTile(handoffFixture, handoffOrigin, edgeContactSlope, handoffSw)
                 || !ContainsHandoffTile(handoffFixture, handoffOrigin, edgeContactSlope, handoffSe))
             { failure = "V/G handoff must use matching edge contacts, not a mismatched center"; return false; }
+            var oceanPreciseHeights = new Dictionary<Tile2i, float>();
+            foreach (KeyValuePair<Tile2i, int> pair in groundHeights)
+                oceanPreciseHeights[pair.Key] = pair.Value / 2f;
+            oceanPreciseHeights[new Tile2i(14, 14)] = 1f;
             var oceanFixture = new AccessSearchSnapshot(
                 new Tile2i(0, 0), new Tile2i(20, 20), new Tile2i(18, 18),
                 -4, 4, true, false, false, 1f, 1f,
@@ -265,10 +269,28 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
                 new[] { new Tile2i(14, 14) },
-                Array.Empty<AccessDurabilityCorner>());
+                Array.Empty<AccessDurabilityCorner>(),
+                preciseTerrainHeights: oceanPreciseHeights);
             if (oceanFixture.IsCandidateProfileFeasible(new Tile2i(12, 12), flat, out string oceanMismatch)
                 || oceanMismatch != "OceanBelowMinimum")
             { failure = "V profiles below height 1 must not visit ocean"; return false; }
+            var allowedOceanFixture = new AccessSearchSnapshot(
+                new Tile2i(0, 0), new Tile2i(20, 20), new Tile2i(18, 18),
+                -2, 2, true, false, false, 1f, 1f,
+                groundHeights,
+                terrainCenters,
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                new[] { new Tile2i(14, 14) },
+                Array.Empty<AccessDurabilityCorner>(),
+                preciseTerrainHeights: oceanPreciseHeights,
+                avoidOcean: false);
+            if (!allowedOceanFixture.IsCandidateProfileFeasible(
+                new Tile2i(12, 12), flat, out string allowedOceanMismatch))
+            { failure = "disabling ocean avoidance must permit V profiles to overlap the ocean envelope: " + allowedOceanMismatch; return false; }
             var dumpingFixture = new AccessSearchSnapshot(
                 new Tile2i(0, 0), new Tile2i(20, 20), new Tile2i(18, 18),
                 -4, 4, false, false, false, 1f, 1f,
@@ -457,31 +479,46 @@ namespace AutoTerrainDesignations.Access
                 Tile2i.Zero, new Tile2i(1, 0), 4f,
                 AccessSideRayOperation.Fill, 1f,
                 avoidOcean: false);
+            AccessSideRayResult zeroWorkOceanRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, 3f),
+                Tile2i.Zero, new Tile2i(1, 0), 4f,
+                AccessSideRayOperation.Fill, 1f);
             AccessSideRayResult cutOceanRay = AccessSideRayCost.Score(
-                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, -2f),
-                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, 4f),
+                Tile2i.Zero, new Tile2i(1, 0), -1f,
                 AccessSideRayOperation.Cut, 1f);
             AccessSideRayResult skippedDistanceOceanRay = AccessSideRayCost.Score(
                 tile => tile.X == 4
-                    ? new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, -2f)
+                    ? new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, 4f)
                     : new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 4f),
                 Tile2i.Zero, new Tile2i(1, 0), 0f,
                 AccessSideRayOperation.Cut, 0.1f);
             AccessSideRayResult postTerminationOceanRay = AccessSideRayCost.Score(
                 tile => tile.X == 4
                     ? new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, -2f)
-                    : new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 3f),
-                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                    : tile.X == 3
+                        ? new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, -1f)
+                        : new AccessSideRayTerrainSample(AccessTerrainSampleKind.Terrain, 3f),
+                Tile2i.Zero, new Tile2i(1, 0), -4f,
                 AccessSideRayOperation.Cut, 1f,
                 postTerminationSafetyMargin: 1);
-            if (fillOceanRay.FatalReason != "SideRayFillOcean"
+            AccessSideRayResult dryOceanCutRay = AccessSideRayCost.Score(
+                _ => new AccessSideRayTerrainSample(AccessTerrainSampleKind.Ocean, 4f),
+                Tile2i.Zero, new Tile2i(1, 0), 0f,
+                AccessSideRayOperation.Cut, 1f);
+            if (fillOceanRay.IsFatal
+                || fillOceanRay.IsUnresolved
+                || Math.Abs(fillOceanRay.TotalCost - 5f) > 0.0001f
                 || allowedFillOceanRay.IsFatal
                 || allowedFillOceanRay.IsUnresolved
                 || Math.Abs(allowedFillOceanRay.TotalCost - 5f) > 0.0001f
+                || zeroWorkOceanRay.IsFatal
+                || zeroWorkOceanRay.TotalCost != 0f
                 || cutOceanRay.FatalReason != "SideRayCutOcean"
                 || skippedDistanceOceanRay.FatalReason != "SideRayCutOcean"
-                || postTerminationOceanRay.FatalReason != "SideRayCutOcean")
-            { failure = "side-ray integrator must reject ocean disturbance when avoidance is enabled and trace through ocean when disabled"; return false; }
+                || postTerminationOceanRay.FatalReason != "SideRayCutOcean"
+                || dryOceanCutRay.IsFatal)
+            { failure = "side-ray integrator must allow ocean fill and dry cuts, reject cuts below sea level including safety samples, permit zero-work termination, and trace cuts through ocean when disabled"; return false; }
 
             var directionalHeights = new Dictionary<Tile2i, float>();
             for (int x = -20; x <= 40; x++)
@@ -1655,6 +1692,11 @@ namespace AutoTerrainDesignations.Access
             Tile2i direction,
             out string reason)
         {
+            if (snapshot.IsProfileBlockedByProjectedDesignationHeight(origin, profile))
+            {
+                reason = "ProjectedDesignationHeight";
+                return false;
+            }
             bool useDirectionalDurability = predecessor.Mode != AccessSearchMode.Existing
                 && predecessor.Mode != AccessSearchMode.Ground;
             return useDirectionalDurability

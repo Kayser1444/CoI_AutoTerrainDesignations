@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Coloque designaciones de eliminación de accesorios en celdas desocupadas accesibles. Ctrl-clic para incluir accesorios inalcanzables. Presione Mayús y haga clic para reemplazar las designaciones de terreno y bosques existentes."
+    "Coloque designaciones de eliminación de escombros en celdas desocupadas accesibles. Ctrl-clic para incluir escombros inalcanzables. Presione Mayús y haga clic para reemplazar también las designaciones de terreno y bosques existentes."
   ],
   [
     "panel.designations.clear_tooltip",

@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Platziere Bezeichnungen zum Entfernen von Trümmern auf erreichbaren freien Feldern. Strg-Klick, um nicht erreichbare Trümmer einzuschließen. Shift-Klick, um bestehende Gelände- und Forstgebiete zu ersetzen."
+    "Platzieren Sie Markierungen zur Trümmerentfernung auf erreichbaren, unbesetzten Zellen. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen. Klicken Sie bei gedrückter Umschalttaste, um auch vorhandene Gelände- und Forstbezeichnungen zu ersetzen."
   ],
   [
     "panel.designations.clear_tooltip",

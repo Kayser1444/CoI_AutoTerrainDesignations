@@ -18,14 +18,27 @@ namespace AutoTerrainDesignations
 {
     public static partial class AutoDepthDesignation
     {
+        private static readonly HashSet<Tile2i> s_lastClearedAccesswayOrigins =
+            new HashSet<Tile2i>();
+
+        private static void CaptureClearedAccesswayOrigins(IAreaManagingTower tower)
+        {
+            s_lastClearedAccesswayOrigins.Clear();
+            foreach (Tile2i origin in GetRegisteredGeneratedAccesswayOrigins(tower))
+                s_lastClearedAccesswayOrigins.Add(origin);
+        }
+
         private static void ClearDesignationsInArea(IAreaManagingTower tower)
         {
             if (s_desigManager == null) return;
 
             var originsToRemove = new List<Tile2i>();
-            foreach (TerrainDesignation designation in tower.ManagedDesignations)
+            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
+                tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax))
             {
-                originsToRemove.Add(designation.OriginTileCoord);
+                if (IsOriginInsideTower(tower, designation.OriginTileCoord)
+                    && IsTerrainWorkDesignationProto(designation.Prototype))
+                    originsToRemove.Add(designation.OriginTileCoord);
             }
 
             foreach (Tile2i origin in originsToRemove)
@@ -46,19 +59,14 @@ namespace AutoTerrainDesignations
 
         private static bool HasTerrainDesignationAtOrigin(IAreaManagingTower tower, Tile2i origin)
         {
-            foreach (TerrainDesignation designation in tower.ManagedDesignations)
-            {
-                if (designation.OriginTileCoord == origin)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return IsOriginInsideTower(tower, origin)
+                && s_desigManager != null
+                && s_desigManager.GetDesignationAt(origin).HasValue;
         }
 
         internal static void ClearDesignationsForTower(IAreaManagingTower tower)
         {
+            CaptureClearedAccesswayOrigins(tower);
             ClearDesignationsInArea(tower);
             ClearRegisteredGeneratedAccessways(tower);
             ClearRegisteredGeneratedDesignations(tower);
@@ -68,9 +76,9 @@ namespace AutoTerrainDesignations
         {
             if (s_desigManager == null) return false;
 
-            foreach (TerrainDesignation designation in tower.ManagedDesignations)
+            foreach (Tile2i origin in GetRegisteredGeneratedDesignationOrigins(tower))
             {
-                if (IsGeneratedDesignationOrigin(tower, designation.OriginTileCoord))
+                if (s_desigManager.GetDesignationAt(origin).HasValue)
                     return true;
             }
 
@@ -79,6 +87,7 @@ namespace AutoTerrainDesignations
 
         internal static void ClearGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
+            CaptureClearedAccesswayOrigins(tower);
             if (s_desigManager == null)
             {
                 ClearRegisteredGeneratedAccessways(tower);
@@ -86,17 +95,28 @@ namespace AutoTerrainDesignations
                 return;
             }
 
+            IReadOnlyList<Tile2i> registeredOrigins =
+                GetRegisteredGeneratedDesignationOrigins(tower);
             var originsToRemove = new List<Tile2i>();
-            foreach (TerrainDesignation designation in tower.ManagedDesignations)
+            foreach (Tile2i origin in registeredOrigins)
             {
-                if (IsGeneratedDesignationOrigin(tower, designation.OriginTileCoord))
-                    originsToRemove.Add(designation.OriginTileCoord);
+                if (s_desigManager.GetDesignationAt(origin).HasValue)
+                    originsToRemove.Add(origin);
             }
 
             foreach (Tile2i origin in originsToRemove)
             {
                 s_desigManager.RemoveDesignation(origin);
             }
+
+            int remainingLive = 0;
+            foreach (Tile2i origin in registeredOrigins)
+                if (s_desigManager.GetDesignationAt(origin).HasValue)
+                    remainingLive++;
+            LogExperimentalAccessDebug(
+                $"[ATD Generated Clear Audit] registered={registeredOrigins.Count} " +
+                $"liveBefore={originsToRemove.Count} removed={originsToRemove.Count} " +
+                $"liveAfter={remainingLive}");
 
             ClearRegisteredGeneratedAccessways(tower);
             ClearRegisteredGeneratedDesignations(tower);

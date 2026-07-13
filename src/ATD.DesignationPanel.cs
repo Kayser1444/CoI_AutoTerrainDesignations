@@ -247,7 +247,7 @@ namespace AutoTerrainDesignations
                 .MinDigits(3).AlignSelfStretch().MarginTopBottom(2.px());
             panel.BodyAdd(BuildStepRow(
                 new LocStrFormatted("Vehicle clearance"),
-                new LocStrFormatted("Selects the vehicle pathability and accessway width. AUTO derives pathability from an assigned excavator, falling back to an available excavator type. OFF disables generated accessways."),
+                new LocStrFormatted("Selects vehicle pathability and accessway width. AUTO uses the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF. OFF disables generated accessways."),
                 rampWidthDisplay,
                 (Action)delegate
                 {

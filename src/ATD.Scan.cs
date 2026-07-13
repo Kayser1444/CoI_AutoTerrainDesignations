@@ -106,7 +106,7 @@ namespace AutoTerrainDesignations
             var towerSettings = GetOrCreateTowerSettings(tower);
             IEnumerator guarded = RunCreateDesignationsWithDebugGate(
                 CreateDesignationsCoroutine(
-                    tower, towerSettings.RampWidth > 0, panelKey),
+                    tower, towerSettings.RampWidth > 0 && ShouldGenerateAccessways(tower), panelKey),
                 requestId);
             try
             {
@@ -359,6 +359,18 @@ namespace AutoTerrainDesignations
             var cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
             HashSet<Tile2i> preexistingTerrainWorkOrigins =
                 CollectExistingTerrainWorkEndpointOrigins(tower);
+            List<Tile2i> recreatedAccesswayOrigins = maxOreDepths.Keys
+                .Where(origin => s_lastClearedAccesswayOrigins.Contains(origin))
+                .OrderBy(origin => origin.X)
+                .ThenBy(origin => origin.Y)
+                .ToList();
+            LogExperimentalAccessDebug(
+                $"[ATD Mining Plan Placement Audit] planned={maxOreDepths.Count} " +
+                $"preexistingTerrainWork={preexistingTerrainWorkOrigins.Count} " +
+                $"vehicleClearance={towerSettings.VehicleClearance} " +
+                $"recreatedClearedAccessways={recreatedAccesswayOrigins.Count} " +
+                $"origins=[{string.Join(",", recreatedAccesswayOrigins.Take(24).Select(
+                    origin => $"({origin.X},{origin.Y})"))}]");
 
             int designCount = 0;
             foreach (var kvp in maxOreDepths)
@@ -716,7 +728,7 @@ namespace AutoTerrainDesignations
             return targetTiles;
         }
 
-        private static bool TryFindNearestPathableTile(
+        internal static bool TryFindNearestPathableTile(
             IPathabilityProvider pathabilityProvider,
             VehiclePathFindingParams pfParams,
             Tile2i origin,

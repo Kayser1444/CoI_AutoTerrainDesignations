@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Posiziona le designazioni per la rimozione degli oggetti sulle celle non occupate raggiungibili. Fare clic tenendo premuto Ctrl per includere oggetti di scena irraggiungibili. Fare clic tenendo premuto il tasto Maiusc per sostituire le designazioni del terreno e della silvicoltura esistenti."
+    "Posiziona le designazioni per la rimozione dei detriti sulle celle non occupate raggiungibili. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili. Fare clic tenendo premuto il tasto Maiusc per sostituire anche le designazioni di terreno e silvicoltura esistenti."
   ],
   [
     "panel.designations.clear_tooltip",

@@ -639,6 +639,8 @@ namespace AutoTerrainDesignations
 
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
                             refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
+                        Dictionary<Tile2i, string> designationStateBeforeSearch =
+                            CaptureTerrainDesignationState(tower);
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
                         IEnumerator mergedSearch = RunExperimentalAccessDryRunSliced(
                             request, cluster, currentClusterOrdinal, unreachableClusterCount,
@@ -647,6 +649,28 @@ namespace AutoTerrainDesignations
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.Result!;
                         experimentalPlan = LastExperimentalAccessPlan;
+                        Dictionary<Tile2i, string> designationStateAfterSearch =
+                            CaptureTerrainDesignationState(tower);
+                        List<Tile2i> addedDuringSearch = designationStateAfterSearch.Keys
+                            .Where(origin => !designationStateBeforeSearch.ContainsKey(origin))
+                            .ToList();
+                        List<Tile2i> removedDuringSearch = designationStateBeforeSearch.Keys
+                            .Where(origin => !designationStateAfterSearch.ContainsKey(origin))
+                            .ToList();
+                        List<Tile2i> changedDuringSearch = designationStateAfterSearch.Keys
+                            .Where(origin => designationStateBeforeSearch.TryGetValue(
+                                origin, out string before)
+                                && !string.Equals(before, designationStateAfterSearch[origin],
+                                    StringComparison.Ordinal))
+                            .ToList();
+                        LogExperimentalAccessDebug(
+                            $"[ATD Experimental Access Mutation Audit] cluster={cluster.ClusterId} " +
+                            $"before={designationStateBeforeSearch.Count} after={designationStateAfterSearch.Count} " +
+                            $"added={addedDuringSearch.Count} removed={removedDuringSearch.Count} " +
+                            $"changed={changedDuringSearch.Count} " +
+                            $"samples=[{string.Join(",", addedDuringSearch.Concat(removedDuringSearch)
+                                .Concat(changedDuringSearch).Distinct().Take(24)
+                                .Select(origin => $"({origin.X},{origin.Y})"))}]");
 
                         if (s_cancelExperimentalAccessSearch)
                         {
@@ -944,6 +968,24 @@ namespace AutoTerrainDesignations
                     .Take(3)
                     .Select(pair => $"{pair.Key}:{pair.Value}"));
             return $"{reason}; topRejections={topRejections}";
+        }
+
+        private static Dictionary<Tile2i, string> CaptureTerrainDesignationState(
+            IAreaManagingTower tower)
+        {
+            var result = new Dictionary<Tile2i, string>();
+            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
+                tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax))
+            {
+                DesignationData data = designation.Data;
+                result[designation.OriginTileCoord] =
+                    designation.Prototype.Id.Value + ":" +
+                    data.OriginTargetHeight.Value + "," +
+                    data.PlusXTargetHeight.Value + "," +
+                    data.PlusXyTargetHeight.Value + "," +
+                    data.PlusYTargetHeight.Value;
+            }
+            return result;
         }
 
         private static List<Tile2i> GetAccessibleFixedGoalOrigins(

@@ -282,6 +282,8 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_expandedBuildingRayBlockers;
         private readonly HashSet<Tile2i> m_cutDesignationRayBlockers;
         private readonly HashSet<Tile2i> m_fillDesignationRayBlockers;
+        private readonly Dictionary<Tile2i, float> m_projectedCutSupportCeilings;
+        private readonly Dictionary<Tile2i, float> m_projectedFillSurfaceFloors;
         private readonly HashSet<Tile2i> m_hardDesignationRayBlockers;
         private readonly HashSet<Tile2i> m_oceanTiles;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByOrigin;
@@ -363,6 +365,8 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i>? rayLevelingDesignationOrigins = null,
             IEnumerable<Tile2i>? projectedCutDisturbedTiles = null,
             IEnumerable<Tile2i>? projectedFillDisturbedTiles = null,
+            IDictionary<Tile2i, float>? projectedCutSupportCeilings = null,
+            IDictionary<Tile2i, float>? projectedFillSurfaceFloors = null,
             int vehicleClearanceRadius = 1,
             bool avoidOcean = true,
             bool avoidBuildings = true)
@@ -407,6 +411,12 @@ namespace AutoTerrainDesignations.Access
                 rayDumpingDesignationOrigins ?? Array.Empty<Tile2i>());
             m_hardDesignationRayBlockers = BuildDesignationRayBlockers(
                 rayLevelingDesignationOrigins ?? fixedProfiles.Keys);
+            m_projectedCutSupportCeilings = projectedCutSupportCeilings != null
+                ? new Dictionary<Tile2i, float>(projectedCutSupportCeilings)
+                : new Dictionary<Tile2i, float>();
+            m_projectedFillSurfaceFloors = projectedFillSurfaceFloors != null
+                ? new Dictionary<Tile2i, float>(projectedFillSurfaceFloors)
+                : new Dictionary<Tile2i, float>();
             if (projectedCutDisturbedTiles != null)
                 m_cutDesignationRayBlockers.UnionWith(projectedCutDisturbedTiles);
             if (projectedFillDisturbedTiles != null)
@@ -716,27 +726,54 @@ namespace AutoTerrainDesignations.Access
 
         public bool IsProfileOceanBlocked(Tile2i origin, AccessHeightProfile profile)
         {
-            const int minOceanHeight2Numerator = 2 * 16;
+            if (!AvoidOcean)
+                return false;
+            const float minimumDrivableOceanHeight = 1f;
             for (int y = 0; y <= 4; y++)
                 for (int x = 0; x <= 4; x++)
-                    if (m_oceanTiles.Contains(origin + new RelTile2i(x, y))
-                        && profile.GetHeight2NumeratorAt(x, y) < minOceanHeight2Numerator)
+                {
+                    Tile2i tile = origin + new RelTile2i(x, y);
+                    // Fill rays may spill into ocean, but the vehicle-bearing
+                    // profile itself must finish above the drivable threshold.
+                    if (m_oceanTiles.Contains(tile)
+                        && profile.GetHeight2NumeratorAt(x, y) / 32f
+                            < minimumDrivableOceanHeight)
                         return true;
+                }
+            return false;
+        }
+
+        public bool IsProfileBlockedByProjectedDesignationHeight(
+            Tile2i origin, AccessHeightProfile profile)
+        {
+            const float epsilon = 0.0001f;
+            for (int y = 0; y <= 4; y++)
+                for (int x = 0; x <= 4; x++)
+                {
+                    Tile2i tile = origin + new RelTile2i(x, y);
+                    float profileHeight = profile.GetHeight2NumeratorAt(x, y) / 32f;
+                    if (m_projectedCutSupportCeilings.TryGetValue(
+                            tile, out float supportCeiling)
+                        && profileHeight > supportCeiling + epsilon)
+                        return true;
+                    if (m_projectedFillSurfaceFloors.TryGetValue(
+                            tile, out float fillFloor)
+                        && profileHeight < fillFloor - epsilon)
+                        return true;
+                }
             return false;
         }
 
         public bool IsCandidateProfileFeasible(Tile2i origin, AccessHeightProfile profile, out string reason)
-            => IsCandidateProfileFeasible(origin, profile, default, default, false, out reason);
+            => IsCandidateProfileFeasibleCore(origin, profile, out reason);
 
         public bool IsCandidateProfileFeasibleFromValidatedPredecessor(
             Tile2i origin, AccessHeightProfile profile, Tile2i predecessorOrigin,
             Tile2i direction, out string reason)
-            => IsCandidateProfileFeasible(origin, profile, predecessorOrigin, direction, true,
-                out reason);
+            => IsCandidateProfileFeasibleCore(origin, profile, out reason);
 
-        private bool IsCandidateProfileFeasible(Tile2i origin, AccessHeightProfile profile,
-            Tile2i predecessorOrigin, Tile2i direction, bool directionalDurabilityCheck,
-            out string reason)
+        private bool IsCandidateProfileFeasibleCore(
+            Tile2i origin, AccessHeightProfile profile, out string reason)
         {
             if (!IsOriginInside(origin)) { reason = "HorizontalBounds"; return false; }
             if (m_workOrigins.Contains(origin)) { reason = "WorkOrigin"; return false; }
@@ -777,9 +814,7 @@ namespace AutoTerrainDesignations.Access
             profile.AddWorldCorners(origin, (corner, height2) =>
             {
                 if (durabilityBlocked) return;
-                durabilityBlocked = directionalDurabilityCheck
-                    ? IsDurabilityBlockedAhead(corner, height2, predecessorOrigin, direction)
-                    : IsDurabilityBlocked(corner, height2);
+                durabilityBlocked = IsDurabilityBlocked(corner, height2);
             });
             if (durabilityBlocked) { reason = "Durability"; return false; }
 
@@ -839,30 +874,6 @@ namespace AutoTerrainDesignations.Access
             {
                 if (corner.Blocks(position, height2, LandslideRunPerHeight))
                     return true;
-            }
-            return false;
-        }
-
-        private bool IsDurabilityBlockedAhead(Tile2i position, int height2,
-            Tile2i predecessorOrigin, Tile2i direction)
-        {
-            if (position.X < BoundsMin.X || position.X > BoundsMax.X
-                || position.Y < BoundsMin.Y || position.Y > BoundsMax.Y)
-                return false;
-
-            int cx = (position.X - BoundsMin.X) / SPATIAL_CELL_SIZE;
-            int cy = (position.Y - BoundsMin.Y) / SPATIAL_CELL_SIZE;
-            if (cx < 0 || cx >= m_gridWidth || cy < 0 || cy >= m_gridHeight) return false;
-            List<AccessDurabilityCorner>? cellCorners = m_spatialGrid[cx, cy];
-            if (cellCorners == null) return false;
-
-            foreach (AccessDurabilityCorner corner in cellCorners)
-            {
-                bool ahead = direction.X > 0 ? corner.Position.X > predecessorOrigin.X
-                    : direction.X < 0 ? corner.Position.X < predecessorOrigin.X
-                    : direction.Y > 0 ? corner.Position.Y > predecessorOrigin.Y
-                    : corner.Position.Y < predecessorOrigin.Y;
-                if (ahead && corner.Blocks(position, height2, LandslideRunPerHeight)) return true;
             }
             return false;
         }

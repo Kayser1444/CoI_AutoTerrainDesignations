@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Placera proppröjningsanvisningar på nåbara lediga rutor. Ctrl-klicka för att inkludera onåbara props. Skift-klicka för att ersätta befintliga terräng- och skogsbruksanvisningar."
+    "Placera skräpborttagningsbeteckningar på lediga celler som kan nås. Ctrl-klicka för att ta med oåtkomliga skräp. Skift-klicka för att även ersätta befintliga terräng- och skogsbruksbeteckningar."
   ],
   [
     "panel.designations.clear_tooltip",
@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "AUTO"
+    "BIL"
   ],
   [
     "panel.designations.ramp_width.label",

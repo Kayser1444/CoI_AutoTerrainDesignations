@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "将道具移除标记放置在可触及的未占用单元格上。按住 Ctrl 键单击以包含无法访问的 props。按住 Shift 键并单击以替换现有地形和林业名称。"
+    "将碎片清除标记放置在可触及的未占用单元格上。按住 Ctrl 键单击以包含无法到达的碎片。按住 Shift 键并单击也可以替换现有的地形和林业名称。"
   ],
   [
     "panel.designations.clear_tooltip",
@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "自动"
+    "汽车"
   ],
   [
     "panel.designations.ramp_width.label",

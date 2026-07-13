@@ -176,7 +176,7 @@ namespace AutoTerrainDesignations
 
             content.Add(BuildIntStepRow(
                 new LocStrFormatted("Vehicle clearance"),
-                new LocStrFormatted("AUTO derives pathability from an assigned excavator, falling back to an available excavator type. OFF disables accessways; T1/T2/T3 select explicit pathability."),
+                new LocStrFormatted("AUTO uses the largest excavator assigned or pre-assigned to the tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF. OFF disables accessways; T1/T2/T3 select explicit pathability."),
                 () => (int)AutoTerrainDesignationsMod.VehicleClearance,
                 value => AutoTerrainDesignationsMod.SetVehicleClearance((AccessVehicleClearanceMode)Math.Max(0, Math.Min(4, value))),
                 value => value == 0 ? "OFF" : ((AccessVehicleClearanceMode)value).ToString(),
@@ -285,7 +285,7 @@ namespace AutoTerrainDesignations
             content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.safety", "Ray and terrain safety", "Pathfinder safety settings heading.").AsFormatted));
             content.Add(BuildToggleRow(
                 Loc.Str("settings.pathfinder.avoid_ocean.label", "Avoid ocean", "Pathfinder avoid-ocean setting label.").AsFormatted,
-                Loc.Str("settings.pathfinder.avoid_ocean.tooltip", "For this world, reject routes whose projected terrain disturbance reaches the ocean. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-ocean setting tooltip.").AsFormatted,
+                Loc.Str("settings.pathfinder.avoid_ocean.tooltip", "For this world, reject routes whose generated profiles or projected cutting rays excavate ocean-flagged terrain below sea level. Dry shoreline cuts and dumping into ocean are allowed. Turning this off permits underwater cutting, but natural ocean tiles still cannot be used as drivable ground until filled. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-ocean setting tooltip.").AsFormatted,
                 () => AutoDepthDesignation.AccessAvoidOcean,
                 AutoDepthDesignation.SetAccessAvoidOcean,
                 refreshers));

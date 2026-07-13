@@ -103,6 +103,7 @@ namespace AutoTerrainDesignations.Access
     {
         internal const float DefaultMaxRayCost = 512f;
         internal const float DefaultUnresolvedPenalty = 128f;
+        private const float MinimumDryOceanHeight = 1f;
         private static readonly int[] s_sampleDistances = { 1, 2, 3, 5, 8, 13, 16 };
 
         public static AccessSideRayResult Score(
@@ -183,11 +184,6 @@ namespace AutoTerrainDesignations.Access
                         integratedCost, 0f, sampleCount, false, false,
                         disturbedDistance: disturbedDistance);
                 }
-                if (avoidOcean && sample.Kind == AccessTerrainSampleKind.Ocean)
-                    return Fatal(operation == AccessSideRayOperation.Cut
-                        ? "SideRayCutOcean"
-                        : "SideRayFillOcean", sampleCount, integratedCost);
-
                 float rayHeight = operation == AccessSideRayOperation.Fill
                     ? plannedCornerHeight - distance * materialSlope
                     : plannedCornerHeight + distance * materialSlope;
@@ -216,10 +212,12 @@ namespace AutoTerrainDesignations.Access
                                 return Fatal("SideRayFillMapEdge", sampleCount, integratedCost);
                             continue;
                         }
-                        if (avoidOcean && safetySample.Kind == AccessTerrainSampleKind.Ocean)
-                            return Fatal(operation == AccessSideRayOperation.Cut
-                                ? "SideRayCutOcean"
-                                : "SideRayFillOcean", sampleCount, integratedCost);
+                        if (avoidOcean
+                            && operation == AccessSideRayOperation.Cut
+                            && safetySample.Kind == AccessTerrainSampleKind.Ocean
+                            && plannedCornerHeight + safetyDistance * materialSlope
+                                < MinimumDryOceanHeight)
+                            return Fatal("SideRayCutOcean", sampleCount, integratedCost);
                         if (!string.IsNullOrEmpty(safetySample.BlockerReason))
                             return Fatal(safetySample.BlockerReason!, sampleCount, integratedCost);
                     }
@@ -227,6 +225,11 @@ namespace AutoTerrainDesignations.Access
                         integratedCost, 0f, sampleCount, false, false,
                         disturbedDistance: disturbedDistance);
                 }
+                if (avoidOcean
+                    && operation == AccessSideRayOperation.Cut
+                    && sample.Kind == AccessTerrainSampleKind.Ocean
+                    && rayHeight < MinimumDryOceanHeight)
+                    return Fatal("SideRayCutOcean", sampleCount, integratedCost);
                 if (!string.IsNullOrEmpty(sample.BlockerReason))
                     return Fatal(sample.BlockerReason!, sampleCount, integratedCost);
 
