@@ -9,24 +9,32 @@ namespace AutoTerrainDesignations.Access
         private readonly int m_plannedHeight2;
         private readonly Tile2i m_direction;
         private readonly AccessHandoffOperation m_workOperation;
+        private readonly bool m_hasExemptDesignationOrigin;
+        private readonly Tile2i m_exemptDesignationOrigin;
 
         public AccessSideRayCacheKey(
             Tile2i corner,
             int plannedHeight2,
             Tile2i direction,
-            AccessHandoffOperation workOperation)
+            AccessHandoffOperation workOperation,
+            Tile2i? exemptDesignationOrigin = null)
         {
             m_corner = corner;
             m_plannedHeight2 = plannedHeight2;
             m_direction = direction;
             m_workOperation = workOperation;
+            m_hasExemptDesignationOrigin = exemptDesignationOrigin.HasValue;
+            m_exemptDesignationOrigin = exemptDesignationOrigin.GetValueOrDefault();
         }
 
         public bool Equals(AccessSideRayCacheKey other)
             => m_corner == other.m_corner
                 && m_plannedHeight2 == other.m_plannedHeight2
                 && m_direction == other.m_direction
-                && m_workOperation == other.m_workOperation;
+                && m_workOperation == other.m_workOperation
+                && m_hasExemptDesignationOrigin == other.m_hasExemptDesignationOrigin
+                && (!m_hasExemptDesignationOrigin
+                    || m_exemptDesignationOrigin == other.m_exemptDesignationOrigin);
 
         public override bool Equals(object? obj)
             => obj is AccessSideRayCacheKey other && Equals(other);
@@ -39,6 +47,9 @@ namespace AutoTerrainDesignations.Access
                 hash = (hash * 397) ^ m_plannedHeight2;
                 hash = (hash * 397) ^ m_direction.GetHashCode();
                 hash = (hash * 397) ^ (int)m_workOperation;
+                hash = (hash * 397) ^ m_hasExemptDesignationOrigin.GetHashCode();
+                if (m_hasExemptDesignationOrigin)
+                    hash = (hash * 397) ^ m_exemptDesignationOrigin.GetHashCode();
                 return hash;
             }
         }
@@ -104,6 +115,7 @@ namespace AutoTerrainDesignations.Access
         internal const float DefaultMaxRayCost = 512f;
         internal const float DefaultUnresolvedPenalty = 128f;
         private const float MinimumDryOceanHeight = 1f;
+        private const string BuildingBlockerReason = "SideRayBuilding";
         private static readonly int[] s_sampleDistances = { 1, 2, 3, 5, 8, 13, 16 };
 
         public static AccessSideRayResult Score(
@@ -116,14 +128,16 @@ namespace AutoTerrainDesignations.Access
             float maxRayCost = DefaultMaxRayCost,
             float unresolvedPenalty = DefaultUnresolvedPenalty,
             int postTerminationSafetyMargin = 0,
-            int? maxTraceDistance = null)
+            int? maxTraceDistance = null,
+            Tile2i? exemptDesignationOrigin = null)
             => Score(
                 tile =>
                 {
                     AccessTerrainSampleKind kind =
                         snapshot.GetSideRayTerrainSample(tile, out float height);
                     return new AccessSideRayTerrainSample(
-                        kind, height, snapshot.GetSideRayBlockerReason(tile, operation));
+                        kind, height, snapshot.GetSideRayBlockerReason(
+                            tile, operation, exemptDesignationOrigin));
                 },
                 corner,
                 lateralDirection,
@@ -135,6 +149,81 @@ namespace AutoTerrainDesignations.Access
                 postTerminationSafetyMargin,
                 maxTraceDistance,
                 snapshot.AvoidOcean);
+
+        public static AccessSideRayResult ScoreZeroLengthBuffer(
+            AccessSearchSnapshot snapshot,
+            Tile2i corner,
+            Tile2i lateralDirection,
+            float plannedCornerHeight,
+            AccessSideRayOperation safetyOperation,
+            int safetyMargin,
+            Tile2i? exemptDesignationOrigin = null)
+            => ScoreZeroLengthBuffer(
+                tile =>
+                {
+                    AccessTerrainSampleKind kind =
+                        snapshot.GetSideRayTerrainSample(tile, out float height);
+                    return new AccessSideRayTerrainSample(
+                        kind, height,
+                        snapshot.GetSideRayBlockerReason(
+                            tile, safetyOperation, exemptDesignationOrigin));
+                },
+                corner,
+                lateralDirection,
+                plannedCornerHeight,
+                safetyOperation,
+                safetyMargin,
+                snapshot.AvoidOcean);
+
+        internal static AccessSideRayResult ScoreZeroLengthBuffer(
+            Func<Tile2i, AccessSideRayTerrainSample> sampleTerrain,
+            Tile2i corner,
+            Tile2i lateralDirection,
+            float plannedCornerHeight,
+            AccessSideRayOperation safetyOperation,
+            int safetyMargin,
+            bool avoidOcean = true)
+        {
+            if ((Math.Abs(lateralDirection.X) + Math.Abs(lateralDirection.Y)) != 1)
+                return Fatal("SideRayInvalidDirection", 0, 0f);
+            if (safetyOperation == AccessSideRayOperation.None || safetyMargin < 0)
+                return Fatal("SideRayInvalidZeroLengthBuffer", 0, 0f);
+            if (safetyMargin == 0)
+                return new AccessSideRayResult(0f, 0f, 0, false, false);
+
+            int sampleCount = 0;
+            for (int distance = 1; distance <= safetyMargin; distance++)
+            {
+                Tile2i tile = new Tile2i(
+                    corner.X + lateralDirection.X * distance,
+                    corner.Y + lateralDirection.Y * distance);
+                AccessSideRayTerrainSample sample = sampleTerrain(tile);
+                sampleCount++;
+                if (sample.Kind == AccessTerrainSampleKind.MissingSnapshot)
+                    return Fatal("SideRaySnapshotMissing", sampleCount, 0f);
+                if (sample.Kind == AccessTerrainSampleKind.PhysicalMapEdge)
+                {
+                    if (safetyOperation == AccessSideRayOperation.Fill)
+                        return Fatal("SideRayFillMapEdge", sampleCount, 0f);
+                    continue;
+                }
+                if (avoidOcean
+                    && safetyOperation == AccessSideRayOperation.Cut
+                    && sample.Kind == AccessTerrainSampleKind.Ocean
+                    && plannedCornerHeight < MinimumDryOceanHeight)
+                    return Fatal("SideRayCutOcean", sampleCount, 0f);
+                // Buildings already carry their own two-tile ray margin. A
+                // zero-length ray performs no terrain work, so applying the
+                // generic post-termination tail to buildings would stack both
+                // margins and reject otherwise safe work inside pipe loops.
+                if (!string.IsNullOrEmpty(sample.BlockerReason)
+                    && sample.BlockerReason != BuildingBlockerReason)
+                    return Fatal(sample.BlockerReason!, sampleCount, 0f);
+            }
+            return new AccessSideRayResult(
+                0f, 0f, sampleCount, false, false,
+                disturbedDistance: safetyMargin);
+        }
 
         internal static AccessSideRayResult Score(
             Func<Tile2i, AccessSideRayTerrainSample> sampleTerrain,
@@ -190,7 +279,11 @@ namespace AutoTerrainDesignations.Access
                 float gap = operation == AccessSideRayOperation.Fill
                     ? rayHeight - sample.TerrainHeight
                     : sample.TerrainHeight - rayHeight;
-                if (gap <= 0f)
+                bool hasPassedTerrain = gap <= 0f;
+                bool hasReachedDryCutHeight =
+                    operation != AccessSideRayOperation.Cut
+                    || rayHeight >= MinimumDryOceanHeight;
+                if (hasPassedTerrain && hasReachedDryCutHeight)
                 {
                     disturbedDistance = Math.Min(
                         maxDistance,
@@ -215,10 +308,17 @@ namespace AutoTerrainDesignations.Access
                         if (avoidOcean
                             && operation == AccessSideRayOperation.Cut
                             && safetySample.Kind == AccessTerrainSampleKind.Ocean
-                            && plannedCornerHeight + safetyDistance * materialSlope
-                                < MinimumDryOceanHeight)
+                            // The ray has already terminated.  The configured
+                            // tail is a spatial safety margin around the
+                            // below-sea-level cut, not a continuation whose
+                            // synthetic height may rise above the ocean.
+                            && plannedCornerHeight < MinimumDryOceanHeight)
                             return Fatal("SideRayCutOcean", sampleCount, integratedCost);
-                        if (!string.IsNullOrEmpty(safetySample.BlockerReason))
+                        // The building-specific margin applies to the active
+                        // ray. Do not stack the generic end buffer on top of it
+                        // after the ray has already met terrain.
+                        if (!string.IsNullOrEmpty(safetySample.BlockerReason)
+                            && safetySample.BlockerReason != BuildingBlockerReason)
                             return Fatal(safetySample.BlockerReason!, sampleCount, integratedCost);
                     }
                     return new AccessSideRayResult(
@@ -232,6 +332,16 @@ namespace AutoTerrainDesignations.Access
                     return Fatal("SideRayCutOcean", sampleCount, integratedCost);
                 if (!string.IsNullOrEmpty(sample.BlockerReason))
                     return Fatal(sample.BlockerReason!, sampleCount, integratedCost);
+
+                // A cut below +1 remains active after first meeting low
+                // terrain so ocean cannot hide immediately beyond that
+                // intersection.  This dry-threshold extension is protection,
+                // not additional excavation cost.
+                if (hasPassedTerrain)
+                {
+                    disturbedDistance = distance;
+                    continue;
+                }
 
                 // Feasibility is dense: an ocean, building, designation, or
                 // terrain intersection at a skipped Fibonacci distance must

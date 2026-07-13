@@ -262,18 +262,18 @@ namespace AutoTerrainDesignations
                 terrMgr.TerrainSize.Y - 1);
             groundCaptureMin = new Tile2i(
                 Math.Max(physicalTerrainMin.X, groundCaptureMin.X
-                    - AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                    - AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer),
+                    - AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    - AutoTerrainDesignationsMod.AccessRayEndBuffer),
                 Math.Max(physicalTerrainMin.Y, groundCaptureMin.Y
-                    - AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                    - AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer));
+                    - AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    - AutoTerrainDesignationsMod.AccessRayEndBuffer));
             groundCaptureMax = new Tile2i(
                 Math.Min(physicalTerrainMax.X, groundCaptureMax.X
-                    + AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                    + AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer),
+                    + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    + AutoTerrainDesignationsMod.AccessRayEndBuffer),
                 Math.Min(physicalTerrainMax.Y, groundCaptureMax.Y
-                    + AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                    + AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer));
+                    + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    + AutoTerrainDesignationsMod.AccessRayEndBuffer));
 
             var groundHeight2 = new Dictionary<Tile2i, int>();
             var preciseTerrainHeights = new Dictionary<Tile2i, float>();
@@ -284,6 +284,7 @@ namespace AutoTerrainDesignations
             var designatedOrigins = new HashSet<Tile2i>();
             var rayDesignationOrigins = new HashSet<Tile2i>();
             var rayDesignations = new Dictionary<Tile2i, TerrainDesignation>();
+            var projectedRayDesignations = new Dictionary<Tile2i, TerrainDesignation>();
             var groundExclusionReasons = new Dictionary<Tile2i, string>();
 
             foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(boundsMin, boundsMax))
@@ -298,6 +299,12 @@ namespace AutoTerrainDesignations
                 rayDesignationOrigins.Add(designation.OriginTileCoord);
                 rayDesignations[designation.OriginTileCoord] = designation;
             }
+            // Projected rays have no artificial distance limit. Include every
+            // designation on the physical map so a remote but sufficiently deep
+            // cut cannot reach the search area without being represented.
+            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
+                physicalTerrainMin, physicalTerrainMax))
+                projectedRayDesignations[designation.OriginTileCoord] = designation;
 
             var workOrigins = new HashSet<Tile2i>();
             foreach (var pair in tileDepths)
@@ -369,15 +376,25 @@ namespace AutoTerrainDesignations
                 AccessPathSearch.GetVehicleDisturbanceRadius(vehicleClearance);
             ProjectedDesignationDisturbance projectedDesignationDisturbance =
                 BuildProjectedDesignationDisturbedTiles(
-                    rayDesignations,
+                    projectedRayDesignations,
+                    terrMgr,
                     preciseTerrainHeights,
                     terrainColumns,
-                    oceanTiles,
+                    groundCaptureMin,
+                    groundCaptureMax,
                     physicalTerrainMin,
                     physicalTerrainMax,
                     dumpingMaterialSlope,
                     fallbackMiningSlope,
-                    vehicleDisturbanceRadius);
+                    vehicleDisturbanceRadius,
+                    out string projectedRayFailure);
+            if (!string.IsNullOrEmpty(projectedRayFailure))
+            {
+                Log.Error("[ATD] Existing-work ray projection failed critically: "
+                    + projectedRayFailure);
+                failureReason = projectedRayFailure;
+                return false;
+            }
 
             foreach (AccessHeightProfile profile in fixedProfiles.Values)
             {
@@ -445,6 +462,8 @@ namespace AutoTerrainDesignations
                     ExtractVehicleClearance(pathParams),
                     out AccessPropCleanupSnapshotDiagnostics cleanupDiagnostics);
             var prospectiveHandoffCache =
+                new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
+            var prospectiveHandoffSpanCache =
                 new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
 
             if (!TryBuildTowerReachableGround(tower, boundsMin, boundsMax,
@@ -533,7 +552,12 @@ namespace AutoTerrainDesignations
                 projectedFillSurfaceFloors: projectedDesignationDisturbance.FillSurfaceFloors,
                 vehicleClearanceRadius: vehicleDisturbanceRadius,
                 avoidOcean: AccessAvoidOcean,
-                avoidBuildings: AccessAvoidBuildings);
+                avoidBuildings: AccessAvoidBuildings,
+                vehicleWidth: vehicleClearance,
+                workableHandoffSpans: cells => BuildProspectiveWorkableHandoffSpan(
+                    cells, terrMgr, groundNodes, towerReachableGround,
+                    propCleanupByOrigin, vehicleClearance,
+                    prospectiveHandoffSpanCache));
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -543,6 +567,10 @@ namespace AutoTerrainDesignations
                 $"dumpingSlope={dumpingMaterialSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
                 $"fallbackMiningSlope={fallbackMiningSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
                 $"hasDumpingMaterial={hasDumpingMaterial} " +
+                $"maxHandoffSpan={AccessPathSearch.GetMaxHandoffSpanLength(vehicleClearance)} " +
+                $"rayConservatism={AutoTerrainDesignationsMod.AccessRaySlopeConservatism.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"rayBuffer={AutoTerrainDesignationsMod.AccessRayEndBuffer} " +
+                $"candidateRayMaxDistance={AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance} " +
                 $"avoidOcean={snapshot.AvoidOcean} avoidBuildings={snapshot.AvoidBuildings} " +
                 $"materialSlopeSource={materialSlopeDiagnostic} " +
                 $"landslideSources={snapshot.LandslideSourceCount} " +
@@ -569,7 +597,7 @@ namespace AutoTerrainDesignations
                 layers.Add(new AccessTerrainLayer(
                     topHeight,
                     bottomHeight,
-                    GetNormalMaterialSlope(material),
+                    GetCutMaterialSlope(material),
                     material.Id.ToString()));
                 topHeight = bottomHeight;
             }
@@ -592,10 +620,10 @@ namespace AutoTerrainDesignations
                 {
                     fallbackDumpingSlope = Math.Min(
                         fallbackDumpingSlope,
-                        material.GetApproxSlopeSteepness().ToFloat());
+                        GetDumpMaterialSlope(material));
                     fallbackMiningSlope = Math.Min(
                         fallbackMiningSlope,
-                        GetNormalMaterialSlope(material));
+                        GetCutMaterialSlope(material));
                 }
             }
             if (fallbackDumpingSlope == float.MaxValue)
@@ -616,8 +644,7 @@ namespace AutoTerrainDesignations
                         continue;
                     dumpingMaterialSlope = Math.Min(
                         dumpingMaterialSlope,
-                        product.TerrainMaterial.Value
-                            .GetApproxSlopeSteepness().ToFloat());
+                        GetDumpMaterialSlope(product.TerrainMaterial.Value));
                     resolvedProducts++;
                 }
                 diagnostic = resolvedProducts > 0
@@ -636,9 +663,35 @@ namespace AutoTerrainDesignations
                 dumpingMaterialSlope = fallbackDumpingSlope;
         }
 
-        private static float GetNormalMaterialSlope(TerrainMaterialProto material)
-            => (material.MinCollapseHeightDiff.Value
-                + material.MaxCollapseHeightDiff.Value).ToFloat() / 3f;
+        private static float GetCutMaterialSlope(TerrainMaterialProto material)
+            // A cut ray predicts failure of the still-intact bank. Preserve the
+            // empirical 2/3 conversion used by vanilla's approximate slope, but
+            // expose the intact material's full collapse range as a shared
+            // conservatism setting instead of forcing its disrupted resting slope.
+            => InterpolateRaySlope(material);
+
+        private static float GetDumpMaterialSlope(TerrainMaterialProto material)
+            // Dumped terrain is loose, so use the disrupted variant when one exists.
+            => InterpolateRaySlope(material.DisruptedMaterialProto.ValueOr(material));
+
+        private static float InterpolateRaySlope(TerrainMaterialProto material)
+        {
+            return InterpolateRaySlopeBounds(
+                material.MinCollapseHeightDiff.Value.ToFloat(),
+                material.MaxCollapseHeightDiff.Value.ToFloat(),
+                AutoTerrainDesignationsMod.AccessRaySlopeConservatism);
+        }
+
+        internal static float InterpolateRaySlopeBounds(
+            float minCollapseHeightDiff,
+            float maxCollapseHeightDiff,
+            float conservatism)
+        {
+            float conservative = minCollapseHeightDiff * (2f / 3f);
+            float aggressive = maxCollapseHeightDiff * (2f / 3f);
+            conservatism = Math.Max(0f, Math.Min(1.5f, conservatism));
+            return aggressive + (conservative - aggressive) * conservatism;
+        }
 
         private static Dictionary<Tile2i, AccessPropCleanupInfo> BuildAccessPropCleanupByOrigin(
             IAreaManagingTower tower,
@@ -1289,6 +1342,12 @@ namespace AutoTerrainDesignations
                     $"lanes=[{string.Join(",", lanes)}]");
             }
 
+            foreach (AccessSearchNode node in result.Path)
+                if (node.IsGround && node.HandoffSpanLength > 1)
+                    details.Add(
+                        $"multiCellHandoff=({node.Position.X},{node.Position.Y})" +
+                        $":{node.HandoffOperation}:span={node.HandoffSpanLength}");
+
             if (details.Count > 0)
                 LogExperimentalAccessDebug(
                     $"[ATD Experimental Access Selected VToG] cluster={clusterId} " +
@@ -1377,18 +1436,23 @@ namespace AutoTerrainDesignations
                 if (!IsClearanceValidHandoffLane(offset, vehicleClearance))
                     continue;
 
-                int edgeX = handoffEdge == 0 ? 0 : handoffEdge == 1 ? 4 : offset;
-                int edgeY = handoffEdge == 2 ? 0 : handoffEdge == 3 ? 4 : offset;
-                int insideX = edgeX - (outwardDirection.X > 0 ? 1 : 0);
-                int insideY = edgeY - (outwardDirection.Y > 0 ? 1 : 0);
+                GetHandoffLaneCoordinates(
+                    handoffEdge, offset,
+                    out int edgeX, out int edgeY,
+                    out int insideX, out int insideY);
                 Tile2i insideEdgeTile = origin + new RelTile2i(insideX, insideY);
                 Tile2i outsideTile = insideEdgeTile + outwardDirection;
                 bool outsideGround = IsExperimentalAccessGroundOrCleanupNode(
                     groundNodes, propCleanupByOrigin, outsideTile);
                 if (outsideGround)
                     groundCandidateCount++;
+                // Workability is defined at the shared designation boundary.  On
+                // +X/+Y exits the traversible tile is one sample inside the 4x4
+                // footprint, but its outside neighbor lies on edge coordinate 4.
+                // Comparing that neighbor with the inside sample biased rising
+                // profiles against +X/+Y handoffs by a quarter of their slope.
                 float edgeTargetHeight = GetDesignationTargetHeightAt(
-                    data, insideX, insideY).Value.ToFloat();
+                    data, edgeX, edgeY).Value.ToFloat();
                 bool meetsOutsideGround = Math.Abs(
                     edgeTargetHeight - terrMgr.GetHeight(outsideTile).Value.ToFloat()) <= 0.0001f;
                 TryAddHandoff(
@@ -1461,6 +1525,221 @@ namespace AutoTerrainDesignations
             return handoffCache[cacheKey];
         }
 
+        private static IReadOnlyList<AccessGroundHandoff> BuildProspectiveWorkableHandoffSpan(
+            IReadOnlyList<AccessHandoffSpanCell> cells,
+            TerrainManager terrMgr,
+            HashSet<Tile2i> groundNodes,
+            HashSet<Tile2i> goalGroundNodes,
+            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin,
+            int vehicleClearance,
+            Dictionary<string, IReadOnlyList<AccessGroundHandoff>> handoffCache)
+        {
+            if (cells.Count < 2)
+                return Array.Empty<AccessGroundHandoff>();
+
+            Tile2i direction = cells[0].EntryDirection;
+            if (!IsCardinalDesignationStep(direction))
+                return Array.Empty<AccessGroundHandoff>();
+            for (int index = 1; index < cells.Count; index++)
+                if (cells[index].EntryDirection != direction
+                    || cells[index].Origin != new Tile2i(
+                        cells[index - 1].Origin.X + direction.X,
+                        cells[index - 1].Origin.Y + direction.Y))
+                    return Array.Empty<AccessGroundHandoff>();
+
+            string cacheKey = string.Join("|", cells.Select(cell =>
+                $"{cell.Origin.X},{cell.Origin.Y}:" +
+                $"{cell.Profile.Nw2},{cell.Profile.Ne2},{cell.Profile.Se2},{cell.Profile.Sw2}"));
+            if (handoffCache.TryGetValue(cacheKey, out IReadOnlyList<AccessGroundHandoff> cached))
+                return cached;
+
+            AccessHandoffSpanCell first = cells[0];
+            Tile2i firstPredecessor = new Tile2i(
+                first.Origin.X - direction.X,
+                first.Origin.Y - direction.Y);
+            if (!TryGetDirectionalHandoff(
+                    first.Origin, first.Profile, firstPredecessor, terrMgr,
+                    vehicleClearance, out _, out AccessHandoffOperation operation, out _)
+                || (operation != AccessHandoffOperation.Mining
+                    && operation != AccessHandoffOperation.Dumping))
+                return Array.Empty<AccessGroundHandoff>();
+
+            AccessHandoffSpanCell last = cells[cells.Count - 1];
+            Tile2i lastPredecessor = new Tile2i(
+                last.Origin.X - direction.X,
+                last.Origin.Y - direction.Y);
+            if (!TryGetConnectedAndHandoffCorners(
+                    last.Origin, lastPredecessor,
+                    out _, out _, out _, out _, out int handoffEdge)
+                || !HasVanillaWorkableExitLane(
+                    last.Origin, last.Profile, handoffEdge,
+                    operation, vehicleClearance, terrMgr))
+                return Array.Empty<AccessGroundHandoff>();
+
+            var result = new List<AccessGroundHandoff>();
+            var emitted = new HashSet<Tile2i>();
+            var dataByOrigin = cells.ToDictionary(
+                cell => cell.Origin,
+                cell => new DesignationData(cell.Origin,
+                    new HeightTilesI(cell.Profile.Nw2 / 2),
+                    new HeightTilesI(cell.Profile.Ne2 / 2),
+                    new HeightTilesI(cell.Profile.Se2 / 2),
+                    new HeightTilesI(cell.Profile.Sw2 / 2)));
+            DesignationData lastData = dataByOrigin[last.Origin];
+            RelTile2i outward = GetHandoffOutwardDirection(handoffEdge);
+            for (int offset = 1; offset < 4; offset++)
+            {
+                if (!IsClearanceValidHandoffLane(offset, vehicleClearance))
+                    continue;
+                GetHandoffLaneCoordinates(
+                    handoffEdge, offset,
+                    out int edgeX, out int edgeY,
+                    out int insideX, out int insideY);
+                Tile2i insideEdgeTile = last.Origin + new RelTile2i(insideX, insideY);
+                Tile2i outsideTile = insideEdgeTile + outward;
+                bool outsideGround = IsExperimentalAccessGroundOrCleanupNode(
+                    groundNodes, propCleanupByOrigin, outsideTile);
+                float boundaryTarget = GetDesignationTargetHeightAt(
+                    lastData, edgeX, edgeY).Value.ToFloat();
+                bool boundaryMatches = Math.Abs(
+                    boundaryTarget - terrMgr.GetHeight(outsideTile).Value.ToFloat()) <= 0.0001f;
+                TryAdd(outsideTile,
+                    outsideGround && boundaryMatches ? new[] { outsideTile } : null);
+
+                for (int depth = 0; depth < 4; depth++)
+                {
+                    int x = handoffEdge == 0 ? depth : handoffEdge == 1 ? 3 - depth : offset;
+                    int y = handoffEdge == 2 ? depth : handoffEdge == 3 ? 3 - depth : offset;
+                    Tile2i interior = last.Origin + new RelTile2i(x, y);
+                    IReadOnlyList<Tile2i>? escape =
+                        IsExperimentalAccessGroundOrCleanupNode(
+                            groundNodes, propCleanupByOrigin, interior)
+                        && DoesProfileCrossGroundInTile(
+                            lastData, terrMgr, handoffEdge, x, y)
+                            ? FindPostWorkGroundPathOutOfHandoffSpan(
+                                cells, firstPredecessor, interior,
+                                groundNodes, propCleanupByOrigin)
+                            : null;
+                    TryAdd(interior, escape);
+                }
+            }
+
+            handoffCache[cacheKey] = result.ToArray();
+            return handoffCache[cacheKey];
+
+            void TryAdd(Tile2i tile, IReadOnlyList<Tile2i>? escape)
+            {
+                if (escape == null || !emitted.Add(tile))
+                    return;
+                result.Add(new AccessGroundHandoff(
+                    tile, operation, escape, cells.Count));
+            }
+
+        }
+
+        private static bool IsCardinalDesignationStep(Tile2i direction)
+            => (Math.Abs(direction.X) == 4 && direction.Y == 0)
+                || (Math.Abs(direction.Y) == 4 && direction.X == 0);
+
+        private static bool HasVanillaWorkableExitLane(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            int handoffEdge,
+            AccessHandoffOperation operation,
+            int vehicleClearance,
+            TerrainManager terrMgr)
+        {
+            TerrainDesignationProto? proto = operation == AccessHandoffOperation.Mining
+                ? s_miningProto : operation == AccessHandoffOperation.Dumping ? s_dumpingProto : null;
+            if (proto == null || s_desigManager == null)
+                return false;
+            var data = new DesignationData(origin,
+                new HeightTilesI(profile.Nw2 / 2),
+                new HeightTilesI(profile.Ne2 / 2),
+                new HeightTilesI(profile.Se2 / 2),
+                new HeightTilesI(profile.Sw2 / 2));
+            for (int offset = 1; offset < 4; offset++)
+            {
+                if (!IsClearanceValidHandoffLane(offset, vehicleClearance))
+                    continue;
+                int x = handoffEdge == 0 ? 0 : handoffEdge == 1 ? 4 : offset;
+                int y = handoffEdge == 2 ? 0 : handoffEdge == 3 ? 4 : offset;
+                Tile2i tile = origin + new RelTile2i(x, y);
+                HeightTilesF target = GetDesignationTargetHeightAt(data, x, y);
+                bool upperEdge = x == 4 || y == 4;
+                bool fulfilled = operation == AccessHandoffOperation.Mining
+                    ? proto.IsFulfilledMiningFn.HasValue
+                        && proto.IsFulfilledMiningFn.Value(
+                            s_desigManager, terrMgr.ExtendTileIndex(tile), target, upperEdge)
+                    : proto.IsFulfilledDumpingFn.HasValue
+                        && proto.IsFulfilledDumpingFn.Value(
+                            s_desigManager, terrMgr.ExtendTileIndex(tile), target, upperEdge);
+                if (fulfilled)
+                    return true;
+            }
+            return false;
+        }
+
+        private static IReadOnlyList<Tile2i>? FindPostWorkGroundPathOutOfHandoffSpan(
+            IReadOnlyList<AccessHandoffSpanCell> cells,
+            Tile2i adjacentVOrigin,
+            Tile2i start,
+            HashSet<Tile2i> groundNodes,
+            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin)
+        {
+            if (!IsExperimentalAccessGroundOrCleanupNode(
+                    groundNodes, propCleanupByOrigin, start))
+                return null;
+
+            // This is a post-work route.  A sample inside the terminal span may
+            // currently require the very mining/dumping operation that creates
+            // the handoff surface; rejecting it here made an interior crest
+            // impossible to use.  It still has to be a captured G node, so
+            // projected main-body work and all ordinary pathability exclusions
+            // remain blocked.
+
+            var queue = new Queue<Tile2i>();
+            var visited = new HashSet<Tile2i> { start };
+            var parent = new Dictionary<Tile2i, Tile2i>();
+            queue.Enqueue(start);
+            RelTile2i[] directions =
+            {
+                new RelTile2i(-1, 0), new RelTile2i(1, 0),
+                new RelTile2i(0, -1), new RelTile2i(0, 1),
+            };
+            while (queue.Count > 0)
+            {
+                Tile2i current = queue.Dequeue();
+                for (int index = 0; index < directions.Length; index++)
+                {
+                    Tile2i next = current + directions[index];
+                    bool insideSpan = cells.Any(cell => IsInsideVFootprint(next, cell.Origin));
+                    bool insideAdjacent = IsInsideVFootprint(next, adjacentVOrigin);
+                    if (!IsExperimentalAccessGroundOrCleanupNode(
+                            groundNodes, propCleanupByOrigin, next))
+                        continue;
+                    if (!insideSpan && !insideAdjacent)
+                    {
+                        parent[next] = current;
+                        var path = new List<Tile2i> { next };
+                        Tile2i pathTile = next;
+                        while (pathTile != start)
+                        {
+                            pathTile = parent[pathTile];
+                            path.Add(pathTile);
+                        }
+                        path.Reverse();
+                        return path;
+                    }
+                    if (insideAdjacent || !visited.Add(next))
+                        continue;
+                    parent[next] = current;
+                    queue.Enqueue(next);
+                }
+            }
+            return null;
+        }
+
         private static void LogExistingHandoffDiagnostic(
             Tile2i origin,
             Tile2i predecessorOrigin,
@@ -1503,6 +1782,21 @@ namespace AutoTerrainDesignations
                 && offset >= sideMargin && offset < 4 - sideMargin;
         }
 
+        internal static void GetHandoffLaneCoordinates(
+            int handoffEdge,
+            int offset,
+            out int edgeX,
+            out int edgeY,
+            out int insideX,
+            out int insideY)
+        {
+            edgeX = handoffEdge == 0 ? 0 : handoffEdge == 1 ? 4 : offset;
+            edgeY = handoffEdge == 2 ? 0 : handoffEdge == 3 ? 4 : offset;
+            RelTile2i outward = GetHandoffOutwardDirection(handoffEdge);
+            insideX = edgeX - (outward.X > 0 ? 1 : 0);
+            insideY = edgeY - (outward.Y > 0 ? 1 : 0);
+        }
+
         private static bool DoesProfileCrossGroundInTile(
             DesignationData data,
             TerrainManager terrMgr,
@@ -1532,9 +1826,14 @@ namespace AutoTerrainDesignations
             IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin)
         {
             if (!IsExperimentalAccessGroundOrCleanupNode(
-                    groundNodes, propCleanupByOrigin, start)
-                || IsHandoffWorkTile(origin, data, terrMgr, operation, start))
+                    groundNodes, propCleanupByOrigin, start))
                 return null;
+
+            // The terminal designation is evaluated after its own work has
+            // completed.  Its crossed samples are therefore part of the new
+            // drivable surface, provided the underlying snapshot already admits
+            // them as G nodes.  Main-body projected work remains excluded when
+            // groundNodes is built.
 
             if (!IsInsideVFootprint(start, origin)
                 && !IsInsideVFootprint(start, adjacentVOrigin))
@@ -1576,8 +1875,7 @@ namespace AutoTerrainDesignations
                     }
                     if (insideAdjacentV)
                         continue;
-                    if (IsHandoffWorkTile(origin, data, terrMgr, operation, next)
-                        || !visited.Add(next))
+                    if (!visited.Add(next))
                         continue;
                     parent[next] = current;
                     queue.Enqueue(next);
@@ -1929,6 +2227,14 @@ namespace AutoTerrainDesignations
                 RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
                 return false;
             }
+            if (AccessHarvestDisruptedTrees
+                && !TryMaterializeDisruptedTreeHarvests(
+                    snapshot, candidate.SearchResult, selectedCleanupTrees, out failureReason))
+            {
+                RollBackTreeCleanupSelections(selectedCleanupTrees);
+                RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                return false;
+            }
 
             Tile2i terminalOrigin = default;
             bool hasGeneratedTerminal = TryGetGeneratedTerminal(
@@ -2024,6 +2330,7 @@ namespace AutoTerrainDesignations
             LastExperimentalAccessPlan = placementPlan;
             s_lastExperimentalCleanupDesignations.AddRange(placedCleanupDesignations);
             s_lastExperimentalCleanupTreeSelections.AddRange(selectedCleanupTrees);
+            RegisterGeneratedHarvestTreePositions(tower, selectedCleanupTrees);
             return true;
         }
 
@@ -2213,6 +2520,45 @@ namespace AutoTerrainDesignations
             return true;
         }
 
+        private static bool TryMaterializeDisruptedTreeHarvests(
+            AccessSearchSnapshot snapshot,
+            AccessSearchResult result,
+            List<TreeId> selectedTrees,
+            out string failureReason)
+        {
+            failureReason = string.Empty;
+            if (s_treesManager == null)
+            {
+                failureReason = "TreesManagerUnavailable";
+                return false;
+            }
+
+            IReadOnlyCollection<Tile2i> disturbedTiles =
+                AccessPathSearch.BuildFinalGeneratedDisturbedTiles(snapshot, result);
+            if (disturbedTiles.Count == 0)
+                return true;
+            var disturbed = disturbedTiles as HashSet<Tile2i>
+                ?? new HashSet<Tile2i>(disturbedTiles);
+            var alreadySelectedNow = new HashSet<TreeId>(selectedTrees);
+            int added = 0;
+            foreach (KeyValuePair<TreeId, TreeData> pair in s_treesManager.Trees)
+            {
+                TreeId treeId = pair.Key;
+                if (!disturbed.Contains(treeId.Position.AsFull)
+                    || alreadySelectedNow.Contains(treeId)
+                    || s_treesManager.IsTreeSelected(treeId))
+                    continue;
+                s_treesManager.AddToHarvest(treeId);
+                selectedTrees.Add(treeId);
+                alreadySelectedNow.Add(treeId);
+                added++;
+            }
+            LogExperimentalAccessDebug(
+                $"[ATD Experimental Access Cleanup] disruptedTiles={disturbed.Count} " +
+                $"additionalTreeHarvestSelections={added}");
+            return true;
+        }
+
         private static void RollBackTreeCleanupSelections(IReadOnlyList<TreeId> selectedTrees)
         {
             if (s_treesManager == null || selectedTrees.Count == 0)
@@ -2305,26 +2651,30 @@ namespace AutoTerrainDesignations
             AccessSearchResult result)
         {
             var operations = new Dictionary<Tile2i, AccessHandoffOperation>();
-            AccessSearchNode? previousGenerated = null;
+            var recentGenerated = new List<AccessSearchNode>();
             foreach (AccessSearchNode node in result.Path)
             {
                 if (node.IsGround)
                 {
-                    if (previousGenerated.HasValue
-                        && node.HandoffOperation != AccessHandoffOperation.None)
-                        operations[previousGenerated.Value.Position] = node.HandoffOperation;
-                    previousGenerated = null;
+                    if (node.HandoffOperation != AccessHandoffOperation.None)
+                    {
+                        int spanLength = Math.Max(1, node.HandoffSpanLength);
+                        int first = Math.Max(0, recentGenerated.Count - spanLength);
+                        for (int index = first; index < recentGenerated.Count; index++)
+                            operations[recentGenerated[index].Position] = node.HandoffOperation;
+                    }
+                    recentGenerated.Clear();
                     continue;
                 }
 
-                if (node.Mode != AccessSearchMode.Existing
-                    && node.HandoffOperation != AccessHandoffOperation.None)
+                if (node.Mode == AccessSearchMode.Existing)
                 {
-                    operations[node.Position] = node.HandoffOperation;
+                    recentGenerated.Clear();
+                    continue;
                 }
-                previousGenerated = node.Mode == AccessSearchMode.Existing
-                    ? (AccessSearchNode?)null
-                    : node;
+                if (node.HandoffOperation != AccessHandoffOperation.None)
+                    operations[node.Position] = node.HandoffOperation;
+                recentGenerated.Add(node);
             }
             return operations;
         }
@@ -2339,7 +2689,7 @@ namespace AutoTerrainDesignations
             {
                 string height = (node.Height2 / 2f).ToString("0.#", CultureInfo.InvariantCulture);
                 string handoff = node.HandoffOperation != AccessHandoffOperation.None
-                    ? $",op={node.HandoffOperation}"
+                    ? $",op={node.HandoffOperation},span={Math.Max(1, node.HandoffSpanLength)}"
                     : string.Empty;
                 parts.Add($"{FormatSearchMode(node.Mode)}@({node.Position.X},{node.Position.Y},h={height}{handoff})");
             }
@@ -2438,15 +2788,20 @@ namespace AutoTerrainDesignations
 
         private static ProjectedDesignationDisturbance BuildProjectedDesignationDisturbedTiles(
             IReadOnlyDictionary<Tile2i, TerrainDesignation> designations,
+            TerrainManager terrMgr,
             IReadOnlyDictionary<Tile2i, float> terrainHeights,
             IReadOnlyDictionary<Tile2i, AccessTerrainColumn> terrainColumns,
-            ISet<Tile2i> oceanTiles,
+            Tile2i relevantTerrainMin,
+            Tile2i relevantTerrainMax,
             Tile2i physicalTerrainMin,
             Tile2i physicalTerrainMax,
             float dumpingMaterialSlope,
             float fallbackMiningSlope,
-            int vehicleDisturbanceRadius)
+            int vehicleDisturbanceRadius,
+            out string failureReason)
         {
+            failureReason = string.Empty;
+            string criticalFailure = string.Empty;
             var result = new ProjectedDesignationDisturbance();
             foreach (KeyValuePair<Tile2i, TerrainDesignation> pair in designations)
             {
@@ -2465,22 +2820,26 @@ namespace AutoTerrainDesignations
                 bool northExposed = IsBoundaryExposed(new Tile2i(0, -4));
                 bool southExposed = IsBoundaryExposed(new Tile2i(0, 4));
 
-                TraceBoundary(westExposed,
+                if (!TraceBoundary(westExposed,
                     origin, profile.Nw2 / 2f,
                     origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
-                    new Tile2i(-1, 0));
-                TraceBoundary(eastExposed,
+                    new Tile2i(-1, 0)))
+                { failureReason = criticalFailure; return result; }
+                if (!TraceBoundary(eastExposed,
                     origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
                     origin + new RelTile2i(4, 4), profile.Se2 / 2f,
-                    new Tile2i(1, 0));
-                TraceBoundary(northExposed,
+                    new Tile2i(1, 0)))
+                { failureReason = criticalFailure; return result; }
+                if (!TraceBoundary(northExposed,
                     origin, profile.Nw2 / 2f,
                     origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
-                    new Tile2i(0, -1));
-                TraceBoundary(southExposed,
+                    new Tile2i(0, -1)))
+                { failureReason = criticalFailure; return result; }
+                if (!TraceBoundary(southExposed,
                     origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
                     origin + new RelTile2i(4, 4), profile.Se2 / 2f,
-                    new Tile2i(0, 1));
+                    new Tile2i(0, 1)))
+                { failureReason = criticalFailure; return result; }
 
                 if (westExposed && northExposed)
                     TraceOutsideCorner(origin, profile.Nw2 / 2f, -1, -1);
@@ -2499,7 +2858,7 @@ namespace AutoTerrainDesignations
                         origin.X + neighborOffset.X,
                         origin.Y + neighborOffset.Y));
 
-                void TraceBoundary(
+                bool TraceBoundary(
                     bool isExposed,
                     Tile2i firstCorner,
                     float firstHeight,
@@ -2508,58 +2867,76 @@ namespace AutoTerrainDesignations
                     Tile2i direction)
                 {
                     if (!isExposed)
-                        return;
-                    TraceCorner(firstCorner, firstHeight, direction);
-                    TraceCorner(secondCorner, secondHeight, direction);
+                        return true;
+                    return TraceCorner(firstCorner, firstHeight, direction)
+                        && TraceCorner(secondCorner, secondHeight, direction);
                 }
 
-                void TraceCorner(Tile2i corner, float plannedHeight, Tile2i direction)
+                bool TraceCorner(Tile2i corner, float plannedHeight, Tile2i direction)
                 {
+                    int relevantMinX = relevantTerrainMin.X - vehicleDisturbanceRadius;
+                    int relevantMaxX = relevantTerrainMax.X + vehicleDisturbanceRadius;
+                    int relevantMinY = relevantTerrainMin.Y - vehicleDisturbanceRadius;
+                    int relevantMaxY = relevantTerrainMax.Y + vehicleDisturbanceRadius;
+                    bool canReachRelevant = direction.X != 0
+                        ? corner.Y >= relevantMinY && corner.Y <= relevantMaxY
+                            && (direction.X > 0
+                                ? corner.X <= relevantMaxX
+                                : corner.X >= relevantMinX)
+                        : corner.X >= relevantMinX && corner.X <= relevantMaxX
+                            && (direction.Y > 0
+                                ? corner.Y <= relevantMaxY
+                                : corner.Y >= relevantMinY);
+                    if (!canReachRelevant)
+                        return true;
                     if (!TryResolveCornerRay(
                         corner, plannedHeight,
                         out AccessSideRayOperation operation,
                         out float materialSlope))
-                        return;
+                        return true;
 
                     int postTerminationSafetyMargin =
-                        AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer;
-                    for (int distance = 1;
-                        distance <= AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance;
-                        distance++)
+                        AutoTerrainDesignationsMod.AccessRayEndBuffer;
+                    int physicalDistance = direction.X < 0
+                        ? corner.X - physicalTerrainMin.X
+                        : direction.X > 0
+                            ? physicalTerrainMax.X - corner.X
+                            : direction.Y < 0
+                                ? corner.Y - physicalTerrainMin.Y
+                                : physicalTerrainMax.Y - corner.Y;
+                    for (int distance = 1; distance <= physicalDistance; distance++)
                     {
                         Tile2i tile = new Tile2i(
                             corner.X + direction.X * distance,
                             corner.Y + direction.Y * distance);
-                        if (tile.X < physicalTerrainMin.X || tile.X > physicalTerrainMax.X
-                            || tile.Y < physicalTerrainMin.Y || tile.Y > physicalTerrainMax.Y
-                            || !terrainHeights.TryGetValue(tile, out float sampledHeight))
-                        {
-                            MarkThrough(distance - 1);
-                            return;
-                        }
+                        float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
                         float rayHeight = operation == AccessSideRayOperation.Fill
                             ? plannedHeight - distance * materialSlope
                             : plannedHeight + distance * materialSlope;
                         float gap = operation == AccessSideRayOperation.Fill
                             ? rayHeight - sampledHeight
                             : sampledHeight - rayHeight;
-                        if (gap <= 0f)
+                        bool hasPassedTerrain = gap <= 0f;
+                        bool hasReachedDryCutHeight =
+                            operation != AccessSideRayOperation.Cut
+                            || rayHeight >= 1f;
+                        if (hasPassedTerrain && hasReachedDryCutHeight)
                         {
                             MarkThrough(distance + postTerminationSafetyMargin);
-                            return;
+                            return true;
                         }
                     }
-                    // The projected slope did not resolve inside the normal ray limit.
-                    MarkThrough(
-                        AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                        + postTerminationSafetyMargin);
+                    criticalFailure =
+                        "ProjectedRayUnresolvedAtMapEdge:" + operation
+                        + "@(" + corner.X.ToString(CultureInfo.InvariantCulture)
+                        + "," + corner.Y.ToString(CultureInfo.InvariantCulture) + ")"
+                        + " dir=(" + direction.X.ToString(CultureInfo.InvariantCulture)
+                        + "," + direction.Y.ToString(CultureInfo.InvariantCulture) + ")";
+                    return false;
 
                     void MarkThrough(int maxDistance)
                     {
-                        maxDistance = Math.Min(
-                            maxDistance,
-                            AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance
-                                + AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer);
+                        maxDistance = Math.Min(maxDistance, physicalDistance);
                         for (int distance = 1; distance <= maxDistance; distance++)
                         {
                             Tile2i disturbed = new Tile2i(
@@ -2585,16 +2962,41 @@ namespace AutoTerrainDesignations
                         out float materialSlope))
                         return;
 
-                    for (int dy = 1; dy <= AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance; dy++)
+                    int scanMinX = Math.Max(
+                        physicalTerrainMin.X,
+                        relevantTerrainMin.X - vehicleDisturbanceRadius);
+                    int scanMaxX = Math.Min(
+                        physicalTerrainMax.X,
+                        relevantTerrainMax.X + vehicleDisturbanceRadius);
+                    int scanMinY = Math.Max(
+                        physicalTerrainMin.Y,
+                        relevantTerrainMin.Y - vehicleDisturbanceRadius);
+                    int scanMaxY = Math.Min(
+                        physicalTerrainMax.Y,
+                        relevantTerrainMax.Y + vehicleDisturbanceRadius);
+                    int firstX = outwardX > 0
+                        ? Math.Max(scanMinX, corner.X + 1)
+                        : scanMinX;
+                    int lastX = outwardX > 0
+                        ? scanMaxX
+                        : Math.Min(scanMaxX, corner.X - 1);
+                    int firstY = outwardY > 0
+                        ? Math.Max(scanMinY, corner.Y + 1)
+                        : scanMinY;
+                    int lastY = outwardY > 0
+                        ? scanMaxY
+                        : Math.Min(scanMaxY, corner.Y - 1);
+                    if (firstX > lastX || firstY > lastY)
+                        return;
+                    for (int y = firstY; y <= lastY; y++)
                     {
-                        for (int dx = 1; dx <= AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance; dx++)
+                        int dy = (y - corner.Y) * outwardY;
+                        for (int x = firstX; x <= lastX; x++)
                         {
+                            int dx = (x - corner.X) * outwardX;
                             int slopeDistance = Math.Max(dx, dy);
-                            Tile2i tile = new Tile2i(
-                                corner.X + outwardX * dx,
-                                corner.Y + outwardY * dy);
-                            if (!terrainHeights.TryGetValue(tile, out float sampledHeight))
-                                continue;
+                            Tile2i tile = new Tile2i(x, y);
+                            float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
                             float projectedHeight = operation == AccessSideRayOperation.Fill
                                 ? plannedHeight - slopeDistance * materialSlope
                                 : plannedHeight + slopeDistance * materialSlope;
@@ -2615,8 +3017,11 @@ namespace AutoTerrainDesignations
                 {
                     operation = AccessSideRayOperation.None;
                     materialSlope = dumpingMaterialSlope;
-                    if (!terrainHeights.TryGetValue(corner, out float terrainHeight))
+                    if (!terrMgr.IsValidCoord(corner))
                         return false;
+                    float terrainHeight = terrainHeights.TryGetValue(corner, out float capturedHeight)
+                        ? capturedHeight
+                        : terrMgr.GetHeight(corner).Value.ToFloat();
                     const float epsilon = 0.0001f;
                     operation = plannedHeight > terrainHeight + epsilon
                         ? AccessSideRayOperation.Fill
@@ -2629,34 +3034,44 @@ namespace AutoTerrainDesignations
                             && workOperation == AccessHandoffOperation.Dumping)
                         || operation == AccessSideRayOperation.None)
                         return false;
-                    if (operation == AccessSideRayOperation.Cut
-                        && (!terrainColumns.TryGetValue(corner, out AccessTerrainColumn column)
-                            || !column.TryGetNormalSlopeAt(
-                                plannedHeight, out materialSlope, out _)))
-                        materialSlope = fallbackMiningSlope;
-                    materialSlope *= AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor;
+                    if (operation == AccessSideRayOperation.Cut)
+                    {
+                        AccessTerrainColumn column =
+                            terrainColumns.TryGetValue(corner, out AccessTerrainColumn capturedColumn)
+                                ? capturedColumn
+                                : CaptureAccessTerrainColumn(terrMgr, corner);
+                        if (!column.TryGetNormalSlopeAt(
+                                plannedHeight, out materialSlope, out _))
+                            materialSlope = fallbackMiningSlope;
+                    }
                     return materialSlope > 0f;
                 }
 
                 void AddProjected(
                     AccessSideRayOperation operation, Tile2i tile, float projectedHeight)
                 {
+                    if (tile.X < relevantTerrainMin.X - vehicleDisturbanceRadius
+                        || tile.X > relevantTerrainMax.X + vehicleDisturbanceRadius
+                        || tile.Y < relevantTerrainMin.Y - vehicleDisturbanceRadius
+                        || tile.Y > relevantTerrainMax.Y + vehicleDisturbanceRadius)
+                        return;
                     result.AddHeight(operation, tile, projectedHeight);
                     for (int dy = -vehicleDisturbanceRadius; dy <= vehicleDisturbanceRadius; dy++)
                     {
                         for (int dx = -vehicleDisturbanceRadius; dx <= vehicleDisturbanceRadius; dx++)
                         {
                             Tile2i blocked = new Tile2i(tile.X + dx, tile.Y + dy);
-                            if (blocked.X >= physicalTerrainMin.X
-                                && blocked.X <= physicalTerrainMax.X
-                                && blocked.Y >= physicalTerrainMin.Y
-                                && blocked.Y <= physicalTerrainMax.Y)
+                            if (blocked.X >= relevantTerrainMin.X
+                                && blocked.X <= relevantTerrainMax.X
+                                && blocked.Y >= relevantTerrainMin.Y
+                                && blocked.Y <= relevantTerrainMax.Y)
                                 result.Add(operation, blocked);
                         }
                     }
                 }
             }
             return result;
+
         }
 
         private static List<AccessDurabilityCorner> BuildDurabilityCorners(
@@ -2749,10 +3164,8 @@ namespace AutoTerrainDesignations
                 {
                     materialSlope = fallbackMiningSlope;
                 }
-                float effectiveSlope = materialSlope
-                    * AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor;
-                return effectiveSlope > 0f
-                    ? 1f / effectiveSlope
+                return materialSlope > 0f
+                    ? 1f / materialSlope
                     : fallbackRunPerHeight;
             }
         }

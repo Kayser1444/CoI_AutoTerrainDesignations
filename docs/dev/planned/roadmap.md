@@ -11,10 +11,15 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
 
 Two per-world Pathfinder parameters now exist and are enforced by accessway candidate rays. Their new-game defaults come from `ATDsettings.json`:
 
-* **Avoid ocean** — reject accessway and mining-designation plans whose projected cut/fill disturbance reaches the ocean.
+* **Avoid ocean** — reject accessway and mining-designation plans whose projected cutting disturbance reaches the ocean; dumping/fill into ocean remains allowed.
 * **Avoid buildings** — reject accessway and mining-designation plans whose projected cut/fill disturbance reaches an existing, planned, or ghost building, including the mine control tower.
+* **Harvest disrupted trees** — mark trees throughout the finalized mining body and its projected disturbance zones; when disabled, mark only trees required to execute the accepted work.
 
-Remaining work: reuse the material-aware disturbance ray tracer for both parameters when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
+Remaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
+
+## Generated mining-body vehicle clearance — future refinement
+
+Rare generated mining bodies can contain a one-origin waist that is too narrow for Mega/T3 vehicles. Add a clearance-aware minimal-change widening/removal pass eventually; this is not a blocker for V2 accessway rollout.
 
 ## Ramp safety margin — low priority
 

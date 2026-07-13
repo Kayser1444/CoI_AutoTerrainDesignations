@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mafi;
 
 namespace AutoTerrainDesignations.Access
@@ -63,11 +64,29 @@ namespace AutoTerrainDesignations.Access
                     }
                     else
                     {
-                        FindPredecessorProfile(result, pathIndex, snapshot, out Tile2i predPosition, out AccessHeightProfile predProfile);
-                        if (!AccessPathSearch.ContainsHandoff(
-                            snapshot, previousPosition, previousProfile,
-                            predPosition, predProfile,
-                            node.Position, node.HandoffOperation))
+                        bool validHandoff;
+                        if (node.HandoffSpanLength > 1)
+                        {
+                            validHandoff = TryBuildHandoffSpan(
+                                    result, pathIndex, snapshot,
+                                    node.HandoffSpanLength,
+                                    out List<AccessHandoffSpanCell> span)
+                                && snapshot.GetWorkableHandoffSpans(span).Any(candidate =>
+                                    candidate.Tile == node.Position
+                                    && candidate.Operation == node.HandoffOperation
+                                    && candidate.SpanLength == node.HandoffSpanLength);
+                        }
+                        else
+                        {
+                            FindPredecessorProfile(result, pathIndex, snapshot,
+                                out Tile2i predPosition,
+                                out AccessHeightProfile predProfile);
+                            validHandoff = AccessPathSearch.ContainsHandoff(
+                                snapshot, previousPosition, previousProfile,
+                                predPosition, predProfile,
+                                node.Position, node.HandoffOperation);
+                        }
+                        if (!validHandoff)
                         {
                             return Invalid("PlanVToGHandoff", result, designations, reusedNodes, groundNodes);
                         }
@@ -131,9 +150,39 @@ namespace AutoTerrainDesignations.Access
                         snapshot, node.Position, profile, previousNode, stepDirection,
                         out string reason))
                         return Invalid("Plan" + reason, result, designations, reusedNodes, groundNodes);
-                    if (snapshot.TryGetPropCleanupInfo(node.Position, out AccessPropCleanupInfo generatedCleanup)
-                        && TryBuildTreeOnlyCleanupInfo(generatedCleanup, out AccessPropCleanupInfo treeCleanup))
-                        MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                    bool hasTerrainDelta = ProfileHasTerrainDelta(
+                        snapshot, node.Position, profile);
+                    if (snapshot.TryGetPropCleanupInfo(
+                            node.Position, out AccessPropCleanupInfo generatedCleanup)
+                        && generatedCleanup.IsEligibleWithinGeneratedV)
+                    {
+                        AccessPropCleanupInfo approvedGeneratedCleanup =
+                            generatedCleanup.BlockerKind == AccessPropBlockerKind.Durability
+                                ? AccessPropCleanupPolicy.BuildOriginInfo(
+                                    generatedCleanup.Origin,
+                                    generatedCleanup.Samples,
+                                    usesTerrainRemovalPolicy:
+                                        generatedCleanup.UsesTerrainRemovalPolicy)
+                                : generatedCleanup;
+                        if (!hasTerrainDelta)
+                            MergeCleanupInfo(cleanupByOrigin, approvedGeneratedCleanup);
+                        else if (TryBuildTreeOnlyCleanupInfo(
+                            approvedGeneratedCleanup, out AccessPropCleanupInfo treeCleanup))
+                            MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                    }
+
+                    // V-space is needed for accurate elevation-aware
+                    // feasibility, but an exact-terrain V cell has no work to
+                    // materialize. Any removable prop it covers is emitted as
+                    // explicit cleanup above instead of a no-op leveling proto.
+                    if (!hasTerrainDelta)
+                    {
+                        previousWasGround = false;
+                        previousPosition = node.Position;
+                        previousProfile = profile;
+                        previousNode = node;
+                        continue;
+                    }
 
                     var planned = new AccessPlannedDesignation(node.Position, node.Mode, profile);
                     if (generatedByOrigin.TryGetValue(node.Position, out AccessPlannedDesignation existing))
@@ -178,6 +227,24 @@ namespace AutoTerrainDesignations.Access
                 handoffOperation,
                 designations, reusedNodes, groundNodes,
                 new List<AccessPropCleanupInfo>(cleanupByOrigin.Values));
+        }
+
+        private static bool ProfileHasTerrainDelta(
+            AccessSearchSnapshot snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile)
+        {
+            for (int y = 0; y <= 4; y++)
+                for (int x = 0; x <= 4; x++)
+                {
+                    Tile2i tile = origin + new RelTile2i(x, y);
+                    if (!snapshot.TryGetGroundHeight2(tile, out int terrainHeight2))
+                        return true;
+                    if (profile.GetHeight2NumeratorAt(x, y)
+                        != terrainHeight2 * 16)
+                        return true;
+                }
+            return false;
         }
 
         private static void MergeCleanupInfo(
@@ -270,6 +337,38 @@ namespace AutoTerrainDesignations.Access
                 predPosition = predecessor.Position;
                 predProfile = profile;
             }
+        }
+
+        private static bool TryBuildHandoffSpan(
+            AccessSearchResult result,
+            int groundPathIndex,
+            AccessSearchSnapshot snapshot,
+            int spanLength,
+            out List<AccessHandoffSpanCell> span)
+        {
+            span = new List<AccessHandoffSpanCell>(spanLength);
+            int firstIndex = groundPathIndex - spanLength;
+            if (firstIndex < 0)
+                return false;
+            Tile2i direction = default;
+            for (int index = firstIndex; index < groundPathIndex; index++)
+            {
+                AccessSearchNode node = result.Path[index];
+                if (node.IsGround || node.Mode == AccessSearchMode.Existing
+                    || !AccessPathSearch.TryGetProfile(
+                        snapshot, node, out AccessHeightProfile profile))
+                    return false;
+                if (index == firstIndex)
+                    direction = node.EntryDirection;
+                else if (node.EntryDirection != direction
+                    || node.Position != new Tile2i(
+                        result.Path[index - 1].Position.X + direction.X,
+                        result.Path[index - 1].Position.Y + direction.Y))
+                    return false;
+                span.Add(new AccessHandoffSpanCell(
+                    node.Position, profile, node.EntryDirection));
+            }
+            return true;
         }
     }
 }

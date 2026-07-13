@@ -273,8 +273,6 @@ namespace AutoTerrainDesignations
                 },
                 FormatFloat,
                 refreshers));
-            AddPathfinderFloat(content, refreshers, "tree_cleanup", "Tree harvest cost", "Cost charged for each tree that must be harvested rather than destroyed by terrain work. Lower values favor forest routes.", () => AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost, AutoTerrainDesignationsMod.SetAccessTreeCleanupLandscapingCost);
-
             content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.costs", "Route costs", "Pathfinder cost settings heading.").AsFormatted));
             AddPathfinderFloat(content, refreshers, "generated_v_fixed", "Generated V cell cost", "Fixed cost charged for every generated V cell. Higher values favor shorter paths and earlier handoffs.", () => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
             AddPathfinderFloat(content, refreshers, "direct_work_weight", "Direct terrain-work weight", "Weight applied to center-cell digging and dumping.", () => AutoTerrainDesignationsMod.AccessDirectWorkWeight, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
@@ -295,12 +293,15 @@ namespace AutoTerrainDesignations
                 () => AutoDepthDesignation.AccessAvoidBuildings,
                 AutoDepthDesignation.SetAccessAvoidBuildings,
                 refreshers));
-            AddPathfinderFloat(content, refreshers, "candidate_slope", "Candidate ray slope factor", "Material-slope multiplier. Lower values extend the predicted run and are more conservative. Default: 0.8.", () => AutoTerrainDesignationsMod.AccessCandidateRaySlopeFactor, AutoTerrainDesignationsMod.SetAccessCandidateRaySlopeFactor);
-            AddPathfinderInt(content, refreshers, "candidate_buffer", "Candidate ray end buffer", "Extra tiles checked after a candidate ray meets terrain. Default: 2.", () => AutoTerrainDesignationsMod.AccessCandidateRayEndBuffer, AutoTerrainDesignationsMod.SetAccessCandidateRayEndBuffer);
+            content.Add(BuildToggleRow(
+                Loc.Str("settings.pathfinder.harvest_disrupted_trees.label", "Harvest disrupted trees", "Pathfinder disrupted-tree harvesting setting label.").AsFormatted,
+                Loc.Str("settings.pathfinder.harvest_disrupted_trees.tooltip", "For this world, mark every tree in the finalized accessway's projected terrain-disturbance zones for harvest. When disabled, only trees that must be removed to clear the selected route are marked. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved.", "Pathfinder disrupted-tree harvesting setting tooltip.").AsFormatted,
+                () => AutoDepthDesignation.AccessHarvestDisruptedTrees,
+                AutoDepthDesignation.SetAccessHarvestDisruptedTrees,
+                refreshers));
+            AddPathfinderFloat(content, refreshers, "ray_conservatism", "Ray slope conservatism", "Shared material-slope setting for candidate and existing-work rays. 1 uses the runniest stable material bound; lower values move toward the steeper, more aggressive bound, while values above 1 add extra conservatism up to 1.5. Default: 1.", () => AutoTerrainDesignationsMod.AccessRaySlopeConservatism, AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism);
+            AddPathfinderInt(content, refreshers, "ray_buffer", "Ray end buffer", "Extra tiles protected after either a candidate or existing-work ray meets terrain and, for cuts, reaches +1. Default: 3.", () => AutoTerrainDesignationsMod.AccessRayEndBuffer, AutoTerrainDesignationsMod.SetAccessRayEndBuffer);
             AddPathfinderInt(content, refreshers, "candidate_distance", "Candidate ray distance", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
-            AddPathfinderFloat(content, refreshers, "projected_slope", "Existing-work slope factor", "Slope multiplier used when projecting future disturbance from existing designations. Default: 0.85.", () => AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor, AutoTerrainDesignationsMod.SetAccessProjectedRaySlopeFactor);
-            AddPathfinderInt(content, refreshers, "projected_buffer", "Existing-work end buffer", "Extra blocked tiles beyond projected existing-designation disturbance. Default: 1.", () => AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer, AutoTerrainDesignationsMod.SetAccessProjectedRayEndBuffer);
-            AddPathfinderInt(content, refreshers, "projected_distance", "Existing-work ray distance", "Maximum projection distance for existing designations. Default: 48.", () => AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance, AutoTerrainDesignationsMod.SetAccessProjectedRayMaxDistance);
 
             content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.").AsFormatted));
             AddPathfinderInt(content, refreshers, "visited", "Maximum visited nodes", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000);

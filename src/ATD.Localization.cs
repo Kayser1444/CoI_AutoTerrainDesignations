@@ -51,9 +51,9 @@ namespace AutoTerrainDesignations
         public static LocStr DesigDebrisTip =
             Loc.Str("panel.designations.debris_tooltip", "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations.", "Tooltip on the Debris button.");
         public static LocStr DesigClearTip =
-            Loc.Str("panel.designations.clear_tooltip", "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area.", "Tooltip on the Clear button.");
+            Loc.Str("panel.designations.clear_tooltip", "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations.", "Tooltip on the Clear button.");
         public static LocStr DesigClearTipWithShiftClick =
-            Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area.", "Tooltip on the Clear button when generated designations exist.");
+            Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations.", "Tooltip on the Clear button when generated designations exist.");
         public static LocStr DesigOreFilterAuto =
             Loc.Str("panel.designations.ore_filter.auto", "AUTO", "Label for automatic scanning behavior in the ore picker.");
         public static LocStr DesigRampWidthLabel =

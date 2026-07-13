@@ -496,6 +496,10 @@ namespace AutoTerrainDesignations
                 if (accessAvoidBuildings.HasValue && ShouldPreserveBool(accessAvoidBuildings.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidBuildings(accessAvoidBuildings.Value);
 
+                bool? accessHarvestDisruptedTrees = ParseBool(json, "accessHarvestDisruptedTrees");
+                if (accessHarvestDisruptedTrees.HasValue && ShouldPreserveBool(accessHarvestDisruptedTrees.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(accessHarvestDisruptedTrees.Value);
+
                 float? accessLandscapingCostDistanceScale = ParseFloat(json, "accessLandscapingCostDistanceScale")
                     ?? ParseFloat(json, "accessWorkDistanceScale");
                 if (accessLandscapingCostDistanceScale.HasValue && ShouldPreserveFloat(accessLandscapingCostDistanceScale.Value, migrateGeneratedDefaults, 1f))
@@ -505,8 +509,6 @@ namespace AutoTerrainDesignations
                 if (accessPropCleanupLandscapingCost.HasValue && ShouldPreserveFloat(accessPropCleanupLandscapingCost.Value, migrateGeneratedDefaults, 6f, 8f))
                     AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(accessPropCleanupLandscapingCost.Value);
 
-                ApplyFloat("accessTreeCleanupLandscapingCost", 6f, AutoTerrainDesignationsMod.SetAccessTreeCleanupLandscapingCost);
-
                 float? accessLandslideRunPerHeight = ParseFloat(json, "accessLandslideRunPerHeight");
                 if (accessLandslideRunPerHeight.HasValue && ShouldPreserveFloat(accessLandslideRunPerHeight.Value, migrateGeneratedDefaults, 1f))
                     AutoTerrainDesignationsMod.SetAccessLandslideRunPerHeight(accessLandslideRunPerHeight.Value);
@@ -514,14 +516,36 @@ namespace AutoTerrainDesignations
                 ApplyFloat("accessGeneratedVFixedCost", 1f, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
                 ApplyFloat("accessDirectWorkWeight", 1f, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
                 ApplyFloat("accessSideRayWeight", 1f, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
-                ApplyFloat("accessCandidateRaySlopeFactor", 0.8f, AutoTerrainDesignationsMod.SetAccessCandidateRaySlopeFactor);
-                ApplyInt("accessCandidateRayEndBuffer", 2, AutoTerrainDesignationsMod.SetAccessCandidateRayEndBuffer);
+                float? accessRaySlopeConservatism =
+                    ParseFloat(json, "accessRaySlopeConservatism")
+                    ?? ParseFloat(json, "accessCandidateRaySlopeFactor")
+                    ?? ParseFloat(json, "accessProjectedRaySlopeFactor");
+                if (accessRaySlopeConservatism.HasValue
+                    && ShouldPreserveFloat(
+                        accessRaySlopeConservatism.Value,
+                        migrateGeneratedDefaults,
+                        1f,
+                        0.8f,
+                        0.85f))
+                    AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism(
+                        accessRaySlopeConservatism.Value);
+
+                int? accessRayEndBuffer =
+                    ParseInt(json, "accessRayEndBuffer")
+                    ?? ParseInt(json, "accessCandidateRayEndBuffer")
+                    ?? ParseInt(json, "accessProjectedRayEndBuffer");
+                if (accessRayEndBuffer.HasValue
+                    && ShouldPreserveInt(
+                        accessRayEndBuffer.Value,
+                        migrateGeneratedDefaults,
+                        3,
+                        2,
+                        1))
+                    AutoTerrainDesignationsMod.SetAccessRayEndBuffer(
+                        accessRayEndBuffer.Value);
                 ApplyInt("accessCandidateRayMaxDistance", 16, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
                 ApplyFloat("accessRayMaxCost", 512f, AutoTerrainDesignationsMod.SetAccessRayMaxCost);
                 ApplyFloat("accessRayUnresolvedPenalty", 128f, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
-                ApplyFloat("accessProjectedRaySlopeFactor", 0.85f, AutoTerrainDesignationsMod.SetAccessProjectedRaySlopeFactor);
-                ApplyInt("accessProjectedRayEndBuffer", 1, AutoTerrainDesignationsMod.SetAccessProjectedRayEndBuffer);
-                ApplyInt("accessProjectedRayMaxDistance", 48, AutoTerrainDesignationsMod.SetAccessProjectedRayMaxDistance);
                 ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
                 ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
                 ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
@@ -902,12 +926,14 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that rejects pathfinder routes whose projected terrain disturbance reaches a building safety footprint. Currently applies only to accessway pathfinding, not Mining Designations generation. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
             sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways mark every tree in their projected disturbance zones for harvest; when disabled, only trees required to clear the selected route are marked. Default: true.\",");
+            sb.AppendLine($"  \"accessHarvestDisruptedTrees\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees)},");
+            sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
             sb.AppendLine($"  \"accessLandscapingCostDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 8, calibrated from observed excavator cleanup effort. Range: 0-100.\",");
             sb.AppendLine($"  \"accessPropCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)},");
-            sb.AppendLine($"  \"accessTreeCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the experimental landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
             sb.AppendLine($"  \"accessLandslideRunPerHeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandslideRunPerHeight)},");
@@ -915,14 +941,11 @@ namespace AutoTerrainDesignations
             sb.AppendLine($"  \"accessGeneratedVFixedCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessGeneratedVFixedCost)},");
             sb.AppendLine($"  \"accessDirectWorkWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessDirectWorkWeight)},");
             sb.AppendLine($"  \"accessSideRayWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessSideRayWeight)},");
-            sb.AppendLine($"  \"accessCandidateRaySlopeFactor\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessCandidateRaySlopeFactor)},");
-            sb.AppendLine($"  \"accessCandidateRayEndBuffer\": {AutoTerrainDesignationsMod.AccessCandidateRayEndBuffer},");
+            sb.AppendLine($"  \"accessRaySlopeConservatism\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRaySlopeConservatism)},");
+            sb.AppendLine($"  \"accessRayEndBuffer\": {AutoTerrainDesignationsMod.AccessRayEndBuffer},");
             sb.AppendLine($"  \"accessCandidateRayMaxDistance\": {AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance},");
             sb.AppendLine($"  \"accessRayMaxCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayMaxCost)},");
             sb.AppendLine($"  \"accessRayUnresolvedPenalty\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty)},");
-            sb.AppendLine($"  \"accessProjectedRaySlopeFactor\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessProjectedRaySlopeFactor)},");
-            sb.AppendLine($"  \"accessProjectedRayEndBuffer\": {AutoTerrainDesignationsMod.AccessProjectedRayEndBuffer},");
-            sb.AppendLine($"  \"accessProjectedRayMaxDistance\": {AutoTerrainDesignationsMod.AccessProjectedRayMaxDistance},");
             sb.AppendLine($"  \"accessMaxVisitedNodes\": {AutoTerrainDesignationsMod.AccessMaxVisitedNodes},");
             sb.AppendLine($"  \"accessSearchTimeoutSeconds\": {AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds},");
             sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");

@@ -11,8 +11,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
+using Mafi.Core;
 using Mafi.Core.Buildings.Towers;
 using Mafi.Core.Terrain.Designation;
+using Mafi.Core.Terrain.Trees;
 
 namespace AutoTerrainDesignations
 {
@@ -68,12 +70,15 @@ namespace AutoTerrainDesignations
         {
             CaptureClearedAccesswayOrigins(tower);
             ClearDesignationsInArea(tower);
+            ClearGeneratedHarvestTreesForTower(tower);
             ClearRegisteredGeneratedAccessways(tower);
             ClearRegisteredGeneratedDesignations(tower);
             MarkTowerMiningPlanDirty(tower);
         }
         internal static bool HasGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
+            if (GetRegisteredGeneratedHarvestTreePositions(tower).Count > 0)
+                return true;
             if (s_desigManager == null) return false;
 
             foreach (Tile2i origin in GetRegisteredGeneratedDesignationOrigins(tower))
@@ -88,6 +93,7 @@ namespace AutoTerrainDesignations
         internal static void ClearGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
             CaptureClearedAccesswayOrigins(tower);
+            ClearGeneratedHarvestTreesForTower(tower);
             if (s_desigManager == null)
             {
                 ClearRegisteredGeneratedAccessways(tower);
@@ -121,6 +127,42 @@ namespace AutoTerrainDesignations
             ClearRegisteredGeneratedAccessways(tower);
             ClearRegisteredGeneratedDesignations(tower);
             MarkTowerMiningPlanDirty(tower);
+        }
+
+        private static void ClearGeneratedHarvestTreesForTower(IAreaManagingTower tower)
+        {
+            IReadOnlyList<Tile2i> registeredPositions =
+                GetRegisteredGeneratedHarvestTreePositions(tower);
+            if (registeredPositions.Count == 0)
+                return;
+
+            var positions = new HashSet<Tile2i>(registeredPositions);
+            if (TryGetTowerEntityId(tower, out EntityId towerId))
+            {
+                foreach (KeyValuePair<EntityId, HashSet<Tile2i>> pair
+                    in s_generatedHarvestTreePositionsByTowerEntityId)
+                {
+                    if (pair.Key == towerId)
+                        continue;
+                    positions.ExceptWith(pair.Value);
+                }
+            }
+
+            int removed = 0;
+            if (s_treesManager != null && positions.Count > 0)
+            {
+                foreach (KeyValuePair<TreeId, TreeData> pair in s_treesManager.Trees)
+                {
+                    if (!positions.Contains(pair.Key.Position.AsFull)
+                        || !s_treesManager.IsTreeSelected(pair.Key))
+                        continue;
+                    s_treesManager.RemoveFromHarvest(pair.Key);
+                    removed++;
+                }
+            }
+            ClearRegisteredGeneratedHarvestTrees(tower);
+            LogExperimentalAccessDebug(
+                $"[ATD Generated Clear Trees] registered={registeredPositions.Count} removed={removed}");
         }
 
         private static void RemoveFulfilledDesignationsForTower(

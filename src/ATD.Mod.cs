@@ -136,21 +136,18 @@ public static string Tt(string text) => text;
         SetExperimentalAccessUseAStar(true);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
+        SetAccessHarvestDisruptedTrees(true);
         SetAccessLandscapingCostDistanceScale(1f);
         SetAccessPropCleanupLandscapingCost(8f);
-        SetAccessTreeCleanupLandscapingCost(6f);
         SetAccessLandslideRunPerHeight(1f);
         SetAccessGeneratedVFixedCost(1f);
         SetAccessDirectWorkWeight(1f);
         SetAccessSideRayWeight(1f);
-        SetAccessCandidateRaySlopeFactor(0.8f);
-        SetAccessCandidateRayEndBuffer(2);
+        SetAccessRaySlopeConservatism(1f);
+        SetAccessRayEndBuffer(3);
         SetAccessCandidateRayMaxDistance(16);
         SetAccessRayMaxCost(512f);
         SetAccessRayUnresolvedPenalty(128f);
-        SetAccessProjectedRaySlopeFactor(0.85f);
-        SetAccessProjectedRayEndBuffer(1);
-        SetAccessProjectedRayMaxDistance(48);
         SetAccessMaxVisitedNodes(250000);
         SetAccessSearchTimeoutSeconds(60);
         SetAccessSearchFrameBudgetMs(30);
@@ -348,6 +345,14 @@ public static string Tt(string text) => text;
         AccessAvoidBuildings = value;
     }
 
+    /// <summary>Marks every tree in the finalized accessway disturbance zone for harvest.</summary>
+    public static bool AccessHarvestDisruptedTrees { get; private set; } = true;
+
+    public static void SetAccessHarvestDisruptedTrees(bool value)
+    {
+        AccessHarvestDisruptedTrees = value;
+    }
+
     /// <summary>Tile-distance cost assigned to one unit of landscaping cost.</summary>
     public static float AccessLandscapingCostDistanceScale { get; private set; } = 1f;
 
@@ -364,10 +369,6 @@ public static string Tt(string text) => text;
         AccessPropCleanupLandscapingCost = Math.Max(0f, Math.Min(100f, value));
     }
 
-    public static float AccessTreeCleanupLandscapingCost { get; private set; } = 6f;
-    public static void SetAccessTreeCleanupLandscapingCost(float value)
-        => AccessTreeCleanupLandscapingCost = Math.Max(0f, Math.Min(100f, value));
-
     /// <summary>Horizontal landslide-envelope run per vertical terrain level. 1 = 45 degrees.</summary>
     public static float AccessLandslideRunPerHeight { get; private set; } = 1f;
 
@@ -382,22 +383,16 @@ public static string Tt(string text) => text;
     public static void SetAccessDirectWorkWeight(float value) => AccessDirectWorkWeight = Math.Max(0f, Math.Min(100f, value));
     public static float AccessSideRayWeight { get; private set; } = 1f;
     public static void SetAccessSideRayWeight(float value) => AccessSideRayWeight = Math.Max(0f, Math.Min(100f, value));
-    public static float AccessCandidateRaySlopeFactor { get; private set; } = 0.8f;
-    public static void SetAccessCandidateRaySlopeFactor(float value) => AccessCandidateRaySlopeFactor = Math.Max(0.1f, Math.Min(1f, value));
-    public static int AccessCandidateRayEndBuffer { get; private set; } = 2;
-    public static void SetAccessCandidateRayEndBuffer(int value) => AccessCandidateRayEndBuffer = Math.Max(0, Math.Min(16, value));
+    public static float AccessRaySlopeConservatism { get; private set; } = 1f;
+    public static void SetAccessRaySlopeConservatism(float value) => AccessRaySlopeConservatism = Math.Max(0f, Math.Min(1.5f, value));
+    public static int AccessRayEndBuffer { get; private set; } = 3;
+    public static void SetAccessRayEndBuffer(int value) => AccessRayEndBuffer = Math.Max(0, Math.Min(16, value));
     public static int AccessCandidateRayMaxDistance { get; private set; } = 16;
     public static void SetAccessCandidateRayMaxDistance(int value) => AccessCandidateRayMaxDistance = Math.Max(4, Math.Min(128, value));
     public static float AccessRayMaxCost { get; private set; } = 512f;
     public static void SetAccessRayMaxCost(float value) => AccessRayMaxCost = Math.Max(1f, Math.Min(10000f, value));
     public static float AccessRayUnresolvedPenalty { get; private set; } = 128f;
     public static void SetAccessRayUnresolvedPenalty(float value) => AccessRayUnresolvedPenalty = Math.Max(0f, Math.Min(10000f, value));
-    public static float AccessProjectedRaySlopeFactor { get; private set; } = 0.85f;
-    public static void SetAccessProjectedRaySlopeFactor(float value) => AccessProjectedRaySlopeFactor = Math.Max(0.1f, Math.Min(1f, value));
-    public static int AccessProjectedRayEndBuffer { get; private set; } = 1;
-    public static void SetAccessProjectedRayEndBuffer(int value) => AccessProjectedRayEndBuffer = Math.Max(0, Math.Min(16, value));
-    public static int AccessProjectedRayMaxDistance { get; private set; } = 48;
-    public static void SetAccessProjectedRayMaxDistance(int value) => AccessProjectedRayMaxDistance = Math.Max(4, Math.Min(128, value));
     public static int AccessMaxVisitedNodes { get; private set; } = 250000;
     public static void SetAccessMaxVisitedNodes(int value) => AccessMaxVisitedNodes = Math.Max(1000, Math.Min(2000000, value));
     public static int AccessSearchTimeoutSeconds { get; private set; } = 60;

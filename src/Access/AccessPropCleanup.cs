@@ -60,6 +60,9 @@ namespace AutoTerrainDesignations.Access
         public bool UsesTerrainRemovalPolicy { get; }
         public IReadOnlyList<AccessPropSample> Samples { get; }
         public bool IsEligible => BlockerKind == AccessPropBlockerKind.None && Classes != AccessPropCleanupClass.None;
+        public bool IsEligibleWithinGeneratedV => Classes != AccessPropCleanupClass.None
+            && (BlockerKind == AccessPropBlockerKind.None
+                || BlockerKind == AccessPropBlockerKind.Durability);
         public bool HasTreeCleanup => (Classes & AccessPropCleanupClass.Tree) != 0;
         public bool HasDenseDebrisCleanup => (Classes & AccessPropCleanupClass.DenseDebris) != 0;
 
@@ -133,9 +136,6 @@ namespace AutoTerrainDesignations.Access
             AccessPropBlockerKind blockerKind = AccessPropBlockerKind.None,
             bool usesTerrainRemovalPolicy = true)
         {
-            if (blockerKind != AccessPropBlockerKind.None)
-                return AccessPropCleanupInfo.HardBlocked(origin, blockerKind);
-
             AccessPropCleanupClass classes = AccessPropCleanupClass.None;
             var collectedSamples = new List<AccessPropSample>();
             var seenSamples = new HashSet<string>(StringComparer.Ordinal);
@@ -158,9 +158,14 @@ namespace AutoTerrainDesignations.Access
                 classes |= Classify(sample);
             }
 
-            return classes == AccessPropCleanupClass.None
-                ? AccessPropCleanupInfo.Clear(origin)
-                : new AccessPropCleanupInfo(origin, classes, AccessPropBlockerKind.None,
+            if (classes == AccessPropCleanupClass.None)
+                return blockerKind == AccessPropBlockerKind.None
+                    ? AccessPropCleanupInfo.Clear(origin)
+                    : AccessPropCleanupInfo.HardBlocked(origin, blockerKind);
+            return blockerKind == AccessPropBlockerKind.None
+                ? new AccessPropCleanupInfo(origin, classes, AccessPropBlockerKind.None,
+                    usesTerrainRemovalPolicy, collectedSamples)
+                : new AccessPropCleanupInfo(origin, classes, blockerKind,
                     usesTerrainRemovalPolicy, collectedSamples);
         }
 
@@ -169,7 +174,7 @@ namespace AutoTerrainDesignations.Access
 
         public static float GetCleanupLandscapingCost(bool isTree) =>
             isTree
-                ? AutoTerrainDesignationsMod.AccessTreeCleanupLandscapingCost
+                ? 0f
                 : AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
     }
 }

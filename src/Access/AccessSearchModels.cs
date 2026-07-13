@@ -35,15 +35,35 @@ namespace AutoTerrainDesignations.Access
         public Tile2i Tile { get; }
         public AccessHandoffOperation Operation { get; }
         public IReadOnlyList<Tile2i> EscapeTiles { get; }
+        public int SpanLength { get; }
 
         public AccessGroundHandoff(
             Tile2i tile,
             AccessHandoffOperation operation,
-            IReadOnlyList<Tile2i>? escapeTiles = null)
+            IReadOnlyList<Tile2i>? escapeTiles = null,
+            int spanLength = 1)
         {
             Tile = tile;
             Operation = operation;
             EscapeTiles = escapeTiles ?? Array.Empty<Tile2i>();
+            SpanLength = Math.Max(1, spanLength);
+        }
+    }
+
+    internal readonly struct AccessHandoffSpanCell
+    {
+        public Tile2i Origin { get; }
+        public AccessHeightProfile Profile { get; }
+        public Tile2i EntryDirection { get; }
+
+        public AccessHandoffSpanCell(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            Tile2i entryDirection)
+        {
+            Origin = origin;
+            Profile = profile;
+            EntryDirection = entryDirection;
         }
     }
 
@@ -53,17 +73,20 @@ namespace AutoTerrainDesignations.Access
         public int Height2 { get; }
         public AccessSearchMode Mode { get; }
         public AccessHandoffOperation HandoffOperation { get; }
+        public int HandoffSpanLength { get; }
         public Tile2i EntryDirection { get; }
 
         public AccessSearchNode(Tile2i position, int height2, AccessSearchMode mode,
             AccessHandoffOperation handoffOperation = AccessHandoffOperation.None,
-            Tile2i entryDirection = default)
+            Tile2i entryDirection = default,
+            int handoffSpanLength = 0)
         {
             Position = position;
             Height2 = height2;
             Mode = mode;
             HandoffOperation = handoffOperation;
             EntryDirection = entryDirection;
+            HandoffSpanLength = Math.Max(0, handoffSpanLength);
         }
 
         public bool IsGround => Mode == AccessSearchMode.Ground;
@@ -72,6 +95,7 @@ namespace AutoTerrainDesignations.Access
         public bool Equals(AccessSearchNode other)
             => Position == other.Position && Height2 == other.Height2 && Mode == other.Mode
                 && HandoffOperation == other.HandoffOperation
+                && HandoffSpanLength == other.HandoffSpanLength
                 && EntryDirection == other.EntryDirection;
 
         public override bool Equals(object? obj) => obj is AccessSearchNode other && Equals(other);
@@ -84,13 +108,14 @@ namespace AutoTerrainDesignations.Access
                 hash = (hash * 397) ^ Height2;
                 hash = (hash * 397) ^ (int)Mode;
                 hash = (hash * 397) ^ (int)HandoffOperation;
+                hash = (hash * 397) ^ HandoffSpanLength;
                 hash = (hash * 397) ^ EntryDirection.GetHashCode();
                 return hash;
             }
         }
 
         public override string ToString()
-            => $"{Mode}@{Position}/h2={Height2}/handoff={HandoffOperation}/entry={EntryDirection}";
+            => $"{Mode}@{Position}/h2={Height2}/handoff={HandoffOperation}/span={HandoffSpanLength}/entry={EntryDirection}";
     }
 
     internal readonly struct AccessHeightProfile
@@ -302,6 +327,8 @@ namespace AutoTerrainDesignations.Access
         private const int SPATIAL_CELL_SIZE = 16;
         private readonly Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
             IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffs;
+        private readonly Func<IReadOnlyList<AccessHandoffSpanCell>,
+            IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffSpans;
 
         public Tile2i BoundsMin { get; }
         public Tile2i BoundsMax { get; }
@@ -316,6 +343,7 @@ namespace AutoTerrainDesignations.Access
         public float LandscapingCostDistanceScale { get; }
         public float LandslideRunPerHeight { get; }
         public int VehicleClearanceRadius { get; }
+        public int VehicleWidth { get; }
         public Tile2i PhysicalTerrainMin { get; }
         public Tile2i PhysicalTerrainMax { get; }
         public float DumpingMaterialSlope { get; }
@@ -369,7 +397,10 @@ namespace AutoTerrainDesignations.Access
             IDictionary<Tile2i, float>? projectedFillSurfaceFloors = null,
             int vehicleClearanceRadius = 1,
             bool avoidOcean = true,
-            bool avoidBuildings = true)
+            bool avoidBuildings = true,
+            int vehicleWidth = 1,
+            Func<IReadOnlyList<AccessHandoffSpanCell>,
+                IReadOnlyList<AccessGroundHandoff>>? workableHandoffSpans = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -384,6 +415,7 @@ namespace AutoTerrainDesignations.Access
             LandscapingCostDistanceScale = landscapingCostDistanceScale;
             LandslideRunPerHeight = landslideRunPerHeight;
             VehicleClearanceRadius = Math.Max(0, vehicleClearanceRadius);
+            VehicleWidth = Math.Max(1, vehicleWidth);
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
             m_preciseTerrainHeights = preciseTerrainHeights != null
                 ? new Dictionary<Tile2i, float>(preciseTerrainHeights)
@@ -491,6 +523,7 @@ namespace AutoTerrainDesignations.Access
             }
 
             m_workableHandoffs = workableHandoffs;
+            m_workableHandoffSpans = workableHandoffSpans;
         }
 
         private static Dictionary<Tile2i, float> BuildPreciseTerrainHeights(
@@ -700,9 +733,13 @@ namespace AutoTerrainDesignations.Access
 
         public int GetTerrainCenterHeight2(Tile2i origin) => m_terrainCenterHeight2.TryGetValue(origin, out int h2) ? h2 : 0;
         public string? GetSideRayBlockerReason(
-            Tile2i tile, AccessSideRayOperation rayOperation)
+            Tile2i tile, AccessSideRayOperation rayOperation,
+            Tile2i? exemptDesignationOrigin = null)
             => AvoidBuildings && m_expandedBuildingRayBlockers.Contains(tile)
                 ? "SideRayBuilding"
+                : exemptDesignationOrigin.HasValue
+                    && IsDesignationFootprintTile(tile, exemptDesignationOrigin.Value)
+                    ? null
                 : m_hardDesignationRayBlockers.Contains(tile)
                     ? "SideRayDesignation"
                     : rayOperation == AccessSideRayOperation.Cut
@@ -713,15 +750,25 @@ namespace AutoTerrainDesignations.Access
                             && m_cutDesignationRayBlockers.Contains(tile)
                                 ? "SideRayOpposingDesignationWork"
                                 : null;
+
+        private static bool IsDesignationFootprintTile(
+            Tile2i tile, Tile2i origin)
+            => tile.X >= origin.X && tile.X <= origin.X + 4
+                && tile.Y >= origin.Y && tile.Y <= origin.Y + 4;
         public bool TryGetCachedSideRay(AccessSideRayCacheKey key, out AccessSideRayResult result)
             => m_sideRayCache.TryGetValue(key, out result);
         public void CacheSideRay(AccessSideRayCacheKey key, AccessSideRayResult result)
             => m_sideRayCache[key] = result;
         public bool HasWorkableHandoffEvaluator => m_workableHandoffs != null;
+        public bool HasWorkableHandoffSpanEvaluator => m_workableHandoffSpans != null;
         public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffs(
             Tile2i origin, AccessHeightProfile profile,
             Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
             => m_workableHandoffs?.Invoke(origin, profile, predecessorOrigin, predecessorProfile)
+                ?? Array.Empty<AccessGroundHandoff>();
+        public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffSpans(
+            IReadOnlyList<AccessHandoffSpanCell> cells)
+            => m_workableHandoffSpans?.Invoke(cells)
                 ?? Array.Empty<AccessGroundHandoff>();
 
         public bool IsProfileOceanBlocked(Tile2i origin, AccessHeightProfile profile)
@@ -946,6 +993,7 @@ namespace AutoTerrainDesignations.Access
         public float UnresolvedPenalty { get; }
         public int RaySampleCount { get; }
         public IReadOnlyList<Tile2i> DisturbedRayTiles { get; }
+        public IReadOnlyList<AccessRayHeightConstraint> RayHeightConstraints { get; }
         public string? FatalReason { get; }
         public float TotalCost =>
             DirectWorkCost + LeftSideRayCost + RightSideRayCost + UnresolvedPenalty;
@@ -958,7 +1006,8 @@ namespace AutoTerrainDesignations.Access
             float unresolvedPenalty = 0f,
             int raySampleCount = 0,
             string? fatalReason = null,
-            IEnumerable<Tile2i>? disturbedRayTiles = null)
+            IEnumerable<Tile2i>? disturbedRayTiles = null,
+            IEnumerable<AccessRayHeightConstraint>? rayHeightConstraints = null)
         {
             DirectWorkCost = directWorkCost;
             LeftSideRayCost = leftSideRayCost;
@@ -968,7 +1017,25 @@ namespace AutoTerrainDesignations.Access
             DisturbedRayTiles = disturbedRayTiles != null
                 ? new List<Tile2i>(disturbedRayTiles).ToArray()
                 : Array.Empty<Tile2i>();
+            RayHeightConstraints = rayHeightConstraints != null
+                ? new List<AccessRayHeightConstraint>(rayHeightConstraints).ToArray()
+                : Array.Empty<AccessRayHeightConstraint>();
             FatalReason = fatalReason;
+        }
+    }
+
+    internal readonly struct AccessRayHeightConstraint
+    {
+        public Tile2i Tile { get; }
+        public AccessSideRayOperation Operation { get; }
+        public float Height { get; }
+
+        public AccessRayHeightConstraint(
+            Tile2i tile, AccessSideRayOperation operation, float height)
+        {
+            Tile = tile;
+            Operation = operation;
+            Height = height;
         }
     }
 

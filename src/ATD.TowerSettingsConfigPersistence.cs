@@ -83,6 +83,8 @@ namespace AutoTerrainDesignations
             AppendJsonBool(sb, AccessAvoidOcean);
             sb.Append(",\"avoidBuildings\":");
             AppendJsonBool(sb, AccessAvoidBuildings);
+            sb.Append(",\"harvestDisruptedTrees\":");
+            AppendJsonBool(sb, AccessHarvestDisruptedTrees);
             sb.Append('}');
             sb.Append(",\"towerSettings\":[");
 
@@ -108,6 +110,8 @@ namespace AutoTerrainDesignations
                 allEntityIds.Add(pair.Key);
             foreach (var pair in s_generatedDesignationOriginsByTowerEntityId)
                 if (pair.Value.Count > 0) allEntityIds.Add(pair.Key);
+            foreach (var pair in s_generatedHarvestTreePositionsByTowerEntityId)
+                if (pair.Value.Count > 0) allEntityIds.Add(pair.Key);
 
             foreach (EntityId entityId in allEntityIds)
             {
@@ -127,9 +131,11 @@ namespace AutoTerrainDesignations
                 bool hasFarmingCollapsed = s_farmingPanelCollapsedByEntityId.TryGetValue(entityId, out bool farmingCollapsed);
                 bool hasGeneratedOrigins = s_generatedDesignationOriginsByTowerEntityId.TryGetValue(entityId, out System.Collections.Generic.HashSet<Tile2i> generatedOrigins)
                     && generatedOrigins.Count > 0;
+                bool hasGeneratedHarvestTrees = s_generatedHarvestTreePositionsByTowerEntityId.TryGetValue(entityId, out System.Collections.Generic.HashSet<Tile2i> generatedHarvestTrees)
+                    && generatedHarvestTrees.Count > 0;
 
                 // Skip towers with no non-default state to persist.
-                if ((!hasSettings || settings.MatchesGlobalDefaults()) && (!hasOre || ore == null) && (!hasPriority || priority == null) && !hasFarmingState && !hasTerrainCollapsed && !hasOreCollapsed && !hasFarmingCollapsed && !hasGeneratedOrigins)
+                if ((!hasSettings || settings.MatchesGlobalDefaults()) && (!hasOre || ore == null) && (!hasPriority || priority == null) && !hasFarmingState && !hasTerrainCollapsed && !hasOreCollapsed && !hasFarmingCollapsed && !hasGeneratedOrigins && !hasGeneratedHarvestTrees)
                 {
                     continue;
                 }
@@ -195,6 +201,8 @@ namespace AutoTerrainDesignations
 
                 if (hasGeneratedOrigins)
                     AppendTileOrigins(sb, "generatedDesignationOrigins", generatedOrigins);
+                if (hasGeneratedHarvestTrees)
+                    AppendTileOrigins(sb, "generatedHarvestTreePositions", generatedHarvestTrees);
 
                 sb.Append('}');
             }
@@ -230,6 +238,8 @@ namespace AutoTerrainDesignations
                     SetAccessAvoidOcean(avoidOcean);
                 if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))
                     SetAccessAvoidBuildings(avoidBuildings);
+                if (TryGetBool(worldSettings, "harvestDisruptedTrees", out bool harvestDisruptedTrees))
+                    SetAccessHarvestDisruptedTrees(harvestDisruptedTrees);
             }
 
             if (!root.TryGetValue("towerSettings", out object rawEntries)
@@ -261,6 +271,7 @@ namespace AutoTerrainDesignations
             s_farmingPanelCollapsedByEntityId.Clear();
             s_generatedDesignationOriginsByTowerEntityId.Clear();
             s_generatedAccesswayOriginsByTowerEntityId.Clear();
+            s_generatedHarvestTreePositionsByTowerEntityId.Clear();
 
             foreach (object rawEntry in entries)
             {
@@ -340,6 +351,8 @@ namespace AutoTerrainDesignations
                 if (TryGetBool(entry, "farmingPanelCollapsed", out bool farmingPanelCollapsed))
                     s_farmingPanelCollapsedByEntityId[entityId] = farmingPanelCollapsed;
                 RestoreTileOrigins(entry, "generatedDesignationOrigins", entityId);
+                RestoreTileOrigins(entry, "generatedHarvestTreePositions", entityId,
+                    s_generatedHarvestTreePositionsByTowerEntityId);
 
                 loadedCount++;
             }
@@ -383,6 +396,14 @@ namespace AutoTerrainDesignations
         }
 
         private static void RestoreTileOrigins(Dict<string, object> entry, string name, EntityId entityId)
+            => RestoreTileOrigins(entry, name, entityId,
+                s_generatedDesignationOriginsByTowerEntityId);
+
+        private static void RestoreTileOrigins(
+            Dict<string, object> entry,
+            string name,
+            EntityId entityId,
+            System.Collections.Generic.Dictionary<EntityId, System.Collections.Generic.HashSet<Tile2i>> target)
         {
             if (!entry.TryGetValue(name, out object rawOrigins) || !(rawOrigins is object[] origins))
                 return;
@@ -397,7 +418,7 @@ namespace AutoTerrainDesignations
             }
 
             if (restored.Count > 0)
-                s_generatedDesignationOriginsByTowerEntityId[entityId] = restored;
+                target[entityId] = restored;
         }
 
         private static void AppendIntOverride(StringBuilder sb, string name, int value, int defaultValue)

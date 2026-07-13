@@ -216,27 +216,34 @@ namespace AutoTerrainDesignations
             new Dictionary<EntityId, HashSet<Tile2i>>();
         private static readonly Dictionary<EntityId, HashSet<Tile2i>> s_generatedDesignationOriginsByTowerEntityId =
             new Dictionary<EntityId, HashSet<Tile2i>>();
+        private static readonly Dictionary<EntityId, HashSet<Tile2i>> s_generatedHarvestTreePositionsByTowerEntityId =
+            new Dictionary<EntityId, HashSet<Tile2i>>();
         private static bool s_startupTowerPrioritySyncCompleted;
         private static int s_startupTowerPrioritySyncAttempts;
         private static bool s_accessAvoidOcean = true;
         private static bool s_accessAvoidBuildings = true;
+        private static bool s_accessHarvestDisruptedTrees = true;
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
+        internal static bool AccessHarvestDisruptedTrees => s_accessHarvestDisruptedTrees;
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
+        internal static void SetAccessHarvestDisruptedTrees(bool value) => s_accessHarvestDisruptedTrees = value;
 
         internal static void ResetWorldPathfinderSettingsToDefaults()
         {
             s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
             s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
+            s_accessHarvestDisruptedTrees = AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees;
         }
 
         internal static void SaveWorldPathfinderSettingsAsGlobalDefaults()
         {
             AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
             AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
+            AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
         }
 
         // Reserved for a future public diagnostics toggle. Keep command-scoped
@@ -434,6 +441,37 @@ namespace AutoTerrainDesignations
                 s_generatedAccesswayOriginsByTowerEntityId.Remove(entityId);
         }
 
+        private static void RegisterGeneratedHarvestTreePositions(
+            IAreaManagingTower tower, IEnumerable<TreeId> trees)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId))
+                return;
+            if (!s_generatedHarvestTreePositionsByTowerEntityId.TryGetValue(
+                    entityId, out HashSet<Tile2i> registered))
+            {
+                registered = new HashSet<Tile2i>();
+                s_generatedHarvestTreePositionsByTowerEntityId[entityId] = registered;
+            }
+            foreach (TreeId tree in trees)
+                registered.Add(tree.Position.AsFull);
+        }
+
+        private static IReadOnlyList<Tile2i> GetRegisteredGeneratedHarvestTreePositions(
+            IAreaManagingTower tower)
+        {
+            if (!TryGetTowerEntityId(tower, out EntityId entityId)
+                || !s_generatedHarvestTreePositionsByTowerEntityId.TryGetValue(
+                    entityId, out HashSet<Tile2i> registered))
+                return Array.Empty<Tile2i>();
+            return registered.ToArray();
+        }
+
+        private static void ClearRegisteredGeneratedHarvestTrees(IAreaManagingTower tower)
+        {
+            if (TryGetTowerEntityId(tower, out EntityId entityId))
+                s_generatedHarvestTreePositionsByTowerEntityId.Remove(entityId);
+        }
+
         internal static bool GetTowerAutoReleaseExcavatorsWhenIdle(IAreaManagingTower tower)
         {
             if (TryGetTowerEntityId(tower, out EntityId entityId) && s_towerSettingsByEntityId.TryGetValue(entityId, out ATDTowerSettings settings))
@@ -594,6 +632,9 @@ namespace AutoTerrainDesignations
             s_terrainPanelCollapsedByEntityId.Clear();
             s_orePanelCollapsedByEntityId.Clear();
             s_farmingPanelCollapsedByEntityId.Clear();
+            s_generatedDesignationOriginsByTowerEntityId.Clear();
+            s_generatedAccesswayOriginsByTowerEntityId.Clear();
+            s_generatedHarvestTreePositionsByTowerEntityId.Clear();
             s_startupTowerPrioritySyncCompleted = false;
             s_startupTowerPrioritySyncAttempts = 0;
 

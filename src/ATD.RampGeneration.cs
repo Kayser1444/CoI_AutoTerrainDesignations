@@ -143,9 +143,9 @@ namespace AutoTerrainDesignations
         }
 
         /// <summary>
-        /// Absolute world tile coordinates occupied by non-tower static buildings within the current tower area.
-        /// Rebuilt by <see cref="BuildBuildingOccupiedTiles"/> at most once per
-        /// <see cref="BUILDING_OCCUPIED_TILES_CACHE_TICKS"/> farming ticks per tower.
+        /// Absolute world tile coordinates occupied by static buildings near the current tower area.
+        /// The capture extends beyond the area far enough to cover access-search and candidate-ray margins.
+        /// Farming automation may reuse the result briefly; an explicit accessway request forces a refresh.
         /// </summary>
         private static readonly HashSet<Tile2i> s_buildingOccupiedTiles = new HashSet<Tile2i>();
         private static readonly Dictionary<Tile2i, HashSet<int>> s_buildingFixedHeights2ByTile =
@@ -179,12 +179,13 @@ namespace AutoTerrainDesignations
         // share the same general area but none are reachable (the fallback is used anyway).
         private const int MAX_RAMP_REACHABILITY_CHECKS = 50;
 
-        private static void BuildBuildingOccupiedTiles(IAreaManagingTower tower)
+        private static void BuildBuildingOccupiedTiles(IAreaManagingTower tower, bool forceRefresh = false)
         {
             // Return the existing set if it was recently built for this same tower.
             bool hasTowerId = TryGetTowerEntityId(tower, out EntityId towerId);
             int ticksSinceCache = s_farmingAutomationTickIndex - s_buildingOccupiedTilesCachedTick;
-            if (hasTowerId
+            if (!forceRefresh
+                && hasTowerId
                 && towerId == s_buildingOccupiedTilesCachedTowerId
                 && ticksSinceCache >= 0
                 && ticksSinceCache < BUILDING_OCCUPIED_TILES_CACHE_TICKS)
@@ -199,17 +200,37 @@ namespace AutoTerrainDesignations
                 return;
             }
 
+            // Candidate origins can reach outside the tower bounding box through the ground-search margin,
+            // and their terrain rays extend farther again. Capturing only Area.ContainsTile used to omit
+            // nearby buildings (and the outside portion of a footprint straddling the area boundary).
+            const int buildingRaySafetyBoundary = 2;
+            int captureMargin = RAMP_ACCESS_SEARCH_MARGIN_TILES
+                + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                + AutoTerrainDesignationsMod.AccessRayEndBuffer
+                + buildingRaySafetyBoundary;
+            Tile2i areaMin = tower.Area.BoundingBoxMin;
+            Tile2i areaMax = tower.Area.BoundingBoxMax;
+            int captureMinX = areaMin.X - captureMargin;
+            int captureMinY = areaMin.Y - captureMargin;
+            int captureMaxX = areaMax.X + captureMargin;
+            int captureMaxY = areaMax.Y + captureMargin;
+            int staticEntityCount = 0;
+            int capturedEntityCount = 0;
+
             foreach (IStaticEntity entity in s_entitiesManager.GetAllEntitiesOfType<IStaticEntity>())
             {
+                staticEntityCount++;
                 Tile2i center = entity.CenterTile.Xy;
                 int fixedHeight2 = entity.CenterTile.Z * 2;
                 var occupiedTiles = entity.OccupiedTiles;
+                bool capturedEntity = false;
                 for (int i = 0; i < occupiedTiles.Length; i++)
                 {
                     Tile2i absCoord = center + occupiedTiles[i].RelCoord;
-                    // Only include tiles that are at least potentially within the tower area
-                    if (tower.Area.ContainsTile(absCoord))
+                    if (absCoord.X >= captureMinX && absCoord.X <= captureMaxX
+                        && absCoord.Y >= captureMinY && absCoord.Y <= captureMaxY)
                     {
+                        capturedEntity = true;
                         s_buildingOccupiedTiles.Add(absCoord);
                         if (!s_buildingFixedHeights2ByTile.TryGetValue(absCoord, out HashSet<int> heights))
                         {
@@ -219,7 +240,14 @@ namespace AutoTerrainDesignations
                         heights.Add(fixedHeight2);
                     }
                 }
+                if (capturedEntity)
+                    capturedEntityCount++;
             }
+
+            LogExperimentalAccessDebug(
+                $"[ATD Building Snapshot] forceRefresh={forceRefresh} staticEntities={staticEntityCount} " +
+                $"capturedEntities={capturedEntityCount} occupiedTiles={s_buildingOccupiedTiles.Count} " +
+                $"captureBounds=({captureMinX},{captureMinY})..({captureMaxX},{captureMaxY})");
 
             if (hasTowerId)
             {
@@ -439,7 +467,9 @@ namespace AutoTerrainDesignations
             TerrainDesignationProto accesswayProto = s_levelingProto ?? sourceWorkProto;
             bool accesswayAllowsMixedWork = s_levelingProto != null && accesswayProto == s_levelingProto;
 
-            BuildBuildingOccupiedTiles(tower);
+            // A user-triggered Create Designations request must see buildings placed since the previous
+            // farming/pathfinding pass. Subsequent cluster snapshots reuse this freshly captured set.
+            BuildBuildingOccupiedTiles(tower, forceRefresh: true);
             BuildDesignationOriginsInArea(tower);
 
             var accessWorkDepths = new Dict<Tile2i, int>();
