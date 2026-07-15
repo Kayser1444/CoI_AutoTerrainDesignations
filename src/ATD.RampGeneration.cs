@@ -655,6 +655,11 @@ namespace AutoTerrainDesignations
                 {
                     List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
                         originClusters, states, cluster);
+                    List<Tile2i> acceptedProviderOrigins = existingProviders
+                        .Where(provider => provider.ReachesGround)
+                        .SelectMany(provider => provider.Tiles)
+                        .Distinct()
+                        .ToList();
                     if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,
                         experimentalIsMining, accesswayAllowsMixedWork, accessibleFixedGoals,
                         out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
@@ -669,7 +674,8 @@ namespace AutoTerrainDesignations
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
-                            refreshedSnapshot, cluster, accessibleFixedGoals);
+                            refreshedSnapshot, cluster, accessibleFixedGoals,
+                            acceptedProviderOrigins);
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Width] cluster={cluster.ClusterId} " +
                             $"legacyRampWidth={configuredRampWidth} " +

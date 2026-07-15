@@ -20,7 +20,7 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyCollection<string> CleanupKeys { get; }
         public float CleanupCost { get; }
         public bool IsQuickPath { get; }
-        public float CenterSpokeCost => 2f;
+        public float CenterSpokeCost { get; }
         public float TotalCost => CenterSpokeCost + CleanupCost;
 
         public AccessV2HandoffCandidate(
@@ -34,7 +34,8 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<Tile2i> groundEntryCenters,
             IReadOnlyCollection<string> cleanupKeys,
             float cleanupCost,
-            bool isQuickPath = false)
+            bool isQuickPath = false,
+            float centerSpokeCost = 2f)
         {
             ExitDirection = exitDirection;
             SpanLength = spanLength;
@@ -49,6 +50,7 @@ namespace AutoTerrainDesignations.Access.V2
             CleanupKeys = cleanupKeys;
             CleanupCost = cleanupCost;
             IsQuickPath = isQuickPath;
+            CenterSpokeCost = Math.Max(2f, centerSpokeCost);
         }
 
         public override string ToString()
@@ -85,7 +87,8 @@ namespace AutoTerrainDesignations.Access.V2
             float cleanupCostScale = 1f,
             Func<Tile2i, AccessV2History, bool>? projectedCenterValidator = null,
             Func<Tile2i, AccessV2History, bool>? projectedCenterOverlapsWork = null,
-            int vehicleWidth = 0)
+            int vehicleWidth = 0,
+            float centerSpokeCost = 2f)
         {
             var result = new List<AccessV2HandoffCandidate>();
             if (recentNewestFirst.Count == 0) return result;
@@ -102,7 +105,8 @@ namespace AutoTerrainDesignations.Access.V2
             AccessV2HandoffCandidate? quick = TryBuildQuickForwardHandoff(
                 current, history, ground,
                 firstLane0, firstLane1, vehicleWidth,
-                cleanupCostScale, projectedCenterValidator);
+                cleanupCostScale, projectedCenterValidator,
+                centerSpokeCost);
             if (quick != null)
                 return new[] { quick };
 
@@ -130,7 +134,8 @@ namespace AutoTerrainDesignations.Access.V2
                     lane0, lane1, lane0Origins, lane1Origins,
                     history, ground,
                     cleanupCostScale, projectedCenterValidator,
-                    projectedCenterOverlapsWork, result);
+                    projectedCenterOverlapsWork,
+                    centerSpokeCost, result);
             }
 
             if (available >= 2)
@@ -158,7 +163,8 @@ namespace AutoTerrainDesignations.Access.V2
                         new[] { older.GetLaneOrigin(laneIndex) },
                         history, ground,
                         cleanupCostScale, projectedCenterValidator,
-                        projectedCenterOverlapsWork, result);
+                        projectedCenterOverlapsWork,
+                        centerSpokeCost, result);
                 }
             }
 
@@ -189,7 +195,8 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessGroundHandoff> lane1,
             int vehicleWidth,
             float cleanupCostScale,
-            Func<Tile2i, AccessV2History, bool>? projectedCenterValidator)
+            Func<Tile2i, AccessV2History, bool>? projectedCenterValidator,
+            float centerSpokeCost)
         {
             if (vehicleWidth <= 0 || lane0.Count == 0 || lane1.Count == 0)
                 return null;
@@ -233,7 +240,8 @@ namespace AutoTerrainDesignations.Access.V2
                 new[] { selected.Value },
                 new[] { selected.Value },
                 cleanupKeys, cleanupCost,
-                isQuickPath: true);
+                isQuickPath: true,
+                centerSpokeCost: centerSpokeCost);
         }
 
         private static bool TrySelectForward(
@@ -382,6 +390,7 @@ namespace AutoTerrainDesignations.Access.V2
             float cleanupCostScale,
             Func<Tile2i, AccessV2History, bool>? projectedCenterValidator,
             Func<Tile2i, AccessV2History, bool>? projectedCenterOverlapsWork,
+            float centerSpokeCost,
             ICollection<AccessV2HandoffCandidate> result)
         {
             for (int leftIndex = 0; leftIndex < lane0.Count; leftIndex++)
@@ -420,7 +429,8 @@ namespace AutoTerrainDesignations.Access.V2
                             leftEscape[leftEscape.Count - 1],
                             rightEscape[rightEscape.Count - 1],
                         }.Distinct().ToArray(),
-                        cleanupKeys, cleanupCost));
+                        cleanupKeys, cleanupCost,
+                        centerSpokeCost: centerSpokeCost));
                 }
             }
         }

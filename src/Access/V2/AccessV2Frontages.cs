@@ -43,13 +43,16 @@ namespace AutoTerrainDesignations.Access.V2
     {
         public AccessV2BandState State { get; }
         public Tile2i ExposedDirection { get; }
+        public float TerminalCost { get; }
 
         public AccessV2FixedFrontage(
             AccessV2BandState state,
-            Tile2i exposedDirection)
+            Tile2i exposedDirection,
+            float terminalCost = 0f)
         {
             State = state;
             ExposedDirection = exposedDirection;
+            TerminalCost = Math.Max(0f, terminalCost);
         }
     }
 

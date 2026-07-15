@@ -548,6 +548,62 @@ namespace AutoTerrainDesignations.Access.V2
                 failure = "Mega cleanup flood or isolated-pocket fixture failed";
                 return false;
             }
+            var openGround = new List<Tile2i>();
+            for (int y = 0; y <= 2; y++)
+                for (int x = 0; x <= 2; x++)
+                    openGround.Add(new Tile2i(x, y));
+            var diagonalGraph = new AccessV2GroundGraph(
+                openGround,
+                new[] { new Tile2i(2, 2) },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            if (!diagonalGraph.CanTraverse(
+                    new Tile2i(0, 0), new Tile2i(1, 1))
+                || !diagonalGraph.TryGetGoalDistance(
+                    new Tile2i(0, 0), out float diagonalDistance)
+                || Math.Abs(diagonalDistance
+                    - 2f * AccessV2GroundGraph.DiagonalCost) > 0.0001f)
+            {
+                failure = "Mega ground graph must use conservative octile travel";
+                return false;
+            }
+            var cornerBlockedGraph = new AccessV2GroundGraph(
+                openGround.Where(tile => tile != new Tile2i(1, 0)),
+                new[] { new Tile2i(2, 2) },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            if (cornerBlockedGraph.CanTraverse(
+                    new Tile2i(0, 0), new Tile2i(1, 1)))
+            {
+                failure = "Mega diagonal ground edge must not cut a blocked corner";
+                return false;
+            }
+            var disconnectedGround = new[]
+            {
+                new Tile2i(0, 0), new Tile2i(1, 0), new Tile2i(2, 0),
+                new Tile2i(10, 0), new Tile2i(11, 0),
+            };
+            var disconnectedGraph = new AccessV2GroundGraph(
+                disconnectedGround,
+                new[] { new Tile2i(11, 0) },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            var disconnectedVPotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(11, 0),
+                disconnectedGraph,
+                Array.Empty<AccessV2FixedFrontage>(),
+                minimumVTravelCostPerTile: 2.25f);
+            var disconnectedEscapePotential =
+                new AccessV2GroundEscapePotentialField(
+                    disconnectedGraph, disconnectedVPotential,
+                    minimumGeneratedEntryCost: 10f);
+            if (disconnectedGraph.TryGetGoalDistance(
+                    new Tile2i(0, 0), out _)
+                || Math.Abs(disconnectedVPotential.GetPotential(
+                    new Tile2i(0, 0)) - 23.5f) > 0.0001f
+                || Math.Abs(disconnectedEscapePotential.GetPotential(
+                    new Tile2i(0, 0)) - 31f) > 0.0001f)
+            {
+                failure = "Disconnected V2 G components must retain a component-aware V escape heuristic";
+                return false;
+            }
             IReadOnlyCollection<string> keys = graph.CollectUnchargedCleanupKeys(
                 new[] { cleanupA, cleanupB, cleanupA },
                 new HashSet<string>(StringComparer.Ordinal));
@@ -614,7 +670,7 @@ namespace AutoTerrainDesignations.Access.V2
                 new[]
                 {
                     new AccessV2FixedFrontage(
-                        goalState, new Tile2i(-4, 0)),
+                        goalState, new Tile2i(-4, 0), terminalCost: 7f),
                 },
                 new AccessV2FrontageDiagnostics());
             AccessV2TransitionEvaluation UnitEvaluator(
@@ -635,9 +691,97 @@ namespace AutoTerrainDesignations.Access.V2
             if (!straight.Result.Success
                 || straight.Result.States.Count != 3
                 || straight.Result.GeneratedProfiles.Count != 4
-                || Math.Abs(straight.Result.Cost - 12f) > 0.0001f)
+                || Math.Abs(straight.Result.Cost - 19f) > 0.0001f
+                || Math.Abs(straight.Result.TraversalCost - 15f) > 0.0001f)
             {
-                failure = "V2 Dijkstra flat-straight route or delta-only cost failed";
+                failure = "V2 Dijkstra fixed-provider terminal fee or route cost failed";
+                return false;
+            }
+
+            var fixedPotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(32, 32),
+                ground: null, fixedGoals: endpoints.FixedGoals);
+            Tile2i fixedMatchCenter =
+                AccessV2PotentialField.GetCanonicalCenter(goalState)
+                + new RelTile2i(-4, 0);
+            if (Math.Abs(fixedPotential.GetPotential(start) - 15f) > 0.0001f
+                || Math.Abs(fixedPotential.GetPotential(fixedMatchCenter) - 7f)
+                    > 0.0001f)
+            {
+                failure = "V2 fixed-frontage charged potential seed or propagation failed";
+                return false;
+            }
+            const float fixtureFixedOriginCost = 5f;
+            float minimumVRate =
+                AccessV2CostModel.GetMinimumVTravelCostPerTile(
+                    fixtureFixedOriginCost);
+            float centerSpoke = AccessV2CostModel.GetCenterSpokeCost(
+                fixtureFixedOriginCost);
+            var weightedPotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(32, 32),
+                ground: null, fixedGoals: endpoints.FixedGoals,
+                minimumVTravelCostPerTile: minimumVRate);
+            if (Math.Abs(minimumVRate - 2.25f) > 0.0001f
+                || Math.Abs(centerSpoke - 4.5f) > 0.0001f
+                || Math.Abs(weightedPotential.GetPotential(start) - 25f)
+                    > 0.0001f)
+            {
+                failure = "V2 weighted cardinal potential and center spoke must share the minimum V rate";
+                return false;
+            }
+            var straightAStar = new AccessV2SearchSession(
+                endpoints, Tile2i.Zero, new Tile2i(32, 32),
+                UnitEvaluator, 10000, float.MaxValue,
+                potentialField: fixedPotential);
+            while (!straightAStar.IsComplete) straightAStar.Step(7);
+            if (!straightAStar.Result.Success
+                || !straightAStar.Result.UsedAStar
+                || Math.Abs(straightAStar.Result.Cost
+                    - straight.Result.Cost) > 0.0001f
+                || !straightAStar.Result.States.SequenceEqual(
+                    straight.Result.States))
+            {
+                failure = "V2 fixed-frontage potential A* must reproduce Dijkstra";
+                return false;
+            }
+
+            if (!TryCreateUniformState(
+                    new Tile2i(24, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState farGoalState, out failure))
+                return false;
+            var feeChoiceEndpoints = new AccessV2EndpointSet(
+                endpoints.Starts,
+                new[]
+                {
+                    new AccessV2FixedFrontage(
+                        goalState, new Tile2i(-4, 0), terminalCost: 20f),
+                    new AccessV2FixedFrontage(
+                        farGoalState, new Tile2i(-4, 0), terminalCost: 0f),
+                },
+                new AccessV2FrontageDiagnostics());
+            var feeChoiceDijkstra = new AccessV2SearchSession(
+                feeChoiceEndpoints, Tile2i.Zero, new Tile2i(36, 32),
+                UnitEvaluator, 10000, float.MaxValue);
+            while (!feeChoiceDijkstra.IsComplete) feeChoiceDijkstra.Step(7);
+            var feeChoicePotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(36, 32),
+                ground: null, fixedGoals: feeChoiceEndpoints.FixedGoals);
+            var feeChoiceAStar = new AccessV2SearchSession(
+                feeChoiceEndpoints, Tile2i.Zero, new Tile2i(36, 32),
+                UnitEvaluator, 10000, float.MaxValue,
+                potentialField: feeChoicePotential);
+            while (!feeChoiceAStar.IsComplete) feeChoiceAStar.Step(7);
+            if (!feeChoiceDijkstra.Result.Success
+                || !feeChoiceAStar.Result.Success
+                || Math.Abs(feeChoiceDijkstra.Result.Cost - 24f) > 0.0001f
+                || Math.Abs(feeChoiceAStar.Result.Cost - 24f) > 0.0001f
+                || feeChoiceDijkstra.Result.States.Last().Anchor
+                    != new Tile2i(20, 4)
+                || !feeChoiceAStar.Result.States.SequenceEqual(
+                    feeChoiceDijkstra.Result.States))
+            {
+                failure = "V2 must prefer lower total cost over nearer fixed frontage geometry";
                 return false;
             }
 
@@ -785,7 +929,7 @@ namespace AutoTerrainDesignations.Access.V2
                 CleanupEvaluator, 10000, float.MaxValue);
             while (!cleanup.IsComplete) cleanup.Step(17);
             if (!cleanup.Result.Success
-                || Math.Abs(cleanup.Result.Cost - 20f) > 0.0001f)
+                || Math.Abs(cleanup.Result.Cost - 27f) > 0.0001f)
             {
                 failure = "V2 Dijkstra cleanup keys were charged more than once";
                 return false;
@@ -869,15 +1013,16 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> candidates =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
-                    graph, Single, Span);
+                    graph, Single, Span,
+                    centerSpokeCost: 4.5f);
             AccessV2HandoffCandidate? forward = candidates.FirstOrDefault(
                 item => item.ExitDirection == new Tile2i(4, 0));
             if (forward == null
                 || forward.Lane0Operation == forward.Lane1Operation
-                || Math.Abs(forward.CenterSpokeCost - 2f) > 0.0001f
+                || Math.Abs(forward.CenterSpokeCost - 4.5f) > 0.0001f
                 || Math.Abs(forward.CleanupCost - 8f) > 0.0001f)
             {
-                failure = "V2 forward seam must retain mixed lane operations, cleanup, and the two-cost center spoke";
+                failure = "V2 forward seam must retain mixed lane operations, cleanup, and the configured center spoke";
                 return false;
             }
 
@@ -1025,9 +1170,9 @@ namespace AutoTerrainDesignations.Access.V2
                     : Array.Empty<AccessV2HandoffCandidate>(),
                 groundGraph: graph);
             while (!session.IsComplete) session.Step(7);
-            int expectedGroundDistance = forward.GroundEntryCenters
-                .Select(center => graph.TryGetGoalDistance(center, out int distance)
-                    ? distance : int.MaxValue)
+            float expectedGroundDistance = forward.GroundEntryCenters
+                .Select(center => graph.TryGetGoalDistance(center, out float distance)
+                    ? distance : float.PositiveInfinity)
                 .Min();
             float expectedTerminalCost = forward.TotalCost + expectedGroundDistance;
             float expectedTerminalTravel =
@@ -1073,6 +1218,99 @@ namespace AutoTerrainDesignations.Access.V2
                     session.Result.States))
             {
                 failure = "V2 A* and Dijkstra must retain the same ground-terminal route and exact cost";
+                return false;
+            }
+
+            var alternatingGround = new AccessV2GroundGraph(
+                new[]
+                {
+                    new Tile2i(18, 8), new Tile2i(19, 8),
+                    new Tile2i(26, 8), new Tile2i(27, 8),
+                    new Tile2i(28, 8), new Tile2i(29, 8),
+                    new Tile2i(30, 8),
+                },
+                new[] { new Tile2i(30, 8) },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            AccessV2HandoffCandidate MakeSeam(
+                AccessV2BandState state,
+                Tile2i exit,
+                Tile2i entry)
+            {
+                var lane0 = new AccessGroundHandoff(
+                    entry, AccessHandoffOperation.Leveling,
+                    new[] { entry });
+                var lane1 = new AccessGroundHandoff(
+                    entry, AccessHandoffOperation.Leveling,
+                    new[] { entry });
+                return new AccessV2HandoffCandidate(
+                    exit, 1, lane0, lane1,
+                    new[] { state.GetLaneOrigin(0) },
+                    new[] { state.GetLaneOrigin(1) },
+                    new[] { entry }, new[] { entry },
+                    Array.Empty<string>(), 0f);
+            }
+            AccessV2HandoffCandidate startSeam = MakeSeam(
+                first, new Tile2i(4, 0), new Tile2i(18, 8));
+            var alternating = new AccessV2SearchSession(
+                endpoints, Tile2i.Zero, new Tile2i(32, 32),
+                UnitEvaluator, 10000, float.MaxValue,
+                (states, history) =>
+                {
+                    AccessV2BandState state = states[0];
+                    if (state.Anchor == first.Anchor)
+                        return new[] { startSeam };
+                    if (state.Anchor == new Tile2i(16, 4)
+                        && state.EntryDirection == new Tile2i(-4, 0)
+                        && state.Band.IsCompletelyFlat
+                        && state.Band.Lane0.Center2 == 0)
+                        return new[]
+                        {
+                            MakeSeam(
+                                state, new Tile2i(-4, 0),
+                                new Tile2i(19, 8)),
+                        };
+                    if (state.Anchor == new Tile2i(20, 4)
+                        && state.EntryDirection == new Tile2i(4, 0)
+                        && state.Band.IsCompletelyFlat
+                        && state.Band.Lane0.Center2 == 0)
+                        return new[]
+                        {
+                            MakeSeam(
+                                state, new Tile2i(4, 0),
+                                new Tile2i(18, 8)),
+                            MakeSeam(
+                                state, new Tile2i(4, 0),
+                                new Tile2i(26, 8)),
+                        };
+                    return Array.Empty<AccessV2HandoffCandidate>();
+                },
+                groundGraph: alternatingGround,
+                terrainCenterHeightProvider: _ => 0);
+            while (!alternating.IsComplete) alternating.Step(31);
+            int groundToV = 0;
+            int vToGround = 0;
+            for (int index = 1;
+                index < alternating.Result.RouteSteps.Count;
+                index++)
+            {
+                AccessV2RouteStep previous =
+                    alternating.Result.RouteSteps[index - 1];
+                AccessV2RouteStep current =
+                    alternating.Result.RouteSteps[index];
+                if (previous.IsGround && !current.IsGround) groundToV++;
+                if (!previous.IsGround && current.IsGround) vToGround++;
+            }
+            if (!alternating.Result.Success
+                || groundToV != 1
+                || vToGround != 2
+                || alternating.Result.RouteSteps.Last().GroundCenter
+                    != new Tile2i(30, 8))
+            {
+                failure = "V2 search must retain and cost an alternating V-G-V-G route: "
+                    + $"success={alternating.Result.Success} "
+                    + $"reason={alternating.Result.FailureReason} "
+                    + $"g2v={groundToV} v2g={vToGround} "
+                    + $"visited={alternating.Result.Visited}";
                 return false;
             }
 
@@ -1161,8 +1399,8 @@ namespace AutoTerrainDesignations.Access.V2
                 {
                     [syntheticOrigin] = first.GetLane(1).Profile,
                 },
-                forward,
-                forward?.GroundEntryCenters ?? Array.Empty<Tile2i>());
+                session.Result.Handoff,
+                session.Result.GroundPath);
             var materializationResult = new AccessSearchResult(
                 true, string.Empty, first.GetLaneOrigin(0),
                 Array.Empty<AccessSearchNode>(),
@@ -1182,6 +1420,58 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 failure = "V2 replay must omit exact-terrain work while retaining cleanup and terminal ownership metadata: "
                     + materialized.FailureReason;
+                return false;
+            }
+
+            AccessHeightProfile.TryForMode(
+                AccessSearchMode.Flat, 0,
+                out AccessHeightProfile providerFlat);
+            var providerProfiles = new Dictionary<Tile2i, AccessHeightProfile>
+            {
+                [new Tile2i(4, 4)] = providerFlat,
+                [new Tile2i(4, 8)] = providerFlat,
+            };
+            var providerGround = new[]
+            {
+                new Tile2i(9, 8), new Tile2i(10, 8),
+                new Tile2i(11, 8), new Tile2i(12, 8),
+            };
+            var providerSnapshot = new AccessSearchSnapshot(
+                Tile2i.Zero, new Tile2i(32, 32), new Tile2i(12, 8),
+                -2, 2, true, true, true, 1f, 1f,
+                heightByTile, centerByOrigin, providerProfiles,
+                Array.Empty<Tile2i>(), providerGround,
+                new[] { new Tile2i(12, 8) },
+                Array.Empty<Tile2i>(), Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                preciseTerrainHeights: preciseByTile,
+                physicalTerrainMin: Tile2i.Zero,
+                physicalTerrainMax: new Tile2i(32, 32),
+                vehicleWidth: 5);
+            AccessV2BandProfile.TryCreateEnabled(
+                AccessV2TravelAxis.X, providerFlat, providerFlat,
+                out AccessV2BandProfile providerBand, out _);
+            var providerGoalState = new AccessV2BandState(
+                new Tile2i(4, 4), providerBand, new Tile2i(4, 0));
+            var providerEndpoints = new AccessV2EndpointSet(
+                Array.Empty<AccessV2StartFrontage>(),
+                new[]
+                {
+                    new AccessV2FixedFrontage(
+                        providerGoalState, new Tile2i(-4, 0)),
+                },
+                new AccessV2FrontageDiagnostics());
+            var providerField = new AccessV2ProviderDistanceField(
+                providerSnapshot, providerProfiles.Keys);
+            AccessV2EndpointSet chargedProviderEndpoints =
+                providerField.ApplyTerminalCosts(providerEndpoints);
+            if (providerField.ProviderNodeCount != 45
+                || providerField.ConnectedNodeCount != 45
+                || chargedProviderEndpoints.FixedGoals.Count != 1
+                || Math.Abs(chargedProviderEndpoints.FixedGoals[0].TerminalCost
+                    - 10f) > 0.0001f)
+            {
+                failure = "V2 accepted-provider field did not charge entry plus exact provider/G suffix";
                 return false;
             }
 

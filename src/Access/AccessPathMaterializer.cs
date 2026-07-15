@@ -62,7 +62,8 @@ namespace AutoTerrainDesignations.Access
                     }
                     if (previousWasGround)
                     {
-                        if (Manhattan(previousPosition, node.Position) != 1)
+                        if (!IsValidGroundStep(
+                                snapshot, previousPosition, node.Position))
                             return Invalid("PlanGroundDiscontinuity", result, designations, reusedNodes, groundNodes);
                     }
                     else
@@ -300,22 +301,43 @@ namespace AutoTerrainDesignations.Access
             Tile2i handoffGround = default;
             AccessHandoffOperation commonOperation = AccessHandoffOperation.None;
             int groundNodes = 0;
-            if (handoff != null)
+            IReadOnlyList<AccessV2HandoffCandidate> handoffs =
+                route.RouteSteps.Count > 0
+                    ? route.RouteSteps
+                        .Where(step => step.Handoff != null)
+                        .Select(step => step.Handoff!)
+                        .ToArray()
+                    : handoff != null
+                        ? new[] { handoff }
+                        : Array.Empty<AccessV2HandoffCandidate>();
+            if (handoffs.Count > 0)
             {
-                handoffGround = handoff.Lane0Contact;
-                commonOperation = handoff.Lane0Operation == handoff.Lane1Operation
-                    ? handoff.Lane0Operation
+                AccessV2HandoffCandidate terminalHandoff =
+                    handoffs[handoffs.Count - 1];
+                handoffGround = terminalHandoff.Lane0Contact;
+                commonOperation = terminalHandoff.Lane0Operation
+                    == terminalHandoff.Lane1Operation
+                    ? terminalHandoff.Lane0Operation
                     : AccessHandoffOperation.Leveling;
-                var replayGroundCenters = new HashSet<Tile2i>(
-                    handoff.EscapeCenters);
+                var replayGroundCenters = new HashSet<Tile2i>();
                 replayGroundCenters.UnionWith(route.GroundPath);
                 groundNodes = replayGroundCenters.Count;
-                AddOperations(
-                    handoff.Lane0TerminalOrigins,
-                    handoff.Lane0Operation);
-                AddOperations(
-                    handoff.Lane1TerminalOrigins,
-                    handoff.Lane1Operation);
+                for (int handoffIndex = 0;
+                    handoffIndex < handoffs.Count;
+                    handoffIndex++)
+                {
+                    AccessV2HandoffCandidate routeHandoff =
+                        handoffs[handoffIndex];
+                    replayGroundCenters.UnionWith(
+                        routeHandoff.EscapeCenters);
+                    AddOperations(
+                        routeHandoff.Lane0TerminalOrigins,
+                        routeHandoff.Lane0Operation);
+                    AddOperations(
+                        routeHandoff.Lane1TerminalOrigins,
+                        routeHandoff.Lane1Operation);
+                }
+                groundNodes = replayGroundCenters.Count;
                 foreach (Tile2i center in replayGroundCenters)
                 {
                     if (!snapshot.TryGetRequiredCleanupInfoForTile(
@@ -444,6 +466,24 @@ namespace AutoTerrainDesignations.Access
 
         private static int Manhattan(Tile2i left, Tile2i right)
             => Math.Abs(left.X - right.X) + Math.Abs(left.Y - right.Y);
+
+        private static bool IsValidGroundStep(
+            AccessSearchSnapshot snapshot,
+            Tile2i from,
+            Tile2i to)
+        {
+            int dx = Math.Abs(to.X - from.X);
+            int dy = Math.Abs(to.Y - from.Y);
+            if (dx + dy == 1) return true;
+            if (dx != 1 || dy != 1) return false;
+
+            // V1 search admits a diagonal only after both cardinal side
+            // corridors have passed the same ordinary-ground test. Replay the
+            // static part here so a valid diagonal route is not rejected as a
+            // materialization discontinuity after it reaches a tower goal.
+            return snapshot.IsGroundNode(new Tile2i(to.X, from.Y))
+                && snapshot.IsGroundNode(new Tile2i(from.X, to.Y));
+        }
 
         private static void FindPredecessorProfile(
             AccessSearchResult result,

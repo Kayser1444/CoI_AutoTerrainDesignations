@@ -17,7 +17,7 @@ Expected:
 * `[ATD Experimental Access Width]` reports `requiredWidth=2`.
 * `[ATD V2 Frontages]` may report zero fixed frontages; this is no longer an immediate failure when a ground seam is available.
 * `[ATD V2 Search]` reports `algorithm=A* success=True` and ends with a non-`none` handoff such as `handoff=exit=(4,0) span=1 ops=Mining/Mining contacts=...`.
-* The cost summary includes the two-cost handoff spoke in `travel` and any newly required seam prop removal in `cleanup`.
+* The cost summary includes the handoff spoke, `2 * (1 + generated-flat-cost / 4)`, in `travel` and any newly required seam prop removal in `cleanup`.
 * The result remains `V2DryRunRouteFound` and produces zero terrain, cleanup, or harvest mutations.
 
 ## Follow-up geometry checks
@@ -36,4 +36,4 @@ Stage 5 is accepted when the primary test finds a plausible ground-terminal rout
 
 ## Recorded primary result
 
-The explicit T3 test passed with `success=True`, three band states, four generated origins, and 22 visited states. The route used one straight and one strafe transition, then `exit=(4,0) span=1 ops=Leveling/Leveling`. Travel cost was `10`: four per generated transition plus the required two-cost center spoke. Direct work was `40`, fixed generated-origin overhead `4`, exterior rays `0.47`, cleanup `0`, and total cost `54.47`. The mutation audit reported one designation before and after with no additions, removals, or changes.
+Historical result before the weighted-spoke change: the explicit T3 test passed with `success=True`, three band states, four generated origins, and 22 visited states. The route used one straight and one strafe transition, then `exit=(4,0) span=1 ops=Leveling/Leveling`. Travel cost was `10`: four per generated transition plus the then-current two-cost center spoke. Direct work was `40`, fixed generated-origin overhead `4`, exterior rays `0.47`, cleanup `0`, and total cost `54.47`. The mutation audit reported one designation before and after with no additions, removals, or changes.

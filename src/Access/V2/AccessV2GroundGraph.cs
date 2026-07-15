@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mafi;
 
 namespace AutoTerrainDesignations.Access.V2
@@ -11,24 +12,36 @@ namespace AutoTerrainDesignations.Access.V2
     /// </summary>
     internal sealed class AccessV2GroundGraph
     {
-        private static readonly RelTile2i[] s_directions =
+        private static readonly RelTile2i[] s_cardinalDirections =
         {
             new RelTile2i(1, 0),
             new RelTile2i(-1, 0),
             new RelTile2i(0, 1),
             new RelTile2i(0, -1),
         };
+        private static readonly RelTile2i[] s_allDirections =
+        {
+            new RelTile2i(1, 0), new RelTile2i(-1, 0),
+            new RelTile2i(0, 1), new RelTile2i(0, -1),
+            new RelTile2i(1, 1), new RelTile2i(1, -1),
+            new RelTile2i(-1, 1), new RelTile2i(-1, -1),
+        };
+        internal const float DiagonalCost = 1.41421356237f;
 
         private readonly HashSet<Tile2i> m_groundNodes;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_cleanupByTile;
         private readonly HashSet<Tile2i> m_goals;
         private readonly Dictionary<Tile2i, int> m_componentByTile;
         private readonly HashSet<int> m_goalComponents;
-        private readonly Dictionary<Tile2i, int> m_goalDistanceByTile;
+        private readonly Dictionary<Tile2i, float> m_goalDistanceByTile;
 
         public int GroundNodeCount => m_groundNodes.Count;
         public int CleanupNodeCount => m_cleanupByTile.Count;
         public int GoalCount => m_goals.Count;
+        public IReadOnlyDictionary<Tile2i, float> GoalDistances
+            => m_goalDistanceByTile;
+        internal IEnumerable<Tile2i> TraversableNodes
+            => m_componentByTile.Keys;
 
         public AccessV2GroundGraph(
             IEnumerable<Tile2i> groundNodes,
@@ -55,10 +68,46 @@ namespace AutoTerrainDesignations.Access.V2
 
         public bool IsGoal(Tile2i tile) => m_goals.Contains(tile);
 
-        public bool TryGetGoalDistance(Tile2i tile, out int distance)
+        public bool TryGetGoalDistance(Tile2i tile, out float distance)
             => m_goalDistanceByTile.TryGetValue(tile, out distance);
 
+        internal bool IsGoalConnected(Tile2i tile)
+            => m_componentByTile.TryGetValue(tile, out int component)
+                && m_goalComponents.Contains(component);
+
         public bool CanTraverse(Tile2i from, Tile2i to)
+        {
+            int dx = Math.Abs(from.X - to.X);
+            int dy = Math.Abs(from.Y - to.Y);
+            if (dx + dy == 1)
+                return CanTraverseCardinal(from, to);
+            if (dx != 1 || dy != 1)
+                return false;
+            Tile2i sideX = new Tile2i(to.X, from.Y);
+            Tile2i sideY = new Tile2i(from.X, to.Y);
+            return CanTraverseCardinal(from, sideX)
+                && CanTraverseCardinal(sideX, to)
+                && CanTraverseCardinal(from, sideY)
+                && CanTraverseCardinal(sideY, to);
+        }
+
+        public static float GetStepCost(Tile2i from, Tile2i to)
+            => from.X != to.X && from.Y != to.Y ? DiagonalCost : 1f;
+
+        public static IReadOnlyList<Tile2i> GetSweptCenters(
+            Tile2i from, Tile2i to)
+        {
+            if (from.X == to.X || from.Y == to.Y)
+                return new[] { to };
+            return new[]
+            {
+                to,
+                new Tile2i(to.X, from.Y),
+                new Tile2i(from.X, to.Y),
+            };
+        }
+
+        private bool CanTraverseCardinal(Tile2i from, Tile2i to)
         {
             if (Math.Abs(from.X - to.X) + Math.Abs(from.Y - to.Y) != 1
                 || !IsTraversable(from)
@@ -176,9 +225,9 @@ namespace AutoTerrainDesignations.Access.V2
             while (queue.Count > 0)
             {
                 Tile2i current = queue.Dequeue();
-                for (int index = 0; index < s_directions.Length; index++)
+                for (int index = 0; index < s_cardinalDirections.Length; index++)
                 {
-                    Tile2i next = current + s_directions[index];
+                    Tile2i next = current + s_cardinalDirections[index];
                     if (reached.Contains(next) || !CanTraverse(current, next))
                         continue;
                     reached.Add(next);
@@ -220,9 +269,9 @@ namespace AutoTerrainDesignations.Access.V2
                 {
                     Tile2i current = queue.Dequeue();
                     if (m_goals.Contains(current)) containsGoal = true;
-                    for (int index = 0; index < s_directions.Length; index++)
+                    for (int index = 0; index < s_cardinalDirections.Length; index++)
                     {
-                        Tile2i next = current + s_directions[index];
+                        Tile2i next = current + s_cardinalDirections[index];
                         if (componentByTile.ContainsKey(next)
                             || !all.Contains(next)
                             || !CanTraverse(current, next))
@@ -236,32 +285,50 @@ namespace AutoTerrainDesignations.Access.V2
             }
         }
 
-        private Dictionary<Tile2i, int> BuildGoalDistances()
+        private Dictionary<Tile2i, float> BuildGoalDistances()
         {
-            var distances = new Dictionary<Tile2i, int>();
-            var queue = new Queue<Tile2i>();
+            var distances = new Dictionary<Tile2i, float>();
+            var queue = new SortedDictionary<float, Queue<Tile2i>>();
             foreach (Tile2i goal in m_goals)
             {
                 if (!IsTraversable(goal) || distances.ContainsKey(goal))
                     continue;
                 distances.Add(goal, 0);
-                queue.Enqueue(goal);
+                Enqueue(goal, 0f);
             }
             while (queue.Count > 0)
             {
-                Tile2i current = queue.Dequeue();
-                int nextDistance = distances[current] + 1;
-                for (int index = 0; index < s_directions.Length; index++)
+                KeyValuePair<float, Queue<Tile2i>> first = queue.First();
+                Tile2i current = first.Value.Dequeue();
+                if (first.Value.Count == 0) queue.Remove(first.Key);
+                if (!distances.TryGetValue(current, out float currentDistance)
+                    || Math.Abs(currentDistance - first.Key) > 0.0001f)
+                    continue;
+                for (int index = 0; index < s_allDirections.Length; index++)
                 {
-                    Tile2i next = current + s_directions[index];
-                    if (distances.ContainsKey(next)
-                        || !CanTraverse(current, next))
+                    Tile2i next = current + s_allDirections[index];
+                    if (!CanTraverse(current, next))
                         continue;
-                    distances.Add(next, nextDistance);
-                    queue.Enqueue(next);
+                    float nextDistance = currentDistance
+                        + GetStepCost(current, next);
+                    if (distances.TryGetValue(next, out float old)
+                        && old <= nextDistance + 0.0001f)
+                        continue;
+                    distances[next] = nextDistance;
+                    Enqueue(next, nextDistance);
                 }
             }
             return distances;
+
+            void Enqueue(Tile2i tile, float cost)
+            {
+                if (!queue.TryGetValue(cost, out Queue<Tile2i> bucket))
+                {
+                    bucket = new Queue<Tile2i>();
+                    queue.Add(cost, bucket);
+                }
+                bucket.Enqueue(tile);
+            }
         }
     }
 }

@@ -2,7 +2,24 @@
 
 ## Status
 
-**Proposed**
+**Implemented in V2; V1 sharing remains future work**
+
+## Accepted V2 formulation
+
+V2 already had combined tower-ground and fixed-frontage goal testing. The implemented change is the combined heuristic:
+
+* Build the potential once per path request because fixed-provider frontages vary by cluster.
+* Seed every goal-connected G center with its exact remaining G distance.
+* Seed each fixed frontage at the canonical center of its exact matching state (`goal anchor + exposed direction`) with its implemented terminal cost: the final provider-entry slice plus optimistic downstream driving distance through the accepted provider network to tower ground.
+* Propagate cardinally over the relaxed request bounds at the proven minimum V cost per tile, `1 + generated-flat-cost / 4`, ignoring V feasibility, history, disturbance, durability, and cleanup.
+* Query this field directly for V states. Goal-connected G states use exact ground-graph distance; disconnected G states use the component-aware escape field described below because they can now transition back to V.
+* Charge the canonical-center spoke at twice that minimum V rate, `2 + generated-flat-cost / 2`, covering the maximum two-tile Manhattan offset without making a handoff cheaper than ordinary V.
+
+The relaxed V field does not itself route around cliffs, ocean, or buildings. Its ground seeds nevertheless carry the exact suffix cost around those obstacles once the route reaches G. Removing constraints and all landscaping costs above the unavoidable generated-origin overhead can only reduce the estimate, preserving admissibility. Concrete G and accepted-provider distance graphs use unit cardinal steps and `sqrt(2)` diagonals with conservative no-corner-cutting side-corridor validation; explicit G states query that exact octile metric rather than the cardinal V relaxation.
+
+An explicit G state in a component containing a tower goal uses that exact octile suffix. A G state in a disconnected component uses a second request-scoped lower-bound field: `min_t(d_G(current,t) + 2F + VPotential(t))` over traversable centers `t` in the same component, where `F` is the unavoidable fixed cost of each of the two origins introduced by the current G-to-V edge. This allows cheap local G travel before G-to-V re-entry without assigning zero to the entire component or leaving every viable V continuation behind an artificial `2F` queue step. Concrete G-to-V expansion is available at any suitable G center, validates the reverse two-lane seam, and pays the same center spoke as V-to-G; this permits starting a grade before a mountainside when doing so avoids expensive terrain work. Feasibility, direct work, cleanup, history blockers, and that nonnegative spoke remain omitted from the lower bound. As in V1, labels are dominated by concrete state rather than full generated-history identity: the cheapest route to a G center or V band owns the history used for future expansion. A genuinely cheaper V shortcut may therefore leave and re-enter the same static G component, while a more expensive detour loses when it reaches an already cheaper concrete state. The V field covers every captured traversable/cleanup G center as well as the V-generation bounds, preventing outside-area zero seeds.
+
+V1 still uses its older height-aware geometric goal index. Its distance grid covers the union of the tower's V-generation bounds and all captured traversable or cleanup-qualified G tiles, so clear outside-area search-margin nodes retain a real lower bound instead of falling back to zero. Its A* queue shares V2's equal-`f` rule: prefer lower remaining `h`, then lower `g`. These changes prevent constant-`f` ground plateaus from expanding outward from the start or receiving artificial priority outside the tower rectangle. Dijkstra is unchanged because every queued heuristic is zero.
 
 ---
 
@@ -13,7 +30,7 @@ The current accessway pathfinding architecture consists of two independent searc
 - **V1** (single-lane accessways)
 - **V2** (band-based accessways)
 
-Both currently search towards a single class of goal (tower-reachable ground), although the long-term architecture envisions searches towards multiple goal types, including:
+Both can receive combined goal requests. V2 currently searches tower-reachable ground and exposed fixed terrain-work frontages, with future provider categories including:
 
 - Tower-reachable ground
 - Existing mining designations
@@ -92,11 +109,11 @@ The proposal consists of three stages.
 
 ## Stage 1
 
-Implement combined goal search in V2.
+Combined goal search in V2. **Implemented.**
 
 ## Stage 2
 
-Introduce a snapshot potential field for V2.
+Introduce a request-scoped potential field for V2. **Implemented.**
 
 ## Stage 3
 
@@ -104,7 +121,7 @@ Share the heuristic infrastructure between V1 and V2.
 
 ---
 
-# Stage 1 — Combined Goal Search (V2)
+# Stage 1 — Combined Goal Search (V2, implemented)
 
 ## Motivation
 
@@ -159,6 +176,42 @@ TerminalCost
 Metadata
 ```
 
+## Fixed-provider downstream travel cost
+
+**V2 initial optimistic field: implemented.** The field is rebuilt for each
+cluster request after prior successful clusters have materialized and been
+accepted. Only accepted provider/accessway origins and the accepted cluster
+frontages participate. The final four-tile entry from the exterior matching
+center to the frontage interior is included in the terminal fee. Frontages
+without a finite provider-to-ground continuation are omitted. The same fee is
+enqueued as real traversal cost and seeds the request potential, preserving
+A*/Dijkstra cost agreement.
+
+Reaching a fixed frontage is not the end of the vehicle's real journey. Vehicles must continue through the established designation/provider network and then across tower-reachable ground. Fixed goals should therefore carry a downstream travel fee rather than always using a zero terminal cost.
+
+Build a provider-distance layer by extending the tower-ground G field into the projected finished surfaces of existing fixed designations:
+
+* start from the exact tower-reachable G distances;
+* admit vehicle-center nodes over existing mining, dumping, and leveling profiles as established-provider nodes;
+* connect compatible cardinal neighbors and provider/G boundaries; and
+* propagate unit travel cost through the combined established-provider network.
+
+The distance at a fixed frontage's interior entry center becomes that frontage's terminal cost. A candidate connecting to it then compares:
+
+```
+new accessway construction and travel cost
++ fixed-provider downstream travel distance
+```
+
+This prevents a geometrically close frontage with a long existing detour from unfairly beating a slightly farther provider with a short route to the tower.
+
+There are two accuracy levels:
+
+1. **Initial optimistic provider field.** Treat compatible fixed-designation centers as relaxed G-like nodes. This may ignore an internal narrow waist or other Mega-clearance defect, but it remains a useful lower bound and can be used as the defined terminal-distance proxy during the initial rollout.
+2. **Clearance-exact provider field.** Project the finished designation profiles, validate the full resolved vehicle mask at every center and edge, and exclude disconnected or too-narrow provider interiors. Its frontage distance is the physical downstream driving cost and can replace the optimistic proxy without changing the search interface.
+
+The provider-distance field describes already established terrain work; it does not itself add G-to-new-V transitions. Until V2 implements G-to-V, explicit G states continue toward tower-ground goals only, while V states may terminate at fixed frontages using these downstream fees.
+
 ---
 
 ## Search behaviour
@@ -195,7 +248,7 @@ Verification should prove:
 
 ---
 
-# Stage 2 — Snapshot Potential Field
+# Stage 2 — Request-Scoped Potential Field (implemented in V2)
 
 ## Concept
 

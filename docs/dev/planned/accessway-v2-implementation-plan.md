@@ -177,7 +177,7 @@ Build a band perimeter first, classify each perimeter edge by work operation and
 
 Current fixed-profile goals are individual origins. V2 initially needs only a local width-two goal frontage. Do not make first-pass goal discovery responsible for proving the internal shape or Mega traversability of the fixed designation network behind that frontage.
 
-Precompute every pair of adjacent fixed origins that exposes two collinear outer edges on the same side, and use that exposed pair as a fixed goal frontage. The concrete fixed profiles still supply the seam heights that a generated terminal must match, but their inward shape and continuation are not part of initial goal eligibility. Do not form arbitrary pairs during expansion, and do not require a Mega-reachable fixed-network continuation yet.
+Precompute every pair of adjacent accepted fixed origins that exposes two collinear outer edges on the same side, and use that exposed pair as a fixed goal frontage. The concrete fixed profiles still supply the seam heights that a generated terminal must match, but their inward shape is not part of initial goal eligibility. Do not form arbitrary pairs during expansion. Each cluster request rebuilds an optimistic provider-distance field over only accepted fixed-provider and generated-accessway profiles; frontages without a finite continuation through that field to tower ground are omitted.
 
 ### 8. Goal seeding and A* lower bounds
 
@@ -185,11 +185,11 @@ Current tower goals are sparse radial G goals. For V2 these can remain center po
 
 Under the lane-0 anchor convention, an `X`-axis frontier has eligible vehicle-center samples `anchor + (2, y)` for `y = 2..6`, with canonical band center `anchor + (2, 4)`. (Thus the eastbound range is `(2,2)..(2,6)`, not `(2,2)..(6,2)`; the latter is the rotated `Y`-axis form.) A `Y`-axis frontier correspondingly uses `anchor + (x, 2)` for `x = 2..6`, centered at `anchor + (4, 2)`.
 
-Represent every V2-to-G and G-to-V2 transition as passing through that canonical band center and charge a fixed **2 travel-cost center spoke** on the real graph edge, in addition to cleanup and other seam costs. A validated seam enters an explicit G state; cardinal G transitions then cost one each and carry the same immutable candidate history until an actual ground goal is reached. Continue validating the actual set of eligible handoff samples and the complete Mega escape corridor; the center is a cost/heuristic abstraction, not a substitute for physical seam validation.
+Represent every V2-to-G and G-to-V2 transition as passing through that canonical band center. Let `F` be the generated-origin fixed cost. The proven cheapest ordinary V traversal rate is `1 + F/4` per canonical horizontal tile, so charge a **`2 * (1 + F/4)` travel-cost center spoke** on the real graph edge, in addition to cleanup and other seam costs. This covers the maximum two-tile Manhattan offset and prevents a handoff from undercutting ordinary V. A validated seam enters an explicit G state and carries the same immutable candidate history until an actual ground goal is reached. Continue validating the actual set of eligible handoff samples and the complete Mega escape corridor; the center is a cost/heuristic abstraction, not a substitute for physical seam validation.
 
-The A* lower bound for a V2 state may then start from the canonical center and its bilinearly interpolated center height. Every eligible centerline handoff sample is at most two Manhattan steps from that point. With the current `max(horizontal distance, height2 difference)` paired-goal lower bound and drivable V2 profile restrictions, its value can change by at most the paid two-cost spoke, preserving admissibility. Add a fixture that compares this center heuristic against the explicit minimum paired distance/height lower bound over every eligible centerline sample. If a later profile family violates that bound, use the explicit sample minimum or fall back to Dijkstra.
+The A* lower bound for a V2 state may then start from the canonical center. Every eligible centerline handoff sample is at most two Manhattan steps from that point, and the paid spoke is exactly two minimum-rate V steps. The relaxed V field therefore propagates cardinally at `1 + F/4`; explicit G states retain exact octile ground distance. Add a fixture that keeps the V rate and spoke coupled. If a later transition family can travel more cheaply per tile, lower both through the shared cost model or fall back to Dijkstra.
 
-Run V2 Dijkstra first and add this A* heuristic only after it reproduces Dijkstra. The initial implementation uses Dijkstra for fixed-provider goals; a multi-source lower-bound index over concrete frontage centers is an optional later optimization.
+Run V2 Dijkstra first and add A* only after it reproduces Dijkstra. The implemented request-scoped potential seeds every goal-connected G center with exact remaining G distance. Each concrete fixed-frontage matching center is seeded with its real terminal fee: the final four-tile entry slice plus the accepted provider network's optimistic downstream travel distance to tower ground. Relaxed cardinal propagation at `1 + F/4` then fills the request bounds. V states query that field; G states retain exact G distance until G-to-V exists.
 
 ### 9. Cost note is stale
 
@@ -238,13 +238,13 @@ All reviewed recommendations have been accepted and folded in. No semantic desig
 | V2/G seam | Workable contact per lane and one continuous five-tile Mega corridor | Accepted |
 | Terminal operation | Per-lane mining/dumping allowed | Accepted |
 | Handoff extension | Common two-lane span, maximum three rows for T3 | Accepted |
-| V2/G cost point | Canonical band center with a fixed two-cost spoke to/from validated handoff samples | Accepted |
+| V2/G cost point | Canonical band center with a two-tile spoke charged at `2 * (1 + F/4)` to/from validated handoff samples | Accepted |
 | One-wide external start | Keep the target immutable and synthesize/cost a compatible companion lane | Accepted |
 | Fixed-provider goal | Two adjacent fixed origins with one exposed width-two edge; ignore inner-network shape initially | Accepted |
 | Work and rays | Four-corner direct work for new origins; material-aware rays only from the exposed band perimeter | Accepted |
 | Ray-buffer harvesting | Buffer tiles remain part of disrupted-tree harvesting | Accepted |
 | A* | Dijkstra oracle first; canonical-center heuristic for ground goals after equivalence proof | Accepted |
-| Fixed-goal A* | Use Dijkstra initially | Accepted |
+| Fixed-goal A* | Request-scoped potential seeded at concrete fixed-frontage match centers with charged downstream provider travel | Implemented |
 | Responsiveness | Existing configurable asynchronous budget with 30 ms default and single-flight cancellation | Accepted |
 | Fixture failures | Tiny fatal core only; full V2 suite is explicit, and any startup V2 gate can disable only V2 | Accepted |
 | T3 fallback | Never silently run V1; compare only with a genuine width-two legacy candidate where available | Accepted |
@@ -262,7 +262,7 @@ Consequently, “origin revisit” means that a transition attempts to reintrodu
 The following choices remain deliberately implementation-level:
 
 * benchmark persistent immutable maps against parent-plus-delta history nodes and choose the lower-overhead representation without changing history semantics;
-* optionally add a multi-source fixed-frontage A* index later; fixed-provider searches use Dijkstra until then;
+* retain Dijkstra as the reference and compare it with the multi-source request-potential A*;
 * enable asymmetric or opposed profile pairs only if dedicated fixtures demonstrate useful valid routes;
 * use a width-two legacy comparator only if the existing generator can actually produce one; its absence does not block V2; and
 * complete the explicitly deferred mining-body clearance, core Mining Designations hazard/tree integration, and fixed-provider interior-clearance refinements after V2 rollout.
@@ -330,7 +330,7 @@ Live result: an exposed one-origin endpoint produced the expected synthetic fron
 * Score direct work for newly introduced origins and rays only on the external band perimeter.
 * Run Dijkstra only and return a V2-specific in-memory result; do not place it.
 
-Implementation note: width-two requests with fixed-provider frontages enter a separate incremental Dijkstra session. The graph expands flat/ramp straight successors, one-lane retained strafes, and explicit flat 2x2 turns; generated history owns only transition deltas and carries source profiles, charged cleanup keys, and elevation-aware exterior-ray constraints. Production evaluation applies snapshot profile feasibility, projected work, prior ray envelopes, four-corner direct work, generated-origin overhead, deduplicated dense-debris cleanup, two outer band rays, and all three old-direction turn rays. Current builds report these searches through the generic `[ATD V2 Search] algorithm=Dijkstra` diagnostic.
+Implementation note: width-two requests with fixed-provider frontages use the same incremental V2 session. The graph expands flat/ramp straight successors, one-lane retained strafes, and explicit flat 2x2 turns; generated history owns only transition deltas and carries source profiles, charged cleanup keys, and elevation-aware exterior-ray constraints. Production evaluation applies snapshot profile feasibility, projected work, prior ray envelopes, four-corner direct work, generated-origin overhead, deduplicated dense-debris cleanup, two outer band rays, and all three old-direction turn rays. Dijkstra remains available as the optimality reference; production A* uses the request-scoped potential.
 
 Exit gate: deterministic routes include flat straight, uniform ramp, the accepted lateral behavior, switchback with 8x8 landing, no-path narrow area, durability block, and cheaper-G reuse. Costs contain no overlap double-counting.
 
@@ -344,16 +344,16 @@ Live result: AUTO resolved a fleet Mega to vehicle width five and `requiredWidth
 * Require a usable crest/contact per lane and a continuous five-tile escape corridor in one clearance-two G component.
 * Support lateral as well as forward exits.
 * Support per-lane mining/dumping and a common two-lane span up to three rows.
-* Charge the fixed two-cost center spoke on every G-to-V2 and V2-to-G edge while retaining the concrete handoff/escape geometry.
+* Charge the shared-cost-model center spoke, `2 * (1 + F/4)`, on every G-to-V2 and V2-to-G edge while retaining the concrete handoff/escape geometry.
 * Revalidate the seam during goal acceptance and materialization replay.
 
-Implementation note: V2 search admits tower-ground routes through a separately costed V-to-G edge followed by explicit G states. The seam evaluator checks both constituent lane designations with vanilla prospective workability, supports mixed per-lane mining/dumping operations, evaluates common forward spans of one through three rows, and derives lateral frontages from the two latest aligned rows. Both lane contacts and their local escape centers must belong to one clearance-two ground component, but local seam acceptance does not require that component already to contain a tower goal. Seam cleanup keys are deduplicated against generated history; the accepted edge charges the fixed two-cost canonical-center spoke, after which cardinal G moves cost one and retain projected history blockers and cleanup ownership until an actual sparse tower goal is reached. The selected seam and traversed G suffix are retained on the typed V2 result for Stage 6 replay and materialization.
+Implementation note: V2 search admits tower-ground routes through a separately costed V-to-G edge followed by explicit G states. The seam evaluator checks both constituent lane designations with vanilla prospective workability, supports mixed per-lane mining/dumping operations, evaluates common forward spans of one through three rows, and derives lateral frontages from the two latest aligned rows. Both lane contacts and their local escape centers must belong to one clearance-two ground component, but local seam acceptance does not require that component already to contain a tower goal. Seam cleanup keys are deduplicated against generated history; the accepted edge charges the shared-cost-model canonical-center spoke. G then admits cardinal moves at cost one and diagonal moves at `sqrt(2)`. Every diagonal requires both orthogonal side corridors to pass ground topology, projected-history, and cleanup validation, preventing corner cutting. After the first G edge, moves with a negative dot product against the incoming direction—exact reversal and both 45-degree backward diagonals—are strictly dominated and omitted. The selected seam and traversed G suffix are retained on the typed V2 result; Stage 6 replay independently revalidates every edge, diagonal swept corridor, projected-history center, cleanup corridor, and final tower goal before materialization.
 
 Exit gate: fixtures cover diagonal terrain across the seam, mixed terminal operations, blocked far lane, lateral exit, two- and three-row spans, prop cleanup at the seam, center-spoke cost in both directions, and rejection of a visually wide but pinched exit.
 
 Fixture result: mixed-operation lane contacts, seam cleanup deduplication/cost, fixed center-spoke cost, lateral exits, two- and three-row common spans, split-component rejection, and ground-terminal Dijkstra retention pass in the explicit V2 runner.
 
-Live result: an explicit T3 request with one inaccessible external work origin and no fixed frontage reached tower ground in 22 visited states. Dijkstra selected a three-state width-two route with one straight and one strafe transition, then a forward one-row Leveling/Leveling seam. Travel reconciled as four plus four for the generated transitions and the fixed two-cost center spoke; the four generated origins reconciled as one synthetic companion, two straight origins, and one strafe origin. Both contacts joined the tower-reachable Mega component, and the mutation audit remained exactly unchanged.
+Historical live result before the weighted-spoke change: an explicit T3 request with one inaccessible external work origin and no fixed frontage reached tower ground in 22 visited states. Dijkstra selected a three-state width-two route with one straight and one strafe transition, then a forward one-row Leveling/Leveling seam. Travel reconciled as four plus four for the generated transitions and the then-current two-cost center spoke; the four generated origins reconciled as one synthetic companion, two straight origins, and one strafe origin. Both contacts joined the tower-reachable Mega component, and the mutation audit remained exactly unchanged.
 
 ### Stage 6 — V2 materialization, placement, and ownership (implemented; live verification pending)
 
@@ -373,17 +373,23 @@ Fixture result: V2 replay and materialization reproduce the searched route, reje
 ### Stage 7 — A*, responsiveness, and diagnostics (implemented; live verification pending)
 
 * Add the paired-goal width-two heuristic only after Dijkstra results are stable.
-* Prove the canonical-center lower bound never exceeds the explicit minimum over all eligible centerline handoff samples plus the paid two-cost spoke, under every enabled profile pair and orientation.
-* Fall back to Dijkstra for fixed-provider goals until a valid multi-source lower bound exists.
+* Keep the canonical-center spoke equal to two minimum-rate V tiles, covering every eligible centerline handoff sample without making the seam cheaper than ordinary V.
+* Seed fixed-provider matching centers in the same admissible request-potential used by combined-goal A*.
 * Preserve asynchronous stepping, cancellation, single-flight behavior, timeout, and configurable frame budget.
 * Add V2 rejection categories and compact path/profile diagnostics.
 * Compare Dijkstra and A* route, cost, visited states, elapsed time, and peak history size.
 
-Implementation note: tower-ground V2 requests now queue states by `g + h`. V states use the Manhattan lower bound from the band's canonical center to the nearest sparse tower-ground goal; explicit G states use the ground graph's remaining-distance lower bound. Every full V transition costs its four-tile center displacement, each cardinal G transition costs one, and the V-to-G edge separately charges the accepted two-cost center spoke. The heuristic ignores landscaping and cleanup costs, so those nonnegative terms cannot make it overestimate. Fixed-frontage requests continue to use Dijkstra. The compact V2 summary and generic `[ATD V2 Search]` tags report the actual algorithm.
+Implementation note: V2 requests queue states by `g + h`. V states use one request-scoped field seeded by exact goal-connected G suffix costs and concrete fixed-frontage match centers, with cardinal propagation at the minimum V rate `1 + F/4` over the relaxed request bounds. Goal-connected G states use exact remaining octile ground distance; disconnected G states use the component-aware escape field and may re-enter generated V through a reverse-qualified two-lane seam at any suitable center. Every V transition pays its canonical-center Manhattan displacement and generated-origin overhead; both seam directions separately charge `2 * (1 + F/4)`. Landscaping above that unavoidable overhead, cleanup, history, disturbance, and feasibility are nonnegative constraints omitted from the field, so it cannot overestimate. The compact V2 summary and generic `[ATD V2 Search]` tags report the actual algorithm and `v2g`/`g2v` counts.
+
+Disconnected explicit G components use a component-aware relaxed escape field rather than heuristic zero: minimize octile G travel within the component plus the V potential at the best reachable center. This preserves the decision to admit local handoffs without finite tower-ground distance, prevents repeated history-qualified ground floods from dominating the queue, and provides the correct lower-bound shape for the forthcoming G-to-V transition.
+
+With G-to-V implemented, that field additionally includes the unavoidable fixed overhead of its two newly generated band origins; direct work, cleanup, feasibility, and the center spoke remain omitted. Label dominance follows V1: one cheapest route is retained per concrete G center or V band state, together with its winning history. This bounds repeated G exploration and identical V regeneration without forbidding a shortcut that crosses a static G component more cheaply than its available G route.
 
 Common forward seams first test the finite set of vehicle-center lanes across the width-two band against the situation-qualified ground graph. Candidate-history profile footprints and ray tiles are overlaid on the outward half of the vehicle mask. A locally traversable lane with valid forward operations on both terminal origins is accepted immediately and enters a real G state; neither ordinary-ground classification nor finite tower-goal distance is a quick-handoff criterion. History intersections and non-forward geometries fall through to the complete seam solver. This is a local pathability-mask optimization, not a height-tolerance approximation or a replacement for G traversal.
 
-Fixture result: the explicit centerline samples in both orientations remain within the paid two-cost center spoke, and A* returns the same accepted ground-terminal state sequence and exact total/traversal cost as Dijkstra. The full V1 and V2 fixture suites pass. Live comparison of visited states, elapsed time, and cancellation/replacement behavior remains the Stage 7 gate.
+A* queue ordering is lexicographic: lowest `g+h` first, then lowest `h`, then FIFO. The lower-`h` tie-break preserves optimality while making exact-distance G plateaus advance toward the goal instead of filling the full set of equally short alternatives. Dijkstra remains FIFO because every `h` is zero.
+
+Fixture result: the explicit centerline samples in both orientations remain within the paid two-tile center spoke. A focused cost-model fixture proves that `F=5` yields a minimum V rate of `2.25`, a spoke of `4.50`, and weighted cardinal potential propagation. A* returns the same accepted ground-terminal state sequence and exact total/traversal cost as Dijkstra. The full V1 and V2 fixture suites pass. Live comparison of visited states, elapsed time, and cancellation/replacement behavior remains the Stage 7 gate.
 
 Live result before the quick-mask optimization: A* produced correct ramps for both the trivial down-ramp and full mining-body cases. The trivial Dijkstra explored 5,490 states in 180.02 seconds and timed out. The mining-body Dijkstra explored 6,076 states in 4.15 seconds, selected ten straight band states, and reconciled travel as nine four-tile V moves plus the two-cost spoke plus nine G tiles (`47` total); placement and Mega-seam validation passed. The roughly 48-fold throughput difference confirms that deep cheap histories, rather than node count alone, dominate the pathological flat case.
 

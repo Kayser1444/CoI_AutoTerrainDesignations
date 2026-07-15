@@ -57,6 +57,7 @@ namespace AutoTerrainDesignations
         {
             AutoTerrainDesignationsMod.ResetGlobalDefaults();
             ShowCursorOverlay = false;
+            ShowExperimentalAccessSearchOverlay = false;
             ResetWorldPathfinderSettingsToDefaults();
             s_batchSize = BATCH_SIZE;
             ResetPurityLevelDefaults();
@@ -496,6 +497,14 @@ namespace AutoTerrainDesignations
                         migrateGeneratedDefaults,
                         false))
                     ShowCursorOverlay = cursorOverlayEnabled.Value;
+
+                bool? experimentalAccessSearchOverlayEnabled = ParseBool(json, "experimentalAccessSearchOverlayEnabled");
+                if (experimentalAccessSearchOverlayEnabled.HasValue
+                    && ShouldPreserveBool(
+                        experimentalAccessSearchOverlayEnabled.Value,
+                        migrateGeneratedDefaults,
+                        false))
+                    ShowExperimentalAccessSearchOverlay = experimentalAccessSearchOverlayEnabled.Value;
 
                 bool? accessAvoidOcean = ParseBool(json, "accessAvoidOcean");
                 if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
@@ -938,6 +947,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_cursorOverlayEnabled\": \"Whether to show the bottom-left terrain cursor coordinates at game start. Coordinates are displayed as (x, y, z). The atd_cursor_overlay console command can still override this for the current session. Default: false.\",");
             sb.AppendLine($"  \"cursorOverlayEnabled\": {BoolToJsonStr(ShowCursorOverlay)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to draw fading yellow dots on the terrain for nodes explored by the sliced experimental access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
+            sb.AppendLine($"  \"experimentalAccessSearchOverlayEnabled\": {BoolToJsonStr(ShowExperimentalAccessSearchOverlay)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that avoids ocean in accessways and Mining Designations. Mining cells directly overlapping ocean are excluded and projected underwater cutting is avoided. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");

@@ -67,6 +67,28 @@ namespace AutoTerrainDesignations.Access.V2
     internal delegate float AccessV2HeuristicEvaluator(
         AccessV2BandState state);
 
+    internal sealed class AccessV2RouteStep
+    {
+        public AccessV2BandState State { get; }
+        public AccessV2Transition? Transition { get; }
+        public AccessV2HandoffCandidate? Handoff { get; }
+        public Tile2i? GroundCenter { get; }
+
+        public bool IsGround => GroundCenter.HasValue;
+
+        public AccessV2RouteStep(
+            AccessV2BandState state,
+            AccessV2Transition? transition,
+            AccessV2HandoffCandidate? handoff,
+            Tile2i? groundCenter)
+        {
+            State = state;
+            Transition = transition;
+            Handoff = handoff;
+            GroundCenter = groundCenter;
+        }
+    }
+
     internal sealed class AccessV2SearchResult
     {
         public bool Success { get; }
@@ -82,6 +104,7 @@ namespace AutoTerrainDesignations.Access.V2
         public float CleanupCost { get; }
         public AccessV2HandoffCandidate? Handoff { get; }
         public IReadOnlyList<Tile2i> GroundPath { get; }
+        public IReadOnlyList<AccessV2RouteStep> RouteSteps { get; }
         public int StraightTransitions { get; }
         public int StrafeTransitions { get; }
         public int TurnTransitions { get; }
@@ -108,6 +131,7 @@ namespace AutoTerrainDesignations.Access.V2
             float cleanupCost,
             AccessV2HandoffCandidate? handoff,
             IReadOnlyList<Tile2i> groundPath,
+            IReadOnlyList<AccessV2RouteStep> routeSteps,
             int straightTransitions,
             int strafeTransitions,
             int turnTransitions,
@@ -133,6 +157,7 @@ namespace AutoTerrainDesignations.Access.V2
             CleanupCost = cleanupCost;
             Handoff = handoff;
             GroundPath = groundPath;
+            RouteSteps = routeSteps;
             StraightTransitions = straightTransitions;
             StrafeTransitions = strafeTransitions;
             TurnTransitions = turnTransitions;
@@ -153,17 +178,20 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyDictionary<Tile2i, AccessHeightProfile> GeneratedProfiles { get; }
         public AccessV2HandoffCandidate? Handoff { get; }
         public IReadOnlyList<Tile2i> GroundPath { get; }
+        public IReadOnlyList<AccessV2RouteStep> RouteSteps { get; }
 
         public AccessV2RouteData(
             IReadOnlyList<AccessV2BandState> states,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> generatedProfiles,
             AccessV2HandoffCandidate? handoff,
-            IReadOnlyList<Tile2i> groundPath)
+            IReadOnlyList<Tile2i> groundPath,
+            IReadOnlyList<AccessV2RouteStep>? routeSteps = null)
         {
             States = states;
             GeneratedProfiles = generatedProfiles;
             Handoff = handoff;
             GroundPath = groundPath;
+            RouteSteps = routeSteps ?? Array.Empty<AccessV2RouteStep>();
         }
     }
 
@@ -175,13 +203,18 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly AccessV2TransitionEvaluator m_evaluator;
         private readonly AccessV2HandoffEvaluator? m_handoffEvaluator;
         private readonly AccessV2HeuristicEvaluator? m_heuristicEvaluator;
+        private readonly AccessV2PotentialField? m_potentialField;
+        private readonly AccessV2GroundEscapePotentialField?
+            m_groundEscapePotentialField;
+        private readonly Func<Tile2i, int?>? m_groundHeightProvider;
+        private readonly Func<Tile2i, int>? m_terrainCenterHeightProvider;
         private readonly AccessV2GroundGraph? m_groundGraph;
         private readonly Func<Tile2i, AccessV2History, bool>? m_groundValidator;
         private readonly float m_cleanupCostScale;
         private readonly int m_maxVisited;
         private readonly float m_maxCost;
-        private readonly SortedDictionary<float, Queue<SearchNode>> m_queue =
-            new SortedDictionary<float, Queue<SearchNode>>();
+        private readonly SortedDictionary<SearchPriority, Queue<SearchNode>> m_queue =
+            new SortedDictionary<SearchPriority, Queue<SearchNode>>();
         private readonly Dictionary<SearchKey, float> m_best =
             new Dictionary<SearchKey, float>();
         private readonly Dictionary<string, int> m_rejections =
@@ -196,6 +229,8 @@ namespace AutoTerrainDesignations.Access.V2
         public bool IsComplete { get; private set; }
         public int Visited => m_visited;
         public int Pending => m_queueCount;
+        // Diagnostic-only hook used by the experimental search overlay.
+        internal Action<Tile2i, int, bool, int?>? NodeExplored { get; set; }
         public AccessV2SearchResult Result { get; private set; }
 
         public AccessV2SearchSession(
@@ -209,7 +244,11 @@ namespace AutoTerrainDesignations.Access.V2
             AccessV2HeuristicEvaluator? heuristicEvaluator = null,
             AccessV2GroundGraph? groundGraph = null,
             Func<Tile2i, AccessV2History, bool>? groundValidator = null,
-            float cleanupCostScale = 1f)
+            float cleanupCostScale = 1f,
+            AccessV2PotentialField? potentialField = null,
+            Func<Tile2i, int?>? groundHeightProvider = null,
+            Func<Tile2i, int>? terrainCenterHeightProvider = null,
+            float groundToVMinimumGeneratedCost = 0f)
         {
             m_boundsMin = boundsMin;
             m_boundsMax = boundsMax;
@@ -217,7 +256,16 @@ namespace AutoTerrainDesignations.Access.V2
             m_evaluator = evaluator;
             m_handoffEvaluator = handoffEvaluator;
             m_heuristicEvaluator = heuristicEvaluator;
+            m_potentialField = potentialField;
+            m_groundHeightProvider = groundHeightProvider;
+            m_terrainCenterHeightProvider = terrainCenterHeightProvider;
             m_groundGraph = groundGraph;
+            m_groundEscapePotentialField = potentialField != null
+                && groundGraph != null
+                    ? new AccessV2GroundEscapePotentialField(
+                        groundGraph, potentialField,
+                        groundToVMinimumGeneratedCost)
+                    : null;
             m_groundValidator = groundValidator;
             m_cleanupCostScale = cleanupCostScale;
             m_maxVisited = Math.Max(1, maxVisited);
@@ -262,6 +310,21 @@ namespace AutoTerrainDesignations.Access.V2
                 }
 
                 m_visited++;
+                Tile2i exploredCenter = current.GroundCenter
+                    ?? AccessV2PotentialField.GetCanonicalCenter(current.State);
+                int exploredHeight2 = current.GroundCenter.HasValue
+                    ? m_groundHeightProvider?.Invoke(exploredCenter) ?? 0
+                    : current.State.Band.Lane0.Center2;
+                NodeExplored?.Invoke(
+                    exploredCenter,
+                    exploredHeight2,
+                    current.GroundCenter.HasValue,
+                    m_groundHeightProvider?.Invoke(exploredCenter));
+                if (current.IsFixedGoalTerminal)
+                {
+                    CompleteSuccess(current);
+                    break;
+                }
                 if (current.GroundCenter.HasValue)
                 {
                     if (m_groundGraph != null
@@ -273,11 +336,8 @@ namespace AutoTerrainDesignations.Access.V2
                     ExpandGround(current);
                     continue;
                 }
-                if (TryMatchGoal(current.State))
-                {
-                    CompleteSuccess(current);
-                    break;
-                }
+                if (TryMatchGoal(current.State, out AccessV2FixedFrontage? fixedGoal))
+                    EnqueueFixedGoal(current, fixedGoal!);
 
                 EnqueueHandoffGoals(current);
                 Expand(current);
@@ -438,13 +498,16 @@ namespace AutoTerrainDesignations.Access.V2
         private void EnqueueHandoffGoals(SearchNode current)
         {
             if (m_handoffEvaluator == null) return;
+            // A freshly entered V band has just proved this same seam in the
+            // opposite direction. Returning immediately is strictly dominated.
+            if (current.Parent?.GroundCenter.HasValue == true) return;
             var recent = new List<AccessV2BandState>(
                 AccessV2Handoffs.MaxSpanLength);
             for (SearchNode? node = current;
                 node != null && recent.Count < AccessV2Handoffs.MaxSpanLength;
                 node = node.Parent)
             {
-                if (node.Handoff != null) continue;
+                if (node.GroundCenter.HasValue) break;
                 recent.Add(node.State);
             }
             IReadOnlyList<AccessV2HandoffCandidate> candidates =
@@ -486,35 +549,212 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 new RelTile2i(1, 0), new RelTile2i(-1, 0),
                 new RelTile2i(0, 1), new RelTile2i(0, -1),
+                new RelTile2i(1, 1), new RelTile2i(1, -1),
+                new RelTile2i(-1, 1), new RelTile2i(-1, -1),
             };
+            int incomingX = 0;
+            int incomingY = 0;
+            if (current.Parent?.GroundCenter is Tile2i previousCenter)
+            {
+                incomingX = Math.Sign(from.X - previousCenter.X);
+                incomingY = Math.Sign(from.Y - previousCenter.Y);
+            }
             for (int index = 0; index < directions.Length; index++)
             {
+                if (incomingX * directions[index].X
+                    + incomingY * directions[index].Y < 0)
+                    continue;
                 Tile2i next = from + directions[index];
-                if (!m_groundGraph.CanTraverse(from, next)
-                    || (m_groundValidator != null
-                        && !m_groundValidator(next, current.History)))
+                if (!m_groundGraph.CanTraverse(from, next))
+                    continue;
+                IReadOnlyList<Tile2i> sweptCenters =
+                    AccessV2GroundGraph.GetSweptCenters(from, next);
+                if (m_groundValidator != null
+                    && sweptCenters.Any(center =>
+                        !m_groundValidator(center, current.History)))
                     continue;
                 if (!m_groundGraph.TryValidateLocalEscape(
-                        new[] { next }, current.History,
+                        sweptCenters, current.History,
                         m_cleanupCostScale,
                         out IReadOnlyCollection<string> cleanupKeys,
                         out float cleanupCost))
                     continue;
                 AccessV2History nextHistory =
                     current.History.ApplyCleanupKeys(cleanupKeys);
-                float nextCost = current.Cost + 1f + cleanupCost;
+                float stepCost = AccessV2GroundGraph.GetStepCost(from, next);
+                float nextCost = current.Cost + stepCost + cleanupCost;
                 if (nextCost > m_maxCost) continue;
                 Enqueue(new SearchNode(
                     current.State, nextHistory, nextCost,
-                    current.TraversalCost + 1f,
+                    current.TraversalCost + stepCost,
                     current.GeneratedWorkCost,
                     current.DirectWorkCost,
                     current.GeneratedFixedCost,
                     current.ExteriorRayCost,
                     current.CleanupCost + cleanupCost,
-                    current, null, current.Handoff, next));
+                    current, null, null, next));
+            }
+
+            ExpandGroundToV(current);
+        }
+
+        private void ExpandGroundToV(SearchNode current)
+        {
+            if (m_groundGraph == null
+                || m_handoffEvaluator == null
+                || m_terrainCenterHeightProvider == null
+                || !current.GroundCenter.HasValue)
+                return;
+
+            Tile2i ground = current.GroundCenter.Value;
+            Tile2i[] travelDirections =
+            {
+                new Tile2i(4, 0), new Tile2i(-4, 0),
+                new Tile2i(0, 4), new Tile2i(0, -4),
+            };
+            var emitted = new HashSet<AccessV2BandState>();
+            for (int directionIndex = 0;
+                directionIndex < travelDirections.Length;
+                directionIndex++)
+            {
+                Tile2i travel = travelDirections[directionIndex];
+                AccessV2TravelAxis axis = travel.X != 0
+                    ? AccessV2TravelAxis.X
+                    : AccessV2TravelAxis.Y;
+                foreach (Tile2i anchor in CandidateBandAnchors(ground, axis))
+                {
+                    int centerDistance = Manhattan(
+                        ground,
+                        axis == AccessV2TravelAxis.X
+                            ? anchor + new RelTile2i(2, 4)
+                            : anchor + new RelTile2i(4, 2));
+                    if (centerDistance > 2) continue;
+
+                    int baseHeight2 = m_terrainCenterHeightProvider(anchor);
+                    AccessSearchMode positive = axis == AccessV2TravelAxis.X
+                        ? AccessSearchMode.XPositive
+                        : AccessSearchMode.YPositive;
+                    AccessSearchMode negative = axis == AccessV2TravelAxis.X
+                        ? AccessSearchMode.XNegative
+                        : AccessSearchMode.YNegative;
+                    AccessSearchMode[] modes =
+                    {
+                        AccessSearchMode.Flat, positive, negative,
+                    };
+                    for (int modeIndex = 0; modeIndex < modes.Length; modeIndex++)
+                    for (int delta = -3; delta <= 3; delta++)
+                    {
+                        if (!AccessHeightProfile.TryForMode(
+                                modes[modeIndex], baseHeight2 + delta,
+                                out AccessHeightProfile profile)
+                            || !AccessV2BandProfile.TryCreateEnabled(
+                                axis, profile, profile,
+                                out AccessV2BandProfile band, out _))
+                            continue;
+                        var state = new AccessV2BandState(anchor, band, travel);
+                        if (!emitted.Add(state)
+                            || !AccessV2Geometry.IsInsideBounds(
+                                state, m_boundsMin, m_boundsMax))
+                            continue;
+
+                        var transition = new AccessV2Transition(
+                            AccessV2TransitionKind.Straight,
+                            state,
+                            new[] { state.GetLane(0), state.GetLane(1) },
+                            Array.Empty<Tile2i>());
+                        if (!current.History.TryApply(
+                                transition, out _, out string historyReason))
+                        {
+                            Reject(historyReason);
+                            continue;
+                        }
+                        AccessV2TransitionEvaluation evaluation = m_evaluator(
+                            null, transition, current.History, null);
+                        if (!evaluation.IsValid)
+                        {
+                            Reject(evaluation.RejectionReason);
+                            continue;
+                        }
+                        if (!current.History.TryApply(
+                                transition.Delta,
+                                transition.LocalContextOrigins,
+                                evaluation.RayConstraints,
+                                evaluation.CleanupKeys,
+                                out AccessV2History nextHistory,
+                                out historyReason))
+                        {
+                            Reject(historyReason);
+                            continue;
+                        }
+
+                        // The same physical band is viewed toward the G side
+                        // solely for symmetric seam validation. Search travel
+                        // continues in 'travel', away from the component.
+                        var reverseState = new AccessV2BandState(
+                            anchor, band,
+                            new Tile2i(-travel.X, -travel.Y));
+                        IReadOnlyList<AccessV2HandoffCandidate> seams =
+                            m_handoffEvaluator(
+                                new[] { reverseState }, nextHistory);
+                        m_handoffEvaluations++;
+                        if (seams.Any(item => item.IsQuickPath))
+                            m_quickHandoffAccepts++;
+                        AccessV2HandoffCandidate? seam = seams
+                            .Where(candidate =>
+                                candidate.GroundEntryCenters.Contains(ground))
+                            .OrderBy(candidate => candidate.TotalCost)
+                            .FirstOrDefault();
+                        if (seam == null) continue;
+
+                        float nextCost = current.Cost
+                            + evaluation.TotalCost + seam.TotalCost;
+                        if (nextCost > m_maxCost) continue;
+                        nextHistory = nextHistory.ApplyCleanupKeys(
+                            seam.CleanupKeys);
+                        Enqueue(new SearchNode(
+                            state, nextHistory, nextCost,
+                            current.TraversalCost
+                                + evaluation.TraversalCost
+                                + seam.CenterSpokeCost,
+                            current.GeneratedWorkCost
+                                + evaluation.GeneratedWorkCost,
+                            current.DirectWorkCost + evaluation.DirectWorkCost,
+                            current.GeneratedFixedCost
+                                + evaluation.GeneratedFixedCost,
+                            current.ExteriorRayCost + evaluation.ExteriorRayCost,
+                            current.CleanupCost
+                                + evaluation.CleanupCost + seam.CleanupCost,
+                            current, transition, seam));
+                    }
+                }
             }
         }
+
+        private static IEnumerable<Tile2i> CandidateBandAnchors(
+            Tile2i ground,
+            AccessV2TravelAxis axis)
+        {
+            int baseX = ground.X & -4;
+            int baseY = ground.Y & -4;
+            var emitted = new HashSet<Tile2i>();
+            for (int dx = -4; dx <= 0; dx += 4)
+            for (int dy = -4; dy <= 0; dy += 4)
+            {
+                Tile2i origin = new Tile2i(baseX + dx, baseY + dy);
+                Tile2i lane = AccessV2BandProfile.GetLaneDirection(axis);
+                Tile2i[] anchors =
+                {
+                    origin,
+                    new Tile2i(origin.X - lane.X, origin.Y - lane.Y),
+                };
+                for (int index = 0; index < anchors.Length; index++)
+                    if (emitted.Add(anchors[index]))
+                        yield return anchors[index];
+            }
+        }
+
+        private static int Manhattan(Tile2i left, Tile2i right)
+            => Math.Abs(left.X - right.X) + Math.Abs(left.Y - right.Y);
 
         private void Enqueue(SearchNode node)
         {
@@ -524,16 +764,25 @@ namespace AutoTerrainDesignations.Access.V2
                 return;
             m_best[key] = node.Cost;
             float heuristic = 0f;
-            if (m_heuristicEvaluator != null)
+            if (m_potentialField != null || m_heuristicEvaluator != null)
             {
                 if (node.GroundCenter.HasValue && m_groundGraph != null
                     && m_groundGraph.TryGetGoalDistance(
-                        node.GroundCenter.Value, out int groundDistance))
+                        node.GroundCenter.Value, out float groundDistance))
                     heuristic = groundDistance;
-                else if (!node.GroundCenter.HasValue)
-                    heuristic = Math.Max(0f, m_heuristicEvaluator(node.State));
+                else if (node.GroundCenter.HasValue
+                    && m_groundEscapePotentialField != null)
+                    heuristic = Math.Max(0f,
+                        m_groundEscapePotentialField.GetPotential(
+                            node.GroundCenter.Value));
+                else if (!node.GroundCenter.HasValue
+                    && !node.IsFixedGoalTerminal)
+                    heuristic = m_potentialField != null
+                        ? Math.Max(0f, m_potentialField.GetPotential(node.State))
+                        : Math.Max(0f, m_heuristicEvaluator!(node.State));
             }
-            float queuePriority = node.Cost + heuristic;
+            var queuePriority = new SearchPriority(
+                node.Cost + heuristic, heuristic);
             if (!m_queue.TryGetValue(
                     queuePriority, out Queue<SearchNode> bucket))
             {
@@ -550,15 +799,18 @@ namespace AutoTerrainDesignations.Access.V2
 
         private SearchNode Pop()
         {
-            KeyValuePair<float, Queue<SearchNode>> first = m_queue.First();
+            KeyValuePair<SearchPriority, Queue<SearchNode>> first = m_queue.First();
             SearchNode node = first.Value.Dequeue();
             if (first.Value.Count == 0) m_queue.Remove(first.Key);
             m_queueCount--;
             return node;
         }
 
-        private bool TryMatchGoal(AccessV2BandState state)
+        private bool TryMatchGoal(
+            AccessV2BandState state,
+            out AccessV2FixedFrontage? matched)
         {
+            matched = null;
             for (int index = 0; index < m_goals.Count; index++)
             {
                 AccessV2FixedFrontage goal = m_goals[index];
@@ -573,9 +825,31 @@ namespace AutoTerrainDesignations.Access.V2
                 bool lane1 = AccessPathSearch.EdgesMatch(
                     state.Band.Lane1, goal.State.Band.Lane1,
                     state.EntryDirection);
-                if (lane0 && lane1) return true;
+                if (lane0 && lane1
+                    && (matched == null
+                        || goal.TerminalCost < matched.TerminalCost))
+                    matched = goal;
             }
-            return false;
+            return matched != null;
+        }
+
+        private void EnqueueFixedGoal(
+            SearchNode current,
+            AccessV2FixedFrontage goal)
+        {
+            float cost = current.Cost + goal.TerminalCost;
+            if (cost > m_maxCost) return;
+            Enqueue(new SearchNode(
+                current.State, current.History, cost,
+                current.TraversalCost + goal.TerminalCost,
+                current.GeneratedWorkCost,
+                current.DirectWorkCost,
+                current.GeneratedFixedCost,
+                current.ExteriorRayCost,
+                current.CleanupCost,
+                current, null, null,
+                groundCenter: null,
+                isFixedGoalTerminal: true));
         }
 
         private void CompleteSuccess(SearchNode goal)
@@ -583,15 +857,19 @@ namespace AutoTerrainDesignations.Access.V2
             var reverse = new List<AccessV2BandState>();
             int straight = 0, strafe = 0, turn = 0;
             var groundReverse = new List<Tile2i>();
-            SearchNode? routeGoal = goal;
-            while (routeGoal != null && routeGoal.GroundCenter.HasValue)
-            {
-                groundReverse.Add(routeGoal.GroundCenter.Value);
-                routeGoal = routeGoal.Parent;
-            }
+            var stepReverse = new List<AccessV2RouteStep>();
+            SearchNode? routeGoal = goal.IsFixedGoalTerminal
+                ? goal.Parent
+                : goal;
             for (SearchNode? node = routeGoal; node != null; node = node.Parent)
             {
-                reverse.Add(node.State);
+                stepReverse.Add(new AccessV2RouteStep(
+                    node.State, node.Transition,
+                    node.Handoff, node.GroundCenter));
+                if (node.GroundCenter.HasValue)
+                    groundReverse.Add(node.GroundCenter.Value);
+                else
+                    reverse.Add(node.State);
                 if (node.Transition?.Kind == AccessV2TransitionKind.Straight)
                     straight++;
                 else if (node.Transition?.Kind == AccessV2TransitionKind.Strafe)
@@ -601,6 +879,11 @@ namespace AutoTerrainDesignations.Access.V2
             }
             reverse.Reverse();
             groundReverse.Reverse();
+            stepReverse.Reverse();
+            AccessV2HandoffCandidate? terminalHandoff = stepReverse
+                .Where(step => step.IsGround && step.Handoff != null)
+                .Select(step => step.Handoff)
+                .LastOrDefault();
             Result = new AccessV2SearchResult(
                 true, string.Empty, reverse,
                 goal.History.Flatten(), goal.Cost,
@@ -610,13 +893,14 @@ namespace AutoTerrainDesignations.Access.V2
                 goal.GeneratedFixedCost,
                 goal.ExteriorRayCost,
                 goal.CleanupCost,
-                goal.Handoff,
+                terminalHandoff,
                 groundReverse,
+                stepReverse,
                 straight, strafe, turn,
                 m_visited, m_queueCount,
                 m_maxHistoryOrigins, m_maxRayConstraints,
                 new Dictionary<string, int>(m_rejections),
-                m_heuristicEvaluator != null,
+                m_potentialField != null || m_heuristicEvaluator != null,
                 m_handoffEvaluations,
                 m_quickHandoffAccepts);
             IsComplete = true;
@@ -635,11 +919,12 @@ namespace AutoTerrainDesignations.Access.V2
                 new Dictionary<Tile2i, AccessHeightProfile>(),
                 0f, 0f, 0f, 0f, 0f, 0f, 0f, null,
                 Array.Empty<Tile2i>(),
+                Array.Empty<AccessV2RouteStep>(),
                 0, 0, 0,
                 m_visited, m_queueCount,
                 m_maxHistoryOrigins, m_maxRayConstraints,
                 new Dictionary<string, int>(m_rejections),
-                m_heuristicEvaluator != null,
+                m_potentialField != null || m_heuristicEvaluator != null,
                 m_handoffEvaluations,
                 m_quickHandoffAccepts);
 
@@ -665,6 +950,7 @@ namespace AutoTerrainDesignations.Access.V2
             public AccessV2Transition? Transition { get; }
             public AccessV2HandoffCandidate? Handoff { get; }
             public Tile2i? GroundCenter { get; }
+            public bool IsFixedGoalTerminal { get; }
 
             public SearchNode(
                 AccessV2BandState state,
@@ -679,7 +965,8 @@ namespace AutoTerrainDesignations.Access.V2
                 SearchNode? parent,
                 AccessV2Transition? transition,
                 AccessV2HandoffCandidate? handoff,
-                Tile2i? groundCenter = null)
+                Tile2i? groundCenter = null,
+                bool isFixedGoalTerminal = false)
             {
                 State = state;
                 History = history;
@@ -694,41 +981,52 @@ namespace AutoTerrainDesignations.Access.V2
                 Transition = transition;
                 Handoff = handoff;
                 GroundCenter = groundCenter;
+                IsFixedGoalTerminal = isFixedGoalTerminal;
+            }
+        }
+
+        private readonly struct SearchPriority : IComparable<SearchPriority>
+        {
+            private readonly float m_total;
+            private readonly float m_heuristic;
+
+            public SearchPriority(float total, float heuristic)
+            {
+                m_total = total;
+                m_heuristic = heuristic;
+            }
+
+            public int CompareTo(SearchPriority other)
+            {
+                int total = m_total.CompareTo(other.m_total);
+                return total != 0
+                    ? total
+                    : m_heuristic.CompareTo(other.m_heuristic);
             }
         }
 
         private readonly struct SearchKey : IEquatable<SearchKey>
         {
             private readonly AccessV2BandState m_state;
-            private readonly int m_historySignature;
-            private readonly int m_originCount;
-            private readonly int m_rayCount;
-            private readonly int m_cleanupCount;
             private readonly Tile2i? m_groundCenter;
-
-            public SearchKey(AccessV2BandState state, AccessV2History history)
-            {
-                m_state = state;
-                m_historySignature = history.Signature;
-                m_originCount = history.OriginCount;
-                m_rayCount = history.RayConstraintCount;
-                m_cleanupCount = history.CleanupKeyCount;
-                m_groundCenter = null;
-            }
+            private readonly bool m_isFixedGoalTerminal;
 
             public SearchKey(SearchNode node)
-                : this(node.State, node.History)
             {
                 m_groundCenter = node.GroundCenter;
+                m_isFixedGoalTerminal = node.IsFixedGoalTerminal;
+                // Match V1's label dominance. The cheapest arrival owns the
+                // history used for later feasibility checks; history is not a
+                // second state dimension for either G centers or V bands.
+                m_state = node.GroundCenter.HasValue
+                    ? default
+                    : node.State;
             }
 
             public bool Equals(SearchKey other)
                 => m_state.Equals(other.m_state)
-                    && m_historySignature == other.m_historySignature
-                    && m_originCount == other.m_originCount
-                    && m_rayCount == other.m_rayCount
-                    && m_cleanupCount == other.m_cleanupCount
-                    && m_groundCenter == other.m_groundCenter;
+                    && m_groundCenter == other.m_groundCenter
+                    && m_isFixedGoalTerminal == other.m_isFixedGoalTerminal;
 
             public override bool Equals(object? obj)
                 => obj is SearchKey other && Equals(other);
@@ -738,11 +1036,8 @@ namespace AutoTerrainDesignations.Access.V2
                 unchecked
                 {
                     int hash = m_state.GetHashCode();
-                    hash = (hash * 397) ^ m_historySignature;
-                    hash = (hash * 397) ^ m_originCount;
-                    hash = (hash * 397) ^ m_rayCount;
-                    hash = (hash * 397) ^ m_cleanupCount;
                     hash = (hash * 397) ^ m_groundCenter.GetHashCode();
+                    hash = (hash * 397) ^ m_isFixedGoalTerminal.GetHashCode();
                     return hash;
                 }
             }

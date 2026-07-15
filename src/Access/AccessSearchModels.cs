@@ -320,11 +320,13 @@ namespace AutoTerrainDesignations.Access
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByTile;
         private readonly Dictionary<Tile2i, string> m_groundExclusionReasons;
         private readonly HashSet<Tile2i> m_validOrigins;
-        private readonly int[] m_anyGoalDistance;
+        private readonly float[] m_anyGoalDistance;
         private readonly int m_minGoalHeight2;
         private readonly int m_maxGoalHeight2;
         private readonly int m_goalDistanceWidth;
         private readonly int m_goalDistanceHeight;
+        private readonly Tile2i m_goalDistanceMin;
+        private readonly Tile2i m_goalDistanceMax;
         private readonly AccessDurabilityCorner[] m_durabilityCorners;
         private readonly List<AccessDurabilityCorner>?[,] m_spatialGrid;
         private readonly int m_gridWidth;
@@ -501,11 +503,35 @@ namespace AutoTerrainDesignations.Access
                     eligibleCleanupOriginCount++;
             EligibleCleanupOriginCount = eligibleCleanupOriginCount;
             m_validOrigins = new HashSet<Tile2i>(m_terrainCenterHeight2.Keys);
-            m_goalDistanceWidth = boundsMax.X - boundsMin.X + 1;
-            m_goalDistanceHeight = boundsMax.Y - boundsMin.Y + 1;
+            Tile2i goalDistanceMin = boundsMin;
+            Tile2i goalDistanceMax = boundsMax;
+            foreach (Tile2i tile in m_groundNodes)
+                ExpandGoalDistanceBounds(tile);
+            foreach (KeyValuePair<Tile2i, AccessPropCleanupInfo> pair
+                in m_propCleanupByTile)
+                if (pair.Value.IsEligible)
+                    ExpandGoalDistanceBounds(pair.Key);
+            m_goalDistanceMin = goalDistanceMin;
+            m_goalDistanceMax = goalDistanceMax;
+            m_goalDistanceWidth =
+                m_goalDistanceMax.X - m_goalDistanceMin.X + 1;
+            m_goalDistanceHeight =
+                m_goalDistanceMax.Y - m_goalDistanceMin.Y + 1;
             m_anyGoalDistance = useAStar
-                ? BuildGoalDistance(boundsMin, boundsMax, m_goalGroundNodes)
-                : Array.Empty<int>();
+                ? BuildGoalDistance(
+                    m_goalDistanceMin, m_goalDistanceMax,
+                    m_goalGroundNodes)
+                : Array.Empty<float>();
+
+            void ExpandGoalDistanceBounds(Tile2i tile)
+            {
+                goalDistanceMin = new Tile2i(
+                    Math.Min(goalDistanceMin.X, tile.X),
+                    Math.Min(goalDistanceMin.Y, tile.Y));
+                goalDistanceMax = new Tile2i(
+                    Math.Max(goalDistanceMax.X, tile.X),
+                    Math.Max(goalDistanceMax.Y, tile.Y));
+            }
 
             int minGoalHeight2 = int.MaxValue;
             int maxGoalHeight2 = int.MinValue;
@@ -708,20 +734,22 @@ namespace AutoTerrainDesignations.Access
             return result;
         }
 
-        internal int[] AnyGoalDistance => m_anyGoalDistance;
+        internal float[] AnyGoalDistance => m_anyGoalDistance;
         internal int MinGoalHeight2 => m_minGoalHeight2;
         internal int MaxGoalHeight2 => m_maxGoalHeight2;
         internal int GoalDistanceWidth => m_goalDistanceWidth;
         internal int GoalDistanceHeight => m_goalDistanceHeight;
+        internal Tile2i GoalDistanceMin => m_goalDistanceMin;
+        internal Tile2i GoalDistanceMax => m_goalDistanceMax;
 
-        public int GetGoalTravelLowerBound(Tile2i tile, int height2)
+        public float GetGoalTravelLowerBound(Tile2i tile, int height2)
         {
             if (m_anyGoalDistance == null || m_anyGoalDistance.Length == 0) return 0;
-            int x = tile.X - BoundsMin.X;
-            int y = tile.Y - BoundsMin.Y;
+            int x = tile.X - m_goalDistanceMin.X;
+            int y = tile.Y - m_goalDistanceMin.Y;
             if (x < 0 || x >= m_goalDistanceWidth || y < 0 || y >= m_goalDistanceHeight) return 0;
             int index = y * m_goalDistanceWidth + x;
-            int horizontalDistance = m_anyGoalDistance[index];
+            float horizontalDistance = m_anyGoalDistance[index];
             if (horizontalDistance < 0) return 0;
             int verticalDistance = height2 < m_minGoalHeight2
                 ? m_minGoalHeight2 - height2
@@ -1151,14 +1179,14 @@ namespace AutoTerrainDesignations.Access
 
 
 
-        internal static int[] BuildGoalDistance(Tile2i boundsMin, Tile2i boundsMax,
+        internal static float[] BuildGoalDistance(Tile2i boundsMin, Tile2i boundsMax,
             HashSet<Tile2i> goals)
         {
             int width = boundsMax.X - boundsMin.X + 1;
             int height = boundsMax.Y - boundsMin.Y + 1;
-            var result = new int[width * height];
+            var result = new float[width * height];
             for (int i = 0; i < result.Length; i++) result[i] = -1;
-            var queue = new Queue<int>();
+            var queue = new SortedDictionary<float, Queue<int>>();
             foreach (Tile2i goal in goals)
             {
                 if (goal.X < boundsMin.X || goal.X > boundsMax.X
@@ -1166,24 +1194,56 @@ namespace AutoTerrainDesignations.Access
                     continue;
                 int index = (goal.Y - boundsMin.Y) * width + goal.X - boundsMin.X;
                 result[index] = 0;
-                queue.Enqueue(index);
+                Enqueue(index, 0f);
             }
             while (queue.Count > 0)
             {
-                int current = queue.Dequeue();
+                KeyValuePair<float, Queue<int>> first = First(queue);
+                int current = first.Value.Dequeue();
+                if (first.Value.Count == 0) queue.Remove(first.Key);
+                if (Math.Abs(result[current] - first.Key) > 0.0001f)
+                    continue;
                 int x = current % width;
                 int y = current / width;
-                int nextDistance = result[current] + 1;
-                if (x > 0 && result[current - 1] < 0)
-                { result[current - 1] = nextDistance; queue.Enqueue(current - 1); }
-                if (x + 1 < width && result[current + 1] < 0)
-                { result[current + 1] = nextDistance; queue.Enqueue(current + 1); }
-                if (y > 0 && result[current - width] < 0)
-                { result[current - width] = nextDistance; queue.Enqueue(current - width); }
-                if (y + 1 < height && result[current + width] < 0)
-                { result[current + width] = nextDistance; queue.Enqueue(current + width); }
+                Relax(current - 1, first.Key, 1f, x > 0);
+                Relax(current + 1, first.Key, 1f, x + 1 < width);
+                Relax(current - width, first.Key, 1f, y > 0);
+                Relax(current + width, first.Key, 1f, y + 1 < height);
+                const float diagonal = 1.41421356237f;
+                Relax(current - width - 1, first.Key, diagonal, x > 0 && y > 0);
+                Relax(current - width + 1, first.Key, diagonal, x + 1 < width && y > 0);
+                Relax(current + width - 1, first.Key, diagonal, x > 0 && y + 1 < height);
+                Relax(current + width + 1, first.Key, diagonal, x + 1 < width && y + 1 < height);
             }
             return result;
+
+            void Relax(int next, float currentDistance, float stepCost, bool inside)
+            {
+                if (!inside) return;
+                float nextDistance = currentDistance + stepCost;
+                if (result[next] >= 0f && result[next] <= nextDistance + 0.0001f)
+                    return;
+                result[next] = nextDistance;
+                Enqueue(next, nextDistance);
+            }
+
+            void Enqueue(int tile, float distance)
+            {
+                if (!queue.TryGetValue(distance, out Queue<int> bucket))
+                {
+                    bucket = new Queue<int>();
+                    queue.Add(distance, bucket);
+                }
+                bucket.Enqueue(tile);
+            }
+
+            KeyValuePair<float, Queue<int>> First(
+                SortedDictionary<float, Queue<int>> items)
+            {
+                foreach (KeyValuePair<float, Queue<int>> pair in items)
+                    return pair;
+                throw new InvalidOperationException("Goal-distance queue is empty.");
+            }
         }
     }
 

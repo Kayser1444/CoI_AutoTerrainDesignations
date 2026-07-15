@@ -2,7 +2,7 @@
 
 Status: ready for live verification
 
-Stage 7 restores exact ground traversal to the primary route cost and enables A* for V2 tower-ground goals. Fixed-provider goals deliberately remain on Dijkstra.
+Stage 7 restores exact ground traversal to the primary route cost and enables A* for V2 tower-ground, fixed-frontage, and combined goals through the request-scoped potential field. Dijkstra remains the optimality reference.
 
 ## Trivial down-ramp responsiveness
 
@@ -12,7 +12,7 @@ Stage 7 restores exact ground traversal to the primary route cost and enables A*
 4. Confirm `[ATD Experimental Access]` and `[ATD V2 Search]` report `algorithm=A*`.
 5. Record `cost`, `costs=[travel:...]`, `visited`, `pending`, `searchMs`, and the selected path.
 
-Expected: the request concludes promptly, chooses the direct sensible ramp, and charges both four per full V transition and one per shortest G tile, plus the fixed two-cost center spoke.
+Expected: the request concludes promptly, chooses the direct sensible ramp, and charges both four per full V transition and one per shortest G tile, plus the center spoke at `2 * (1 + generated-flat-cost / 4)`.
 
 ## Dijkstra oracle comparison
 
@@ -40,10 +40,14 @@ Observed before the quick-mask optimization: A* passed both the trivial and mini
 3. Confirm the search remains responsive across frame slices and the resulting ramp passes the Stage 6 placement and Mega-pathability checks.
 4. Start another search while one is active and confirm normal single-flight replacement/cancellation behavior remains intact.
 
-## Fixed-provider fallback
+## Fixed-provider potential
 
-Provide an exposed adjacent two-origin fixed frontage as the goal and run a short V2 request. Confirm the log reports `algorithm=Dijkstra`; A* must not be claimed for fixed-provider goals yet.
+Provide an exposed adjacent two-origin fixed frontage as the goal and run a short V2 request. Confirm the log reports `algorithm=A*` and reaches the same frontage with the same exact cost as a Dijkstra control. Repeat with both fixed frontages and tower-ground goals present; the cheapest accepted provider must win naturally.
+
+The `[ATD V2 Frontages]` line must report nonzero `providerNodes` and `providerConnected`, and each retained goal sample must include a two-decimal-or-shorter `terminal=` fee. Compare two accepted frontages where the geometrically nearer provider takes a longer established designation route to the tower. A* and Dijkstra must choose by construction/travel plus the logged terminal fee, not by geometric frontage distance alone.
+
+For the Cluster 2 regression, first let Cluster 1 materialize its provider network, then run Cluster 2 with the normal combined goals. Confirm the request reports nonzero fixed frontages and `algorithm=A*`, rather than the former fixed-goal Dijkstra fallback. Record visited states, pending high-water, runtime, selected goal kind, and whether the accepted route connects directly to the Cluster 1 frontage.
 
 ## Acceptance gate
 
-Stage 7 passes when the trivial down-ramp no longer times out under A*, A* and Dijkstra reconcile to the same accepted cost/plan on a repeatable case, the non-trivial route remains asynchronously responsive and Mega-pathable, and fixed-provider searches retain the documented Dijkstra fallback.
+Stage 7 passes when the trivial down-ramp no longer times out under A*, A* and Dijkstra reconcile to the same accepted cost/plan on repeatable tower-ground and fixed-frontage cases, combined-goal search selects the cheapest provider, and the non-trivial route remains asynchronously responsive and Mega-pathable.

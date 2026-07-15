@@ -3,17 +3,12 @@
 Planned and candidate improvements for Kayser's Automatic Terrain Designations.
 
 # Planned
-* Climb cliff? (i.e. path A->B)
 * Cut/Copy/Paste/Blueprint designations?
 * rail incline (12.5%) designations
 
-## Configurable hazard avoidance for accessways and mine designations
-
-Two per-world Pathfinder parameters now exist and are enforced by accessway candidate rays. Their new-game defaults come from `ATDsettings.json`:
-
-* **Avoid ocean** — reject accessway and mining-designation plans whose projected cutting disturbance reaches the ocean; dumping/fill into ocean remains allowed.
-* **Avoid buildings** — reject accessway and mining-designation plans whose projected cut/fill disturbance reaches an existing, planned, or ghost building, including the mine control tower.
-* **Harvest disrupted trees** — mark trees throughout the finalized mining body and its projected disturbance zones; when disabled, mark only trees required to execute the accepted work.
+## Accessways and pathfinding
+Domain pruning: envelope
+Harmonize V1 and V2
 
 Remaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
 
@@ -21,52 +16,22 @@ Remaining work: reuse the material-aware disturbance ray tracer and tower-owned 
 
 Rare generated mining bodies can contain a one-origin waist that is too narrow for Mega/T3 vehicles. Add a clearance-aware minimal-change widening/removal pass eventually; this is not a blocker for V2 accessway rollout.
 
-## Ramp safety margin — low priority
-
-Review ramp building safety margin logic in more depth. Current margin is based on ramp planning depth rather than actual vertical drop relative to surrounding surface, so it may not fully reflect landslide/building risk in uneven terrain.
-
-## Place leveling designations with a farm
+## Construction assist
 Handle overlapping towers?
 Auto-prepare ground anywhere
 - If farm placed outside mining tower area -> warn that global filling rules must be adjusted
 - Handle case where no storage exports soil -> warn, force-export, or alter truck behavior
 - Not supported yet: Gas injection pump (requires 6 levels of limestone)
 
-## Order truck or excavator from tower, pre-assigned to tower (+supress completed notification)
-
 ## Make Create Designations consider possible farming work
-
-## Make corridors go up then down if they are long
-
-## Tighten access generation framework
-
-Define shared access-generation language, helpers, diagnostics, and regression scenarios for mining designations and farmland preparation.
-
-See [../in-progress/access-framework.md](../in-progress/access-framework.md) for the working glossary and architecture notes.
 
 ## Issue?: Vehichles auto-released can be assigned to the tower again (or to something else)
 Maybe reverse meaning and make auto-assign instead of auto-unassign?
-Handled in v0.4.3a:
-- Split soft-unassign into excavators and trucks.
-- Auto-release vehicles also when tower paused.
-- Improve tower with an assigned list of vehicles.
-- Same vehicles cannot be truly soft-assigned to several towers because vanilla vehicle assignment is single-owner; ATD restore skips vehicles already assigned elsewhere.
-
-## Improve ramps? make them turn?
-
-Proposed approach: treat accessway generation as a least-work corridor search over the heightfield (turning/switchbacks fall out for free). See [accessway-pathfinding.md](accessway-pathfinding.md).
 
 ## Saddle designation?
 
-## Prepare ground for ANY entity/blueprint /MrTammy
-
-See [../in-progress/construction-assist.md](../in-progress/construction-assist.md) for the design; the non-farm leveling facet is the remaining work.
-
 ### Long term: Support underground pipe construction both for modded and unmodded games
 * Highly complicated if unmodded: must dig trench, place pipes, build pipes, prepare remaining ground, place rest of BP.
-
-## CornerDesignationKey Tooltip Global Scope clarification
-Ensure the settings UI tooltip for the CornerDesignationKey explicitly documents that it is a global setting persisted in ATDsettings.json rather than per-save.
 
 ## Topsoil Optimization
 Investigate placing only the minimum required soil to satisfy farmability (e.g., 95% thickness) instead of a full topsoil band. Deferred during the access framework rewrite.
@@ -75,9 +40,3 @@ Investigate placing only the minimum required soil to satisfy farmability (e.g.,
 `AutoDepthDesignation.TickIdleVehicleRelease()` runs on the simulation thread (`~Sim` thread) and iterates over active towers using `m_entitiesManager.GetAllEntitiesOfType<MineTower>()`. This can collide with the Unity main thread (`~Mai` thread) when other UI elements (like `PollutionWorldRenderer` or other mods) try to enumerate entities of any type concurrently using MaFi's non-thread-safe `LystMutableDuringIter` collections, triggering `Outer enumerator finished first?` assertions in the game's log.
 
 **Solution:** Query and snapshot the entities safely on a main-thread tick or copy them to avoid concurrent enumeration.
-
-# Props/Debris clearing
-- Unwire the prop clearing from "Auto" mode. It's just a recipe for confusion.
-- Shift-click Remove debris to force-replace existing designations (terrain or forestry)
-
-## When constructing snapshot and materalizing path, mark trees at risk of destruction for harvesting.

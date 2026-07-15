@@ -361,6 +361,20 @@ public sealed class AtdConsoleCommands
             : "[ATD] Cursor overlay OFF.";
     }
 
+    [ConsoleCommand(false, false, "Toggles the fading terrain-dot overlay for nodes explored by the sliced experimental access search. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
+    private string atdAccessSearchOverlay(string value = "")
+    {
+        bool current = AutoDepthDesignation.ShowExperimentalAccessSearchOverlay;
+        if (!TryParseConsoleBool(value, out bool parsed))
+            parsed = !current;
+        AutoDepthDesignation.ShowExperimentalAccessSearchOverlay = parsed;
+        if (!parsed)
+            AutoDepthDesignation.ClearExperimentalAccessSearchOverlay();
+        return parsed
+            ? "[ATD] Experimental access search overlay ON."
+            : "[ATD] Experimental access search overlay OFF.";
+    }
+
     private static bool TryParseConsoleBool(string value, out bool parsed)
     {
         switch ((value ?? string.Empty).Trim().ToLowerInvariant())

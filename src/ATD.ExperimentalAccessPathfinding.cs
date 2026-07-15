@@ -627,7 +627,7 @@ namespace AutoTerrainDesignations
                         prospectiveV2HandoffSpanCache));
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Timing] phase=snapshot algorithm={(vehicleClearance > 4 ? snapshot.UseAStar ? "A*-ground/Dijkstra-fixed" : "Dijkstra" : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
+                $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"goals={snapshot.GoalCount} fullTowerGoals={fullTowerGoalCount} towerGroundStart={groundStart} " +
                 $"rayHeightSamples={preciseTerrainHeights.Count} rayMaterialColumns={terrainColumns.Count} " +
@@ -1154,6 +1154,7 @@ namespace AutoTerrainDesignations
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
+            IEnumerable<Tile2i> acceptedProviderOrigins,
             float maxCostLimit = float.MaxValue)
         {
             int requiredWidth = snapshot.VehicleWidth > 4 ? 2 : 1;
@@ -1164,6 +1165,14 @@ namespace AutoTerrainDesignations
                     cluster.Origins.Select(origin => origin.Origin),
                     fixedGoals)
                 : null;
+            AccessV2ProviderDistanceField? providerField = null;
+            if (v2Endpoints != null && v2Endpoints.FixedGoals.Count > 0)
+            {
+                providerField = new AccessV2ProviderDistanceField(
+                    snapshot,
+                    acceptedProviderOrigins.Concat(fixedGoals).Distinct());
+                v2Endpoints = providerField.ApplyTerminalCosts(v2Endpoints);
+            }
             if (v2Endpoints != null)
             {
                 AccessV2FrontageDiagnostics diagnostics = v2Endpoints.Diagnostics;
@@ -1182,7 +1191,8 @@ namespace AutoTerrainDesignations
                             : "/fixed-pair")));
                 string goalSamples = string.Join(";", v2Endpoints.FixedGoals.Take(8)
                     .Select(goal =>
-                        $"{goal.State.Anchor}/{goal.State.Axis}/exposed={goal.ExposedDirection}"));
+                        $"{goal.State.Anchor}/{goal.State.Axis}/exposed={goal.ExposedDirection}" +
+                        $"/terminal={goal.TerminalCost.ToString("0.##", CultureInfo.InvariantCulture)}"));
                 LogExperimentalAccessDebug(
                     $"[ATD V2 Frontages] seeds={diagnostics.SeedCount} " +
                     $"starts={v2Endpoints.Starts.Count} " +
@@ -1190,6 +1200,8 @@ namespace AutoTerrainDesignations
                     $"existingPairStarts={diagnostics.ExistingPairStartCount} " +
                     $"fixedGoalOrigins={diagnostics.FixedGoalOriginCount} " +
                     $"fixedFrontages={v2Endpoints.FixedGoals.Count} " +
+                    $"providerNodes={providerField?.ProviderNodeCount ?? 0} " +
+                    $"providerConnected={providerField?.ConnectedNodeCount ?? 0} " +
                     $"rejections=[{rejections}] startSamples=[{startSamples}] " +
                     $"goalSamples=[{goalSamples}]");
             }
@@ -1245,6 +1257,11 @@ namespace AutoTerrainDesignations
             Stopwatch createSessionTimer = Stopwatch.StartNew();
             var session = AccessPathSearch.CreateSession(request);
             createSessionTimer.Stop();
+            if (ShowExperimentalAccessSearchOverlay)
+            {
+                BeginExperimentalAccessSearchOverlay();
+                session.NodeExplored = RecordExperimentalAccessSearchNode;
+            }
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
                 $"createMs={createSessionTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +

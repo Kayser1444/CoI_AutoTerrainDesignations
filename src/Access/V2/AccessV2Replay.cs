@@ -19,6 +19,10 @@ namespace AutoTerrainDesignations.Access.V2
             replayedHandoff = null;
             var ordered = new List<AccessV2OriginProfile>();
             orderedGenerated = ordered;
+            if (route.RouteSteps.Count > 0)
+                return TryReplaySegmented(
+                    snapshot, route, ref history, ordered,
+                    out replayedHandoff, out reason);
             if (route.States.Count == 0)
             {
                 reason = "V2ReplayEmptyStates";
@@ -125,8 +129,236 @@ namespace AutoTerrainDesignations.Access.V2
                     reason = "V2ReplayHandoffMismatch";
                     return false;
                 }
+                if (!ReplayGroundPath(
+                        snapshot, route.GroundPath,
+                        route.Handoff, history, out reason))
+                    return false;
             }
 
+            reason = string.Empty;
+            return true;
+        }
+
+        private static bool TryReplaySegmented(
+            AccessSearchSnapshot snapshot,
+            AccessV2RouteData route,
+            ref AccessV2History history,
+            ICollection<AccessV2OriginProfile> ordered,
+            out AccessV2HandoffCandidate? replayedHandoff,
+            out string reason)
+        {
+            replayedHandoff = null;
+            if (route.RouteSteps.Count == 0
+                || route.RouteSteps[0].IsGround)
+            {
+                reason = "V2ReplayInvalidFirstStep";
+                return false;
+            }
+
+            AccessV2RouteStep firstStep = route.RouteSteps[0];
+            AccessV2BandState first = firstStep.State;
+            var initialDelta = new List<AccessV2OriginProfile>();
+            var initialContext = new List<Tile2i>();
+            Tile2i? connectedFixed = null;
+            for (int lane = 0; lane < 2; lane++)
+            {
+                AccessV2OriginProfile item = first.GetLane(lane);
+                if (route.GeneratedProfiles.TryGetValue(
+                        item.Origin, out AccessHeightProfile generated))
+                {
+                    if (!ProfilesEqual(item.Profile, generated))
+                    {
+                        reason = "V2ReplayInitialProfileMismatch";
+                        return false;
+                    }
+                    initialDelta.Add(item);
+                }
+                else
+                {
+                    initialContext.Add(item.Origin);
+                    if (!connectedFixed.HasValue) connectedFixed = item.Origin;
+                }
+            }
+            if (initialDelta.Count > 0)
+            {
+                var initial = new AccessV2Transition(
+                    AccessV2TransitionKind.Strafe,
+                    first, initialDelta, initialContext);
+                if (!Apply(
+                        snapshot, null, initial, connectedFixed,
+                        ref history, ordered, out reason))
+                    return false;
+            }
+
+            for (int index = 1; index < route.RouteSteps.Count; index++)
+            {
+                AccessV2RouteStep previous = route.RouteSteps[index - 1];
+                AccessV2RouteStep step = route.RouteSteps[index];
+                if (!step.IsGround)
+                {
+                    if (step.Transition == null)
+                    {
+                        reason = "V2ReplayTransitionMissing";
+                        return false;
+                    }
+                    AccessV2BandState? current = previous.IsGround
+                        ? (AccessV2BandState?)null
+                        : previous.State;
+                    if (!Apply(
+                            snapshot, current, step.Transition, null,
+                            ref history, ordered, out reason))
+                        return false;
+
+                    if (previous.IsGround)
+                    {
+                        if (step.Handoff == null)
+                        {
+                            reason = "V2ReplayGroundToVSeamMissing";
+                            return false;
+                        }
+                        var reverse = new AccessV2BandState(
+                            step.State.Anchor, step.State.Band,
+                            new Tile2i(
+                                -step.State.EntryDirection.X,
+                                -step.State.EntryDirection.Y));
+                        AccessV2HandoffCandidate? seam =
+                            AccessPathSearch.EvaluateV2Handoffs(
+                                    snapshot, new[] { reverse }, history)
+                                .FirstOrDefault(candidate =>
+                                    HandoffsEqual(candidate, step.Handoff)
+                                    && candidate.GroundEntryCenters.Contains(
+                                        previous.GroundCenter!.Value));
+                        if (seam == null)
+                        {
+                            reason = "V2ReplayGroundToVSeamMismatch";
+                            return false;
+                        }
+                        history = history.ApplyCleanupKeys(seam.CleanupKeys);
+                    }
+                    continue;
+                }
+
+                Tile2i center = step.GroundCenter!.Value;
+                if (!previous.IsGround)
+                {
+                    if (step.Handoff == null)
+                    {
+                        reason = "V2ReplayVToGroundSeamMissing";
+                        return false;
+                    }
+                    var recent = new List<AccessV2BandState>();
+                    for (int recentIndex = index - 1;
+                        recentIndex >= 0
+                            && recent.Count < AccessV2Handoffs.MaxSpanLength;
+                        recentIndex--)
+                    {
+                        AccessV2RouteStep recentStep = route.RouteSteps[recentIndex];
+                        if (recentStep.IsGround) break;
+                        recent.Add(recentStep.State);
+                        }
+                    AccessV2History historyAtHandoff = history;
+                    replayedHandoff = AccessPathSearch.EvaluateV2Handoffs(
+                            snapshot, recent, historyAtHandoff)
+                        .FirstOrDefault(candidate =>
+                            HandoffsEqual(candidate, step.Handoff)
+                            && candidate.GroundEntryCenters.Contains(center));
+                    if (replayedHandoff == null)
+                    {
+                        reason = "V2ReplayHandoffMismatch";
+                        return false;
+                    }
+                    history = history.ApplyCleanupKeys(
+                        replayedHandoff.CleanupKeys);
+                }
+                else
+                {
+                    Tile2i from = previous.GroundCenter!.Value;
+                    AccessV2GroundGraph? graph = snapshot.V2GroundGraph;
+                    IReadOnlyList<Tile2i> swept =
+                        AccessV2GroundGraph.GetSweptCenters(from, center);
+                    AccessV2History replayHistory = history;
+                    if (graph == null || !graph.CanTraverse(from, center)
+                        || swept.Any(item =>
+                            !snapshot.IsProjectedV2CenterPathable(
+                                item, replayHistory))
+                        || !graph.TryValidateLocalEscape(
+                            swept, history,
+                            snapshot.LandscapingCostDistanceScale,
+                            out _, out _))
+                    {
+                        reason = "V2ReplayGroundCorridor";
+                        return false;
+                    }
+                }
+            }
+
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> flattened =
+                history.Flatten();
+            if (flattened.Count != route.GeneratedProfiles.Count
+                || route.GeneratedProfiles.Any(pair =>
+                    !flattened.TryGetValue(pair.Key, out AccessHeightProfile value)
+                    || !ProfilesEqual(pair.Value, value)))
+            {
+                reason = "V2ReplayGeneratedProfileMismatch";
+                return false;
+            }
+            AccessV2RouteStep last = route.RouteSteps[
+                route.RouteSteps.Count - 1];
+            if (last.IsGround
+                && (snapshot.V2GroundGraph == null
+                    || !snapshot.V2GroundGraph.IsGoal(
+                        last.GroundCenter!.Value)))
+            {
+                reason = "V2ReplayGroundGoal";
+                return false;
+            }
+            reason = string.Empty;
+            return true;
+        }
+
+        private static bool ReplayGroundPath(
+            AccessSearchSnapshot snapshot,
+            IReadOnlyList<Tile2i> groundPath,
+            AccessV2HandoffCandidate handoff,
+            AccessV2History history,
+            out string reason)
+        {
+            AccessV2GroundGraph? graph = snapshot.V2GroundGraph;
+            if (graph == null || groundPath.Count == 0
+                || !handoff.GroundEntryCenters.Contains(groundPath[0]))
+            {
+                reason = "V2ReplayGroundEntry";
+                return false;
+            }
+            for (int index = 0; index < groundPath.Count; index++)
+            {
+                Tile2i current = groundPath[index];
+                IReadOnlyList<Tile2i> swept = index == 0
+                    ? new[] { current }
+                    : AccessV2GroundGraph.GetSweptCenters(
+                        groundPath[index - 1], current);
+                if (index > 0
+                    && !graph.CanTraverse(groundPath[index - 1], current))
+                {
+                    reason = "V2ReplayGroundEdge";
+                    return false;
+                }
+                if (swept.Any(center =>
+                        !snapshot.IsProjectedV2CenterPathable(center, history))
+                    || !graph.TryValidateLocalEscape(
+                        swept, history,
+                        snapshot.LandscapingCostDistanceScale,
+                        out _, out _))
+                {
+                    reason = "V2ReplayGroundCorridor";
+                    return false;
+                }
+            }
+            if (!graph.IsGoal(groundPath[groundPath.Count - 1]))
+            {
+                reason = "V2ReplayGroundGoal";
+                return false;
+            }
             reason = string.Empty;
             return true;
         }
