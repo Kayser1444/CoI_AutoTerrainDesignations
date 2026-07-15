@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 107,
+  "total_keys": 131,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
@@ -21,17 +21,6 @@
       "ru": "Макс",
       "zh": "最大限度"
     },
-    "panel.designations.debris_tooltip": {
-      "en": "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations.",
-      "context": "Tooltip on the Debris button.",
-      "de": "Platzieren Sie Markierungen zur Trümmerentfernung auf erreichbaren, unbesetzten Zellen. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen. Klicken Sie bei gedrückter Umschalttaste, um auch vorhandene Gelände- und Forstbezeichnungen zu ersetzen.",
-      "es": "Coloque designaciones de eliminación de escombros en celdas desocupadas accesibles. Ctrl-clic para incluir escombros inalcanzables. Presione Mayús y haga clic para reemplazar también las designaciones de terreno y bosques existentes.",
-      "it": "Posiziona le designazioni per la rimozione dei detriti sulle celle non occupate raggiungibili. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili. Fare clic tenendo premuto il tasto Maiusc per sostituire anche le designazioni di terreno e silvicoltura esistenti.",
-      "pt": "Coloque designações de remoção de detritos em células desocupadas acessíveis. Ctrl-clique para incluir detritos inacessíveis. Clique com a tecla Shift pressionada para substituir também as designações de terreno e florestais existentes.",
-      "ru": "Разместите обозначения удаления мусора на доступных незанятых ячейках. Удерживая клавишу Ctrl, щелкните, чтобы включить недоступные обломки. Щелкните, удерживая клавишу Shift, чтобы также заменить существующие обозначения местности и лесного хозяйства.",
-      "sv": "Placera skräpborttagningsbeteckningar på lediga celler som kan nås. Ctrl-klicka för att ta med oåtkomliga skräp. Skift-klicka för att även ersätta befintliga terräng- och skogsbruksbeteckningar.",
-      "zh": "将碎片清除标记放置在可触及的未占用单元格上。按住 Ctrl 键单击以包含无法到达的碎片。按住 Shift 键并单击也可以替换现有的地形和林业名称。"
-    },
     "panel.designations.ore_filter.auto": {
       "en": "AUTO",
       "context": "Label for automatic scanning behavior in the ore picker.",
@@ -42,7 +31,29 @@
       "ru": "АВТО",
       "sv": "BIL",
       "zh": "汽车"
+    },
+    "settings.world.safety_policy.label": {
+      "en": "Safety policy",
+      "context": "World safety policy setting label.",
+      "de": "Sicherheitspolitik",
+      "es": "Política de seguridad",
+      "it": "Politica di sicurezza",
+      "pt": "Política de segurança",
+      "ru": "Политика безопасности",
+      "sv": "Säkerhetspolicy",
+      "zh": "安全政策"
+    },
+    "settings.world.safety_policy.tooltip": {
+      "en": "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL.",
+      "context": "World safety policy setting tooltip.",
+      "de": "Steuert, wie vorsichtig ATD Erdrutsche vorhersagt und welchen Abstand es zu geschützten Ozeanen und Gebäuden hält. Höhere Stufen reservieren mehr Platz; niedrigere Stufen erlauben Geländearbeiten näher an Gefahren. Standard: BAL.",
+      "es": "Controla con qué cautela ATD predice los deslizamientos y la distancia que mantiene respecto a océanos y edificios protegidos. Los niveles superiores reservan más espacio; los inferiores permiten trabajar el terreno más cerca de los peligros. Predeterminado: BAL.",
+      "it": "Controlla la cautela con cui ATD prevede le frane e la distanza che mantiene dagli oceani e dagli edifici protetti. Politiche più elevate riservano più spazio; politiche più basse consentono di lavorare sul terreno più vicino ai pericoli. Predefinito: BAL.",
+      "pt": "Controla a cautela com que o ATD prevê deslizamentos de terra e a distância que mantém dos oceanos e edifícios protegidos. Políticas mais elevadas reservam mais espaço; políticas mais baixas permitem o trabalho no terreno mais próximo dos perigos. Padrão: BAL.",
+      "ru": "Определяет, насколько осторожно ATD прогнозирует оползни и какое расстояние сохраняет до защищаемого океана и зданий. Более высокие уровни резервируют больше места; более низкие позволяют проводить земляные работы ближе к опасным зонам. По умолчанию: BAL.",
+      "sv": "Styr hur försiktigt ATD förutsäger jordskred och hur långt avstånd den håller från skyddade hav och byggnader. Högre policyer reserverar mer utrymme; lägre policyer tillåter terrängarbete närmare faror. Standard: BAL.",
+      "zh": "控制 ATD 预测山体滑坡的谨慎程度以及与受保护的海洋和建筑物的距离。更高的政策预留更多的空间；较低的政策允许地形更接近危险。默认值：BAL。"
     }
   },
-  "keys_needing_translation": 3
+  "keys_needing_translation": 4
 }

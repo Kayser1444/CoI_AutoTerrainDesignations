@@ -46,6 +46,8 @@ using Mafi.Unity.UiToolkit;
 
 namespace AutoTerrainDesignations;
 
+internal enum SafetyPolicy { Min = 0, Low = 1, Med = 2, High = 3, Max = 4 }
+
 public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
 {
     private Harmony? m_harmony;
@@ -146,8 +148,8 @@ public static string Tt(string text) => text;
         SetAccessRaySlopeConservatism(1f);
         SetAccessRayEndBuffer(3);
         SetAccessCandidateRayMaxDistance(16);
-        SetAccessRayMaxCost(512f);
-        SetAccessRayUnresolvedPenalty(128f);
+        SetAccessRayMaxCost(500f);
+        SetAccessRayUnresolvedPenalty(200f);
         SetAccessMaxVisitedNodes(250000);
         SetAccessSearchTimeoutSeconds(60);
         SetAccessSearchFrameBudgetMs(30);
@@ -334,6 +336,8 @@ public static string Tt(string text) => text;
 
     public static void SetAccessAvoidOcean(bool value)
     {
+        if (AccessAvoidOcean != value)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
         AccessAvoidOcean = value;
     }
 
@@ -342,6 +346,8 @@ public static string Tt(string text) => text;
 
     public static void SetAccessAvoidBuildings(bool value)
     {
+        if (AccessAvoidBuildings != value)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
         AccessAvoidBuildings = value;
     }
 
@@ -350,6 +356,8 @@ public static string Tt(string text) => text;
 
     public static void SetAccessHarvestDisruptedTrees(bool value)
     {
+        if (AccessHarvestDisruptedTrees != value)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
         AccessHarvestDisruptedTrees = value;
     }
 
@@ -384,14 +392,71 @@ public static string Tt(string text) => text;
     public static float AccessSideRayWeight { get; private set; } = 1f;
     public static void SetAccessSideRayWeight(float value) => AccessSideRayWeight = Math.Max(0f, Math.Min(100f, value));
     public static float AccessRaySlopeConservatism { get; private set; } = 1f;
-    public static void SetAccessRaySlopeConservatism(float value) => AccessRaySlopeConservatism = Math.Max(0f, Math.Min(1.5f, value));
+    public static void SetAccessRaySlopeConservatism(float value)
+    {
+        float clamped = Math.Max(0f, Math.Min(1.5f, value));
+        if (Math.Abs(AccessRaySlopeConservatism - clamped) > 0.0001f)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        AccessRaySlopeConservatism = clamped;
+    }
     public static int AccessRayEndBuffer { get; private set; } = 3;
-    public static void SetAccessRayEndBuffer(int value) => AccessRayEndBuffer = Math.Max(0, Math.Min(16, value));
+    public static void SetAccessRayEndBuffer(int value)
+    {
+        int clamped = Math.Max(0, Math.Min(16, value));
+        if (AccessRayEndBuffer != clamped)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        AccessRayEndBuffer = clamped;
+    }
+    internal static SafetyPolicy GetSafetyPolicy()
+    {
+        SafetyPolicy closest = SafetyPolicy.Med;
+        float closestDistance = float.MaxValue;
+        for (int value = (int)SafetyPolicy.Min; value <= (int)SafetyPolicy.Max; value++)
+        {
+            SafetyPolicy candidate = (SafetyPolicy)value;
+            GetSafetyPolicyParameters(candidate, out float slope, out int buffer);
+            float slopeDelta = (AccessRaySlopeConservatism - slope) / 0.1f;
+            float bufferDelta = AccessRayEndBuffer - buffer;
+            float distance = slopeDelta * slopeDelta + bufferDelta * bufferDelta;
+            if (distance < closestDistance)
+            {
+                closest = candidate;
+                closestDistance = distance;
+            }
+        }
+        return closest;
+    }
+    internal static void SetSafetyPolicy(SafetyPolicy policy)
+    {
+        if (policy < SafetyPolicy.Min || policy > SafetyPolicy.Max)
+            policy = SafetyPolicy.Med;
+        GetSafetyPolicyParameters(policy, out float slope, out int buffer);
+        SetAccessRaySlopeConservatism(slope);
+        SetAccessRayEndBuffer(buffer);
+    }
+    private static void GetSafetyPolicyParameters(
+        SafetyPolicy policy, out float slope, out int buffer)
+    {
+        switch (policy)
+        {
+            case SafetyPolicy.Max: slope = 1.5f; buffer = 5; break;
+            case SafetyPolicy.High: slope = 1.25f; buffer = 4; break;
+            case SafetyPolicy.Low: slope = 0.9f; buffer = 2; break;
+            case SafetyPolicy.Min: slope = 0.8f; buffer = 1; break;
+            default: slope = 1f; buffer = 3; break;
+        }
+    }
     public static int AccessCandidateRayMaxDistance { get; private set; } = 16;
-    public static void SetAccessCandidateRayMaxDistance(int value) => AccessCandidateRayMaxDistance = Math.Max(4, Math.Min(128, value));
-    public static float AccessRayMaxCost { get; private set; } = 512f;
+    public static void SetAccessCandidateRayMaxDistance(int value)
+    {
+        int clamped = Math.Max(4, Math.Min(128, value));
+        if (AccessCandidateRayMaxDistance != clamped)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        AccessCandidateRayMaxDistance = clamped;
+    }
+    public static float AccessRayMaxCost { get; private set; } = 500f;
     public static void SetAccessRayMaxCost(float value) => AccessRayMaxCost = Math.Max(1f, Math.Min(10000f, value));
-    public static float AccessRayUnresolvedPenalty { get; private set; } = 128f;
+    public static float AccessRayUnresolvedPenalty { get; private set; } = 200f;
     public static void SetAccessRayUnresolvedPenalty(float value) => AccessRayUnresolvedPenalty = Math.Max(0f, Math.Min(10000f, value));
     public static int AccessMaxVisitedNodes { get; private set; } = 250000;
     public static void SetAccessMaxVisitedNodes(int value) => AccessMaxVisitedNodes = Math.Max(1000, Math.Min(2000000, value));
@@ -620,7 +685,7 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.SetUiRoot(resolver.Resolve<UiRoot>());
 
             ModSettings.RegisterTab(AtdModSettingsTab.BuildDefaultsTab());
-            ModSettings.RegisterTab(AtdModSettingsTab.BuildGameSettingsTab());
+            ModSettings.RegisterTab(AtdModSettingsTab.BuildWorldSettingsTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildOreQualityTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildPathfinderTab());
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mafi;
+using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -10,6 +11,8 @@ namespace AutoTerrainDesignations.Access
         public static AccessDesignationPlan Materialize(AccessSearchSnapshot snapshot, AccessSearchResult result)
         {
             if (!result.Success) return AccessDesignationPlan.Invalid("SearchFailed", result.StartOrigin);
+            if (result.V2Route != null)
+                return MaterializeV2(snapshot, result);
             if (result.Path.Count == 0) return AccessDesignationPlan.Invalid("EmptyPath", result.StartOrigin);
             if (!snapshot.TryGetFixedProfile(result.StartOrigin, out AccessHeightProfile previousProfile))
                 return AccessDesignationPlan.Invalid("MissingStartProfile", result.StartOrigin);
@@ -227,6 +230,133 @@ namespace AutoTerrainDesignations.Access
                 handoffOperation,
                 designations, reusedNodes, groundNodes,
                 new List<AccessPropCleanupInfo>(cleanupByOrigin.Values));
+        }
+
+        private static AccessDesignationPlan MaterializeV2(
+            AccessSearchSnapshot snapshot,
+            AccessSearchResult result)
+        {
+            AccessV2RouteData route = result.V2Route!;
+            if (!AccessV2Replay.TryReplay(
+                    snapshot, route,
+                    out _,
+                    out IReadOnlyList<AccessV2OriginProfile> ordered,
+                    out AccessV2HandoffCandidate? handoff,
+                    out string replayReason))
+                return AccessDesignationPlan.Invalid(
+                    replayReason, result.StartOrigin);
+
+            var designations = new List<AccessPlannedDesignation>();
+            var cleanupByOrigin = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            var terrainWorkOrigins = new HashSet<Tile2i>();
+            var corners = new Dictionary<Tile2i, int>();
+            for (int index = 0; index < ordered.Count; index++)
+            {
+                AccessV2OriginProfile item = ordered[index];
+                bool cornerMismatch = false;
+                item.Profile.AddWorldCorners(item.Origin, (corner, height2) =>
+                {
+                    if (corners.TryGetValue(corner, out int old)
+                        && old != height2)
+                        cornerMismatch = true;
+                    else
+                        corners[corner] = height2;
+                });
+                if (cornerMismatch)
+                    return AccessDesignationPlan.Invalid(
+                        "V2PlanCornerFight", result.StartOrigin);
+
+                bool hasTerrainDelta = ProfileHasTerrainDelta(
+                    snapshot, item.Origin, item.Profile);
+                if (snapshot.TryGetPropCleanupInfo(
+                        item.Origin, out AccessPropCleanupInfo generatedCleanup)
+                    && generatedCleanup.IsEligibleWithinGeneratedV)
+                {
+                    AccessPropCleanupInfo approved =
+                        generatedCleanup.BlockerKind == AccessPropBlockerKind.Durability
+                            ? AccessPropCleanupPolicy.BuildOriginInfo(
+                                generatedCleanup.Origin,
+                                generatedCleanup.Samples,
+                                usesTerrainRemovalPolicy:
+                                    generatedCleanup.UsesTerrainRemovalPolicy)
+                            : generatedCleanup;
+                    if (!hasTerrainDelta)
+                        MergeCleanupInfo(cleanupByOrigin, approved);
+                    else if (TryBuildTreeOnlyCleanupInfo(
+                        approved, out AccessPropCleanupInfo trees))
+                        MergeCleanupInfo(cleanupByOrigin, trees);
+                }
+                if (!hasTerrainDelta) continue;
+                if (!AccessV2BandProfile.TryGetProfileMode(
+                        item.Profile, out AccessSearchMode mode))
+                    return AccessDesignationPlan.Invalid(
+                        "V2PlanProfileMode", result.StartOrigin);
+                terrainWorkOrigins.Add(item.Origin);
+                designations.Add(new AccessPlannedDesignation(
+                    item.Origin, mode, item.Profile));
+            }
+
+            var operations = new Dictionary<Tile2i, AccessHandoffOperation>();
+            Tile2i handoffGround = default;
+            AccessHandoffOperation commonOperation = AccessHandoffOperation.None;
+            int groundNodes = 0;
+            if (handoff != null)
+            {
+                handoffGround = handoff.Lane0Contact;
+                commonOperation = handoff.Lane0Operation == handoff.Lane1Operation
+                    ? handoff.Lane0Operation
+                    : AccessHandoffOperation.Leveling;
+                var replayGroundCenters = new HashSet<Tile2i>(
+                    handoff.EscapeCenters);
+                replayGroundCenters.UnionWith(route.GroundPath);
+                groundNodes = replayGroundCenters.Count;
+                AddOperations(
+                    handoff.Lane0TerminalOrigins,
+                    handoff.Lane0Operation);
+                AddOperations(
+                    handoff.Lane1TerminalOrigins,
+                    handoff.Lane1Operation);
+                foreach (Tile2i center in replayGroundCenters)
+                {
+                    if (!snapshot.TryGetRequiredCleanupInfoForTile(
+                            center, out AccessPropCleanupInfo cleanup))
+                        continue;
+                    if (terrainWorkOrigins.Contains(cleanup.Origin))
+                    {
+                        if (TryBuildTreeOnlyCleanupInfo(
+                                cleanup, out AccessPropCleanupInfo trees))
+                            MergeCleanupInfo(cleanupByOrigin, trees);
+                    }
+                    else
+                    {
+                        MergeCleanupInfo(cleanupByOrigin, cleanup);
+                    }
+                }
+            }
+
+            var fixedOrigins = new HashSet<Tile2i>();
+            foreach (AccessV2BandState state in route.States)
+                for (int lane = 0; lane < 2; lane++)
+                {
+                    Tile2i origin = state.GetLaneOrigin(lane);
+                    if (!route.GeneratedProfiles.ContainsKey(origin))
+                        fixedOrigins.Add(origin);
+                }
+            return new AccessDesignationPlan(
+                true, string.Empty, result.StartOrigin,
+                handoffGround, commonOperation,
+                designations, fixedOrigins.Count, groundNodes,
+                new List<AccessPropCleanupInfo>(cleanupByOrigin.Values),
+                operations);
+
+            void AddOperations(
+                IReadOnlyList<Tile2i> origins,
+                AccessHandoffOperation operation)
+            {
+                for (int index = 0; index < origins.Count; index++)
+                    if (route.GeneratedProfiles.ContainsKey(origins[index]))
+                        operations[origins[index]] = operation;
+            }
         }
 
         private static bool ProfileHasTerrainDelta(

@@ -108,8 +108,8 @@
     "Predeterminados"
   ],
   [
-    "settings.tab.game_settings",
-    "Ajustes de juego"
+    "settings.tab.world_settings",
+    "Configuración mundial"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "Accesos experimentales"
+  ],
+  [
+    "settings.world.safety",
+    "Seguridad del terreno"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "Evite el océano"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "Evite el océano en los accesos generados y los planes mineros en este mundo. Se excluyen las celdas mineras que se superponen al océano. También se evitan los cortes proyectados por debajo del nivel del mar; Sigue estando permitido el vertido al océano. Desactívelo para permitir trabajos arriesgados en la costa."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "Evite los edificios"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "Evite los edificios en los accesos generados y los planes mineros en este mundo. Se excluyen las celdas mineras que se superpongan a un edificio o a su perímetro de seguridad. También se evitan las perturbaciones previstas del terreno cerca de los edificios."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Cosecha de árboles interrumpidos"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "Política de seguridad"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "Controla con qué cautela ATD predice los deslizamientos y la distancia que mantiene respecto a océanos y edificios protegidos. Los niveles superiores reservan más espacio; los inferiores permiten trabajar el terreno más cerca de los peligros. Predeterminado: BAL."
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "Costo de designación del terreno"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "Costo fijo cobrado por cada designación de terreno generada. Los valores más altos favorecen menos designaciones de terreno, incluso cuando eso aumenta la distancia de viaje y el costo total de jardinería."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "Peso directo del trabajo en el terreno"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "Peso aplicado al terreno de excavación o vertido directamente encima o debajo de las designaciones de terreno generadas."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "Distancia máxima del rayo candidato"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "Distancia máxima de traza de rayo candidato. Los valores más altos protegen y ponen precio a las cuñas laterales muy grandes, pero cuestan más tiempo de búsqueda. Predeterminado: 16."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "Costo máximo por rayo"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "Limita el costo de paisajismo aportado por un rayo no resuelto."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "Penalización de rayos no resueltos"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "Penalización cuando un rayo no encuentra terreno dentro de su alcance de traza."
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} completó una excavadora"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "¿Construir {0} en {1} y asignarlo previamente a {2}?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "¿Construir {0} × {1} en {2} y asignarlos previamente a {3}?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "Construir"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "Ir a {0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "Preasignado a {0}"
   ]
 ]

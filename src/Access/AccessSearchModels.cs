@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Mafi;
+using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -307,6 +308,10 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_expandedBuildingRayBlockers;
         private readonly HashSet<Tile2i> m_cutDesignationRayBlockers;
         private readonly HashSet<Tile2i> m_fillDesignationRayBlockers;
+        private readonly HashSet<Tile2i> m_projectedCutRayBlockers;
+        private readonly HashSet<Tile2i> m_projectedFillRayBlockers;
+        private readonly Dictionary<Tile2i, HashSet<Tile2i>> m_projectedCutSourcesByTile;
+        private readonly Dictionary<Tile2i, HashSet<Tile2i>> m_projectedFillSourcesByTile;
         private readonly Dictionary<Tile2i, float> m_projectedCutSupportCeilings;
         private readonly Dictionary<Tile2i, float> m_projectedFillSurfaceFloors;
         private readonly HashSet<Tile2i> m_hardDesignationRayBlockers;
@@ -329,6 +334,14 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffs;
         private readonly Func<IReadOnlyList<AccessHandoffSpanCell>,
             IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffSpans;
+        private readonly Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
+            IReadOnlyList<AccessGroundHandoff>>? m_v2WorkableHandoffs;
+        private readonly Func<IReadOnlyList<AccessHandoffSpanCell>,
+            IReadOnlyList<AccessGroundHandoff>>? m_v2WorkableHandoffSpans;
+        private V2.AccessV2History? m_projectedV2CachedHistory;
+        private IReadOnlyDictionary<Tile2i, AccessHeightProfile>
+            m_projectedV2CachedProfiles =
+                new Dictionary<Tile2i, AccessHeightProfile>();
 
         public Tile2i BoundsMin { get; }
         public Tile2i BoundsMax { get; }
@@ -344,6 +357,7 @@ namespace AutoTerrainDesignations.Access
         public float LandslideRunPerHeight { get; }
         public int VehicleClearanceRadius { get; }
         public int VehicleWidth { get; }
+        public float VehicleMaxSteepnessDelta { get; }
         public Tile2i PhysicalTerrainMin { get; }
         public Tile2i PhysicalTerrainMax { get; }
         public float DumpingMaterialSlope { get; }
@@ -352,6 +366,7 @@ namespace AutoTerrainDesignations.Access
         public bool HasDumpingMaterial { get; }
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
+        public V2.AccessV2GroundGraph? V2GroundGraph { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
         public int LandslideSourceCount => m_durabilityCorners.Length;
         public IEnumerable<AccessPropCleanupInfo> PropCleanupOrigins => m_propCleanupByOrigin.Values;
@@ -395,12 +410,20 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i>? projectedFillDisturbedTiles = null,
             IDictionary<Tile2i, float>? projectedCutSupportCeilings = null,
             IDictionary<Tile2i, float>? projectedFillSurfaceFloors = null,
+            IDictionary<Tile2i, HashSet<Tile2i>>? projectedCutSourcesByTile = null,
+            IDictionary<Tile2i, HashSet<Tile2i>>? projectedFillSourcesByTile = null,
             int vehicleClearanceRadius = 1,
             bool avoidOcean = true,
             bool avoidBuildings = true,
             int vehicleWidth = 1,
             Func<IReadOnlyList<AccessHandoffSpanCell>,
-                IReadOnlyList<AccessGroundHandoff>>? workableHandoffSpans = null)
+                IReadOnlyList<AccessGroundHandoff>>? workableHandoffSpans = null,
+            IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByTile = null,
+            Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
+                IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffs = null,
+            Func<IReadOnlyList<AccessHandoffSpanCell>,
+                IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffSpans = null,
+            float vehicleMaxSteepnessDelta = 0.5f)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -416,6 +439,7 @@ namespace AutoTerrainDesignations.Access
             LandslideRunPerHeight = landslideRunPerHeight;
             VehicleClearanceRadius = Math.Max(0, vehicleClearanceRadius);
             VehicleWidth = Math.Max(1, vehicleWidth);
+            VehicleMaxSteepnessDelta = Math.Max(0f, vehicleMaxSteepnessDelta);
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
             m_preciseTerrainHeights = preciseTerrainHeights != null
                 ? new Dictionary<Tile2i, float>(preciseTerrainHeights)
@@ -449,10 +473,14 @@ namespace AutoTerrainDesignations.Access
             m_projectedFillSurfaceFloors = projectedFillSurfaceFloors != null
                 ? new Dictionary<Tile2i, float>(projectedFillSurfaceFloors)
                 : new Dictionary<Tile2i, float>();
-            if (projectedCutDisturbedTiles != null)
-                m_cutDesignationRayBlockers.UnionWith(projectedCutDisturbedTiles);
-            if (projectedFillDisturbedTiles != null)
-                m_fillDesignationRayBlockers.UnionWith(projectedFillDisturbedTiles);
+            m_projectedCutRayBlockers = projectedCutDisturbedTiles != null
+                ? new HashSet<Tile2i>(projectedCutDisturbedTiles)
+                : new HashSet<Tile2i>();
+            m_projectedFillRayBlockers = projectedFillDisturbedTiles != null
+                ? new HashSet<Tile2i>(projectedFillDisturbedTiles)
+                : new HashSet<Tile2i>();
+            m_projectedCutSourcesByTile = CopySourceMap(projectedCutSourcesByTile);
+            m_projectedFillSourcesByTile = CopySourceMap(projectedFillSourcesByTile);
             m_oceanTiles = new HashSet<Tile2i>(oceanTiles);
             m_propCleanupByOrigin = propCleanupByOrigin != null
                 ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
@@ -460,7 +488,13 @@ namespace AutoTerrainDesignations.Access
             m_groundExclusionReasons = groundExclusionReasons != null
                 ? new Dictionary<Tile2i, string>(groundExclusionReasons)
                 : new Dictionary<Tile2i, string>();
-            m_propCleanupByTile = BuildCleanupByTile(m_propCleanupByOrigin);
+            m_propCleanupByTile = propCleanupByTile != null
+                ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByTile)
+                : BuildCleanupByTile(m_propCleanupByOrigin);
+            V2GroundGraph = VehicleWidth > 4
+                ? new V2.AccessV2GroundGraph(
+                    m_groundNodes, m_goalGroundNodes, m_propCleanupByTile)
+                : null;
             int eligibleCleanupOriginCount = 0;
             foreach (AccessPropCleanupInfo info in m_propCleanupByOrigin.Values)
                 if (info.IsEligible)
@@ -524,6 +558,8 @@ namespace AutoTerrainDesignations.Access
 
             m_workableHandoffs = workableHandoffs;
             m_workableHandoffSpans = workableHandoffSpans;
+            m_v2WorkableHandoffs = v2WorkableHandoffs;
+            m_v2WorkableHandoffSpans = v2WorkableHandoffSpans;
         }
 
         private static Dictionary<Tile2i, float> BuildPreciseTerrainHeights(
@@ -542,6 +578,8 @@ namespace AutoTerrainDesignations.Access
                 && tile.X <= BoundsMax.X && tile.Y <= BoundsMax.Y;
 
         public bool IsWorkOrigin(Tile2i origin) => m_workOrigins.Contains(origin);
+        public IReadOnlyDictionary<Tile2i, AccessHeightProfile> FixedProfiles
+            => m_fixedProfiles;
         public bool TryGetFixedProfile(Tile2i origin, out AccessHeightProfile profile) => m_fixedProfiles.TryGetValue(origin, out profile);
         public bool IsGroundNode(Tile2i tile) => m_groundNodes.Contains(tile);
         public bool IsCleanupGroundNode(Tile2i tile)
@@ -691,6 +729,124 @@ namespace AutoTerrainDesignations.Access
             return Math.Max(horizontalDistance, verticalDistance);
         }
         public bool TryGetGroundHeight2(Tile2i tile, out int height2) => m_groundHeight2.TryGetValue(tile, out height2);
+
+        public bool IsProjectedV2CenterPathable(
+            Tile2i center,
+            V2.AccessV2History history)
+        {
+            EnsureProjectedV2ProfileCache(history);
+            if (V2GroundGraph == null || !V2GroundGraph.IsTraversable(center))
+                return false;
+            int clearance = Math.Max(1, VehicleWidth);
+            Tile2i corner = center + new RelTile2i(
+                -(clearance / 2), -(clearance / 2));
+            IReadOnlyCollection<Tile2i> rayTiles = history.CollectRayTiles();
+            var raySet = rayTiles as HashSet<Tile2i>
+                ?? new HashSet<Tile2i>(rayTiles);
+            const float epsilon = 0.0001f;
+            for (int y = 0; y < clearance; y++)
+                for (int x = 0; x < clearance; x++)
+                {
+                    Tile2i tile = corner + new RelTile2i(x, y);
+                    if (raySet.Contains(tile)
+                        && !history.ContainsGeneratedTile(tile))
+                        return false;
+                    if (!TryGetProjectedV2Height(tile, history, out float height)
+                        || !TryGetProjectedV2Height(
+                            tile + new RelTile2i(1, 0), history,
+                            out float plusX)
+                        || !TryGetProjectedV2Height(
+                            tile + new RelTile2i(0, 1), history,
+                            out float plusY))
+                        return false;
+                    if (Math.Max(
+                            Math.Abs(height - plusX),
+                            Math.Abs(height - plusY))
+                        > VehicleMaxSteepnessDelta + epsilon)
+                        return false;
+                }
+            return true;
+        }
+
+        public bool DoesProjectedV2CenterOverlapWork(
+            Tile2i center,
+            V2.AccessV2History history)
+        {
+            EnsureProjectedV2ProfileCache(history);
+            int clearance = Math.Max(1, VehicleWidth);
+            Tile2i corner = center + new RelTile2i(
+                -(clearance / 2), -(clearance / 2));
+            const float epsilon = 0.0001f;
+            for (int y = 0; y < clearance; y++)
+                for (int x = 0; x < clearance; x++)
+                {
+                    Tile2i tile = corner + new RelTile2i(x, y);
+                    if (!TryGetProjectedV2Height(tile, history, out float projected)
+                        || !m_preciseTerrainHeights.TryGetValue(
+                            tile, out float natural))
+                        return true;
+                    if (Math.Abs(projected - natural) > epsilon)
+                        return true;
+                }
+            return false;
+        }
+
+        private bool TryGetProjectedV2Height(
+            Tile2i tile,
+            V2.AccessV2History history,
+            out float height)
+        {
+            Tile2i canonical = TerrainOriginForTile(tile);
+            Tile2i[] candidates =
+            {
+                canonical,
+                canonical + new RelTile2i(-4, 0),
+                canonical + new RelTile2i(0, -4),
+                canonical + new RelTile2i(-4, -4),
+            };
+            for (int index = 0; index < candidates.Length; index++)
+            {
+                Tile2i origin = candidates[index];
+                int localX = tile.X - origin.X;
+                int localY = tile.Y - origin.Y;
+                if (localX < 0 || localX > 4
+                    || localY < 0 || localY > 4)
+                    continue;
+                if (m_projectedV2CachedProfiles.TryGetValue(
+                        origin, out AccessHeightProfile generatedProfile))
+                {
+                    height = generatedProfile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    return true;
+                }
+            }
+            for (int index = 0; index < candidates.Length; index++)
+            {
+                Tile2i origin = candidates[index];
+                int localX = tile.X - origin.X;
+                int localY = tile.Y - origin.Y;
+                if (localX < 0 || localX > 4
+                    || localY < 0 || localY > 4)
+                    continue;
+                if (m_fixedProfiles.TryGetValue(
+                        origin, out AccessHeightProfile fixedProfile))
+                {
+                    height = fixedProfile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    return true;
+                }
+            }
+            return m_preciseTerrainHeights.TryGetValue(tile, out height);
+        }
+
+        private void EnsureProjectedV2ProfileCache(
+            V2.AccessV2History history)
+        {
+            if (ReferenceEquals(m_projectedV2CachedHistory, history))
+                return;
+            m_projectedV2CachedHistory = history;
+            m_projectedV2CachedProfiles = history.Flatten();
+        }
         public AccessTerrainSampleKind GetSideRayTerrainSample(
             Tile2i tile,
             out float terrainHeight)
@@ -742,14 +898,48 @@ namespace AutoTerrainDesignations.Access
                     ? null
                 : m_hardDesignationRayBlockers.Contains(tile)
                     ? "SideRayDesignation"
-                    : rayOperation == AccessSideRayOperation.Cut
+                : rayOperation == AccessSideRayOperation.Cut
                         ? m_fillDesignationRayBlockers.Contains(tile)
+                            || IsProjectedBlockerFromOtherSource(
+                                tile, exemptDesignationOrigin,
+                                m_projectedFillRayBlockers,
+                                m_projectedFillSourcesByTile)
                             ? "SideRayOpposingDesignationWork"
                             : null
                         : rayOperation == AccessSideRayOperation.Fill
-                            && m_cutDesignationRayBlockers.Contains(tile)
+                            && (m_cutDesignationRayBlockers.Contains(tile)
+                                || IsProjectedBlockerFromOtherSource(
+                                    tile, exemptDesignationOrigin,
+                                    m_projectedCutRayBlockers,
+                                    m_projectedCutSourcesByTile))
                                 ? "SideRayOpposingDesignationWork"
                                 : null;
+
+        private static bool IsProjectedBlockerFromOtherSource(
+            Tile2i tile,
+            Tile2i? exemptDesignationOrigin,
+            ISet<Tile2i> projectedBlockers,
+            IReadOnlyDictionary<Tile2i, HashSet<Tile2i>> sourcesByTile)
+        {
+            if (!projectedBlockers.Contains(tile)) return false;
+            if (!exemptDesignationOrigin.HasValue) return true;
+            if (!sourcesByTile.TryGetValue(tile, out HashSet<Tile2i> sources))
+                return true;
+            foreach (Tile2i source in sources)
+                if (source != exemptDesignationOrigin.Value)
+                    return true;
+            return false;
+        }
+
+        private static Dictionary<Tile2i, HashSet<Tile2i>> CopySourceMap(
+            IDictionary<Tile2i, HashSet<Tile2i>>? source)
+        {
+            var copy = new Dictionary<Tile2i, HashSet<Tile2i>>();
+            if (source == null) return copy;
+            foreach (KeyValuePair<Tile2i, HashSet<Tile2i>> pair in source)
+                copy.Add(pair.Key, new HashSet<Tile2i>(pair.Value));
+            return copy;
+        }
 
         private static bool IsDesignationFootprintTile(
             Tile2i tile, Tile2i origin)
@@ -769,6 +959,18 @@ namespace AutoTerrainDesignations.Access
         public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffSpans(
             IReadOnlyList<AccessHandoffSpanCell> cells)
             => m_workableHandoffSpans?.Invoke(cells)
+                ?? Array.Empty<AccessGroundHandoff>();
+        public bool HasV2WorkableHandoffEvaluator
+            => m_v2WorkableHandoffs != null && m_v2WorkableHandoffSpans != null;
+        public IReadOnlyList<AccessGroundHandoff> GetV2WorkableHandoffs(
+            Tile2i origin, AccessHeightProfile profile,
+            Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
+            => m_v2WorkableHandoffs?.Invoke(
+                    origin, profile, predecessorOrigin, predecessorProfile)
+                ?? Array.Empty<AccessGroundHandoff>();
+        public IReadOnlyList<AccessGroundHandoff> GetV2WorkableHandoffSpans(
+            IReadOnlyList<AccessHandoffSpanCell> cells)
+            => m_v2WorkableHandoffSpans?.Invoke(cells)
                 ?? Array.Empty<AccessGroundHandoff>();
 
         public bool IsProfileOceanBlocked(Tile2i origin, AccessHeightProfile profile)
@@ -875,7 +1077,7 @@ namespace AutoTerrainDesignations.Access
             Tile2i boundsMin,
             Tile2i boundsMax)
         {
-            const int safetyBoundary = 2;
+            const int safetyBoundary = AutoDepthDesignation.BuildingSafetyBufferTiles;
             const int rayDistance = 16;
             int minX = boundsMin.X - rayDistance - safetyBoundary;
             int maxX = boundsMax.X + rayDistance + safetyBoundary;
@@ -1060,6 +1262,7 @@ namespace AutoTerrainDesignations.Access
         public int SideRaySampleCount { get; }
         public AccessReachedGoalKind ReachedGoalKind { get; }
         public AccessSearchDiagnostics Diagnostics { get; }
+        public AccessV2RouteData? V2Route { get; }
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
@@ -1090,7 +1293,8 @@ namespace AutoTerrainDesignations.Access
             float rightSideRayCost = 0f,
             float sideRayUnresolvedPenalty = 0f,
             int sideRaySampleCount = 0,
-            AccessSearchDiagnostics? diagnostics = null)
+            AccessSearchDiagnostics? diagnostics = null,
+            AccessV2RouteData? v2Route = null)
         {
             Success = success;
             FailureReason = failureReason;
@@ -1111,11 +1315,14 @@ namespace AutoTerrainDesignations.Access
             SideRaySampleCount = sideRaySampleCount;
             ReachedGoalKind = reachedGoalKind;
             Diagnostics = diagnostics?.Clone() ?? new AccessSearchDiagnostics();
+            V2Route = v2Route;
         }
     }
 
     internal sealed class AccessSearchDiagnostics
     {
+        private const int MaxStartDiagnosticDetails = 64;
+
         public int GroundExpansions;
         public int OriginExpansions;
         public int GroundSuccessorChecks;
@@ -1157,6 +1364,23 @@ namespace AutoTerrainDesignations.Access
         public long PathHistoryTicks;
         public long SideRayCostTicks;
         public long PropCleanupTicks;
+        public List<string> StartSuccessorDetails { get; } = new List<string>();
+        public List<string> FirstGeneratedHandoffDetails { get; } = new List<string>();
+        public string V2DryRunSummary = string.Empty;
+        public string V2DryRunPath = string.Empty;
+
+        public void RecordStartSuccessor(string detail)
+        {
+            if (StartSuccessorDetails.Count < MaxStartDiagnosticDetails)
+                StartSuccessorDetails.Add(detail);
+        }
+
+        public void RecordFirstGeneratedHandoff(string detail)
+        {
+            if (FirstGeneratedHandoffDetails.Count < MaxStartDiagnosticDetails)
+                FirstGeneratedHandoffDetails.Add(detail);
+        }
+
         public AccessSearchDiagnostics Clone()
         {
             return (AccessSearchDiagnostics)MemberwiseClone();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Mafi;
+using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -62,6 +63,7 @@ namespace AutoTerrainDesignations.Access
         public int RequiredWidth { get; }
         public AccessPathIntent Intent { get; }
         public float MaxCostLimit { get; }
+        public AccessV2EndpointSet? V2Endpoints { get; }
 
         public AccessPathRequest(
             string requestId,
@@ -70,7 +72,8 @@ namespace AutoTerrainDesignations.Access
             AccessPathEndpoint goal,
             int requiredWidth,
             AccessPathIntent intent,
-            float maxCostLimit = float.MaxValue)
+            float maxCostLimit = float.MaxValue,
+            AccessV2EndpointSet? v2Endpoints = null)
         {
             RequestId = requestId ?? throw new ArgumentNullException(nameof(requestId));
             Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
@@ -81,6 +84,7 @@ namespace AutoTerrainDesignations.Access
             RequiredWidth = requiredWidth;
             Intent = intent;
             MaxCostLimit = maxCostLimit;
+            V2Endpoints = v2Endpoints;
         }
     }
 }

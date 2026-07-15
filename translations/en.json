@@ -41,11 +41,11 @@
   ],
   [
     "panel.designations.clear_tooltip",
-    "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area."
+    "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations."
   ],
   [
     "panel.designations.clear_tooltip.shift_click",
-    "Clear this tower's ATD-generated designations. Shift-click to clear all terrain designations in the tower's area."
+    "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations."
   ],
   [
     "panel.designations.ore_filter.auto",
@@ -108,8 +108,8 @@
     "Defaults"
   ],
   [
-    "settings.tab.game_settings",
-    "Game settings"
+    "settings.tab.world_settings",
+    "World settings"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "Experimental accessways"
+  ],
+  [
+    "settings.world.safety",
+    "Terrain safety"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "Avoid ocean"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "Avoid ocean in generated accessways and mining plans in this world. Mining cells that overlap ocean are excluded. Projected cutting below sea level is also avoided; dumping into ocean remains allowed. Turn this off to allow risky shoreline work."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "Avoid buildings"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Harvest disrupted trees"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "Safety policy"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL."
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "Terrain designation cost"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "Fixed cost charged for every generated terrain designation. Higher values favor fewer terrain designations, even when that increases travel distance and total landscaping cost."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "Direct terrain-work weight"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "Weight applied to digging or dumping terrain directly above or below generated terrain designations."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "Candidate ray max distance"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "Maximum cost per ray"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "Caps the landscaping cost contributed by one unresolved ray."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "Unresolved-ray penalty"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "Penalty when a ray does not meet terrain inside its trace range."
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} completed an excavator"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "Build {0} at {1} and pre-assign it to {2}?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "Build {0} × {1} at {2} and pre-assign them to {3}?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "Build"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "Go to {0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "Pre-assigned to {0}"
   ]
 ]

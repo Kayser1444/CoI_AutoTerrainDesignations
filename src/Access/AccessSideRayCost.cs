@@ -112,8 +112,8 @@ namespace AutoTerrainDesignations.Access
 
     internal static class AccessSideRayCost
     {
-        internal const float DefaultMaxRayCost = 512f;
-        internal const float DefaultUnresolvedPenalty = 128f;
+        internal const float DefaultMaxRayCost = 500f;
+        internal const float DefaultUnresolvedPenalty = 200f;
         private const float MinimumDryOceanHeight = 1f;
         private const string BuildingBlockerReason = "SideRayBuilding";
         private static readonly int[] s_sampleDistances = { 1, 2, 3, 5, 8, 13, 16 };

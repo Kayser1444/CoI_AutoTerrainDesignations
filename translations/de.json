@@ -108,8 +108,8 @@
     "Standardwerte"
   ],
   [
-    "settings.tab.game_settings",
-    "Spieleinstellungen"
+    "settings.tab.world_settings",
+    "Welteinstellungen"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "Experimentelle Zugänge"
+  ],
+  [
+    "settings.world.safety",
+    "Geländesicherheit"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "Vermeiden Sie das Meer"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "Vermeiden Sie das Meer in erstellten Zugangswegen und Bergbauplänen auf dieser Welt. Bergbauzellen, die den Ozean überlappen, sind ausgeschlossen. Auch geplante Einschnitte unterhalb des Meeresspiegels werden vermieden; Das Ablassen ins Meer ist weiterhin erlaubt. Schalten Sie dies aus, um riskante Arbeiten am Ufer zu ermöglichen."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "Vermeiden Sie Gebäude"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "Vermeiden Sie Gebäude in generierten Zugangswegen und Bergbauplänen auf dieser Welt. Ausgenommen sind Bergbauzellen, die ein Gebäude oder dessen Sicherheitsperimeter überlappen. Auch geplante Geländestörungen in der Nähe von Gebäuden werden vermieden."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Ernten Sie zerstörte Bäume"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "Sicherheitspolitik"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "Steuert, wie vorsichtig ATD Erdrutsche vorhersagt und welchen Abstand es zu geschützten Ozeanen und Gebäuden hält. Höhere Stufen reservieren mehr Platz; niedrigere Stufen erlauben Geländearbeiten näher an Gefahren. Standard: BAL."
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "Kosten für die Geländeausweisung"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "Für jede generierte Geländebezeichnung werden feste Kosten berechnet. Höhere Werte begünstigen weniger Geländebezeichnungen, auch wenn dadurch die Reisestrecke und die Gesamtkosten für die Landschaftsgestaltung steigen."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "Direktes Arbeitsgewicht im Gelände"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "Gewicht, das beim Graben oder Abladen von Gelände direkt über oder unter den generierten Geländebezeichnungen angewendet wird."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "Maximale Entfernung des Kandidatenstrahls"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "Maximale Raytrace-Entfernung des Kandidaten. Höhere Werte schützen und bepreisen sehr große Seitenkeile, kosten aber mehr Suchzeit. Standard: 16."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "Maximale Kosten pro Strahl"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "Begrenzt die Landschaftsgestaltungskosten, die durch einen ungelösten Strahl verursacht werden."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "Ungelöste Strahlenstrafe"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "Strafe, wenn ein Strahl innerhalb seiner Spurweite kein Gelände trifft."
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} hat einen Bagger fertiggestellt"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "{0} bei {1} erstellen und {2} vorab zuweisen?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "{0} × {1} bei {2} erstellen und sie {3} vorab zuweisen?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "Bauen"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "Gehen Sie zu {0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "Vorab zugewiesen an {0}"
   ]
 ]

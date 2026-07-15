@@ -29,12 +29,16 @@ namespace AutoTerrainDesignations.Access
         public int ReusedNodeCount { get; }
         public int GroundNodeCount { get; }
         public IReadOnlyList<AccessPropCleanupInfo> CleanupOrigins { get; }
+        public IReadOnlyDictionary<Tile2i, AccessHandoffOperation>
+            HandoffOperationsByOrigin { get; }
 
         public AccessDesignationPlan(bool isValid, string failureReason, Tile2i startOrigin,
             Tile2i handoffGround, AccessHandoffOperation handoffOperation,
             IReadOnlyList<AccessPlannedDesignation> designations,
             int reusedNodeCount, int groundNodeCount,
-            IReadOnlyList<AccessPropCleanupInfo>? cleanupOrigins = null)
+            IReadOnlyList<AccessPropCleanupInfo>? cleanupOrigins = null,
+            IReadOnlyDictionary<Tile2i, AccessHandoffOperation>?
+                handoffOperationsByOrigin = null)
         {
             IsValid = isValid;
             FailureReason = failureReason;
@@ -45,6 +49,8 @@ namespace AutoTerrainDesignations.Access
             ReusedNodeCount = reusedNodeCount;
             GroundNodeCount = groundNodeCount;
             CleanupOrigins = cleanupOrigins ?? Array.Empty<AccessPropCleanupInfo>();
+            HandoffOperationsByOrigin = handoffOperationsByOrigin
+                ?? new Dictionary<Tile2i, AccessHandoffOperation>();
         }
 
         public static AccessDesignationPlan Invalid(string reason, Tile2i startOrigin)

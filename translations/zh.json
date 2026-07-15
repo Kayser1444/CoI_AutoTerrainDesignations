@@ -108,8 +108,8 @@
     "默认值"
   ],
   [
-    "settings.tab.game_settings",
-    "游戏设置"
+    "settings.tab.world_settings",
+    "世界设定"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "实验通道"
+  ],
+  [
+    "settings.world.safety",
+    "地形安全"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "避开海洋"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "在这个世界中生成的通道和采矿计划中避免海洋。与海洋重叠的采矿单元被排除在外。还可以避免预计在海平面以下进行砍伐；仍允许向海洋倾倒。关闭此功能以允许危险的海岸线工作。"
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "避开建筑物"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "避免在这个世界中生成的通道和采矿计划中出现建筑物。与建筑物或其安全边界重叠的采矿单元被排除在外。还避免了建筑物附近的预计地形干扰。"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "收获被破坏的树木"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "在最终确定的通道和采矿指定干扰区域中标记树木以供采伐。禁用后，ATD 不会创建树木采伐订单。 ATD 下的收获订单可通过清除操作删除；不相关的玩家收获订单被保留。"
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "安全政策"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "控制 ATD 预测山体滑坡的谨慎程度以及与受保护的海洋和建筑物的距离。更高的政策预留更多的空间；较低的政策允许地形更接近危险。默认值：BAL。"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "地形指定成本"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "对每个生成的地形指定收取固定成本。较高的值有利于较少的地形指定，即使这会增加行驶距离和总景观美化成本。"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "直接地形工作重量"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "应用于在生成的地形名称正上方或下方挖掘或倾倒地形的重量。"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "候选射线最大距离"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "最大候选光线追踪距离。较高的值可以保护和定价非常大的侧楔，但会花费更多的搜索时间。默认值：16。"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "每条光线的最大成本"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "限制由一根未解析的射线造成的景观美化成本。"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "未解决的射线惩罚"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "当光线未在其轨迹范围内遇到地形时受到惩罚。"
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity}完成了挖掘机建造"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "在 {1} 构建 {0} 并将其预先分配给 {2}？"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "在 {2} 构建 {0} × {1} 并将它们预先分配给 {3}？"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "建造"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "转到{0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "预先分配给{0}"
   ]
 ]

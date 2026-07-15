@@ -30,7 +30,7 @@ is included by mistake, I intend to correct it promptly upon discovery or notice
   </Target>
 
   <PropertyGroup>
-    <DefaultItemExcludes>$(DefaultItemExcludes);external\**\*;artifacts\**\*;Mori\**\*</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);external\**\*;artifacts\**\*;tools\**\*;Mori\**\*</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

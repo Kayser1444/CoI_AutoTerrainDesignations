@@ -100,8 +100,8 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.mod.name", "Auto Terrain Designations", "Mod name in the shared Mod Settings window.");
         public static LocStr SettingsTabDefaults =
             Loc.Str("settings.tab.defaults", "Defaults", "Settings tab title for ATD defaults.");
-        public static LocStr SettingsTabGameSettings =
-            Loc.Str("settings.tab.game_settings", "Game settings", "Settings tab title for ATD game settings.");
+        public static LocStr SettingsTabWorldSettings =
+            Loc.Str("settings.tab.world_settings", "World settings", "Settings tab title for ATD world settings.");
         public static LocStr SettingsTabOreQuality =
             Loc.Str("settings.tab.ore_quality", "Ore quality", "Settings tab title for ATD ore quality settings.");
         public static LocStr SettingsHeadingMiningDefaults =
@@ -118,6 +118,44 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.heading.notifications", "Notifications", "Settings section heading for notification settings.");
         public static LocStr SettingsHeadingExperimentalAccess =
             Loc.Str("settings.heading.experimental_access", "Experimental accessways", "Settings section heading for experimental accessway settings.");
+        public static LocStr SettingsHeadingWorldSafety =
+            Loc.Str("settings.world.safety", "Terrain safety", "Settings section heading for world terrain-safety settings.");
+        public static LocStr SettingsAvoidOceanLabel =
+            Loc.Str("settings.world.avoid_ocean.label", "Avoid ocean", "World safety setting label for ocean avoidance.");
+        public static LocStr SettingsAvoidOceanTooltip =
+            Loc.Str("settings.world.avoid_ocean.tooltip", "Avoid ocean in generated accessways and mining plans in this world. Mining cells that overlap ocean are excluded. Projected cutting below sea level is also avoided; dumping into ocean remains allowed. Turn this off to allow risky shoreline work.", "World safety setting tooltip for ocean avoidance.");
+        public static LocStr SettingsAvoidBuildingsLabel =
+            Loc.Str("settings.world.avoid_buildings.label", "Avoid buildings", "World safety setting label for building avoidance.");
+        public static LocStr SettingsAvoidBuildingsTooltip =
+            Loc.Str("settings.world.avoid_buildings.tooltip", "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided.", "World safety setting tooltip for building avoidance.");
+        public static LocStr SettingsHarvestDisruptedTreesLabel =
+            Loc.Str("settings.world.harvest_disrupted_trees.label", "Harvest disrupted trees", "World safety setting label for disrupted-tree harvesting.");
+        public static LocStr SettingsHarvestDisruptedTreesTooltip =
+            Loc.Str("settings.world.harvest_disrupted_trees.tooltip", "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved.", "World safety setting tooltip for disrupted-tree harvesting.");
+        public static LocStr SettingsSafetyPolicyLabel =
+            Loc.Str("settings.world.safety_policy.label", "Safety policy", "World safety policy setting label.");
+        public static LocStr SettingsSafetyPolicyTooltip =
+            Loc.Str("settings.world.safety_policy.tooltip", "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL.", "World safety policy setting tooltip.");
+        public static LocStr SettingsTerrainDesignationCostLabel =
+            Loc.Str("settings.pathfinder.generated_v_fixed.label", "Terrain designation cost", "Pathfinder cost setting label for generated terrain designations.");
+        public static LocStr SettingsTerrainDesignationCostTooltip =
+            Loc.Str("settings.pathfinder.generated_v_fixed.tooltip", "Fixed cost charged for every generated terrain designation. Higher values favor fewer terrain designations, even when that increases travel distance and total landscaping cost.", "Pathfinder cost setting tooltip for generated terrain designations.");
+        public static LocStr SettingsDirectTerrainWorkWeightLabel =
+            Loc.Str("settings.pathfinder.direct_work_weight.label", "Direct terrain-work weight", "Pathfinder cost setting label for direct terrain work.");
+        public static LocStr SettingsDirectTerrainWorkWeightTooltip =
+            Loc.Str("settings.pathfinder.direct_work_weight.tooltip", "Weight applied to digging or dumping terrain directly above or below generated terrain designations.", "Pathfinder cost setting tooltip for direct terrain work.");
+        public static LocStr SettingsCandidateRayMaxDistanceLabel =
+            Loc.Str("settings.pathfinder.candidate_distance.label", "Candidate ray max distance", "Pathfinder setting label for candidate ray maximum distance.");
+        public static LocStr SettingsCandidateRayMaxDistanceTooltip =
+            Loc.Str("settings.pathfinder.candidate_distance.tooltip", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", "Pathfinder setting tooltip for candidate ray maximum distance.");
+        public static LocStr SettingsRayMaximumCostLabel =
+            Loc.Str("settings.pathfinder.ray_max_cost.label", "Maximum cost per ray", "Pathfinder setting label for ray cost cap.");
+        public static LocStr SettingsRayMaximumCostTooltip =
+            Loc.Str("settings.pathfinder.ray_max_cost.tooltip", "Caps the landscaping cost contributed by one unresolved ray.", "Pathfinder setting tooltip for ray cost cap.");
+        public static LocStr SettingsUnresolvedRayPenaltyLabel =
+            Loc.Str("settings.pathfinder.ray_unresolved.label", "Unresolved-ray penalty", "Pathfinder setting label for unresolved ray penalty.");
+        public static LocStr SettingsUnresolvedRayPenaltyTooltip =
+            Loc.Str("settings.pathfinder.ray_unresolved.tooltip", "Penalty when a ray does not meet terrain inside its trace range.", "Pathfinder setting tooltip for unresolved ray penalty.");
         public static LocStr SettingsTurningRampsLabel =
             Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps (experimental)", "Settings toggle label for experimental turning ramps.");
         public static LocStr SettingsTurningRampsTooltip =

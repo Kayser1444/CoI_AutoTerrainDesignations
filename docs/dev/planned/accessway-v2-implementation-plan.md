@@ -1,13 +1,14 @@
 # Accessway V2 review and staged implementation plan
 
-Status: design review and implementation plan, not yet implemented  
+Status: Stages 0–6 implemented; Stage 7 A* is implemented and awaiting live verification alongside the remaining Stage 6 Mega-pathability cases
+
 Reviewed: 2026-07-13
 
 ## Purpose
 
 V2 is the width-two access search used for five-tile-clearance Mega/T3 vehicles. It remains in the vanilla designation set: flat and axis-aligned slope profiles only. Corner and saddle designation search spaces (`V'` and `V''`) are separate future work.
 
-This review reconciles the earlier V2 notes with the production V1 implementation and the decisions made while testing V1. It identifies one blocking representation problem, records the current requirements, and breaks implementation into independently testable stages.
+This review reconciles the earlier V2 notes with the production V1 implementation and the decisions made while testing V1. It resolves the former representation ambiguity, records the accepted requirements, and breaks implementation into independently testable stages.
 
 ## Sources reviewed
 
@@ -47,7 +48,7 @@ Any V2 implementation that falls back to center-only work, boolean V-ray blockin
 * Generated slopes remain vanilla flat/slope profiles with a maximum constructed grade of one height level per four tiles.
 * Turns require a full flat 2x2-origin landing. A slope-to-slope axis change without that landing is illegal.
 * The whole width-two footprint, including a turn landing, must remain inside the tower's designation area.
-* Straight travel, lateral strafe, and turns must preserve shared origin profiles and shared corner heights exactly.
+* Straight travel, turns, and any accepted direct-strafe transition must preserve shared origin profiles and shared corner heights exactly.
 * Mixed-axis origin shapes, corner designations, and saddles are out of scope.
 
 ### G traversal and endpoints
@@ -55,8 +56,8 @@ Any V2 implementation that falls back to center-only work, boolean V-ray blockin
 * Width-two G occupancy, G adjacency, tower-reachable flood, goals, cleanup overlay, and post-placement verification must all use the concrete Mega/T3 pathability parameters.
 * A V2/G seam must expose two consecutive workable lanes connected to the same clearance-two G component.
 * G-to-V2 and V2-to-G are symmetric graph operations, even if the mine-tower caller usually starts at fixed V work and ends at tower ground.
-* Fixed providers are reusable only when two consecutive compatible profiles form a Mega-reachable provider frontage.
-* A width-one work endpoint is a valid V2 **seed** when the search can synthesize a compatible adjacent companion lane. It does not become a reusable fixed provider unless a real width-two frontage and Mega-reachable continuation exist.
+* A fixed-provider goal initially requires only two adjacent fixed origins with an exposed two-origin frontage. Internal fixed-network shape and Mega clearance behind that frontage are deferred.
+* A width-one work endpoint is a valid V2 **seed** when the search can synthesize a compatible adjacent companion lane. It becomes a reusable fixed provider only when another fixed origin supplies the required exposed two-origin frontage.
 
 ### Terrain work, hazards, and props
 
@@ -73,11 +74,12 @@ Any V2 implementation that falls back to center-only work, boolean V-ray blockin
 * Search charges only work newly introduced by a transition. State context may reference the current frontier, but a transition may not reintroduce an origin already present in that candidate history.
 * The final plan is a unique mapping from origin to concrete `AccessHeightProfile`, independent of how many search states touched that origin.
 * Any generated-origin revisit is illegal and pruned before costing, whether its profile is identical or conflicting. Returning to an identical origin is strictly dominated by the earlier occurrence and must not be explored. This is the same invariant already enforced by V1 `GeneratedPathHistory.ContainsOrigin()`.
+* Any generated origin with cardinal edge contact to earlier generated history is likewise rejected unless that earlier origin belongs to the transition's explicit local context. V2 local-context exceptions are the retained strafe lane, the other lane introduced by the same delta, an explicit 2x2 turn landing, and the active bounded handoff span. Diagonal corner contact remains legal. Existing/player designations and G nodes are not generated-history contacts.
 * Materialization omits exact-terrain no-op profiles and retains required cleanup metadata.
 * Terminal lanes may use their required mining or dumping proto independently, provided shared corners and the combined seam remain valid.
 * Rollback and persisted ownership cover all generated lane designations, cleanup designations, and newly selected tree markers.
 
-## Blocking design gap: the current node definition is under-specified
+## Accepted state representation
 
 The existing notes alternately describe V2 as:
 
@@ -89,7 +91,7 @@ Two tokens and one reference height do not uniquely define four origin profiles.
 
 Several listed profiles are also not automatically legal. For example, `FX+` or `X+X-` may fight across the lane seam depending on travel axis and relative lane heights. A single shared `h` cannot express all compatible relative offsets. The legal set must be derived from concrete corner profiles, not accepted by token name alone.
 
-### Recommended resolution: width-two band slices
+### Width-two band slices
 
 Represent a V2 generated state as a two-origin cross-section:
 
@@ -108,60 +110,54 @@ This state is the current two-origin **frontier slice**, not the complete access
 `lane0Profile` and `lane1Profile` are concrete `AccessHeightProfile` values: the complete `(NW, NE, SE, SW)` target-elevation tuple for that lane's 4x4 designation origin. The stored fields are `(Nw2, Ne2, Se2, Sw2)` in half-level units, so the physical corner elevations are those integers divided by two. The tuple determines every shared-edge height and the bilinearly interpolated target surface; it is not merely a mode name such as `F`, `X+`, or `Y-` plus one shared height. For example, an east-rising designation from level 0 to level 1 is `(0, 2, 2, 0)` in stored units. The anchor has one canonical definition per travel axis and lane order.
 
 * A straight transition advances one origin step and introduces one new two-origin slice.
-* A strafe shifts the slice laterally and validates the changed band footprint.
+* A strafe shifts the slice laterally by one origin while preserving travel axis and profile family. The overlapping lane is retained as immutable frontier context; only the newly exposed lane belongs to the transition delta.
 * A turn is a special transition available only when the current and immediately preceding slices are both completely flat. Those two slices form the required 2x2-origin landing. The turn validates the appropriate perpendicular edge of that landing and advances directly to the first new outgoing slice; it does not enqueue an orientation-only frontier made from already introduced landing origins.
-* Search history owns a unique origin/profile map. Every transition adds previously unused origins; costs and materialization are computed only for that addition.
+* Search history owns a unique origin/profile map. Every transition delta adds previously unused origins; costs and materialization are computed only for that addition. A strafe may retain one already-owned lane as frontier context without re-adding, re-costing, or rematerializing it.
 
 Worked clockwise example, using `+X = east` and `+Y = south`: let the current eastbound frontier anchor be `A`, with the preceding anchor at `A + (-4, 0)`. Their four flat origins form the 2x2 landing. The landing's implicit south-facing frontier is anchored at `A + (-4, 4)`, but both of its origins already belong to the landing and are therefore not enqueued. The first new `Y`, `entryDirection = (0, +4)` frontier is anchored at `A + (-4, 8)`, with origins `A + (-4, 8)` and `A + (0, 8)`. Therefore `A + (4, 4)` is not the successor anchor under this convention; it would attach an outgoing slice to only the landing's east side rather than continue from its full south edge.
 
 The turn must also retain the incoming frontier's forward disturbance. Cast three material-aware durability rays in the **old** travel direction from the three vertices across the predecessor frontier's two-origin forward face: both endpoints and the shared-lane midpoint. In the eastbound example these start at `A + (4, 0)`, `A + (4, 4)`, and `A + (4, 8)` and all travel in `+X`. This is the V1 turn-forward/outer-corner ray extended with the other full-width endpoint (the true outer corner for the second lane) and the predecessor-frontier midpoint. All three participate in feasibility, cost, elevation-aware generated history, finalized disturbance, and disrupted-tree harvesting; vehicle-clearance thickening does not replace any of the three source rays.
 
-A geometric center anchor was considered but is not recommended for the band-slice model. The center of a two-origin slice has different lattice offsets for `X` and `Y` orientation, while the convenient grid-aligned center exists only for the temporary 2x2 turn landing. It would make some coordinate traces more symmetric but would not prevent loops or replace concrete-origin history checks. Using lane 0 keeps origin derivation and materialization direct.
+A geometric center anchor was considered and rejected for the band-slice model. The center of a two-origin slice has different lattice offsets for `X` and `Y` orientation, while the convenient grid-aligned center exists only for the temporary 2x2 turn landing. It would make some coordinate traces more symmetric but would not prevent loops or replace concrete-origin history checks. The accepted lane-0 anchor keeps origin derivation and materialization direct.
 
 This model satisfies the physical width and turn requirement without a four-origin sliding state. It also avoids carrying and reconsidering already introduced origins as part of every step.
 
-The alternative is a true four-origin brush state. If retained, it must store all four concrete profiles (or two full cross-sections) while distinguishing frontier context from newly introduced origins. A successor that would reintroduce any origin from its candidate history is pruned, even when the profile matches. The larger state is more error-prone and should be chosen only if band-slice fixtures expose geometry that cannot be represented safely.
+The earlier true four-origin sliding-brush state is not part of the implementation plan. It would require four concrete profiles, explicit frontier-vs-delta ownership, and canonicalization of overlapping windows while adding no demonstrated geometry unavailable to band slices. Revisit it only if future fixtures prove the accepted band-slice model cannot represent a required route.
 
-## Other gaps, conflicts, and ambiguities
+## Folded-in design decisions
 
-### 1. Initial profile set
+### 1. Profile-pair legality and initial set
 
 The prose whitelist (`FF`, `FX+`, uniform ramps, and opposed pairs) is not sufficient as a correctness definition. The physical lane order, travel axis, independent center heights, shared seam, and transverse drivability decide legality.
 
-Recommendation: enumerate pairs of concrete V1 profiles within a small relative-height range, retain only pairs whose shared edge matches and whose five-tile center corridor is drivable, then classify them for diagnostics. Start production search with flat pairs and uniform same-sign ramps. Enable asymmetric and opposed pairs only after dedicated fixtures prove they add valid routes.
+Enumerate pairs of concrete V1 profiles within the construction-reachable relative-height range, retain only pairs whose shared edge matches and whose five-tile center corridor is drivable, then classify them for diagnostics. The initial production search enables flat pairs and uniform same-sign ramps. Asymmetric and opposed pairs remain disabled unless dedicated fixtures later prove that they add valid routes; they are an optional search-space expansion, not an unresolved V2 requirement.
 
-### 2. Meaning of axis at a flat state
+### 2. Orientation at a flat state
 
-An `FF` slice is geometrically axis-neutral, but route state needs an orientation to define lane order and the next footprint. It is unclear whether changing orientation is a zero-cost state change or part of a turn transition.
+An `FF` slice is geometrically axis-neutral, but route state retains orientation to define lane order and the next footprint.
 
-Recommendation: keep orientation in the state key and permit an axis change only through the explicit flat-turn transition above. It validates the already charged 2x2 landing, then costs only the first new outgoing slice and newly exposed exterior rays. Do not add free in-place orientation edges or enqueue a frontier composed of already introduced landing origins.
+Keep orientation in the state key and permit an axis change only through the explicit flat-turn transition above. It validates the already charged 2x2 landing, then costs only the first new outgoing slice and newly exposed exterior rays. Do not add free in-place orientation edges or enqueue a frontier composed of already introduced landing origins.
 
 ### 3. Start frontage and narrow mining bodies
 
 Current clusters and fixed endpoints are origin-based. Requiring players to paint a two-origin target merely to request a Mega accessway would be poor UX. A single existing designation cannot by itself expose a reusable width-two frontage, but it can anchor one lane of a newly generated V2 start. Generated mining bodies may also contain waists or one-origin corridors that a Mega excavator cannot traverse.
 
-Recommendation:
-
 * Treat a single external/player designation as an immutable fixed seed profile. Enumerate all transverse companion positions and both travel signs. An already existing compatible neighbor may supply the second lane; otherwise solve and generate a companion `AccessHeightProfile` whose shared edge exactly matches the seed and whose shape belongs to the enabled V2 profile set.
 * The fixed seed and its companion form the initial two-origin frontier. Validate the full Mega footprint, shared corners, bounds, props, buildings, designation conflicts, and exterior rays before admitting it. Existing-work disturbance from the seed remains authoritative, with only the connected shared seam exempted from self-conflict.
 * Never alter or take ownership of the player's seed. A synthetic companion is costed like ordinary generated V work and is materialized and owned by ATD only if its route wins. Failed candidates leave no designation behind.
 * If every companion candidate is blocked or profile-incompatible, fail with a specific start reason such as `NoWidth2StartCompanion`, including orientation/rejection diagnostics. Do not ask the player to widen the target manually and do not fall back to V1 for a T3 request.
-* A single-origin seed is start-only. It must not be advertised as a fixed provider that later clusters can reuse; provider reuse still requires a genuine paired frontage and Mega-reachable continuation behind it.
+* A single-origin seed is start-only. It must not be advertised as a fixed provider that later clusters can reuse; provider reuse still requires a genuine exposed frontage made from two adjacent fixed origins.
 * Rare one-origin waists inside ATD-generated mining bodies are accepted as an initial V2 limitation. A later mining-body clearance pass should widen or remove them, but it is not a V2 rollout blocker.
 
 ### 4. Width-two handoff rule
 
-The older design says each lane runs a V1 handoff and mixed mining/dumping lanes are allowed. Recent V1 behavior permits a diagonal-style handoff after one usable corner crests, plus a bounded longitudinal extension. It is not defined whether V2 needs one crest across the entire seam or one per lane.
-
-Recommendation: require at least one clearance-eligible, vanilla-workable crest/contact in each lane and prove a continuous five-tile Mega exit corridor beyond the combined seam. Allow mixed lane operations because the lanes materialize as separate origins. Allow any brush side as an exit, not only forward. Generalize the bounded extension to a two-lane strip of at most three rows for T3.
-
-Open detail: whether a two-lane extension may use different span lengths per lane. Start with one common span length; asymmetric spans complicate escape validation and visual output.
+Require at least one clearance-eligible, vanilla-workable crest/contact in each lane and prove a continuous five-tile Mega exit corridor beyond the combined seam. Allow mixed lane operations because the lanes materialize as separate origins. Allow any band side as an exit, not only forward. Generalize the bounded extension to a two-lane strip of at most three rows for T3. Both lanes use one common span length; asymmetric per-lane spans are outside the initial V2 search space.
 
 ### 5. Search-history representation
 
 V1 history is a linked sequence of single generated origins plus ray envelopes and categorically rejects an origin already present in the path. V2 keeps that invariant. A multi-origin band/brush may retain the current frontier as state context for seam validation, but this is not a new visit: a successor's generated delta must contain only origins absent from the complete candidate history.
 
-Recommendation: V2 history stores or structurally shares:
+V2 history stores or structurally shares:
 
 * `origin -> concrete profile`;
 * the set of previously introduced generated origins, used to reject revisits before scoring;
@@ -169,98 +165,135 @@ Recommendation: V2 history stores or structurally shares:
 * exterior disturbed tiles and elevation envelopes; and
 * current exposed band frontier.
 
-Any origin already in the history rejects the transition before profile comparison or costing. Persistent immutable maps or parent-plus-delta nodes should be benchmarked before choosing a representation.
+Any origin reintroduced by a transition delta rejects the transition before profile comparison or costing. An origin merely retained as the unchanged lane of a direct strafe is not part of that delta and remains legal immutable frontier context. Whether history is implemented with persistent immutable maps or parent-plus-delta nodes is a performance/engineering choice to benchmark during Stage 1, not a semantic design question.
 
 ### 6. Exterior rays at straight and turning bands
 
 Calling the V1 scorer independently for both lanes would cast rays from the internal seam and exaggerate cost/blocking. Turns also have an inside corner, outside corner, and potentially newly exposed flat landing edges.
 
-Recommendation: build a band perimeter first, classify each perimeter edge by work operation and exposure, and score only exterior rays. Keep direct work per newly introduced origin. A turn transition reuses the already scored flat landing only as validation context, then scores the first new outgoing slice, the exterior corners newly exposed by the changed direction, and the three old-direction forward rays across the incoming frontier described above.
-
-Open detail: define whether safety-buffer tiles count as “disrupted” for harvesting. Current V1 `DisturbedRayTiles` includes the end buffer, so preserving current behavior means yes.
+Build a band perimeter first, classify each perimeter edge by work operation and exposure, and score only exterior rays. Keep direct work per newly introduced origin. A turn transition reuses the already scored flat landing only as validation context, then scores the first new outgoing slice, the exterior corners newly exposed by the changed direction, and the three old-direction forward rays across the incoming frontier described above. Safety-buffer tiles count as disrupted for harvesting, preserving V1 `DisturbedRayTiles` behavior.
 
 ### 7. Fixed providers and provider goals
 
-Current fixed-profile goals are individual origins. V2 needs paired exposed edges and Mega-reachable continuation. A pair of compatible profiles is not sufficient if the provider narrows immediately behind it.
+Current fixed-profile goals are individual origins. V2 initially needs only a local width-two goal frontage. Do not make first-pass goal discovery responsible for proving the internal shape or Mega traversability of the fixed designation network behind that frontage.
 
-Recommendation: precompute width-two fixed-provider frontage states from the same Mega reachability graph used for G, and use those frontage states as fixed goals. Do not pair arbitrary neighboring fixed origins during expansion.
+Precompute every pair of adjacent fixed origins that exposes two collinear outer edges on the same side, and use that exposed pair as a fixed goal frontage. The concrete fixed profiles still supply the seam heights that a generated terminal must match, but their inward shape and continuation are not part of initial goal eligibility. Do not form arbitrary pairs during expansion, and do not require a Mega-reachable fixed-network continuation yet.
 
 ### 8. Goal seeding and A* lower bounds
 
 Current tower goals are sparse radial G goals. For V2 these can remain center positions only if they belong to the same clearance-two G graph and are not isolated docking pockets. The V1 paired height/distance heuristic is not automatically admissible for a two-origin footprint or fixed-provider band.
 
-Recommendation: run V2 Dijkstra first. Add A* only after it reproduces Dijkstra. Compute horizontal distance from the nearest occupied point of the band to a concrete goal and pair it with a travel-safe height lower bound for that same goal. Fixed-provider goals need a multi-source lower-bound index or Dijkstra fallback.
+Under the lane-0 anchor convention, an `X`-axis frontier has eligible vehicle-center samples `anchor + (2, y)` for `y = 2..6`, with canonical band center `anchor + (2, 4)`. (Thus the eastbound range is `(2,2)..(2,6)`, not `(2,2)..(6,2)`; the latter is the rotated `Y`-axis form.) A `Y`-axis frontier correspondingly uses `anchor + (x, 2)` for `x = 2..6`, centered at `anchor + (4, 2)`.
+
+Represent every V2-to-G and G-to-V2 transition as passing through that canonical band center and charge a fixed **2 travel-cost center spoke** on the real graph edge, in addition to cleanup and other seam costs. A validated seam enters an explicit G state; cardinal G transitions then cost one each and carry the same immutable candidate history until an actual ground goal is reached. Continue validating the actual set of eligible handoff samples and the complete Mega escape corridor; the center is a cost/heuristic abstraction, not a substitute for physical seam validation.
+
+The A* lower bound for a V2 state may then start from the canonical center and its bilinearly interpolated center height. Every eligible centerline handoff sample is at most two Manhattan steps from that point. With the current `max(horizontal distance, height2 difference)` paired-goal lower bound and drivable V2 profile restrictions, its value can change by at most the paid two-cost spoke, preserving admissibility. Add a fixture that compares this center heuristic against the explicit minimum paired distance/height lower bound over every eligible centerline sample. If a later profile family violates that bound, use the explicit sample minimum or fall back to Dijkstra.
+
+Run V2 Dijkstra first and add this A* heuristic only after it reproduces Dijkstra. The initial implementation uses Dijkstra for fixed-provider goals; a multi-source lower-bound index over concrete frontage centers is an optional later optimization.
 
 ### 9. Cost note is stale
 
 The older V2 text permits a center-point landscaping estimate. Production V1 already has more accurate four-corner and ray costing. Reintroducing center-only cost would repeat the route-quality failures already corrected in V1.
 
-Recommendation: sum direct work for newly introduced concrete origins and calculate rays from the external band perimeter from the first V2 search. A simpler scorer may be used only in pure geometry fixtures, never in production candidate comparison.
+Sum direct work for newly introduced concrete origins and calculate rays from the external band perimeter from the first V2 search. A simpler scorer may be used only in pure geometry fixtures, never in production candidate comparison.
 
 ### 10. Frame budget and state growth
 
 The historical notes mention Dijkstra-first validation and asynchronous search. The current configurable default is 30 ms per frame, while an earlier design discussion proposed a hard-wired 20 ms budget. V2 has materially more states and larger histories.
 
-Recommendation: keep the existing configurable asynchronous budget and single-flight cancellation; do not hard-wire a second V2 budget. Decide separately whether the public default should return to 20 ms. Add V2-specific counters for band states, profile-pair candidates, history deltas, and memory/high-water estimates.
+Keep the existing configurable asynchronous budget and 30 ms default, plus single-flight cancellation; do not hard-wire a second V2 budget. Add V2-specific counters for band states, profile-pair candidates, history deltas, and memory/high-water estimates.
 
 ### 11. Fatal startup self-tests
 
 The current transition self-test aborts every production snapshot if a fixture becomes stale. Recent no-op materialization changes exposed this failure mode twice. V2 will add many more geometry fixtures.
 
-Recommendation: keep a very small fatal invariant test, but move the full V2 fixture matrix to an explicit development/test entry point or make failures disable only V2 with one precise diagnostic. A V2 fixture failure must not disable V1.
+Keep a very small fatal invariant test. Move the full V2 fixture matrix to an explicit development/test entry point; if any production-gating V2 fixture is retained at startup, its failure disables only V2 with one precise diagnostic. A V2 fixture failure must not disable V1.
 
 ### 12. Legacy comparison and unsupported widths
 
 Generated-mining clusters can currently compare V1 with the legacy generator, while external terrain-work endpoints rely on the generic path and cannot safely use the mining-specific legacy fallback.
 
-Recommendation: while V2 is experimental, generated-mining clusters may compare V2 with a genuine width-two legacy candidate if one exists. External endpoints report the V2 reason directly. Never silently run V1 for a T3 request.
+While V2 is experimental, generated-mining clusters may compare V2 with a genuine width-two legacy candidate if one exists. External endpoints report the V2 reason directly. Never silently run V1 for a T3 request.
 
 ### 13. Documentation drift
 
-Some older notes still describe center classification for handoffs, hourglasses as the authoritative generated-V blocker, ocean avoidance for both cut and fill, and AUTO fallback behavior that predates the current vehicle pool. Those statements should be updated after the V2 representation decision so implementation is not guided by obsolete V1 behavior.
+Some older notes still describe center classification for handoffs, hourglasses as the authoritative generated-V blocker, ocean avoidance for both cut and fill, and AUTO fallback behavior that predates the current vehicle pool. Stage 0 updates those notes to reference this accepted design so implementation is not guided by obsolete V1 behavior.
 
-## Decisions required before production graph work
+## Accepted decisions
 
-| Decision | Recommendation | Blocking? |
+All reviewed recommendations have been accepted and folded in. No semantic design question remains before production graph work.
+
+| Area | Accepted decision | Status |
 |---|---|---|
-| State footprint | Two-origin band slice; 2x2 union only for turns | Yes |
-| Lane height representation | Two concrete `AccessHeightProfile`s; no single shared `h` | Yes |
-| Initial profile pairs | Flat + uniform same-sign first; gate mixed/opposed pairs behind fixtures | Yes |
-| V2 seam crest | At least one workable contact per lane plus continuous Mega corridor | Yes |
-| Terminal operation | Per-lane mining/dumping allowed | Yes |
-| Handoff extension | Common span, two lanes wide, maximum three rows for T3 | Yes |
-| One-wide external start | Keep target immutable; synthesize and cost a compatible companion lane | Yes |
-| Mining-body waists | Accept as a rare limitation; add a generated-mining clearance pass later | Future refinement |
-| Ray-buffer tree harvesting | Preserve current behavior: buffer is included | No |
-| V2 A* | Dijkstra oracle first, A* later | No |
-| Centerline-thicken | Diagnostic comparator only, if useful | No |
-| V2 fixture failure | Disable V2 only; V1 remains available | Strong recommendation |
+| State footprint | Canonical two-origin band frontier; no sliding four-origin brush | Accepted |
+| Anchor and orientation | Lane-0 origin anchor, unsigned axis, signed entry direction | Accepted |
+| Lane heights | Two concrete `AccessHeightProfile`s; no shared `h` or token-only legality | Accepted |
+| Initial profile pairs | Flat and uniform same-sign ramps; asymmetric/opposed pairs disabled initially | Accepted |
+| Generated history | Every transition delta introduces unused origins; any origin reintroduced by a delta is rejected before costing | Accepted |
+| Generated self-contact | Reject nonlocal cardinal edge contact; allow only explicit transition context and diagonal corner contact | Accepted |
+| Lateral strafe | Shift by one origin; retain the overlapping lane as immutable, uncharged frontier context and generate only the newly exposed lane | Accepted |
+| Turns | Current and predecessor flat slices form the 2x2 landing; jump to the first new outgoing slice | Accepted |
+| Turn disturbance | Three old-direction forward rays across the complete incoming frontage plus newly exposed perimeter rays | Accepted |
+| G graph | Concrete Mega/T3 mask, cleanup footprint, tower component, and sparse goals | Accepted |
+| V2/G seam | Workable contact per lane and one continuous five-tile Mega corridor | Accepted |
+| Terminal operation | Per-lane mining/dumping allowed | Accepted |
+| Handoff extension | Common two-lane span, maximum three rows for T3 | Accepted |
+| V2/G cost point | Canonical band center with a fixed two-cost spoke to/from validated handoff samples | Accepted |
+| One-wide external start | Keep the target immutable and synthesize/cost a compatible companion lane | Accepted |
+| Fixed-provider goal | Two adjacent fixed origins with one exposed width-two edge; ignore inner-network shape initially | Accepted |
+| Work and rays | Four-corner direct work for new origins; material-aware rays only from the exposed band perimeter | Accepted |
+| Ray-buffer harvesting | Buffer tiles remain part of disrupted-tree harvesting | Accepted |
+| A* | Dijkstra oracle first; canonical-center heuristic for ground goals after equivalence proof | Accepted |
+| Fixed-goal A* | Use Dijkstra initially | Accepted |
+| Responsiveness | Existing configurable asynchronous budget with 30 ms default and single-flight cancellation | Accepted |
+| Fixture failures | Tiny fatal core only; full V2 suite is explicit, and any startup V2 gate can disable only V2 | Accepted |
+| T3 fallback | Never silently run V1; compare only with a genuine width-two legacy candidate where available | Accepted |
+| Mining-body waists | Known rare limitation; clearance pass deferred until after V2 rollout | Deferred refinement |
+| Centerline-thicken | Not a production route; optional diagnostic comparator only | Optional |
+
+### Accepted lateral-strafe semantics
+
+A direct one-origin strafe carries one old lane into the successor frontier and introduces one new lane. The retained lane is immutable context: it is not added to the transition delta, re-added to history, re-costed, revalidated as new work, or rematerialized. The new lane is the complete generated delta and must agree with every shared corner and profile constraint.
+
+Consequently, “origin revisit” means that a transition attempts to reintroduce an origin in its generated delta. Merely retaining the unchanged lane in a successor frontier is not a revisit. This preserves direct uniform-slope strafing for cost-efficient mountainside routes without permitting duplicate work or exploration of an identical full state.
+
+### Non-blocking implementation choices
+
+The following choices remain deliberately implementation-level:
+
+* benchmark persistent immutable maps against parent-plus-delta history nodes and choose the lower-overhead representation without changing history semantics;
+* optionally add a multi-source fixed-frontage A* index later; fixed-provider searches use Dijkstra until then;
+* enable asymmetric or opposed profile pairs only if dedicated fixtures demonstrate useful valid routes;
+* use a width-two legacy comparator only if the existing generator can actually produce one; its absence does not block V2; and
+* complete the explicitly deferred mining-body clearance, core Mining Designations hazard/tree integration, and fixed-provider interior-clearance refinements after V2 rollout.
 
 ## Staged implementation plan
 
 Each stage must build and be reviewable independently. Width two remains explicitly unsupported in production until the stage's exit gate says otherwise.
 
-### Stage 0 — Close and codify the geometry design
+### Stage 0 — Codify the accepted geometry design (implemented)
 
-* Adopt either the recommended band-slice state or a fully specified four-profile brush.
-* Define canonical anchor, lane order, travel axis, entry direction, and turn footprint with coordinate examples for X+/X-/Y+/Y- travel.
-* Define profile-pair generation from concrete corner profiles and remove token names as the source of legality.
-* Define common-span width-two handoff semantics and per-lane operation rules.
-* Update the older pathfinding/framework notes to reference this decision.
+* Encode the accepted band-slice state specification; do not implement the rejected sliding four-origin brush.
+* Codify canonical anchor, lane order, travel axis, entry direction, and turn footprint with coordinate examples for X+/X-/Y+/Y- travel.
+* Codify direct strafe as a one-origin lateral shift with one immutable retained lane and one newly generated lane, and make the delta-based history invariant explicit.
+* Codify profile-pair generation from concrete corner profiles, initially exposing only flat and uniform same-sign pairs.
+* Codify common-span width-two handoff semantics, per-lane operation rules, and the canonical-center spoke cost.
+* Update the older pathfinding/framework notes to reference these accepted decisions.
 
-Exit gate: four worked examples (flat straight, uniform ramp, strafe, 90-degree flat turn) map unambiguously to origin coordinates and corner heights in both positive and negative directions.
+Exit gate: four worked examples (flat straight, uniform ramp, direct strafe, and 90-degree flat turn) map unambiguously to origin coordinates and corner heights in both positive and negative directions, including the retained-lane and generated-delta sets for strafe.
 
-### Stage 1 — Pure V2 geometry and fixture surface
+### Stage 1 — Pure V2 geometry and fixture surface (implemented)
 
 * Add V2 geometry types separate from `AccessSearchNode` and `AccessHeightProfile` state identity.
 * Enumerate mechanically valid lane-profile pairs.
-* Implement shared-seam compatibility, straight advance, strafe, flat-turn union, bounds, and origin/profile addition with an early used-origin rejection.
+* Implement shared-seam compatibility, straight advance, the Stage-0 accepted lateral behavior, flat-turn union, bounds, and origin/profile addition with the accepted history rule.
+* Reject every new delta origin with cardinal edge contact to older generated history outside the explicit local transition context; keep diagonal corner contact legal.
 * Add fixtures for direction symmetry, relative lane heights, illegal fights, opposed pairs, turn landing size, all three old-direction turn rays under four rotational symmetries, identical-origin revisit, and conflicting-origin revisit.
-* Make full V2 fixture failure disable V2 only.
+* Put the full V2 matrix behind an explicit development/test entry point; any retained startup V2 gate disables V2 only.
 
-Exit gate: pure fixtures prove every emitted origin profile has integer corners, all shared corners agree, every transition introduces a deterministic origin/profile delta, and no transition double-owns an origin.
+Exit gate: pure fixtures prove every emitted origin profile has integer corners, all shared corners agree, every transition introduces a deterministic origin/profile delta, no transition double-owns an origin, nonlocal edge contact is rejected, and straight, strafe, turn-landing, and handoff-span local contacts remain legal.
 
-### Stage 2 — Clearance-two G graph and cleanup overlay
+### Stage 2 — Clearance-two G graph and cleanup overlay (implemented and live-verified)
 
 * Refactor snapshot construction so the resolved vehicle parameters drive G occupancy and adjacency without the current `vehicleClearance > 4` early exit.
 * Build the Mega/T3 G graph, tower flood, sparse radial goals, and exclusion diagnostics.
@@ -268,40 +301,61 @@ Exit gate: pure fixtures prove every emitted origin profile has integer corners,
 * Deduplicate cleanup cost keys across footprint tiles.
 * Keep `AccessPathRequest` width two returning `V2GraphNotEnabled` after snapshot validation.
 
+Implementation note: Mega requests now pass the former width guard, run the pure V2 fixture gate, capture ordinary ground with the concrete width-five pathability mask, build cleanup eligibility per vehicle-center tile rather than inheriting a whole origin's blocker state, deduplicate cleanup objects across footprint centers, build an immutable V2 ground view, and emit `[ATD V2 Ground Graph]` diagnostics. Search still returns `V2GraphNotEnabled`, so this stage cannot place terrain or cleanup designations.
+
 Exit gate: fixtures and a dry-run diagnostic distinguish pathable Mega ground, T1-only ground, cleanup-eligible Mega ground, isolated docking pockets, and non-cleanup blockers.
 
-### Stage 3 — Width-two starts and fixed-provider frontages
+Live result: the Mega request reached `[ATD V2 Ground Graph]`, emitted plausible width-five ground/goal/cleanup counts, stopped deliberately at `V2GraphNotEnabled`, and produced no accessway mutations.
+
+### Stage 3 — Width-two starts and fixed-provider frontages (implemented and live-verified)
 
 * Convert clusters into candidate width-two start frontages.
 * For each single-origin external target, enumerate fixed or synthetic companion-lane starts in every orientation without modifying the target.
-* Precompute compatible fixed-provider frontage states and their Mega-reachable continuation.
-* Emit explicit reasons for missing/blocked companion profiles, narrow generated clusters, provider pinch points, and out-of-area frontages.
+* Precompute fixed-provider goal states from adjacent origin pairs with an exposed two-origin outer edge; retain their concrete seam profiles but do not inspect the fixed network behind them.
+* Emit explicit reasons for missing/blocked companion profiles, narrow generated clusters, non-exposed fixed pairs, and out-of-area frontages.
 * Do not rewrite external/player terrain designations.
 
-Exit gate: paired flat/ramp starts and fixed providers are recognized in all orientations; a one-wide player endpoint produces valid fixed-plus-synthetic start candidates in every feasible orientation, owns only the winning companion, and fails diagnostically only when no companion is feasible, without falling back to V1.
+Implementation note: V2 now enumerates all enabled orientations for every one-origin seed, accepts compatible existing companion lanes, otherwise records a side-effect-free synthetic companion delta, rejects blocked/out-of-area/non-exposed frontages with categorized diagnostics, and discovers fixed goals only from adjacent allowed origins with an open two-origin outer edge. The request carries these concrete frontage states into the V2 dispatch boundary and emits `[ATD V2 Frontages]`; search and placement remain disabled.
 
-### Stage 4 — V2 Dijkstra graph, history, and production cost
+Exit gate: paired flat/ramp starts and exposed two-origin fixed goals are recognized in all orientations without inspecting fixed-network interiors; a one-wide player endpoint produces valid fixed-plus-synthetic start candidates in every feasible orientation, owns only the winning companion, and fails diagnostically only when no companion is feasible, without falling back to V1.
+
+Live result: an exposed one-origin endpoint produced the expected synthetic frontage candidates without mutation; surrounding the same endpoint with blockers rejected every companion and concluded with `NoWidth2StartCompanion`. Stage 3 is accepted.
+
+### Stage 4 — V2 Dijkstra graph, history, and production cost (implemented and live-verified)
 
 * Add a V2 search session/adapter selected by `RequiredWidth == 2`.
 * Implement immutable origin/profile history with early origin-revisit rejection and cleanup-key deduplication.
-* Expand straight, strafe, and flat-turn transitions.
+* Expand straight, the accepted lateral behavior, and flat-turn transitions.
 * Apply current profile feasibility, bounds, designation fights, elevation-aware prior rays, ocean/building rules, and candidate ray limits to every newly introduced origin.
 * Score direct work for newly introduced origins and rays only on the external band perimeter.
 * Run Dijkstra only and return a V2-specific in-memory result; do not place it.
 
-Exit gate: deterministic routes include flat straight, uniform ramp, strafe, switchback with 8x8 landing, no-path narrow area, durability block, and cheaper-G reuse. Costs contain no overlap double-counting.
+Implementation note: width-two requests with fixed-provider frontages enter a separate incremental Dijkstra session. The graph expands flat/ramp straight successors, one-lane retained strafes, and explicit flat 2x2 turns; generated history owns only transition deltas and carries source profiles, charged cleanup keys, and elevation-aware exterior-ray constraints. Production evaluation applies snapshot profile feasibility, projected work, prior ray envelopes, four-corner direct work, generated-origin overhead, deduplicated dense-debris cleanup, two outer band rays, and all three old-direction turn rays. Current builds report these searches through the generic `[ATD V2 Search] algorithm=Dijkstra` diagnostic.
 
-### Stage 5 — Width-two G/V handoffs and bounded spans
+Exit gate: deterministic routes include flat straight, uniform ramp, the accepted lateral behavior, switchback with 8x8 landing, no-path narrow area, durability block, and cheaper-G reuse. Costs contain no overlap double-counting.
+
+Fixture result: flat straight, uniform ramp, retained-lane strafe, 2x2 flat turn, injected durability/no-path, and cleanup-key deduplication pass in the explicit V2 runner. The already verified Mega ground graph remains the cheaper traversal substrate; connecting it to V2 is intentionally the Stage 5 seam rather than an implicit Stage 4 edge.
+
+Live result: AUTO resolved a fleet Mega to vehicle width five and `requiredWidth=2`; frontage discovery found six starts and ten fixed frontages. Dijkstra found a 16-state route with 23 generated origins, seven straight and eight strafe transitions, bounded history/ray high-water counts, and zero terrain-designation mutations. Delta ownership reconciled exactly as 14 straight origins plus eight strafe origins plus one synthetic start companion.
+
+### Stage 5 — Width-two G/V handoffs and bounded spans (implemented and live-verified)
 
 * Implement two-lane prospective workability with concrete Mega pathing.
 * Require a usable crest/contact per lane and a continuous five-tile escape corridor in one clearance-two G component.
 * Support lateral as well as forward exits.
 * Support per-lane mining/dumping and a common two-lane span up to three rows.
+* Charge the fixed two-cost center spoke on every G-to-V2 and V2-to-G edge while retaining the concrete handoff/escape geometry.
 * Revalidate the seam during goal acceptance and materialization replay.
 
-Exit gate: fixtures cover diagonal terrain across the seam, mixed terminal operations, blocked far lane, lateral exit, two- and three-row spans, prop cleanup at the seam, and rejection of a visually wide but pinched exit.
+Implementation note: V2 search admits tower-ground routes through a separately costed V-to-G edge followed by explicit G states. The seam evaluator checks both constituent lane designations with vanilla prospective workability, supports mixed per-lane mining/dumping operations, evaluates common forward spans of one through three rows, and derives lateral frontages from the two latest aligned rows. Both lane contacts and their local escape centers must belong to one clearance-two ground component, but local seam acceptance does not require that component already to contain a tower goal. Seam cleanup keys are deduplicated against generated history; the accepted edge charges the fixed two-cost canonical-center spoke, after which cardinal G moves cost one and retain projected history blockers and cleanup ownership until an actual sparse tower goal is reached. The selected seam and traversed G suffix are retained on the typed V2 result for Stage 6 replay and materialization.
 
-### Stage 6 — V2 materialization, placement, and ownership
+Exit gate: fixtures cover diagonal terrain across the seam, mixed terminal operations, blocked far lane, lateral exit, two- and three-row spans, prop cleanup at the seam, center-spoke cost in both directions, and rejection of a visually wide but pinched exit.
+
+Fixture result: mixed-operation lane contacts, seam cleanup deduplication/cost, fixed center-spoke cost, lateral exits, two- and three-row common spans, split-component rejection, and ground-terminal Dijkstra retention pass in the explicit V2 runner.
+
+Live result: an explicit T3 request with one inaccessible external work origin and no fixed frontage reached tower ground in 22 visited states. Dijkstra selected a three-state width-two route with one straight and one strafe transition, then a forward one-row Leveling/Leveling seam. Travel reconciled as four plus four for the generated transitions and the fixed two-cost center spoke; the four generated origins reconciled as one synthetic companion, two straight origins, and one strafe origin. Both contacts joined the tower-reachable Mega component, and the mutation audit remained exactly unchanged.
+
+### Stage 6 — V2 materialization, placement, and ownership (implemented; live verification pending)
 
 * Flatten the accepted origin/profile map into unique planned designations.
 * Omit exact-terrain no-op origins without breaking provider validation.
@@ -310,15 +364,28 @@ Exit gate: fixtures cover diagonal terrain across the seam, mixed terminal opera
 * Place per-lane terminal protos, register primitive ownership, and roll back every terrain/cleanup/tree mutation on failure.
 * Rebuild the snapshot and prove Mega reachability to the intended cluster after placement.
 
+Implementation note: successful V2 search results now retain their band states, unique generated origin/profile map, and selected two-lane seam as typed route data. Before placement, a separate replay reconstructs every synthetic-start, straight, strafe, and turn delta against the unchanged snapshot, re-applies production work/ray/cleanup evaluation, proves the flattened profile map identical, and revalidates the selected Mega seam. Materialization emits each unique terrain-work origin once, omits exact-terrain profiles, retains explicit cleanup, and maps the selected operation independently across both terminal lanes and common spans. The existing placement transaction owns and rolls back terrain, debris cleanup, and tree selections; V2-specific post-placement validation confirms every emitted profile/prototype and the retained tower-ground seam before the provider is accepted. Exact-terrain route origins remain provider geometry without acquiring terrain-designation ownership.
+
 Exit gate: successful placement produces a Mega-reachable provider; injected conflicts and placement failures leave no terrain designations, cleanup designations, harvest markers, or ownership residue.
 
-### Stage 7 — A*, responsiveness, and diagnostics
+Fixture result: V2 replay and materialization reproduce the searched route, reject seam drift, omit an exact-terrain synthetic companion, retain its required cleanup, and preserve per-origin terminal-operation metadata. The existing V1 fixture suite continues to cover transactional terrain/cleanup materialization invariants. Live placement and rollback are the remaining Stage 6 gate.
+
+### Stage 7 — A*, responsiveness, and diagnostics (implemented; live verification pending)
 
 * Add the paired-goal width-two heuristic only after Dijkstra results are stable.
+* Prove the canonical-center lower bound never exceeds the explicit minimum over all eligible centerline handoff samples plus the paid two-cost spoke, under every enabled profile pair and orientation.
 * Fall back to Dijkstra for fixed-provider goals until a valid multi-source lower bound exists.
 * Preserve asynchronous stepping, cancellation, single-flight behavior, timeout, and configurable frame budget.
 * Add V2 rejection categories and compact path/profile diagnostics.
 * Compare Dijkstra and A* route, cost, visited states, elapsed time, and peak history size.
+
+Implementation note: tower-ground V2 requests now queue states by `g + h`. V states use the Manhattan lower bound from the band's canonical center to the nearest sparse tower-ground goal; explicit G states use the ground graph's remaining-distance lower bound. Every full V transition costs its four-tile center displacement, each cardinal G transition costs one, and the V-to-G edge separately charges the accepted two-cost center spoke. The heuristic ignores landscaping and cleanup costs, so those nonnegative terms cannot make it overestimate. Fixed-frontage requests continue to use Dijkstra. The compact V2 summary and generic `[ATD V2 Search]` tags report the actual algorithm.
+
+Common forward seams first test the finite set of vehicle-center lanes across the width-two band against the situation-qualified ground graph. Candidate-history profile footprints and ray tiles are overlaid on the outward half of the vehicle mask. A locally traversable lane with valid forward operations on both terminal origins is accepted immediately and enters a real G state; neither ordinary-ground classification nor finite tower-goal distance is a quick-handoff criterion. History intersections and non-forward geometries fall through to the complete seam solver. This is a local pathability-mask optimization, not a height-tolerance approximation or a replacement for G traversal.
+
+Fixture result: the explicit centerline samples in both orientations remain within the paid two-cost center spoke, and A* returns the same accepted ground-terminal state sequence and exact total/traversal cost as Dijkstra. The full V1 and V2 fixture suites pass. Live comparison of visited states, elapsed time, and cancellation/replacement behavior remains the Stage 7 gate.
+
+Live result before the quick-mask optimization: A* produced correct ramps for both the trivial down-ramp and full mining-body cases. The trivial Dijkstra explored 5,490 states in 180.02 seconds and timed out. The mining-body Dijkstra explored 6,076 states in 4.15 seconds, selected ten straight band states, and reconciled travel as nine four-tile V moves plus the two-cost spoke plus nine G tiles (`47` total); placement and Mega-seam validation passed. The roughly 48-fold throughput difference confirms that deep cheap histories, rather than node count alone, dominate the pathological flat case.
 
 Exit gate: A* and Dijkstra return the same accepted plan and cost on deterministic fixtures and representative saves. A failed or cancelled V2 search does not leak state or block a subsequent request.
 
@@ -333,6 +400,10 @@ Exit gate: A* and Dijkstra return the same accepted plan and cost on determinist
 Exit gate: V2 is no worse than the valid width-two control on representative saves, all failures are diagnosable, V1 behavior is unchanged, and disabling the feature preserves the existing fallback behavior.
 
 ## Future refinements after V2 rollout
+
+### V1 situation-pathability quick handoff
+
+Backport the V2 quick-handoff optimization to V1 after the V2 rollout is stable. The pre-approved V1 masks are the two center vehicle lanes running through the terminal handoff designation and continuing for one cardinal vehicle-center step onto the outside ground. Accept the quick path when either lane is situation-pathable for the resolved vehicle after applying vanilla pathability, snapshot designation blockers, and candidate-history profiles and rays. Retain the full V1 crest, span, cleanup, and projected-seam evaluator as the fallback whenever neither simple mask qualifies.
 
 ### Generated mining-body vehicle-clearance pass
 
@@ -353,6 +424,14 @@ Extend the existing per-world pathfinder options to the core Mining Designations
 
 Use the same material-aware ray tracer as accessway generation. When an avoidance option is disabled, allow the plan but retain a concise hazard diagnostic. Apply these checks after any future mining-body clearance widening as well.
 
+### Fixed-provider interior clearance
+
+The initial fixed-goal rule deliberately stops at an exposed pair of adjacent origins. Later, if tests show false provider connections matter in practice, validate that the fixed designation network behind the frontage retains Mega-width internal clearance and does not immediately pinch to one origin. Keep that refinement separate from local frontage discovery so the first V2 implementation remains tractable.
+
+### Vehicle-speed-normalized traversal cost
+
+Read the resolved vehicle prototype's travel speed and normalize traversal by slowness `s = 1 / v` relative to a documented baseline. Apply the same factor consistently to both graph domains: a full four-tile V transition costs `4 * s`, while each G tile costs `1 * s`. This should allow AUTO/T3 to reflect the slower Mega fleet without changing geometric feasibility. Keep the first V2 release on the current distance-only scale until prototype speed access, normalization, migration behavior, and cross-tier route comparisons have fixtures.
+
 ## Required regression matrix
 
 At minimum, record route, plan, cost breakdown, visited states, runtime, placement result, and post-placement Mega reachability for:
@@ -361,13 +440,13 @@ At minimum, record route, plan, cost breakdown, visited states, runtime, placeme
 * straight up-ramp and down-ramp;
 * 90-degree turn with the minimum flat landing;
 * switchback;
-* lateral strafe on a uniform slope;
+* direct lateral strafe on a uniform slope, proving the retained lane is neither re-costed nor rematerialized;
 * mixed natural ground and generated V;
 * early lateral V/G handoff on diagonal terrain;
 * two- and three-row handoff spans;
 * mixed lane mining/dumping terminal;
 * one blocked seam lane;
-* existing width-two provider reuse and immediate pinch behind provider;
+* exposed width-two fixed-provider goal, non-exposed adjacent pair, and a provider that pinches internally as a documented initial limitation;
 * sparse forest, dense debris, mixed cleanup, and non-removable prop;
 * harvest-disrupted-trees on and off;
 * shoreline cutting, ocean dumping, and Avoid ocean on/off;
@@ -406,6 +485,6 @@ Keep V2-specific state out of the already dense V1 node type:
 
 Share snapshot data, V1 concrete profile math, terrain sampling, material/ray scoring primitives, cleanup policy, placement transaction helpers, and diagnostics contracts. Do not copy the large V1 search class and modify it independently.
 
-## Recommended first action
+## Next implementation action
 
-Do Stage 0 and Stage 1 only. The band-slice representation and mechanically valid profile pairs must be proven before changing snapshot dispatch or allowing a T3 request past the current width guard. Once those fixtures are stable, the clearance-two G graph can be developed without guessing what generated state it must connect to.
+Run the Stage 7 A*/Dijkstra live comparison in `docs/test/accessway-v2-stage7-live-test.md`, beginning with the trivial down-ramp that previously timed out and then the non-trivial mining-body route. Retain the Stage 6 placement, Mega-pathability, clear, and rollback checks while evaluating the selected plan.

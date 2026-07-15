@@ -108,8 +108,8 @@
     "Standardvärden"
   ],
   [
-    "settings.tab.game_settings",
-    "Spelinställningar"
+    "settings.tab.world_settings",
+    "Världsinställningar"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "Experimentella tillfarter"
+  ],
+  [
+    "settings.world.safety",
+    "Terrängsäkerhet"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "Undvik havet"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "Undvik hav i genererade tillfarter och gruvplaner i denna värld. Gruvceller som överlappar havet utesluts. Planerad schaktning under havsnivån undviks också; dumpning i havet är fortfarande tillåten. Stäng av detta för att tillåta riskfyllt arbete vid stranden."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "Undvik byggnader"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "Undvik byggnader i genererade tillfarter och gruvplaner i den här världen. Gruvceller som överlappar en byggnad eller dess säkerhetsmarginal utesluts. Även beräknad terrängstörning nära byggnader undviks."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Skörda störda träd"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "Säkerhetspolicy"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "Styr hur försiktigt ATD förutsäger jordskred och hur långt avstånd den håller från skyddade hav och byggnader. Högre policyer reserverar mer utrymme; lägre policyer tillåter terrängarbete närmare faror. Standard: BAL."
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "Kostnad för terränganvisning"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "Fast kostnad för varje genererad terränganvisning. Högre värden gynnar färre terränganvisningar, även om det ökar resavståndet och den totala kostnaden för terrängarbete."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "Vikt för direkt terrängarbete"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "Vikt som används för att gräva eller dumpa terräng direkt ovanför eller under genererade terränganvisningar."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "Maxavstånd för kandidatstråle"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "Maximalt avstånd för kandidatstrålespårning. Högre värden skyddar och prissätter mycket stora sidokilar men kostar mer söktid. Standard: 16."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "Högsta kostnad per stråle"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "Begränsar landskapskostnaden som bidrar med en olöst stråle."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "Straff för olöst stråle"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "Straff när en stråle inte möter terräng inom sitt spårområde."
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} har färdigställt en grävmaskin"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "Bygga {0} vid {1} och förtilldela den till {2}?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "Bygga {0} × {1} vid {2} och förtilldela dem till {3}?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "Bygga"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "Gå till {0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "Förtilldelad till {0}"
   ]
 ]

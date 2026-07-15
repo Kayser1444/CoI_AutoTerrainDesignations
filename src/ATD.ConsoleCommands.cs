@@ -44,6 +44,9 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
+        sb.AppendLine($"  SafetyPolicy          = {AutoTerrainDesignationsMod.GetSafetyPolicy().ToString().ToUpperInvariant()}");
+        sb.AppendLine($"  LandslideSlopeFactor  = {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}");
+        sb.AppendLine($"  LandslideBuffer       = {AutoTerrainDesignationsMod.AccessRayEndBuffer}");
         sb.AppendLine($"  CornerDesignationMode = {AutoTerrainDesignationsMod.CornerDesignationMode.ToNiceStringLong()}");
         sb.Append(AutoDepthDesignation.FormatPurityArrays());
         return sb.ToString();
@@ -213,6 +216,30 @@ public sealed class AtdConsoleCommands
         return $"[ATD] AutoReleaseExcavatorsWhenIdle and AutoReleaseTrucksWhenIdle set to {parsed}.";
     }
 
+    [ConsoleCommand(false, false, "Sets the World safety policy (MIN, LOW, MED, HIGH, or MAX).", null)]
+    private string atdSetSafetyPolicy(string value)
+    {
+        if (!System.Enum.TryParse(value, true, out SafetyPolicy parsed)
+            || parsed < SafetyPolicy.Min || parsed > SafetyPolicy.Max)
+            return $"[ATD] Invalid safety policy '{value}'. Use MIN, LOW, MED, HIGH, or MAX.";
+        AutoTerrainDesignationsMod.SetSafetyPolicy(parsed);
+        return $"[ATD] Safety policy set to {parsed.ToString().ToUpperInvariant()}.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the landslide predictor slope factor (0-1.5). This is the expert value behind Safety policy.", null)]
+    private string atdSetLandslidePredictorSlopeFactor(float value)
+    {
+        AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism(value);
+        return $"[ATD] Landslide predictor slope factor set to {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the landslide safety buffer (0-16 tiles). This is the expert value behind Safety policy.", null)]
+    private string atdSetLandslideBuffer(int value)
+    {
+        AutoTerrainDesignationsMod.SetAccessRayEndBuffer(value);
+        return $"[ATD] Landslide buffer set to {AutoTerrainDesignationsMod.AccessRayEndBuffer}.";
+    }
+
     [ConsoleCommand(false, false, "Sets the global default for Auto-release excavators when idle on new towers (true/false, on/off, 1/0).", null)]
     private string atdSetAutoReleaseExcavatorsWhenIdle(string value)
     {
@@ -322,7 +349,7 @@ public sealed class AtdConsoleCommands
         return AutoDepthDesignation.FormatAssignedVehiclesDump();
     }
 
-    [ConsoleCommand(false, false, "Toggles the cursor tile-position overlay (bottom-left corner). Optionally pass 'on' or 'off'.", null)]
+    [ConsoleCommand(false, false, "Toggles the cursor tile-position overlay (bottom-left corner) for this session. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
     private string atdCursorOverlay(string value = "")
     {
         bool current = AutoDepthDesignation.ShowCursorOverlay;

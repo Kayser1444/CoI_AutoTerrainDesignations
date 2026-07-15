@@ -203,7 +203,7 @@ namespace AutoTerrainDesignations
             // Candidate origins can reach outside the tower bounding box through the ground-search margin,
             // and their terrain rays extend farther again. Capturing only Area.ContainsTile used to omit
             // nearby buildings (and the outside portion of a footprint straddling the area boundary).
-            const int buildingRaySafetyBoundary = 2;
+            int buildingRaySafetyBoundary = BuildingSafetyBufferTiles;
             int captureMargin = RAMP_ACCESS_SEARCH_MARGIN_TILES
                 + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
                 + AutoTerrainDesignationsMod.AccessRayEndBuffer
@@ -542,15 +542,16 @@ namespace AutoTerrainDesignations
             LastExperimentalAccessPlan = null;
             bool suppressLegacyAccessRamps = AutoTerrainDesignationsMod.SuppressLegacyAccessRamps;
             bool experimentalOperationSupported = TryGetExperimentalOperation(sourceWorkProto, out bool experimentalIsMining);
+            bool experimentalWidthSupported = configuredRampWidth > 0;
             bool experimentalSearchEnabled = AutoTerrainDesignationsMod.TurningRampsExperimental
-                && configuredRampWidth == 1
+                && experimentalWidthSupported
                 && experimentalOperationSupported;
             if (AutoTerrainDesignationsMod.TurningRampsExperimental && !experimentalSearchEnabled)
             {
-                string reason = configuredRampWidth != 1
-                    ? $"tower ramp width is {configuredRampWidth}; V1 requires 1"
+                string reason = !experimentalWidthSupported
+                    ? "tower accessway generation is disabled"
                     : $"designation proto {sourceWorkProto.Id.Value} is neither mining nor dumping";
-                LogExperimentalAccessDebug($"[ATD Experimental Access] V1 skipped because {reason}.");
+                LogExperimentalAccessDebug($"[ATD Experimental Access] skipped because {reason}.");
             }
             if (suppressLegacyAccessRamps)
             {
@@ -668,7 +669,12 @@ namespace AutoTerrainDesignations
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
-                            refreshedSnapshot, cluster, accessibleFixedGoals, configuredRampWidth);
+                            refreshedSnapshot, cluster, accessibleFixedGoals);
+                        LogExperimentalAccessDebug(
+                            $"[ATD Experimental Access Width] cluster={cluster.ClusterId} " +
+                            $"legacyRampWidth={configuredRampWidth} " +
+                            $"resolvedVehicleWidth={refreshedSnapshot.VehicleWidth} " +
+                            $"requiredWidth={request.RequiredWidth}");
                         Dictionary<Tile2i, string> designationStateBeforeSearch =
                             CaptureTerrainDesignationState(tower);
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
@@ -713,7 +719,8 @@ namespace AutoTerrainDesignations
                         if (experimentalResult.Success
                             && experimentalPlan != null
                             && experimentalPlan.IsValid
-                            && experimentalPlan.Designations.Count == 0)
+                            && experimentalPlan.Designations.Count == 0
+                            && experimentalPlan.CleanupOrigins.Count == 0)
                         {
                             states[cluster] = AccessClusterState.AccessibleViaProvider;
                             validatedExistingRoute = true;
@@ -834,7 +841,12 @@ namespace AutoTerrainDesignations
                         string decidedBy = bestCandidate == null
                             ? (suppressLegacyAccessRamps ? "legacy-suppressed" : "only-valid-candidate")
                             : EvaluatedAccessCandidate.GetDecidedBy(experimentalCandidate, bestCandidate);
-                        var experimentalProvider = new AccessProvider(localPlacedOrigins, reachesGround: true);
+                        List<Tile2i> providerOrigins = source.SearchResult.V2Route != null
+                            ? source.SearchResult.V2Route.GeneratedProfiles.Keys.ToList()
+                            : new List<Tile2i>(localPlacedOrigins);
+                        if (providerOrigins.Count == 0)
+                            providerOrigins.AddRange(localPlacedOrigins);
+                        var experimentalProvider = new AccessProvider(providerOrigins, reachesGround: true);
                         existingProviders.Add(experimentalProvider);
                         states = AccessReachability.EvaluateReachability(
                             originClusters,
@@ -847,6 +859,21 @@ namespace AutoTerrainDesignations
                                 Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                                 return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                             });
+                        string v2ValidationReason = "NotV2";
+                        bool v2ProviderValid = source.SearchResult.V2Route != null
+                            && ValidatePlacedV2Provider(
+                                source.SearchResult,
+                                source.Plan,
+                                accesswayProto,
+                                out v2ValidationReason);
+                        if (source.SearchResult.V2Route != null)
+                            LogExperimentalAccessDebug(
+                                $"[ATD V2 Placement Validation] cluster={cluster.ClusterId} " +
+                                $"success={v2ProviderValid} reason={v2ValidationReason} " +
+                                $"placedTerrain={localPlacedOrigins.Count} " +
+                                $"providerOrigins={providerOrigins.Count}");
+                        if (v2ProviderValid)
+                            states[cluster] = AccessClusterState.AccessibleViaProvider;
                         if (states[cluster] == AccessClusterState.AccessibleViaProvider
                             || states[cluster] == AccessClusterState.AccessibleDirect)
                         {

@@ -20,6 +20,7 @@ namespace AutoTerrainDesignations.Access
         ActiveTerrainDesignation,
         Ocean,
         Durability,
+        UnderlyingTerrain,
         SourceWorkOrigin,
         OutOfArea
     }
@@ -62,7 +63,8 @@ namespace AutoTerrainDesignations.Access
         public bool IsEligible => BlockerKind == AccessPropBlockerKind.None && Classes != AccessPropCleanupClass.None;
         public bool IsEligibleWithinGeneratedV => Classes != AccessPropCleanupClass.None
             && (BlockerKind == AccessPropBlockerKind.None
-                || BlockerKind == AccessPropBlockerKind.Durability);
+                || BlockerKind == AccessPropBlockerKind.Durability
+                || BlockerKind == AccessPropBlockerKind.UnderlyingTerrain);
         public bool HasTreeCleanup => (Classes & AccessPropCleanupClass.Tree) != 0;
         public bool HasDenseDebrisCleanup => (Classes & AccessPropCleanupClass.DenseDebris) != 0;
 

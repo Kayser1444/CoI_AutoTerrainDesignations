@@ -16,11 +16,13 @@ using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Trees;
+using Mafi.Core.Vehicles.Excavators;
 using Mafi.Localization;
 using Mafi.Unity.UiToolkit;
 using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
 using AutoTerrainDesignations.Access;
+using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations
 {
@@ -113,13 +115,42 @@ namespace AutoTerrainDesignations
                 new Dictionary<Tile2i, float>();
             public readonly Dictionary<Tile2i, float> FillSurfaceFloors =
                 new Dictionary<Tile2i, float>();
+            public readonly Dictionary<Tile2i, HashSet<Tile2i>> CutSourcesByTile =
+                new Dictionary<Tile2i, HashSet<Tile2i>>();
+            public readonly Dictionary<Tile2i, HashSet<Tile2i>> FillSourcesByTile =
+                new Dictionary<Tile2i, HashSet<Tile2i>>();
             public int Count => CutTiles.Union(FillTiles).Count();
             public bool Contains(Tile2i tile)
                 => CutTiles.Contains(tile) || FillTiles.Contains(tile);
-            public void Add(AccessSideRayOperation operation, Tile2i tile)
+            public void Add(
+                AccessSideRayOperation operation,
+                Tile2i tile,
+                Tile2i sourceOrigin)
             {
-                if (operation == AccessSideRayOperation.Cut) CutTiles.Add(tile);
-                else if (operation == AccessSideRayOperation.Fill) FillTiles.Add(tile);
+                if (operation == AccessSideRayOperation.Cut)
+                {
+                    CutTiles.Add(tile);
+                    AddSource(CutSourcesByTile, tile, sourceOrigin);
+                }
+                else if (operation == AccessSideRayOperation.Fill)
+                {
+                    FillTiles.Add(tile);
+                    AddSource(FillSourcesByTile, tile, sourceOrigin);
+                }
+
+                static void AddSource(
+                    Dictionary<Tile2i, HashSet<Tile2i>> target,
+                    Tile2i disturbedTile,
+                    Tile2i origin)
+                {
+                    if (!target.TryGetValue(
+                            disturbedTile, out HashSet<Tile2i> sources))
+                    {
+                        sources = new HashSet<Tile2i>();
+                        target.Add(disturbedTile, sources);
+                    }
+                    sources.Add(origin);
+                }
             }
             public void AddHeight(
                 AccessSideRayOperation operation, Tile2i tile, float projectedHeight)
@@ -186,12 +217,6 @@ namespace AutoTerrainDesignations
             int handoffDeltaB,
             out AccessHandoffOperation operation)
         {
-            if (handoffDeltaA == 0 && handoffDeltaB == 0)
-            {
-                operation = AccessHandoffOperation.Leveling;
-                return true;
-            }
-
             bool isMining =
                 connectedDeltaA <= 0
                 && connectedDeltaB <= 0
@@ -213,6 +238,12 @@ namespace AutoTerrainDesignations
             if (isDumping)
             {
                 operation = AccessHandoffOperation.Dumping;
+                return true;
+            }
+
+            if (handoffDeltaA == 0 && handoffDeltaB == 0)
+            {
+                operation = AccessHandoffOperation.Leveling;
                 return true;
             }
 
@@ -374,6 +405,12 @@ namespace AutoTerrainDesignations
             int vehicleClearance = Math.Max(1, ExtractVehicleClearance(pathParams).Value);
             int vehicleDisturbanceRadius =
                 AccessPathSearch.GetVehicleDisturbanceRadius(vehicleClearance);
+            if (vehicleClearance > 4
+                && !AccessV2Fixtures.ValidateAll(out string v2GeometryFailure))
+            {
+                failureReason = "V2GeometrySelfTest: " + v2GeometryFailure;
+                return false;
+            }
             ProjectedDesignationDisturbance projectedDesignationDisturbance =
                 BuildProjectedDesignationDisturbedTiles(
                     projectedRayDesignations,
@@ -413,15 +450,11 @@ namespace AutoTerrainDesignations
                 fallbackMiningSlope,
                 landslideRunPerHeight);
             IPathabilityProvider provider = s_vehiclePathFindingManager.PathabilityProvider;
-            // A generated V node is exactly one 4x4 designation wide.  The
-            // profile's five samples are boundary points, not five traversible
-            // tiles, so a five-wide Mega/T3 cannot use this graph yet.
-            if (vehicleClearance > 4)
-            {
-                failureReason = "ExperimentalAccesswayWidthInsufficient";
-                return false;
-            }
             try { provider.UpdateChangedTiles(); } catch { }
+            VehiclePathFindingParams t1PathParams = VehiclePathFindingParams.DEFAULT;
+            bool hasT1DiagnosticMask = vehicleClearance > 4
+                && TryGetTierExcavatorPathFindingParams(
+                    "T1", out t1PathParams);
 
             var groundNodes = new HashSet<Tile2i>();
             foreach (var pair in groundHeight2)
@@ -446,7 +479,11 @@ namespace AutoTerrainDesignations
                 if (provider.IsPathable(tile, pathParams.PathabilityQueryMask))
                     groundNodes.Add(tile);
                 else
-                    groundExclusionReasons[tile] = "NotPathable";
+                    groundExclusionReasons[tile] = hasT1DiagnosticMask
+                        && provider.IsPathable(
+                            tile, t1PathParams.PathabilityQueryMask)
+                                ? "T1Only"
+                                : "NotPathable";
             }
 
             Dictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin =
@@ -460,10 +497,18 @@ namespace AutoTerrainDesignations
                     oceanTiles,
                     projectedDesignationDisturbance,
                     ExtractVehicleClearance(pathParams),
+                    BuildTerrainOnlyPathabilityPredicate(
+                        provider, pathParams.PathabilityQueryMask,
+                        ExtractVehicleClearance(pathParams)),
+                    out Dictionary<Tile2i, AccessPropCleanupInfo> propCleanupByTile,
                     out AccessPropCleanupSnapshotDiagnostics cleanupDiagnostics);
             var prospectiveHandoffCache =
                 new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
             var prospectiveHandoffSpanCache =
+                new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
+            var prospectiveV2HandoffCache =
+                new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
+            var prospectiveV2HandoffSpanCache =
                 new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
 
             if (!TryBuildTowerReachableGround(tower, boundsMin, boundsMax,
@@ -500,6 +545,14 @@ namespace AutoTerrainDesignations
                 failureReason = "NoTowerRadialGroundGoals";
                 return false;
             }
+            if (vehicleClearance > 4)
+                LogV2GroundGraphDiagnostics(
+                    vehicleClearance,
+                    groundNodes,
+                    fullTowerGoalCount,
+                    towerReachableGround,
+                    propCleanupByTile,
+                    groundExclusionReasons);
             if (minHeight2 == int.MaxValue) { minHeight2 = 0; maxHeight2 = 0; }
 
             snapshot = new AccessSearchSnapshot(
@@ -550,25 +603,39 @@ namespace AutoTerrainDesignations
                 projectedFillDisturbedTiles: projectedDesignationDisturbance.FillTiles,
                 projectedCutSupportCeilings: projectedDesignationDisturbance.CutSupportCeilings,
                 projectedFillSurfaceFloors: projectedDesignationDisturbance.FillSurfaceFloors,
+                projectedCutSourcesByTile: projectedDesignationDisturbance.CutSourcesByTile,
+                projectedFillSourcesByTile: projectedDesignationDisturbance.FillSourcesByTile,
                 vehicleClearanceRadius: vehicleDisturbanceRadius,
                 avoidOcean: AccessAvoidOcean,
                 avoidBuildings: AccessAvoidBuildings,
                 vehicleWidth: vehicleClearance,
-                workableHandoffSpans: cells => BuildProspectiveWorkableHandoffSpan(
-                    cells, terrMgr, groundNodes, towerReachableGround,
-                    propCleanupByOrigin, vehicleClearance,
-                    prospectiveHandoffSpanCache));
+                 workableHandoffSpans: cells => BuildProspectiveWorkableHandoffSpan(
+                     cells, terrMgr, groundNodes, towerReachableGround,
+                     propCleanupByOrigin, vehicleClearance,
+                     prospectiveHandoffSpanCache),
+                 propCleanupByTile: propCleanupByTile,
+                 v2WorkableHandoffs:
+                    (origin, profile, predecessorOrigin, predecessorProfile) =>
+                        BuildProspectiveWorkableHandoffs(
+                            origin, profile, predecessorOrigin, predecessorProfile,
+                            terrMgr, groundNodes, towerReachableGround,
+                            propCleanupByOrigin, 1, prospectiveV2HandoffCache),
+                 v2WorkableHandoffSpans: cells =>
+                    BuildProspectiveWorkableHandoffSpan(
+                        cells, terrMgr, groundNodes, towerReachableGround,
+                        propCleanupByOrigin, 1,
+                        prospectiveV2HandoffSpanCache));
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
-                $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"[ATD Experimental Access Timing] phase=snapshot algorithm={(vehicleClearance > 4 ? snapshot.UseAStar ? "A*-ground/Dijkstra-fixed" : "Dijkstra" : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
+                $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"goals={snapshot.GoalCount} fullTowerGoals={fullTowerGoalCount} towerGroundStart={groundStart} " +
                 $"rayHeightSamples={preciseTerrainHeights.Count} rayMaterialColumns={terrainColumns.Count} " +
-                $"dumpingSlope={dumpingMaterialSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
-                $"fallbackMiningSlope={fallbackMiningSlope.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"dumpingSlope={dumpingMaterialSlope.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                $"fallbackMiningSlope={fallbackMiningSlope.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"hasDumpingMaterial={hasDumpingMaterial} " +
                 $"maxHandoffSpan={AccessPathSearch.GetMaxHandoffSpanLength(vehicleClearance)} " +
-                $"rayConservatism={AutoTerrainDesignationsMod.AccessRaySlopeConservatism.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"rayConservatism={AutoTerrainDesignationsMod.AccessRaySlopeConservatism.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"rayBuffer={AutoTerrainDesignationsMod.AccessRayEndBuffer} " +
                 $"candidateRayMaxDistance={AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance} " +
                 $"avoidOcean={snapshot.AvoidOcean} avoidBuildings={snapshot.AvoidBuildings} " +
@@ -703,11 +770,15 @@ namespace AutoTerrainDesignations
             ISet<Tile2i> oceanTiles,
             ProjectedDesignationDisturbance projectedDesignationDisturbance,
             RelTile1i requiredClearance,
+            Func<Tile2i, bool> isTerrainPathableWithoutBlockers,
+            out Dictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile,
             out AccessPropCleanupSnapshotDiagnostics diagnostics)
         {
             diagnostics = new AccessPropCleanupSnapshotDiagnostics();
             var samplesByOrigin = new Dictionary<Tile2i, List<AccessPropSample>>();
             var blockersByOrigin = new Dictionary<Tile2i, AccessPropBlockerKind>();
+            var samplesByTile = new Dictionary<Tile2i, List<AccessPropSample>>();
+            var blockersByTile = new Dictionary<Tile2i, AccessPropBlockerKind>();
             var buildingBlockedGroundTiles = new HashSet<Tile2i>();
             foreach (Tile2i occupiedTile in s_buildingOccupiedTiles)
                 foreach (Tile2i blockedCenter in EnumerateBlockedCenterTilesForOccupiedTile(
@@ -747,8 +818,11 @@ namespace AutoTerrainDesignations
                                 oceanTiles,
                                 buildingBlockedGroundTiles,
                                 projectedDesignationDisturbance,
+                                isTerrainPathableWithoutBlockers,
                                 samplesByOrigin,
-                                blockersByOrigin);
+                                blockersByOrigin,
+                                samplesByTile,
+                                blockersByTile);
                             diagnostics.RecordSample(tile, origin, sample, blocker);
                             diagnostics.PropSamples++;
                         }
@@ -780,8 +854,11 @@ namespace AutoTerrainDesignations
                             oceanTiles,
                             buildingBlockedGroundTiles,
                             projectedDesignationDisturbance,
+                            isTerrainPathableWithoutBlockers,
                             samplesByOrigin,
-                            blockersByOrigin);
+                            blockersByOrigin,
+                            samplesByTile,
+                            blockersByTile);
                         diagnostics.RecordSample(tile, origin, sample, blocker);
                         diagnostics.TreeSamples++;
                     }
@@ -811,7 +888,77 @@ namespace AutoTerrainDesignations
                 }
             }
 
+            cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            foreach (KeyValuePair<Tile2i, List<AccessPropSample>> pair in samplesByTile)
+            {
+                blockersByTile.TryGetValue(
+                    pair.Key, out AccessPropBlockerKind blockerKind);
+                cleanupByTile[pair.Key] = AccessPropCleanupPolicy.BuildOriginInfo(
+                    TerrainDesignation.GetOrigin(pair.Key), pair.Value, blockerKind);
+            }
+
             return cleanupByOrigin;
+        }
+
+        private static void LogV2GroundGraphDiagnostics(
+            int vehicleClearance,
+            IReadOnlyCollection<Tile2i> groundNodes,
+            int towerReachableGroundCount,
+            IReadOnlyCollection<Tile2i> towerGoals,
+            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile,
+            IReadOnlyDictionary<Tile2i, string> exclusionReasons)
+        {
+            int eligibleCleanupTiles = 0;
+            int blockedCleanupTiles = 0;
+            var cleanupKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (AccessPropCleanupInfo info in cleanupByTile.Values)
+            {
+                if (info.IsEligible)
+                {
+                    eligibleCleanupTiles++;
+                    for (int index = 0; index < info.Samples.Count; index++)
+                        cleanupKeys.Add(info.Samples[index].CleanupObjectKey);
+                }
+                else if (info.BlockerKind != AccessPropBlockerKind.None)
+                    blockedCleanupTiles++;
+            }
+
+            string exclusions = string.Join(",", exclusionReasons.Values
+                .GroupBy(reason => reason.StartsWith(
+                    "DesignatedOrigin@", StringComparison.Ordinal)
+                        ? "DesignatedOrigin" : reason)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => $"{group.Key}:{group.Count()}"));
+            LogExperimentalAccessDebug(
+                $"[ATD V2 Ground Graph] vehicleWidth={vehicleClearance} " +
+                $"pathableCenters={groundNodes.Count} " +
+                $"towerReachableCenters={towerReachableGroundCount} " +
+                $"sparseTowerGoals={towerGoals.Count} " +
+                $"cleanupEligibleCenters={eligibleCleanupTiles} " +
+                $"cleanupBlockedCenters={blockedCleanupTiles} " +
+                $"distinctCleanupObjects={cleanupKeys.Count} " +
+                $"exclusions=[{exclusions}]");
+        }
+
+        private static bool TryGetTierExcavatorPathFindingParams(
+            string tierToken,
+            out VehiclePathFindingParams pathFindingParams)
+        {
+            if (s_protosDb != null)
+            {
+                foreach (ExcavatorProto proto in s_protosDb.All<ExcavatorProto>()
+                    .OrderBy(candidate => candidate.Id.Value, StringComparer.Ordinal))
+                {
+                    if (proto.Id.Value.IndexOf(
+                            tierToken, StringComparison.OrdinalIgnoreCase) < 0)
+                        continue;
+                    pathFindingParams = proto.PathFindingParams;
+                    return true;
+                }
+            }
+            pathFindingParams = VehiclePathFindingParams.DEFAULT;
+            return false;
         }
 
         private static AccessPropBlockerKind AddCleanupSample(
@@ -824,8 +971,11 @@ namespace AutoTerrainDesignations
             ISet<Tile2i> oceanTiles,
             ISet<Tile2i> buildingBlockedGroundTiles,
             ProjectedDesignationDisturbance projectedDesignationDisturbance,
+            Func<Tile2i, bool> isTerrainPathableWithoutBlockers,
             Dictionary<Tile2i, List<AccessPropSample>> samplesByOrigin,
-            Dictionary<Tile2i, AccessPropBlockerKind> blockersByOrigin)
+            Dictionary<Tile2i, AccessPropBlockerKind> blockersByOrigin,
+            Dictionary<Tile2i, List<AccessPropSample>> samplesByTile,
+            Dictionary<Tile2i, AccessPropBlockerKind> blockersByTile)
         {
             if (!samplesByOrigin.TryGetValue(origin, out List<AccessPropSample> samples))
             {
@@ -833,14 +983,25 @@ namespace AutoTerrainDesignations
                 samplesByOrigin[origin] = samples;
             }
             samples.Add(sample);
+            if (!samplesByTile.TryGetValue(tile, out List<AccessPropSample> tileSamples))
+            {
+                tileSamples = new List<AccessPropSample>();
+                samplesByTile[tile] = tileSamples;
+            }
+            tileSamples.Add(sample);
 
             AccessPropBlockerKind blocker = GetCleanupBlockerKind(
                 tower, origin, tile, groundHeight2, designatedOrigins,
-                oceanTiles, buildingBlockedGroundTiles, projectedDesignationDisturbance);
+                oceanTiles, buildingBlockedGroundTiles, projectedDesignationDisturbance,
+                isTerrainPathableWithoutBlockers);
             if (blocker != AccessPropBlockerKind.None
                 && (!blockersByOrigin.TryGetValue(origin, out AccessPropBlockerKind existing)
                     || existing == AccessPropBlockerKind.None))
                 blockersByOrigin[origin] = blocker;
+            if (blocker != AccessPropBlockerKind.None
+                && (!blockersByTile.TryGetValue(tile, out AccessPropBlockerKind tileExisting)
+                    || tileExisting == AccessPropBlockerKind.None))
+                blockersByTile[tile] = blocker;
             return blocker;
         }
 
@@ -897,6 +1058,31 @@ namespace AutoTerrainDesignations
             return ClearancePathabilityProvider.ExtractClearanceFromMask(ref mask);
         }
 
+        private static Func<Tile2i, bool> BuildTerrainOnlyPathabilityPredicate(
+            IPathabilityProvider provider,
+            Mafi.Numerics.UInt128 pathabilityMask,
+            RelTile1i clearance)
+        {
+            // Each clearance column occupies ten mask bits. Bit zero is the
+            // generic TerrainManager.BlocksVehicles flag used by props and
+            // trees. Remove only that bit; retain the selected vehicle's slope,
+            // height-clearance, ocean, and encoded footprint requirements.
+            for (int x = 0; x < clearance.Value; x++)
+                pathabilityMask &= ~(
+                    Mafi.Numerics.UInt128.One << (x * 10));
+
+            var cache = new Dictionary<Tile2i, bool>();
+            return tile =>
+            {
+                if (!cache.TryGetValue(tile, out bool pathable))
+                {
+                    pathable = provider.IsPathable(tile, pathabilityMask);
+                    cache.Add(tile, pathable);
+                }
+                return pathable;
+            };
+        }
+
         private static AccessPropBlockerKind GetCleanupBlockerKind(
             IAreaManagingTower tower,
             Tile2i origin,
@@ -905,7 +1091,8 @@ namespace AutoTerrainDesignations
             ISet<Tile2i> designatedOrigins,
             ISet<Tile2i> oceanTiles,
             ISet<Tile2i> buildingBlockedGroundTiles,
-            ProjectedDesignationDisturbance projectedDesignationDisturbance)
+            ProjectedDesignationDisturbance projectedDesignationDisturbance,
+            Func<Tile2i, bool> isTerrainPathableWithoutBlockers)
         {
             if (!IsOriginInsideTower(tower, origin) || !tower.Area.ContainsTile(tile))
                 return AccessPropBlockerKind.OutOfArea;
@@ -919,6 +1106,8 @@ namespace AutoTerrainDesignations
                 return AccessPropBlockerKind.Ocean;
             if (projectedDesignationDisturbance.Contains(tile))
                 return AccessPropBlockerKind.Durability;
+            if (!isTerrainPathableWithoutBlockers(tile))
+                return AccessPropBlockerKind.UnderlyingTerrain;
             return AccessPropBlockerKind.None;
         }
 
@@ -965,9 +1154,45 @@ namespace AutoTerrainDesignations
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
-            int requiredWidth,
             float maxCostLimit = float.MaxValue)
         {
+            int requiredWidth = snapshot.VehicleWidth > 4 ? 2 : 1;
+            List<Tile2i> fixedGoals = fixedGoalOrigins.Distinct().ToList();
+            AccessV2EndpointSet? v2Endpoints = requiredWidth == 2
+                ? AccessV2FrontageDiscovery.Build(
+                    snapshot,
+                    cluster.Origins.Select(origin => origin.Origin),
+                    fixedGoals)
+                : null;
+            if (v2Endpoints != null)
+            {
+                AccessV2FrontageDiagnostics diagnostics = v2Endpoints.Diagnostics;
+                string rejections = diagnostics.Rejections.Count == 0
+                    ? "none"
+                    : string.Join(",", diagnostics.Rejections
+                        .OrderByDescending(pair => pair.Value)
+                        .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Take(12)
+                        .Select(pair => $"{pair.Key}:{pair.Value}"));
+                string startSamples = string.Join(";", v2Endpoints.Starts.Take(8)
+                    .Select(start =>
+                        $"{start.State.Anchor}/{start.State.Axis}/{start.State.EntryDirection}" +
+                        (start.HasSyntheticCompanion
+                            ? $"/synthetic={start.SyntheticCompanionOrigin.GetValueOrDefault()}"
+                            : "/fixed-pair")));
+                string goalSamples = string.Join(";", v2Endpoints.FixedGoals.Take(8)
+                    .Select(goal =>
+                        $"{goal.State.Anchor}/{goal.State.Axis}/exposed={goal.ExposedDirection}"));
+                LogExperimentalAccessDebug(
+                    $"[ATD V2 Frontages] seeds={diagnostics.SeedCount} " +
+                    $"starts={v2Endpoints.Starts.Count} " +
+                    $"syntheticStarts={diagnostics.SyntheticStartCount} " +
+                    $"existingPairStarts={diagnostics.ExistingPairStartCount} " +
+                    $"fixedGoalOrigins={diagnostics.FixedGoalOriginCount} " +
+                    $"fixedFrontages={v2Endpoints.FixedGoals.Count} " +
+                    $"rejections=[{rejections}] startSamples=[{startSamples}] " +
+                    $"goalSamples=[{goalSamples}]");
+            }
             return new AccessPathRequest(
                 $"merged-goals-cluster-{cluster.ClusterId}",
                 snapshot,
@@ -975,11 +1200,12 @@ namespace AutoTerrainDesignations
                     AccessPathEndpointKind.FixedProfiles,
                     cluster.Origins.Select(origin => origin.Origin)),
                 new AccessPathEndpoint(
-                    fixedGoalOrigins,
+                    fixedGoals,
                     snapshot.GoalGroundNodes),
                 requiredWidth,
                 AccessPathIntent.ConstructAccessway,
-                maxCostLimit);
+                maxCostLimit,
+                v2Endpoints);
         }
 
         private sealed class ExperimentalAccessDryRunResult
@@ -1021,7 +1247,7 @@ namespace AutoTerrainDesignations
             createSessionTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
-                $"createMs={createSessionTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                $"createMs={createSessionTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"complete={session.IsComplete} pending={session.PendingNodes} visited={session.VisitedNodes}");
             int frames = 0;
             TimeSpan maxSlice = TimeSpan.Zero;
@@ -1041,9 +1267,9 @@ namespace AutoTerrainDesignations
                         slowStepLogCount++;
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Search SlowStep] request={request.RequestId} " +
-                            $"cluster={cluster.ClusterId} stepMs={stepTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} " +
+                            $"cluster={cluster.ClusterId} stepMs={stepTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                             $"visited={session.VisitedNodes} pending={session.PendingNodes} " +
-                            $"elapsedMs={searchTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)}");
+                            $"elapsedMs={searchTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)}");
                     }
                 }
                 while (!session.IsComplete
@@ -1164,8 +1390,8 @@ namespace AutoTerrainDesignations
                     .Select(pair => $"{pair.Key}:{pair.Value}"));
             string reason = string.IsNullOrEmpty(result.FailureReason) ? "none" : result.FailureReason;
             string cost = result.Cost.ToString("0.##", CultureInfo.InvariantCulture);
-            string searchMs = elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
-            string maxSliceMs = maxSlice.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+            string searchMs = elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
+            string maxSliceMs = maxSlice.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
             string landslideRun = snapshot.LandslideRunPerHeight.ToString("0.##", CultureInfo.InvariantCulture);
             AccessSearchDiagnostics diag = result.Diagnostics;
             double ticksToMs = 1000d / Stopwatch.Frequency;
@@ -1180,17 +1406,17 @@ namespace AutoTerrainDesignations
                 $"fixed=[checks:{diag.FixedProfileSuccessorChecks},relax:{diag.FixedProfileRelaxations}] " +
                 $"goals=[pops:{diag.GoalPops},rejected:{diag.GoalRejected},acceptedAt:{diag.GoalAcceptedAtVisited}] " +
                 $"queue=[relax:{diag.QueueRelaxations},stale:{diag.QueueStalePops}] " +
-                $"timingMs=[ground:{(diag.GroundExpansionTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"origin:{(diag.OriginExpansionTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"profile:{(diag.ProfileFeasibilityTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"handoff:{(diag.HandoffValidationTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"history:{(diag.PathHistoryTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"sideRay:{(diag.SideRayCostTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}," +
-                $"prop:{(diag.PropCleanupTicks * ticksToMs).ToString("0.###", CultureInfo.InvariantCulture)}]";
+                $"timingMs=[ground:{(diag.GroundExpansionTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"origin:{(diag.OriginExpansionTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"profile:{(diag.ProfileFeasibilityTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"handoff:{(diag.HandoffValidationTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"history:{(diag.PathHistoryTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"sideRay:{(diag.SideRayCostTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                $"prop:{(diag.PropCleanupTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}]";
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access] request={request.RequestId} " +
                 $"{FormatAccessPathRequest(request)} cluster={cluster.ClusterId} " +
-                $"algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
+                $"algorithm={(request.RequiredWidth == 2 ? AccessPathSearch.ShouldUseV2AStar(request) ? "A*" : "Dijkstra" : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"success={result.Success} reason={reason} start=({result.StartOrigin.X},{result.StartOrigin.Y}) " +
                 $"goals={request.Goal.Nodes.Count} reachedGoal={result.ReachedGoalKind} landslideRun={landslideRun} " +
                 $"landslideSources={snapshot.LandslideSourceCount} cost={cost} " +
@@ -1198,6 +1424,22 @@ namespace AutoTerrainDesignations
                 $"searchMs={searchMs} maxSliceMs={maxSliceMs} " +
                 $"{diagnostics} " +
                 $"rejections=[{rejections}]");
+            if (diag.StartSuccessorDetails.Count > 0)
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access Start Successors] cluster={cluster.ClusterId} " +
+                    string.Join("; ", diag.StartSuccessorDetails));
+            if (diag.FirstGeneratedHandoffDetails.Count > 0)
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access First Handoffs] cluster={cluster.ClusterId} " +
+                    string.Join("; ", diag.FirstGeneratedHandoffDetails));
+            if (!string.IsNullOrEmpty(diag.V2DryRunSummary))
+                LogExperimentalAccessDebug(
+                    $"[ATD V2 Search] cluster={cluster.ClusterId} " +
+                    diag.V2DryRunSummary);
+            if (!string.IsNullOrEmpty(diag.V2DryRunPath))
+                LogExperimentalAccessDebug(
+                    $"[ATD V2 Search Path] cluster={cluster.ClusterId} " +
+                    diag.V2DryRunPath);
             if (result.Success)
             {
                 LogExperimentalAccessDebug($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
@@ -1207,7 +1449,7 @@ namespace AutoTerrainDesignations
                 AccessDesignationPlan plan = AccessPathMaterializer.Materialize(snapshot, result);
                 materializeTimer.Stop();
                 LastExperimentalAccessPlan = plan;
-                string materializeMs = materializeTimer.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
+                string materializeMs = materializeTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
                 float selectedSideRayCost = result.LeftSideRayCost
                     + result.RightSideRayCost
                     + result.SideRayUnresolvedPenalty;
@@ -1958,7 +2200,7 @@ namespace AutoTerrainDesignations
                 }
                 diagnostic =
                     "deltas=[" + string.Join(",", heightDeltas.Select(
-                        delta => delta.ToString("0.###", CultureInfo.InvariantCulture))) + "]"
+                        delta => delta.ToString("0.##", CultureInfo.InvariantCulture))) + "]"
                     + " connectedCorners=" + connectedA + "," + connectedB
                     + " groundCorners=" + handoffA + "," + handoffB;
             }
@@ -1977,12 +2219,6 @@ namespace AutoTerrainDesignations
                     + " groundEdgeDeltas=[" + FormatHeightDeltas(handoffDeltas) + "]";
 
             bool groundEdgeLevel = handoffSigns.All(sign => sign == 0);
-            if (groundEdgeLevel)
-            {
-                operation = AccessHandoffOperation.Leveling;
-                return true;
-            }
-
             bool mining = connectedSigns.All(sign => sign <= 0)
                 && connectedSigns.Any(sign => sign < 0)
                 && HasVanillaWorkableExitLane(isMining: true);
@@ -1998,6 +2234,12 @@ namespace AutoTerrainDesignations
             if (dumping)
             {
                 operation = AccessHandoffOperation.Dumping;
+                return true;
+            }
+
+            if (groundEdgeLevel)
+            {
+                operation = AccessHandoffOperation.Leveling;
                 return true;
             }
 
@@ -2074,7 +2316,7 @@ namespace AutoTerrainDesignations
 
         private static string FormatHeightDeltas(IEnumerable<float> deltas)
             => string.Join(",", deltas.Select(
-                delta => delta.ToString("0.###", CultureInfo.InvariantCulture)));
+                delta => delta.ToString("0.##", CultureInfo.InvariantCulture)));
 
         private static int CompareProfileHeightToGround(int profileHeight2, float groundHeight)
             => CompareHeightDeltaToGround(profileHeight2 * 0.5f - groundHeight);
@@ -2151,7 +2393,9 @@ namespace AutoTerrainDesignations
             Tile2i towerPosition,
             TerrainManager terrMgr)
         {
-            if (!result.Success || plan == null || !plan.IsValid || plan.Designations.Count == 0)
+            if (!result.Success || plan == null || !plan.IsValid
+                || (plan.Designations.Count == 0
+                    && plan.CleanupOrigins.Count == 0))
                 return null;
 
             var rampTiles = new List<RampTilePlan>(plan.Designations.Count);
@@ -2168,7 +2412,11 @@ namespace AutoTerrainDesignations
 
             Tile2i terminal = plan.GroundNodeCount > 0
                 ? plan.HandoffGround
-                : result.Path[result.Path.Count - 1].Position;
+                : result.V2Route != null
+                    ? AccessPathSearch.GetV2CanonicalCenter(
+                        result.V2Route.States[
+                            result.V2Route.States.Count - 1])
+                    : result.Path[result.Path.Count - 1].Position;
             int dx = towerPosition.X - terminal.X;
             int dy = towerPosition.Y - terminal.Y;
             return new EvaluatedAccessCandidate(
@@ -2177,7 +2425,8 @@ namespace AutoTerrainDesignations
                 isReachableNow: true,
                 mouthDistance: dx * dx + dy * dy,
                 materialMoved: CalculateUselessMaterialMoved(rampTiles, terrMgr),
-                designationCount: plan.Designations.Count,
+                designationCount: plan.Designations.Count
+                    + plan.CleanupOrigins.Count,
                 stableOrder: int.MaxValue,
                 sourceCandidate: new ExperimentalAccessCandidate(result, plan));
         }
@@ -2202,15 +2451,21 @@ namespace AutoTerrainDesignations
             }
 
             AccessDesignationPlan placementPlan = AccessPathMaterializer.Materialize(snapshot, candidate.SearchResult);
-            if (!placementPlan.IsValid || placementPlan.Designations.Count == 0)
+            if (!placementPlan.IsValid
+                || (placementPlan.Designations.Count == 0
+                    && placementPlan.CleanupOrigins.Count == 0))
             {
-                failureReason = placementPlan.IsValid ? "EmptyPlan" : placementPlan.FailureReason;
+                failureReason = placementPlan.IsValid
+                    ? "EmptyPlan" : placementPlan.FailureReason;
                 return false;
             }
 
             var placedCleanupDesignations = new List<PlacedExperimentalDesignation>();
+            var plannedTerrainWorkOrigins = new HashSet<Tile2i>(
+                placementPlan.Designations.Select(item => item.Origin));
             if (!TryPlaceDenseDebrisCleanupDesignations(
                     placementPlan.CleanupOrigins,
+                    plannedTerrainWorkOrigins,
                     tower,
                     reservedRampTiles,
                     placedCleanupDesignations,
@@ -2240,7 +2495,10 @@ namespace AutoTerrainDesignations
             bool hasGeneratedTerminal = TryGetGeneratedTerminal(
                 candidate.SearchResult, out terminalOrigin);
             Dictionary<Tile2i, AccessHandoffOperation> generatedHandoffOperations =
-                BuildGeneratedHandoffOperations(candidate.SearchResult);
+                placementPlan.HandoffOperationsByOrigin.Count > 0
+                    ? placementPlan.HandoffOperationsByOrigin.ToDictionary(
+                        pair => pair.Key, pair => pair.Value)
+                    : BuildGeneratedHandoffOperations(candidate.SearchResult);
             var placedNow = new List<PlacedExperimentalDesignation>(placementPlan.Designations.Count);
             int placementIndex = -1;
             foreach (AccessPlannedDesignation item in placementPlan.Designations)
@@ -2326,7 +2584,9 @@ namespace AutoTerrainDesignations
             }
 
             placedRampOrigins?.AddRange(placedNow.Select(item => item.Origin));
-            topRowTile = placementPlan.Designations[placementPlan.Designations.Count - 1].Origin;
+            topRowTile = placementPlan.Designations.Count > 0
+                ? placementPlan.Designations[placementPlan.Designations.Count - 1].Origin
+                : placementPlan.HandoffGround;
             LastExperimentalAccessPlan = placementPlan;
             s_lastExperimentalCleanupDesignations.AddRange(placedCleanupDesignations);
             s_lastExperimentalCleanupTreeSelections.AddRange(selectedCleanupTrees);
@@ -2334,8 +2594,77 @@ namespace AutoTerrainDesignations
             return true;
         }
 
+        private static bool ValidatePlacedV2Provider(
+            AccessSearchResult result,
+            AccessDesignationPlan plan,
+            TerrainDesignationProto accesswayProto,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (result.V2Route == null
+                || result.V2Route.States.Count == 0
+                || s_desigManager == null)
+            {
+                reason = "MissingRouteOrManager";
+                return false;
+            }
+            if (result.V2Route.Handoff != null
+                && plan.GroundNodeCount == 0)
+            {
+                reason = "MissingGroundHandoff";
+                return false;
+            }
+
+            foreach (AccessPlannedDesignation item in plan.Designations)
+            {
+                Option<TerrainDesignation> placed =
+                    s_desigManager.GetDesignationAt(item.Origin);
+                if (!placed.HasValue)
+                {
+                    reason = $"MissingDesignation@{item.Origin}";
+                    return false;
+                }
+                TerrainDesignationProto expected = accesswayProto;
+                if (plan.HandoffOperationsByOrigin.TryGetValue(
+                        item.Origin, out AccessHandoffOperation operation))
+                {
+                    expected = operation == AccessHandoffOperation.Mining
+                        ? s_miningProto ?? accesswayProto
+                        : operation == AccessHandoffOperation.Dumping
+                            ? s_dumpingProto ?? accesswayProto
+                            : operation == AccessHandoffOperation.Leveling
+                                ? s_levelingProto ?? accesswayProto
+                                : accesswayProto;
+                }
+                if (placed.Value.Prototype != expected)
+                {
+                    reason = $"ProtoMismatch@{item.Origin}";
+                    return false;
+                }
+                int nw = GetDesignationTargetHeightRounded(
+                    placed.Value, 0, 0) * 2;
+                int ne = GetDesignationTargetHeightRounded(
+                    placed.Value, 4, 0) * 2;
+                int se = GetDesignationTargetHeightRounded(
+                    placed.Value, 4, 4) * 2;
+                int sw = GetDesignationTargetHeightRounded(
+                    placed.Value, 0, 4) * 2;
+                if (nw != item.Profile.Nw2
+                    || ne != item.Profile.Ne2
+                    || se != item.Profile.Se2
+                    || sw != item.Profile.Sw2)
+                {
+                    reason = $"ProfileMismatch@{item.Origin}";
+                    return false;
+                }
+            }
+            reason = "ValidatedProfilesAndMegaSeam";
+            return true;
+        }
+
         private static bool TryPlaceDenseDebrisCleanupDesignations(
             IReadOnlyList<AccessPropCleanupInfo> cleanupOrigins,
+            ISet<Tile2i> plannedTerrainWorkOrigins,
             IAreaManagingTower tower,
             HashSet<Tile2i>? reservedRampTiles,
             List<PlacedExperimentalDesignation> placedCleanupDesignations,
@@ -2371,6 +2700,7 @@ namespace AutoTerrainDesignations
 
             TerrainManager terrMgr = s_desigManager.TerrainManager;
             var placedCleanupOrigins = new HashSet<Tile2i>();
+            int coveredByTerrainWork = 0;
             foreach (KeyValuePair<string, AccessPropCleanupInfo> pair in cleanupByObjectKey)
             {
                 if (!TrySelectDenseDebrisCleanupOrigin(
@@ -2378,6 +2708,17 @@ namespace AutoTerrainDesignations
                 {
                     failureReason = "DenseDebrisCleanupOriginUnavailable";
                     return false;
+                }
+                // The cleanup snapshot is indexed by the path/ground origin, but
+                // commit relocates a prop-removal designation to the prop's own
+                // canonical origin. That origin can be a generated V cell even
+                // when the snapshot cleanup origin was not. The terrain work is
+                // already the approved removal mechanism there; placing a
+                // separate +1 mining cleanup first would collide with the V cell.
+                if (plannedTerrainWorkOrigins.Contains(origin))
+                {
+                    coveredByTerrainWork++;
+                    continue;
                 }
                 if (!placedCleanupOrigins.Add(origin))
                     continue;
@@ -2402,7 +2743,8 @@ namespace AutoTerrainDesignations
 
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Cleanup] dense debris materialization origins={denseCleanupOrigins} " +
-                $"props={cleanupByObjectKey.Count} designations={placedCleanupDesignations.Count}");
+                $"props={cleanupByObjectKey.Count} designations={placedCleanupDesignations.Count} " +
+                $"coveredByTerrainWork={coveredByTerrainWork}");
             return true;
         }
 
@@ -2681,6 +3023,9 @@ namespace AutoTerrainDesignations
 
         private static string FormatExperimentalPath(AccessSearchResult result)
         {
+            if (result.V2Route != null)
+                return string.Join(" -> ",
+                    result.V2Route.States.Select(state => state.ToString()));
             var parts = new List<string>(result.Path.Count + 1)
             {
                 $"S@({result.StartOrigin.X},{result.StartOrigin.Y})"
@@ -3065,7 +3410,7 @@ namespace AutoTerrainDesignations
                                 && blocked.X <= relevantTerrainMax.X
                                 && blocked.Y >= relevantTerrainMin.Y
                                 && blocked.Y <= relevantTerrainMax.Y)
-                                result.Add(operation, blocked);
+                                result.Add(operation, blocked, origin);
                         }
                     }
                 }

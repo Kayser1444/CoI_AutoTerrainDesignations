@@ -56,6 +56,7 @@ namespace AutoTerrainDesignations
         internal static void ResetSettingsToDefaults()
         {
             AutoTerrainDesignationsMod.ResetGlobalDefaults();
+            ShowCursorOverlay = false;
             ResetWorldPathfinderSettingsToDefaults();
             s_batchSize = BATCH_SIZE;
             ResetPurityLevelDefaults();
@@ -488,6 +489,14 @@ namespace AutoTerrainDesignations
                 if (experimentalAccessUseAStar.HasValue && ShouldPreserveBool(experimentalAccessUseAStar.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(experimentalAccessUseAStar.Value);
 
+                bool? cursorOverlayEnabled = ParseBool(json, "cursorOverlayEnabled");
+                if (cursorOverlayEnabled.HasValue
+                    && ShouldPreserveBool(
+                        cursorOverlayEnabled.Value,
+                        migrateGeneratedDefaults,
+                        false))
+                    ShowCursorOverlay = cursorOverlayEnabled.Value;
+
                 bool? accessAvoidOcean = ParseBool(json, "accessAvoidOcean");
                 if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidOcean(accessAvoidOcean.Value);
@@ -544,8 +553,15 @@ namespace AutoTerrainDesignations
                     AutoTerrainDesignationsMod.SetAccessRayEndBuffer(
                         accessRayEndBuffer.Value);
                 ApplyInt("accessCandidateRayMaxDistance", 16, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
-                ApplyFloat("accessRayMaxCost", 512f, AutoTerrainDesignationsMod.SetAccessRayMaxCost);
-                ApplyFloat("accessRayUnresolvedPenalty", 128f, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
+                float? accessRayMaxCost = ParseFloat(json, "accessRayMaxCost");
+                if (accessRayMaxCost.HasValue
+                    && ShouldPreserveFloat(accessRayMaxCost.Value, migrateGeneratedDefaults, 500f, 512f))
+                    AutoTerrainDesignationsMod.SetAccessRayMaxCost(accessRayMaxCost.Value);
+
+                float? accessRayUnresolvedPenalty = ParseFloat(json, "accessRayUnresolvedPenalty");
+                if (accessRayUnresolvedPenalty.HasValue
+                    && ShouldPreserveFloat(accessRayUnresolvedPenalty.Value, migrateGeneratedDefaults, 200f, 128f))
+                    AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty(accessRayUnresolvedPenalty.Value);
                 ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
                 ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
                 ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
@@ -920,13 +936,16 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for experimental access search. Set false for route and cost comparison. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that rejects pathfinder routes whose projected terrain disturbance reaches ocean. Currently applies only to accessway pathfinding, not Mining Designations generation. Default: true.\",");
+            sb.AppendLine("  \"_comment_cursorOverlayEnabled\": \"Whether to show the bottom-left terrain cursor coordinates at game start. Coordinates are displayed as (x, y, z). The atd_cursor_overlay console command can still override this for the current session. Default: false.\",");
+            sb.AppendLine($"  \"cursorOverlayEnabled\": {BoolToJsonStr(ShowCursorOverlay)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that avoids ocean in accessways and Mining Designations. Mining cells directly overlapping ocean are excluded and projected underwater cutting is avoided. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that rejects pathfinder routes whose projected terrain disturbance reaches a building safety footprint. Currently applies only to accessway pathfinding, not Mining Designations generation. Default: true.\",");
+            sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways mark every tree in their projected disturbance zones for harvest; when disabled, only trees required to clear the selected route are marked. Default: true.\",");
+            sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways and Mining Designations mark trees in their disturbance zones for harvest; when disabled, ATD creates no tree harvest orders. Default: true.\",");
             sb.AppendLine($"  \"accessHarvestDisruptedTrees\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
@@ -941,6 +960,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine($"  \"accessGeneratedVFixedCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessGeneratedVFixedCost)},");
             sb.AppendLine($"  \"accessDirectWorkWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessDirectWorkWeight)},");
             sb.AppendLine($"  \"accessSideRayWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessSideRayWeight)},");
+            sb.AppendLine("  \"_comment_safetyPolicyExpertValues\": \"Expert values behind the World settings Safety policy. Defaults by policy: MAX=[1.5,5], HIGH=[1.25,4], MED=[1.0,3], LOW=[0.9,2], MIN=[0.8,1]. Custom values are allowed and the UI displays the nearest policy.\",");
             sb.AppendLine($"  \"accessRaySlopeConservatism\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRaySlopeConservatism)},");
             sb.AppendLine($"  \"accessRayEndBuffer\": {AutoTerrainDesignationsMod.AccessRayEndBuffer},");
             sb.AppendLine($"  \"accessCandidateRayMaxDistance\": {AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance},");

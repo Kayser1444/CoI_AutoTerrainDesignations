@@ -39,6 +39,10 @@ namespace AutoTerrainDesignations
 
     public static partial class AutoDepthDesignation
     {
+        // Shared Chebyshev-distance margin around static building footprints for
+        // mining-body exclusion and accessway terrain-disturbance checks.
+        internal const int BuildingSafetyBufferTiles = 3;
+
         private static TerrainDesignationsManager? s_desigManager;
         private static TerrainDesignationProto? s_miningProto;
         private static TerrainDesignationProto? s_dumpingProto;
@@ -353,6 +357,12 @@ namespace AutoTerrainDesignations
         }
 
         internal static void MarkTowerMiningPlanDirty(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).MarkMiningPlanDirty();
+
+        internal static void MarkAllMiningPlansDirty()
+        {
+            foreach (ATDTowerSettings settings in s_towerSettingsByEntityId.Values)
+                settings.MarkMiningPlanDirty();
+        }
 
         internal static void MarkTowerMiningPlanClean(IAreaManagingTower tower, string fingerprint) =>
             GetOrCreateTowerSettings(tower).MarkMiningPlanClean(fingerprint);

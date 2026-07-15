@@ -23,7 +23,9 @@ using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Resources;
+using Mafi.Core.Terrain.Trees;
 using UnityEngine;
+using AutoTerrainDesignations.Access;
 
 namespace AutoTerrainDesignations
 {
@@ -133,6 +135,7 @@ namespace AutoTerrainDesignations
 
             var terrMgr = s_desigManager.TerrainManager;
             var towerSettings = GetOrCreateTowerSettings(tower);
+            BuildBuildingOccupiedTiles(tower, forceRefresh: true);
             string miningPlanFingerprint = BuildMiningPlanFingerprint(tower, towerSettings);
             bool autoScan = GetSelectedOre(tower) == null;
 
@@ -349,6 +352,22 @@ namespace AutoTerrainDesignations
                 }
             }
 
+            int directProtectedRemoved = RemoveDirectlyProtectedMiningTiles(maxOreDepths, terrMgr);
+            if (directProtectedRemoved > 0)
+            {
+                FilterIsolatedDesignations(maxOreDepths, targetProductIds, resourceDetailsByTile, purityLevel);
+                LogDebug($"Mining safety removed {directProtectedRemoved} directly protected designation(s).");
+            }
+
+            if (maxOreDepths.Count == 0)
+            {
+                RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
+                ClearGeneratedHarvestTreesForTower(tower);
+                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                yield break;
+            }
+
             LogDebug(string.Format("After filtering+connecting: {0} tiles in designations", maxOreDepths.Count));
             LogDebug("Selected product: " + selectedProduct?.Id);
 
@@ -357,6 +376,27 @@ namespace AutoTerrainDesignations
             LogDebug(string.Format("Creating designations for {0} tiles with overall max depth {1}", maxOreDepths.Count, maxOreDepthOverall));
 
             var cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
+            int rayProtectedRemoved = RemoveRayHazardMiningTiles(maxOreDepths, cornerHeights, terrMgr, tower);
+            if (rayProtectedRemoved > 0)
+            {
+                FilterIsolatedDesignations(maxOreDepths, targetProductIds, resourceDetailsByTile, purityLevel);
+                if (maxOreDepths.Count == 0)
+                {
+                    RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
+                    ClearGeneratedHarvestTreesForTower(tower);
+                    MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
+                    yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                    yield break;
+                }
+                cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
+                LogDebug($"Mining safety removed {rayProtectedRemoved} designation(s) with protected exterior disturbance.");
+            }
+
+            // Safety settings can make the new plan smaller.  Existing ATD-owned
+            // cells are not removed by AddOrReplaceDesignation, so discard only
+            // origins that no longer belong to the recalculated plan.
+            RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
+            ClearGeneratedHarvestTreesForTower(tower);
             HashSet<Tile2i> preexistingTerrainWorkOrigins =
                 CollectExistingTerrainWorkEndpointOrigins(tower);
             List<Tile2i> recreatedAccesswayOrigins = maxOreDepths.Keys
@@ -410,6 +450,8 @@ namespace AutoTerrainDesignations
             }
 
             LogDebug(string.Format("Created {0} designations", designCount));
+            if (AccessHarvestDisruptedTrees)
+                MarkMiningDisruptedTreesForHarvest(tower, maxOreDepths, terrMgr);
             MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
 
             if (generateRamps)
@@ -453,6 +495,310 @@ namespace AutoTerrainDesignations
             }
         }
 
+        private static int RemoveDirectlyProtectedMiningTiles(
+            Dict<Tile2i, int> tileDepths, TerrainManager terrMgr)
+        {
+            if (!AccessAvoidOcean && !AccessAvoidBuildings)
+                return 0;
+
+            var rejected = new List<Tile2i>();
+            foreach (Tile2i origin in tileDepths.Keys)
+            {
+                if (DesignationIntersectsProtectedMargin(origin, terrMgr))
+                    rejected.Add(origin);
+            }
+            foreach (Tile2i origin in rejected)
+                tileDepths.Remove(origin);
+            return rejected.Count;
+        }
+
+        private static bool DesignationIntersectsProtectedMargin(
+            Tile2i origin, TerrainManager terrMgr)
+        {
+            int landslideBuffer = AutoTerrainDesignationsMod.AccessRayEndBuffer;
+            if (AccessAvoidOcean)
+            {
+                for (int y = -landslideBuffer; y <= 3 + landslideBuffer; y++)
+                for (int x = -landslideBuffer; x <= 3 + landslideBuffer; x++)
+                {
+                    Tile2i tile = origin + new RelTile2i(x, y);
+                    if (terrMgr.IsValidCoord(tile) && terrMgr.IsOcean(tile))
+                        return true;
+                }
+            }
+
+            if (AccessAvoidBuildings)
+            {
+                int buildingMargin = landslideBuffer + BuildingSafetyBufferTiles;
+                for (int y = -buildingMargin; y <= 3 + buildingMargin; y++)
+                for (int x = -buildingMargin; x <= 3 + buildingMargin; x++)
+                    if (s_buildingOccupiedTiles.Contains(
+                        origin + new RelTile2i(x, y)))
+                        return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsWithinBuildingSafetyFootprint(Tile2i tile)
+        {
+            int safetyRadius = BuildingSafetyBufferTiles;
+            for (int y = tile.Y - safetyRadius; y <= tile.Y + safetyRadius; y++)
+            for (int x = tile.X - safetyRadius; x <= tile.X + safetyRadius; x++)
+                if (s_buildingOccupiedTiles.Contains(new Tile2i(x, y)))
+                    return true;
+            return false;
+        }
+
+        private static int RemoveRayHazardMiningTiles(
+            Dict<Tile2i, int> tileDepths, Dict<Tile2i, int> corners,
+            TerrainManager terrMgr, IAreaManagingTower tower)
+        {
+            if (!AccessAvoidOcean && !AccessAvoidBuildings)
+                return 0;
+
+            ResolveAccessMaterialSlopes(tower, out float dumpingSlope,
+                out float fallbackMiningSlope, out _, out _, out _);
+            var rejected = new List<Tile2i>();
+            foreach (Tile2i origin in tileDepths.Keys)
+            {
+                bool exposedWest = !tileDepths.ContainsKey(origin + new RelTile2i(-4, 0));
+                bool exposedEast = !tileDepths.ContainsKey(origin + new RelTile2i(4, 0));
+                bool exposedNorth = !tileDepths.ContainsKey(origin + new RelTile2i(0, -4));
+                bool exposedSouth = !tileDepths.ContainsKey(origin + new RelTile2i(0, 4));
+                bool hazardous =
+                    HasHazardOnBoundary(exposedWest, 0, 0, 0, 4, new Tile2i(-1, 0)) ||
+                    HasHazardOnBoundary(exposedEast, 4, 0, 4, 4, new Tile2i(1, 0)) ||
+                    HasHazardOnBoundary(exposedNorth, 0, 0, 4, 0, new Tile2i(0, -1)) ||
+                    HasHazardOnBoundary(exposedSouth, 0, 4, 4, 4, new Tile2i(0, 1));
+                if (hazardous)
+                    rejected.Add(origin);
+
+                bool HasHazardOnBoundary(bool exposed, int firstX, int firstY,
+                    int lastX, int lastY, Tile2i direction)
+                {
+                    if (!exposed)
+                        return false;
+                    for (int step = 0; step <= 4; step++)
+                    {
+                        int localX = firstX + (lastX - firstX) * step / 4;
+                        int localY = firstY + (lastY - firstY) * step / 4;
+                        Tile2i sample = origin + new RelTile2i(localX, localY);
+                        if (MiningRayHitsHazard(sample,
+                            GetPlannedHeight(localX, localY), direction))
+                            return true;
+                    }
+                    return false;
+                }
+
+                float GetPlannedHeight(int localX, int localY)
+                {
+                    if (!corners.TryGetValue(origin, out int nw)
+                        || !corners.TryGetValue(origin.AddX(4), out int ne)
+                        || !corners.TryGetValue(origin.AddXy(4), out int se)
+                        || !corners.TryGetValue(origin.AddY(4), out int sw))
+                        return terrMgr.GetHeight(origin + new RelTile2i(localX, localY)).Value.ToFloat();
+                    return (nw * (4 - localX) * (4 - localY)
+                        + ne * localX * (4 - localY)
+                        + sw * (4 - localX) * localY
+                        + se * localX * localY) / 16f;
+                }
+
+                bool MiningRayHitsHazard(Tile2i start, float plannedHeight, Tile2i direction)
+                {
+                    float rayHeight = plannedHeight;
+                    float terrainHeight = terrMgr.GetHeight(start).Value.ToFloat();
+                    AccessSideRayOperation operation = rayHeight < terrainHeight - 0.0001f
+                        ? AccessSideRayOperation.Cut
+                        : rayHeight > terrainHeight + 0.0001f
+                            ? AccessSideRayOperation.Fill : AccessSideRayOperation.None;
+                    if (operation == AccessSideRayOperation.None)
+                        return false;
+                    int maxDistance = direction.X != 0
+                        ? (direction.X < 0 ? start.X : terrMgr.TerrainSize.X - 1 - start.X)
+                        : (direction.Y < 0 ? start.Y : terrMgr.TerrainSize.Y - 1 - start.Y);
+                    for (int distance = 1; distance <= maxDistance; distance++)
+                    {
+                        Tile2i tile = start + new RelTile2i(direction.X * distance, direction.Y * distance);
+                        // Building rays are deliberately dense and resolve the material at every
+                        // step. This avoids treating a mixed-material slope as one long ray.
+                        float slope = dumpingSlope;
+                        if (operation == AccessSideRayOperation.Cut)
+                        {
+                            AccessTerrainColumn column = CaptureAccessTerrainColumn(terrMgr, tile);
+                            if (!column.TryGetNormalSlopeAt(rayHeight, out slope, out _))
+                                slope = fallbackMiningSlope;
+                        }
+                        rayHeight += operation == AccessSideRayOperation.Cut ? slope : -slope;
+                        float sampled = terrMgr.GetHeight(tile).Value.ToFloat();
+                        if (AccessAvoidBuildings && IsWithinBuildingSafetyFootprint(tile))
+                            return true;
+                        if (AccessAvoidOcean && operation == AccessSideRayOperation.Cut
+                            && terrMgr.IsOcean(tile) && rayHeight < 1f)
+                            return true;
+                        bool passedTerrain = operation == AccessSideRayOperation.Cut
+                            ? sampled <= rayHeight : sampled >= rayHeight;
+                        if (passedTerrain && (operation != AccessSideRayOperation.Cut || rayHeight >= 1f))
+                        {
+                            for (int tail = 1; tail <= AutoTerrainDesignationsMod.AccessRayEndBuffer; tail++)
+                            {
+                                Tile2i buffered = tile + new RelTile2i(direction.X * tail, direction.Y * tail);
+                                if (!terrMgr.IsValidCoord(buffered))
+                                    break;
+                                if ((AccessAvoidOcean && terrMgr.IsOcean(buffered))
+                                    || (AccessAvoidBuildings && IsWithinBuildingSafetyFootprint(buffered)))
+                                    return true;
+                            }
+                            return false;
+                        }
+                    }
+                    return false;
+                }
+            }
+            foreach (Tile2i origin in rejected)
+                tileDepths.Remove(origin);
+            return rejected.Count;
+        }
+
+        private static void MarkMiningDisruptedTreesForHarvest(
+            IAreaManagingTower tower, Dict<Tile2i, int> tileDepths, TerrainManager terrMgr)
+        {
+            if (s_treesManager == null || s_desigManager == null)
+                return;
+            var disturbed = new HashSet<Tile2i>();
+            foreach (Tile2i origin in tileDepths.Keys)
+                for (int y = 0; y < 4; y++)
+                for (int x = 0; x < 4; x++)
+                    disturbed.Add(origin + new RelTile2i(x, y));
+
+            var finalizedDesignations = new Dictionary<Tile2i, TerrainDesignation>();
+            foreach (Tile2i origin in tileDepths.Keys)
+            {
+                Option<TerrainDesignation> designation = s_desigManager.GetDesignationAt(origin);
+                if (designation.HasValue)
+                    finalizedDesignations[origin] = designation.Value;
+            }
+
+            ResolveAccessMaterialSlopes(tower, out float dumpingSlope,
+                out float fallbackMiningSlope, out _, out _, out _);
+            if (finalizedDesignations.Count > 0)
+            {
+                int margin = AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    + AutoTerrainDesignationsMod.AccessRayEndBuffer;
+                int minX = Math.Max(0, tileDepths.Keys.Min(origin => origin.X) - margin);
+                int minY = Math.Max(0, tileDepths.Keys.Min(origin => origin.Y) - margin);
+                int maxX = Math.Min(terrMgr.TerrainSize.X - 1,
+                    tileDepths.Keys.Max(origin => origin.X + 4) + margin);
+                int maxY = Math.Min(terrMgr.TerrainSize.Y - 1,
+                    tileDepths.Keys.Max(origin => origin.Y + 4) + margin);
+                ProjectedDesignationDisturbance projection =
+                    BuildProjectedDesignationDisturbedTiles(
+                        finalizedDesignations,
+                        terrMgr,
+                        new Dictionary<Tile2i, float>(),
+                        new Dictionary<Tile2i, AccessTerrainColumn>(),
+                        new Tile2i(minX, minY),
+                        new Tile2i(maxX, maxY),
+                        Tile2i.Zero,
+                        new Tile2i(terrMgr.TerrainSize.X - 1, terrMgr.TerrainSize.Y - 1),
+                        dumpingSlope,
+                        fallbackMiningSlope,
+                        vehicleDisturbanceRadius: 0,
+                        out string projectionFailure);
+                if (!string.IsNullOrEmpty(projectionFailure))
+                {
+                    Log.Warning("[ATD] Mining tree-harvest projection failed: " + projectionFailure);
+                }
+                else
+                {
+                    disturbed.UnionWith(projection.CutTiles);
+                    disturbed.UnionWith(projection.FillTiles);
+                }
+
+                // The shared projection traces each 4x4 edge from its corners. Trees are
+                // point objects, however, and an excavated edge can disturb every intervening
+                // world tile. Sweep all five samples on every exposed edge so harvesting is
+                // conservative even on a tilted designation or a stepped mine boundary.
+                foreach (KeyValuePair<Tile2i, TerrainDesignation> pair in finalizedDesignations)
+                {
+                    Tile2i origin = pair.Key;
+                    AccessHeightProfile profile = ProfileFromDesignation(pair.Value);
+                    if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(-4, 0)))
+                        for (int y = 0; y <= 4; y++)
+                            AddBoundarySweep(origin + new RelTile2i(0, y),
+                                profile.GetHeight2NumeratorAt(0, y) / 32f, new Tile2i(-1, 0));
+                    if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(4, 0)))
+                        for (int y = 0; y <= 4; y++)
+                            AddBoundarySweep(origin + new RelTile2i(4, y),
+                                profile.GetHeight2NumeratorAt(4, y) / 32f, new Tile2i(1, 0));
+                    if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(0, -4)))
+                        for (int x = 0; x <= 4; x++)
+                            AddBoundarySweep(origin + new RelTile2i(x, 0),
+                                profile.GetHeight2NumeratorAt(x, 0) / 32f, new Tile2i(0, -1));
+                    if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(0, 4)))
+                        for (int x = 0; x <= 4; x++)
+                            AddBoundarySweep(origin + new RelTile2i(x, 4),
+                                profile.GetHeight2NumeratorAt(x, 4) / 32f, new Tile2i(0, 1));
+                }
+            }
+
+            var addedTrees = new List<TreeId>();
+            foreach (KeyValuePair<TreeId, TreeData> pair in s_treesManager.Trees)
+            {
+                Tile2i position = pair.Key.Position.AsFull;
+                if (!disturbed.Contains(position) || s_treesManager.IsTreeSelected(pair.Key))
+                    continue;
+                s_treesManager.AddToHarvest(pair.Key);
+                addedTrees.Add(pair.Key);
+            }
+            RegisterGeneratedHarvestTreePositions(tower, addedTrees);
+            LogDebug($"Mining disrupted-tree harvest selections={addedTrees.Count} disturbedTiles={disturbed.Count}");
+
+            void AddBoundarySweep(Tile2i start, float plannedHeight, Tile2i direction)
+            {
+                float terrainHeight = terrMgr.GetHeight(start).Value.ToFloat();
+                AccessSideRayOperation operation = plannedHeight < terrainHeight - 0.0001f
+                    ? AccessSideRayOperation.Cut
+                    : plannedHeight > terrainHeight + 0.0001f
+                        ? AccessSideRayOperation.Fill : AccessSideRayOperation.None;
+                if (operation == AccessSideRayOperation.None)
+                    return;
+
+                float rayHeight = plannedHeight;
+                int mapDistance = direction.X != 0
+                    ? (direction.X < 0 ? start.X : terrMgr.TerrainSize.X - 1 - start.X)
+                    : (direction.Y < 0 ? start.Y : terrMgr.TerrainSize.Y - 1 - start.Y);
+                int maxDistance = Math.Min(
+                    Math.Max(1, AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance),
+                    mapDistance);
+                for (int distance = 1; distance <= maxDistance; distance++)
+                {
+                    Tile2i tile = start + new RelTile2i(direction.X * distance, direction.Y * distance);
+                    float slope = dumpingSlope;
+                    if (operation == AccessSideRayOperation.Cut)
+                    {
+                        AccessTerrainColumn column = CaptureAccessTerrainColumn(terrMgr, tile);
+                        if (!column.TryGetNormalSlopeAt(rayHeight, out slope, out _))
+                            slope = fallbackMiningSlope;
+                    }
+                    rayHeight += operation == AccessSideRayOperation.Cut ? slope : -slope;
+                    disturbed.Add(tile);
+                    float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
+                    bool passedTerrain = operation == AccessSideRayOperation.Cut
+                        ? sampledHeight <= rayHeight : sampledHeight >= rayHeight;
+                    if (!passedTerrain || (operation == AccessSideRayOperation.Cut && rayHeight < 1f))
+                        continue;
+                    for (int tail = 1; tail <= AutoTerrainDesignationsMod.AccessRayEndBuffer; tail++)
+                    {
+                        Tile2i buffered = tile + new RelTile2i(direction.X * tail, direction.Y * tail);
+                        if (terrMgr.IsValidCoord(buffered))
+                            disturbed.Add(buffered);
+                    }
+                    return;
+                }
+            }
+        }
+
         private static string BuildMiningPlanFingerprint(IAreaManagingTower tower, ATDTowerSettings towerSettings)
         {
             var area = tower.Area;
@@ -469,7 +815,51 @@ namespace AutoTerrainDesignations
                 towerSettings.CorridorClearance,
                 selectedOreId,
                 AutoTerrainDesignationsMod.BottomFlatteningEnabled,
-                AutoTerrainDesignationsMod.BottomFlatteningStrength);
+                AutoTerrainDesignationsMod.BottomFlatteningStrength,
+                AccessAvoidOcean,
+                AccessAvoidBuildings,
+                AccessHarvestDisruptedTrees,
+                AutoTerrainDesignationsMod.AccessRaySlopeConservatism,
+                AutoTerrainDesignationsMod.AccessRayEndBuffer,
+                AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance,
+                BuildMiningBuildingSafetyFingerprint());
+        }
+
+        private static string BuildMiningBuildingSafetyFingerprint()
+        {
+            if (!AccessAvoidBuildings || s_buildingOccupiedTiles.Count == 0)
+                return "<none>";
+
+            // The building snapshot is refreshed before the mining fingerprint is
+            // built. Sorting makes this stable despite HashSet enumeration order.
+            return string.Join(",", s_buildingOccupiedTiles
+                .OrderBy(tile => tile.X)
+                .ThenBy(tile => tile.Y)
+                .Select(tile => tile.X + ":" + tile.Y));
+        }
+
+        private static void RemoveObsoleteGeneratedDesignationsForMiningPlan(
+            IAreaManagingTower tower,
+            Dict<Tile2i, int> plannedOrigins)
+        {
+            if (s_desigManager == null)
+                return;
+
+            // Generated accessways share the designation registry. They are all
+            // candidates for regeneration with the new mining plan, so preserve
+            // their old locations for the placement audit and reset their separate
+            // ownership registry along with any cells removed below.
+            CaptureClearedAccesswayOrigins(tower);
+            foreach (Tile2i origin in GetRegisteredGeneratedDesignationOrigins(tower))
+            {
+                if (plannedOrigins.ContainsKey(origin))
+                    continue;
+
+                if (s_desigManager.GetDesignationAt(origin).HasValue)
+                    s_desigManager.RemoveDesignation(origin);
+                UnregisterGeneratedDesignationOrigin(tower, origin);
+            }
+            ClearRegisteredGeneratedAccessways(tower);
         }
 
         private static IEnumerator RepairExistingTerrainWorkAccessCoroutine(
@@ -478,12 +868,30 @@ namespace AutoTerrainDesignations
             ATDTowerSettings towerSettings,
             bool generateRamps)
         {
-            if (!generateRamps
-                || !AutoTerrainDesignationsMod.TurningRampsExperimental
-                || towerSettings.RampWidth != 1
-                || s_miningProto == null
-                || !HasExistingTerrainWorkEndpoint(tower))
+            string? skipReason = !generateRamps
+                ? "accessway generation disabled"
+                : !AutoTerrainDesignationsMod.TurningRampsExperimental
+                    ? "experimental access disabled"
+                    : towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2
+                        ? $"unsupported width {towerSettings.RampWidth}"
+                        : s_miningProto == null
+                            ? "mining prototype unavailable"
+                            : null;
+            if (skipReason != null)
+            {
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access Repair] skipped reason={skipReason} " +
+                    $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
                 yield break;
+            }
+
+            if (!HasExistingTerrainWorkEndpoint(tower))
+            {
+                LogExperimentalAccessDebug(
+                    "[ATD Experimental Access Repair] skipped reason=no eligible external terrain-work endpoint " +
+                    $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
+                yield break;
+            }
 
             var emptyGeneratedPlan = new Dict<Tile2i, int>();
             var endpointCornerHeights = new Dict<Tile2i, int>();

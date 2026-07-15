@@ -53,14 +53,14 @@ namespace AutoTerrainDesignations
                 ORE_QUALITY_ICON);
         }
 
-        internal static ModSettingsTab BuildGameSettingsTab()
+        internal static ModSettingsTab BuildWorldSettingsTab()
         {
             return new ModSettingsTab(
                 MOD_ID,
                 AtdLocalization.SettingsModName.AsFormatted,
-                AtdLocalization.SettingsTabGameSettings.AsFormatted,
+                AtdLocalization.SettingsTabWorldSettings.AsFormatted,
                 110,
-                BuildGameSettingsContent,
+                BuildWorldSettingsContent,
                 GAME_SETTINGS_ICON);
         }
 
@@ -88,12 +88,13 @@ namespace AutoTerrainDesignations
             return content;
         }
 
-        private static UiComponent BuildGameSettingsContent()
+        private static UiComponent BuildWorldSettingsContent()
         {
             var refreshers = new List<Action>();
             var content = BuildSettingsColumn();
 
             AddScanBehaviorSection(content, refreshers);
+            AddWorldSafetySection(content, refreshers);
             AddNotificationsSection(content, refreshers);
 
             content.Add(BuildFooter(refreshers));
@@ -274,39 +275,50 @@ namespace AutoTerrainDesignations
                 FormatFloat,
                 refreshers));
             content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.costs", "Route costs", "Pathfinder cost settings heading.").AsFormatted));
-            AddPathfinderFloat(content, refreshers, "generated_v_fixed", "Generated V cell cost", "Fixed cost charged for every generated V cell. Higher values favor shorter paths and earlier handoffs.", () => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
-            AddPathfinderFloat(content, refreshers, "direct_work_weight", "Direct terrain-work weight", "Weight applied to center-cell digging and dumping.", () => AutoTerrainDesignationsMod.AccessDirectWorkWeight, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
+            AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsTerrainDesignationCostLabel, AtdLocalization.SettingsTerrainDesignationCostTooltip, () => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
+            AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsDirectTerrainWorkWeightLabel, AtdLocalization.SettingsDirectTerrainWorkWeightTooltip, () => AutoTerrainDesignationsMod.AccessDirectWorkWeight, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
             AddPathfinderFloat(content, refreshers, "side_ray_weight", "Side-ray work weight", "Weight applied to lateral and turn-corner landscaping rays.", () => AutoTerrainDesignationsMod.AccessSideRayWeight, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
-            AddPathfinderFloat(content, refreshers, "ray_max_cost", "Maximum cost per ray", "Caps the landscaping cost contributed by one unresolved ray.", () => AutoTerrainDesignationsMod.AccessRayMaxCost, AutoTerrainDesignationsMod.SetAccessRayMaxCost);
-            AddPathfinderFloat(content, refreshers, "ray_unresolved", "Unresolved-ray penalty", "Penalty when a ray does not meet terrain inside its trace range.", () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty);
 
-            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.safety", "Ray and terrain safety", "Pathfinder safety settings heading.").AsFormatted));
+            AddPathfinderInt(content, refreshers, AtdLocalization.SettingsCandidateRayMaxDistanceLabel, AtdLocalization.SettingsCandidateRayMaxDistanceTooltip, () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
+
+            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.").AsFormatted));
+            AddPathfinderInt(content, refreshers, "visited", "Maximum visited nodes", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000, 50000, 100000);
+            AddPathfinderInt(content, refreshers, "timeout", "Search timeout (seconds)", "Maximum wall-clock time for one accessway search.", () => AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds, 5, 15, 60);
+            AddPathfinderInt(content, refreshers, "frame_budget", "Frame budget (ms)", "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls.", () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 1, 5, 10);
+            AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsRayMaximumCostLabel, AtdLocalization.SettingsRayMaximumCostTooltip, () => AutoTerrainDesignationsMod.AccessRayMaxCost, AutoTerrainDesignationsMod.SetAccessRayMaxCost, 10f, 50f, 100f);
+            AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsUnresolvedRayPenaltyLabel, AtdLocalization.SettingsUnresolvedRayPenaltyTooltip, () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty, 10f, 50f, 100f);
+        }
+
+        private static void AddWorldSafetySection(Column content, List<Action> refreshers)
+        {
+            content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingWorldSafety.AsFormatted));
+            content.Add(BuildIntStepRow(
+                AtdLocalization.SettingsSafetyPolicyLabel.AsFormatted,
+                AtdLocalization.SettingsSafetyPolicyTooltip.AsFormatted,
+                () => (int)AutoTerrainDesignationsMod.GetSafetyPolicy(),
+                value => AutoTerrainDesignationsMod.SetSafetyPolicy(
+                    (SafetyPolicy)Math.Max((int)SafetyPolicy.Min,
+                        Math.Min((int)SafetyPolicy.Max, value))),
+                value => FormatSafetyPolicy((SafetyPolicy)value),
+                refreshers));
             content.Add(BuildToggleRow(
-                Loc.Str("settings.pathfinder.avoid_ocean.label", "Avoid ocean", "Pathfinder avoid-ocean setting label.").AsFormatted,
-                Loc.Str("settings.pathfinder.avoid_ocean.tooltip", "For this world, reject routes whose generated profiles or projected cutting rays excavate ocean-flagged terrain below sea level. Dry shoreline cuts and dumping into ocean are allowed. Turning this off permits underwater cutting, but natural ocean tiles still cannot be used as drivable ground until filled. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-ocean setting tooltip.").AsFormatted,
+                AtdLocalization.SettingsAvoidOceanLabel.AsFormatted,
+                AtdLocalization.SettingsAvoidOceanTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessAvoidOcean,
                 AutoDepthDesignation.SetAccessAvoidOcean,
                 refreshers));
             content.Add(BuildToggleRow(
-                Loc.Str("settings.pathfinder.avoid_buildings.label", "Avoid buildings", "Pathfinder avoid-buildings setting label.").AsFormatted,
-                Loc.Str("settings.pathfinder.avoid_buildings.tooltip", "For this world, reject routes whose projected terrain disturbance reaches a building safety footprint. Currently applies only to the pathfinder; Mining Designations generation does not yet use this option.", "Pathfinder avoid-buildings setting tooltip.").AsFormatted,
+                AtdLocalization.SettingsAvoidBuildingsLabel.AsFormatted,
+                AtdLocalization.SettingsAvoidBuildingsTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessAvoidBuildings,
                 AutoDepthDesignation.SetAccessAvoidBuildings,
                 refreshers));
             content.Add(BuildToggleRow(
-                Loc.Str("settings.pathfinder.harvest_disrupted_trees.label", "Harvest disrupted trees", "Pathfinder disrupted-tree harvesting setting label.").AsFormatted,
-                Loc.Str("settings.pathfinder.harvest_disrupted_trees.tooltip", "For this world, mark every tree in the finalized accessway's projected terrain-disturbance zones for harvest. When disabled, only trees that must be removed to clear the selected route are marked. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved.", "Pathfinder disrupted-tree harvesting setting tooltip.").AsFormatted,
+                AtdLocalization.SettingsHarvestDisruptedTreesLabel.AsFormatted,
+                AtdLocalization.SettingsHarvestDisruptedTreesTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessHarvestDisruptedTrees,
                 AutoDepthDesignation.SetAccessHarvestDisruptedTrees,
                 refreshers));
-            AddPathfinderFloat(content, refreshers, "ray_conservatism", "Ray slope conservatism", "Shared material-slope setting for candidate and existing-work rays. 1 uses the runniest stable material bound; lower values move toward the steeper, more aggressive bound, while values above 1 add extra conservatism up to 1.5. Default: 1.", () => AutoTerrainDesignationsMod.AccessRaySlopeConservatism, AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism);
-            AddPathfinderInt(content, refreshers, "ray_buffer", "Ray end buffer", "Extra tiles protected after either a candidate or existing-work ray meets terrain and, for cuts, reaches +1. Default: 3.", () => AutoTerrainDesignationsMod.AccessRayEndBuffer, AutoTerrainDesignationsMod.SetAccessRayEndBuffer);
-            AddPathfinderInt(content, refreshers, "candidate_distance", "Candidate ray distance", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
-
-            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.").AsFormatted));
-            AddPathfinderInt(content, refreshers, "visited", "Maximum visited nodes", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000);
-            AddPathfinderInt(content, refreshers, "timeout", "Search timeout (seconds)", "Maximum wall-clock time for one accessway search.", () => AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds, 5);
-            AddPathfinderInt(content, refreshers, "frame_budget", "Frame budget (ms)", "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls.", () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 5);
         }
 
         private static void AddPathfinderFloat(Column content, List<Action> refreshers,
@@ -316,12 +328,28 @@ namespace AutoTerrainDesignations
                 Loc.Str("settings.pathfinder." + key + ".tooltip", tooltip, tooltip).AsFormatted,
                 getter, value => { setter(value); return true; }, FormatFloat, refreshers));
 
+        private static void AddPathfinderFloat(Column content, List<Action> refreshers,
+            LocStr label, LocStr tooltip, Func<float> getter, Action<float> setter,
+            float step = 0.05f, float shiftStep = 0.10f, float ctrlStep = 0.25f)
+            => content.Add(BuildFloatStepRow(
+                label.AsFormatted, tooltip.AsFormatted,
+                getter, value => { setter(value); return true; }, FormatFloat, refreshers,
+                step, shiftStep, ctrlStep));
+
         private static void AddPathfinderInt(Column content, List<Action> refreshers,
             string key, string label, string tooltip, Func<int> getter, Action<int> setter,
-            int baseStep = 1)
+            int step = 1, int shiftStep = 5, int ctrlStep = 10)
             => content.Add(BuildIntStepRow(
                 Loc.Str("settings.pathfinder." + key + ".label", label, label).AsFormatted,
                 Loc.Str("settings.pathfinder." + key + ".tooltip", tooltip, tooltip).AsFormatted,
+                getter, setter, value => value.ToString(CultureInfo.InvariantCulture), refreshers,
+                step, shiftStep, ctrlStep));
+
+        private static void AddPathfinderInt(Column content, List<Action> refreshers,
+            LocStr label, LocStr tooltip, Func<int> getter, Action<int> setter,
+            int baseStep = 1)
+            => content.Add(BuildIntStepRow(
+                label.AsFormatted, tooltip.AsFormatted,
                 getter, setter, value => value.ToString(CultureInfo.InvariantCulture), refreshers, baseStep));
 
         private static void AddPanelDefaultsSection(Column content, List<Action> refreshers)
@@ -385,7 +413,9 @@ namespace AutoTerrainDesignations
             Action<int> setValue,
             Func<int, string> format,
             List<Action> refreshers,
-            int baseStep = 1)
+            int step = 1,
+            int shiftStep = 5,
+            int ctrlStep = 10)
         {
             var display = new Display(L(format(getValue()))).MinDigits(4).AlignSelfStretch().MarginTopBottom(2.px());
             void Refresh() => display.SetValue(L(format(getValue())));
@@ -397,12 +427,12 @@ namespace AutoTerrainDesignations
                 display,
                 () =>
                 {
-                    setValue(getValue() + baseStep * ModifierStepSize());
+                    setValue(getValue() + IntStepSize(step, shiftStep, ctrlStep));
                     Refresh();
                 },
                 () =>
                 {
-                    setValue(getValue() - baseStep * ModifierStepSize());
+                    setValue(getValue() - IntStepSize(step, shiftStep, ctrlStep));
                     Refresh();
                 });
         }
@@ -428,7 +458,10 @@ namespace AutoTerrainDesignations
             Func<float> getValue,
             Func<float, bool> setValue,
             Func<float, string> format,
-            List<Action> refreshers)
+            List<Action> refreshers,
+            float step = 0.05f,
+            float shiftStep = 0.10f,
+            float ctrlStep = 0.25f)
         {
             var display = new Display(L(format(getValue()))).MinDigits(5).AlignSelfStretch().MarginTopBottom(2.px());
             void Refresh() => display.SetValue(L(format(getValue())));
@@ -440,12 +473,12 @@ namespace AutoTerrainDesignations
                 display,
                 () =>
                 {
-                    setValue(getValue() + FloatStepSize());
+                    setValue(getValue() + FloatStepSize(step, shiftStep, ctrlStep));
                     Refresh();
                 },
                 () =>
                 {
-                    setValue(getValue() - FloatStepSize());
+                    setValue(getValue() - FloatStepSize(step, shiftStep, ctrlStep));
                     Refresh();
                 });
         }
@@ -556,11 +589,18 @@ namespace AutoTerrainDesignations
             return 1;
         }
 
-        private static float FloatStepSize()
+        private static int IntStepSize(int step, int shiftStep, int ctrlStep)
         {
-            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) return 0.25f;
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) return 0.10f;
-            return 0.05f;
+            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) return ctrlStep;
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) return shiftStep;
+            return step;
+        }
+
+        private static float FloatStepSize(float step = 0.05f, float shiftStep = 0.10f, float ctrlStep = 0.25f)
+        {
+            if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) return ctrlStep;
+            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) return shiftStep;
+            return step;
         }
 
         private static string FormatNoLimitZero(int value)
@@ -588,6 +628,13 @@ namespace AutoTerrainDesignations
                 case 4: return "Max";
                 default: return value.ToString(CultureInfo.InvariantCulture);
             }
+        }
+
+        private static string FormatSafetyPolicy(SafetyPolicy policy)
+        {
+            return policy == SafetyPolicy.Med
+                ? "BAL"
+                : policy.ToString().ToUpperInvariant();
         }
 
         private static string FormatClearance(int value)

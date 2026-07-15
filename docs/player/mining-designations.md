@@ -112,6 +112,10 @@ See [Corner Designations](corner-designations.md) for the standalone guide.
 
 The per-tower settings in the inspector are separate from the global defaults stored in `ATDsettings.json`.
 
+### Terrain safety
+
+The per-world **Avoid ocean** and **Avoid buildings** options also apply to regular mining plans. ATD removes mine cells that directly overlap ocean or a building safety perimeter before evaluating the remaining mine edge. It then avoids exterior terrain work that would reach protected ocean or buildings. **Safety policy** controls the combined landslide prediction and protected-area buffer from `MIN` through `MAX`; `MED` is the default. **Harvest disrupted trees** marks trees in the final mine body and its disturbance zone only when enabled; disabling it creates no ATD tree harvest orders.
+
 Useful console commands:
 
 | Command | What it does |
@@ -124,6 +128,9 @@ Useful console commands:
 | `atd_set_ore_purity_level n` | Sets the global default ore purity preset. |
 | `atd_set_bottom_flattening on\|off` | Toggles the extra bottom-flattening pass. |
 | `atd_set_bottom_flattening_strength n` | Sets how aggressively the bottom-flattening pass levels the designation floor (1–10). 1 = mildest (few tiles affected), 5 = median target (default), 10 = strongest (everything pulled to the deepest tile). |
+| `atd_set_safety_policy MIN\|LOW\|MED\|HIGH\|MAX` | Applies a World safety preset. |
+| `atd_set_landslide_predictor_slope_factor n` | Sets the expert slope factor behind **Safety policy**. |
+| `atd_set_landslide_buffer n` | Sets the expert protected-area buffer behind **Safety policy**. |
 | `atd_set_min_corridor_clearance n` | Sets the global default corridor clearance. |
 | `atd_set_ramp_notifications on\|off` | Enables or disables ramp access warning notifications on mine towers (Failed, Truncated, NotAccessible icons). |
 | `atd_set_auto_release_when_idle on\|off` | Sets the global default for the **Auto-release when idle** feature; individual towers can override this via the inspector toggle. |

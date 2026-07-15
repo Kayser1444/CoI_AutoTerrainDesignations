@@ -108,8 +108,8 @@
     "Padrões"
   ],
   [
-    "settings.tab.game_settings",
-    "Configurações do jogo"
+    "settings.tab.world_settings",
+    "Configurações mundiais"
   ],
   [
     "settings.tab.ore_quality",
@@ -142,6 +142,82 @@
   [
     "settings.heading.experimental_access",
     "Acessos experimentais"
+  ],
+  [
+    "settings.world.safety",
+    "Segurança do terreno"
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "Evite o oceano"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "Evite o oceano nos acessos gerados e nos planos de mineração neste mundo. As células de mineração que se sobrepõem ao oceano estão excluídas. O corte projetado abaixo do nível do mar também é evitado; o despejo no oceano continua permitido. Desligue esta opção para permitir trabalhos arriscados na costa."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "Evite edifícios"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "Evite edifícios em acessos gerados e planos de mineração neste mundo. Excluem-se as células de mineração que se sobrepõem a um edifício ou ao seu perímetro de segurança. A perturbação projetada do terreno perto de edifícios também é evitada."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Colha árvores interrompidas"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Marcar as árvores nas zonas de acesso finalizadas e nas zonas de perturbação designadas à mineração para colheita. Quando desativado, o ATD não cria ordens de colheita de árvores. Os pedidos de colheita feitos pelo ATD são removidos pela ação Clear; as ordens de colheita de jogadores não relacionados são preservadas."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "Política de segurança"
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "Controla a cautela com que o ATD prevê deslizamentos de terra e a distância que mantém dos oceanos e edifícios protegidos. Políticas mais elevadas reservam mais espaço; políticas mais baixas permitem o trabalho no terreno mais próximo dos perigos. Padrão: BAL."
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "Custo de designação de terreno"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "Custo fixo cobrado para cada designação de terreno gerada. Valores mais altos favorecem menos designações de terreno, mesmo quando isso aumenta a distância percorrida e o custo total do paisagismo."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "Peso direto do trabalho no terreno"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "Peso aplicado à escavação ou despejo de terreno diretamente acima ou abaixo das designações de terreno geradas."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "Distância máxima do raio candidato"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "Distância máxima do traçado do raio candidato. Valores mais altos protegem e precificam cunhas laterais muito grandes, mas custam mais tempo de pesquisa. Padrão: 16."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "Custo máximo por raio"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "Limita o custo de paisagismo contribuído por um raio não resolvido."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "Penalidade de raio não resolvido"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "Penalidade quando um raio não encontra terreno dentro de seu alcance de rastreamento."
   ],
   [
     "settings.experimental_access.turning_ramps.label",
@@ -426,5 +502,25 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} concluiu uma escavadeira"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "Construir {0} em {1} e pré-atribuí-lo a {2}?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "Construir {0} × {1} em {2} e pré-atribuí-los a {3}?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "Construir"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "Vá para {0}"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "Pré-atribuído a {0}"
   ]
 ]
