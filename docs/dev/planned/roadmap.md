@@ -7,7 +7,12 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
 * rail incline (12.5%) designations
 
 ## Accessways and pathfinding
-Domain pruning: envelope
+
+1. [Domain pruning: useful-height envelope](accessway-pathfinding-height-envelope.md)
+2. [Lazy unavoidable-landscaping heuristic](accessway-pathfinding-lazy-landscaping-heuristic.md),
+   evaluated only after the envelope; later restrict its relaxed frontier to
+   eligible V origins if measurements justify it
+
 Harmonize V1 and V2
 
 Remaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.

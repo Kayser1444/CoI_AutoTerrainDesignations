@@ -200,9 +200,10 @@ namespace AutoTerrainDesignations.Access.V2
         {
             if (vehicleWidth <= 0 || lane0.Count == 0 || lane1.Count == 0)
                 return null;
-            if (!TrySelectForward(lane0, current, out AccessGroundHandoff left)
-                || !TrySelectForward(
-                    lane1, current, out AccessGroundHandoff right))
+            if (!TrySelectForwardPair(
+                    lane0, lane1, current,
+                    out AccessGroundHandoff left,
+                    out AccessGroundHandoff right))
                 return null;
 
             int radius = Math.Max(0, vehicleWidth / 2);
@@ -244,20 +245,35 @@ namespace AutoTerrainDesignations.Access.V2
                 centerSpokeCost: centerSpokeCost);
         }
 
-        private static bool TrySelectForward(
-            IReadOnlyList<AccessGroundHandoff> candidates,
+        private static bool TrySelectForwardPair(
+            IReadOnlyList<AccessGroundHandoff> lane0,
+            IReadOnlyList<AccessGroundHandoff> lane1,
             AccessV2BandState state,
-            out AccessGroundHandoff selected)
+            out AccessGroundHandoff selected0,
+            out AccessGroundHandoff selected1)
         {
-            for (int index = 0; index < candidates.Count; index++)
-                if (IsAheadOfBand(candidates[index].Tile, state))
+            for (int leftIndex = 0; leftIndex < lane0.Count; leftIndex++)
+                for (int rightIndex = 0; rightIndex < lane1.Count; rightIndex++)
                 {
-                    selected = candidates[index];
-                    return true;
+                    AccessGroundHandoff left = lane0[leftIndex];
+                    AccessGroundHandoff right = lane1[rightIndex];
+                    if (IsAheadOfBand(left.Tile, state)
+                        && IsAheadOfBand(right.Tile, state)
+                        && AreConsecutiveContacts(left.Tile, right.Tile))
+                    {
+                        selected0 = left;
+                        selected1 = right;
+                        return true;
+                    }
                 }
-            selected = default;
+            selected0 = default;
+            selected1 = default;
             return false;
         }
+
+        private static bool AreConsecutiveContacts(Tile2i first, Tile2i second)
+            => Math.Abs(first.X - second.X)
+                + Math.Abs(first.Y - second.Y) == 1;
 
         private static bool IsAheadOfBand(
             Tile2i tile,
@@ -265,10 +281,10 @@ namespace AutoTerrainDesignations.Access.V2
             => state.EntryDirection.X > 0
                 ? tile.X >= state.Anchor.X + 4
                 : state.EntryDirection.X < 0
-                    ? tile.X < state.Anchor.X
+                    ? tile.X <= state.Anchor.X
                     : state.EntryDirection.Y > 0
                         ? tile.Y >= state.Anchor.Y + 4
-                        : tile.Y < state.Anchor.Y;
+                        : tile.Y <= state.Anchor.Y;
 
         private static Tile2i GetForwardCenter(
             AccessV2BandState state,
@@ -395,11 +411,13 @@ namespace AutoTerrainDesignations.Access.V2
         {
             for (int leftIndex = 0; leftIndex < lane0.Count; leftIndex++)
             {
-                AccessGroundHandoff left = lane0[leftIndex];
-                for (int rightIndex = 0; rightIndex < lane1.Count; rightIndex++)
-                {
-                    AccessGroundHandoff right = lane1[rightIndex];
-                    if (!TryBuildCompleteEscape(
+                    AccessGroundHandoff left = lane0[leftIndex];
+                    for (int rightIndex = 0; rightIndex < lane1.Count; rightIndex++)
+                    {
+                        AccessGroundHandoff right = lane1[rightIndex];
+                        if (!AreConsecutiveContacts(left.Tile, right.Tile))
+                            continue;
+                        if (!TryBuildCompleteEscape(
                             left, exitDirection, history, ground,
                             projectedCenterValidator,
                             projectedCenterOverlapsWork,

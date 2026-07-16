@@ -369,6 +369,12 @@ namespace AutoTerrainDesignations.Access
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public V2.AccessV2GroundGraph? V2GroundGraph { get; }
+        /// <summary>
+        /// Diagnostic useful-height hull built from this immutable snapshot when
+        /// the experimental console flag is enabled. It is not yet used to prune
+        /// search states.
+        /// </summary>
+        public AccessUsefulHeightEnvelope? UsefulHeightEnvelope { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
         public int LandslideSourceCount => m_durabilityCorners.Length;
         public IEnumerable<AccessPropCleanupInfo> PropCleanupOrigins => m_propCleanupByOrigin.Values;
@@ -425,7 +431,8 @@ namespace AutoTerrainDesignations.Access
                 IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffs = null,
             Func<IReadOnlyList<AccessHandoffSpanCell>,
                 IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffSpans = null,
-            float vehicleMaxSteepnessDelta = 0.5f)
+            float vehicleMaxSteepnessDelta = 0.5f,
+            AccessUsefulHeightEnvelope? usefulHeightEnvelope = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -442,6 +449,7 @@ namespace AutoTerrainDesignations.Access
             VehicleClearanceRadius = Math.Max(0, vehicleClearanceRadius);
             VehicleWidth = Math.Max(1, vehicleWidth);
             VehicleMaxSteepnessDelta = Math.Max(0f, vehicleMaxSteepnessDelta);
+            UsefulHeightEnvelope = usefulHeightEnvelope;
             m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
             m_preciseTerrainHeights = preciseTerrainHeights != null
                 ? new Dictionary<Tile2i, float>(preciseTerrainHeights)

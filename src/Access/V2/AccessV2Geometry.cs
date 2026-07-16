@@ -207,13 +207,44 @@ namespace AutoTerrainDesignations.Access.V2
         }
 
         /// <summary>
-        /// Shifts the band one lane transversely. EntryDirection remains the
-        /// longitudinal corridor direction; the lateral movement is transition
-        /// metadata rather than a change of travel orientation.
+        /// Shifts the band one lane transversely while preserving the previous
+        /// longitudinal slice. The newly exposed lane is generated beside both
+        /// the current and predecessor slices, producing a complete 2x3 swept
+        /// footprint. EntryDirection remains the longitudinal corridor
+        /// direction; the lateral movement is transition metadata rather than
+        /// a change of travel orientation.
         /// </summary>
         public static bool TryStrafe(
             AccessV2BandState current,
             int transverseSign,
+            out AccessV2Transition transition,
+            out string reason)
+        {
+            if (transverseSign != -1 && transverseSign != 1)
+            {
+                transition = null!;
+                reason = "InvalidStrafeSign";
+                return false;
+            }
+            Tile2i reverseDirection = Scale(current.EntryDirection, -1);
+            if (!current.Band.TryAdvance(
+                    reverseDirection,
+                    out AccessV2BandProfile predecessorBand,
+                    out reason))
+            {
+                transition = null!;
+                return false;
+            }
+            int newLane = transverseSign < 0 ? 0 : 1;
+            return TryStrafe(
+                current, transverseSign, predecessorBand.GetLane(newLane),
+                out transition, out reason);
+        }
+
+        public static bool TryStrafe(
+            AccessV2BandState current,
+            int transverseSign,
+            AccessHeightProfile predecessorOuterProfile,
             out AccessV2Transition transition,
             out string reason)
         {
@@ -239,11 +270,21 @@ namespace AutoTerrainDesignations.Access.V2
                 nextAnchor, current.Band, current.EntryDirection);
             int newLane = transverseSign < 0 ? 0 : 1;
             int retainedCurrentLane = transverseSign < 0 ? 0 : 1;
+            AccessV2OriginProfile currentOuter = next.GetLane(newLane);
+            var predecessorOuter = new AccessV2OriginProfile(
+                Subtract(currentOuter.Origin, current.EntryDirection),
+                predecessorOuterProfile);
             transition = new AccessV2Transition(
                 AccessV2TransitionKind.Strafe,
                 next,
-                new[] { next.GetLane(newLane) },
-                new[] { current.GetLaneOrigin(retainedCurrentLane) });
+                new[] { predecessorOuter, currentOuter },
+                new[]
+                {
+                    Subtract(
+                        current.GetLaneOrigin(retainedCurrentLane),
+                        current.EntryDirection),
+                    current.GetLaneOrigin(retainedCurrentLane),
+                });
             reason = string.Empty;
             return true;
         }
@@ -347,6 +388,24 @@ namespace AutoTerrainDesignations.Access.V2
             for (int lane = 0; lane < 2; lane++)
             {
                 Tile2i origin = state.GetLaneOrigin(lane);
+                if (origin.X < boundsMin.X || origin.Y < boundsMin.Y
+                    || origin.X + 4 > boundsMax.X
+                    || origin.Y + 4 > boundsMax.Y)
+                    return false;
+            }
+            return true;
+        }
+
+        public static bool IsInsideBounds(
+            AccessV2Transition transition,
+            Tile2i boundsMin,
+            Tile2i boundsMax)
+        {
+            if (!IsInsideBounds(transition.Next, boundsMin, boundsMax))
+                return false;
+            for (int index = 0; index < transition.Delta.Count; index++)
+            {
+                Tile2i origin = transition.Delta[index].Origin;
                 if (origin.X < boundsMin.X || origin.Y < boundsMin.Y
                     || origin.X + 4 > boundsMax.X
                     || origin.Y + 4 > boundsMax.Y)

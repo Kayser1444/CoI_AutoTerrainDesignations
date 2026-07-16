@@ -136,6 +136,7 @@ public static string Tt(string text) => text;
         SetTurningRampsExperimental(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
+        SetExperimentalAccessUsefulHeightEnvelope(false);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -329,6 +330,17 @@ public static string Tt(string text) => text;
     public static void SetExperimentalAccessUseAStar(bool value)
     {
         ExperimentalAccessUseAStar = value;
+    }
+
+    /// <summary>
+    /// Builds and logs the experimental access useful-height hull. This is a
+    /// session-only diagnostic switch; it does not yet enable search pruning.
+    /// </summary>
+    public static bool ExperimentalAccessUsefulHeightEnvelope { get; private set; }
+
+    public static void SetExperimentalAccessUsefulHeightEnvelope(bool value)
+    {
+        ExperimentalAccessUsefulHeightEnvelope = value;
     }
 
     /// <summary>Rejects accessway rays whose projected disturbance reaches ocean.</summary>

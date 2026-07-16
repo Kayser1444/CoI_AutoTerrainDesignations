@@ -868,10 +868,11 @@ namespace AutoTerrainDesignations
                         string v2ValidationReason = "NotV2";
                         bool v2ProviderValid = source.SearchResult.V2Route != null
                             && ValidatePlacedV2Provider(
-                                source.SearchResult,
-                                source.Plan,
-                                accesswayProto,
-                                out v2ValidationReason);
+                                 source.SearchResult,
+                                 source.Plan,
+                                 accesswayProto,
+                                 terrMgr,
+                                 out v2ValidationReason);
                         if (source.SearchResult.V2Route != null)
                             LogExperimentalAccessDebug(
                                 $"[ATD V2 Placement Validation] cluster={cluster.ClusterId} " +
@@ -2018,12 +2019,8 @@ namespace AutoTerrainDesignations
             TerrainManager terrMgr,
             DesignationData data)
         {
-            if (!TryBuildProspectiveFulfilledBitmap(rampProto, terrMgr, data,
-                AccessHandoffOperation.Mining, out uint miningFulfilledBitmap))
-                return false;
-
-            return miningFulfilledBitmap != ALL_DESIGNATION_TILES_MASK
-                && (miningFulfilledBitmap & READY_PERIMETER_MASK) != 0;
+            return IsProspectiveDesignationReady(
+                rampProto, terrMgr, data, AccessHandoffOperation.Mining);
         }
 
         private static bool RowHasReadyDumpingDesignation(
@@ -2058,12 +2055,22 @@ namespace AutoTerrainDesignations
             TerrainManager terrMgr,
             DesignationData data)
         {
-            if (!TryBuildProspectiveFulfilledBitmap(rampProto, terrMgr, data,
-                AccessHandoffOperation.Dumping, out uint dumpingFulfilledBitmap))
+            return IsProspectiveDesignationReady(
+                rampProto, terrMgr, data, AccessHandoffOperation.Dumping);
+        }
+
+        private static bool IsProspectiveDesignationReady(
+            TerrainDesignationProto proto,
+            TerrainManager terrMgr,
+            DesignationData data,
+            AccessHandoffOperation operation)
+        {
+            if (!TryBuildProspectiveFulfilledBitmap(
+                    proto, terrMgr, data, operation, out uint fulfilledBitmap))
                 return false;
 
-            return dumpingFulfilledBitmap != ALL_DESIGNATION_TILES_MASK
-                && (dumpingFulfilledBitmap & READY_PERIMETER_MASK) != 0;
+            return fulfilledBitmap != ALL_DESIGNATION_TILES_MASK
+                && (fulfilledBitmap & READY_PERIMETER_MASK) != 0;
         }
 
         private static bool TryBuildProspectiveFulfilledBitmap(

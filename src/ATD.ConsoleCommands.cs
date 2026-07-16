@@ -44,6 +44,7 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
+        sb.AppendLine($"  ExperimentalHeightHull = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
         sb.AppendLine($"  SafetyPolicy          = {AutoTerrainDesignationsMod.GetSafetyPolicy().ToString().ToUpperInvariant()}");
         sb.AppendLine($"  LandslideSlopeFactor  = {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}");
         sb.AppendLine($"  LandslideBuffer       = {AutoTerrainDesignationsMod.AccessRayEndBuffer}");
@@ -373,6 +374,18 @@ public sealed class AtdConsoleCommands
         return parsed
             ? "[ATD] Experimental access search overlay ON."
             : "[ATD] Experimental access search overlay OFF.";
+    }
+
+    [ConsoleCommand(false, false, "Builds and logs the experimental access useful-height hull for newly created snapshots. This session-only diagnostic does not yet prune search nodes. Optionally pass 'on' or 'off'.", null)]
+    private string atdAccessHeightEnvelope(string value = "")
+    {
+        bool current = AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope;
+        if (!TryParseConsoleBool(value, out bool parsed))
+            parsed = !current;
+        AutoTerrainDesignationsMod.SetExperimentalAccessUsefulHeightEnvelope(parsed);
+        return parsed
+            ? "[ATD] Experimental access useful-height hull diagnostics ON (pruning remains OFF)."
+            : "[ATD] Experimental access useful-height hull diagnostics OFF.";
     }
 
     private static bool TryParseConsoleBool(string value, out bool parsed)

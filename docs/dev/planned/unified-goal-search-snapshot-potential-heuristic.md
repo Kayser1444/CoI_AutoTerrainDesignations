@@ -526,6 +526,15 @@ The field described here is intentionally conservative.
 
 Possible future enhancements include:
 
+## Lazy unavoidable-landscaping component
+
+After the higher-priority useful-height domain-pruning envelope is implemented
+and measured, evaluate a lazy request-scoped lower bound on unpaid future
+direct landscaping work. The refinement uses actual snapshot terrain and
+relaxed legal V profiles, stops at a proven goal/V-step horizon, and may later
+restrict its frontier to V origins admitted by the frozen pruning envelope.
+See [Lazy Unavoidable-Landscaping Heuristic](accessway-pathfinding-lazy-landscaping-heuristic.md).
+
 ## Vehicle speed
 
 Traversal cost:

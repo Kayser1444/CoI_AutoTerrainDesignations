@@ -227,25 +227,30 @@ namespace AutoTerrainDesignations.Access
                     32, 16.1f, out AccessHandoffOperation flatOperation)
                 || flatOperation != AccessHandoffOperation.None)
             { failure = "a profile matching quantized ground height must not create a topology handoff"; return false; }
-            if (!AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    -1, 0, 0, 1, out AccessHandoffOperation directionalMining)
-                || directionalMining != AccessHandoffOperation.Mining
-                || !AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    0, 1, -1, 0, out AccessHandoffOperation directionalDumping)
-                || directionalDumping != AccessHandoffOperation.Dumping
-                || !AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    -1, 1, 0, 0, out AccessHandoffOperation levelHandoff)
-                || levelHandoff != AccessHandoffOperation.Leveling
-                || !AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    -1, -1, 0, 0, out AccessHandoffOperation levelHandoffFromMining)
-                || levelHandoffFromMining != AccessHandoffOperation.Mining
-                || AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    -1, 1, 1, 1, out _)
-                || AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    -1, -1, -1, 0, out _)
-                || AutoDepthDesignation.TrySelectDirectionalHandoffOperation(
-                    0, 0, 1, 1, out _))
-            { failure = "directional handoff must be level at the ground face or workable toward V and non-workable toward ground"; return false; }
+            if (!AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                    new[] { -1, -1, 0, -1, -1 },
+                    out AccessHandoffOperation edgeMining)
+                || edgeMining != AccessHandoffOperation.Mining
+                || !AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                    new[] { 0, 1, 1, 1, 0 },
+                    out AccessHandoffOperation edgeDumping)
+                || edgeDumping != AccessHandoffOperation.Dumping
+                || !AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                    new[] { 0, 0, 0, 0, 0 },
+                    out AccessHandoffOperation levelEdgeDumping)
+                || levelEdgeDumping != AccessHandoffOperation.Dumping
+                || AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                    new[] { -1, -1, 0, 1, 1 }, out _))
+            { failure = "handoff operation must come only from a single-operation ground-facing edge"; return false; }
+            if (!AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
+                    new[] { -1, 0, -1, 0 }, AccessHandoffOperation.Mining)
+                || AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
+                    new[] { -1, 0, 1, 0 }, AccessHandoffOperation.Mining)
+                || !AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
+                    new[] { 1, 0, 1, 0 }, AccessHandoffOperation.Dumping)
+                || AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
+                    new[] { 1, 0, -1, 0 }, AccessHandoffOperation.Dumping))
+            { failure = "handoff proto must be able to create every work cell in the terminal profile"; return false; }
             if (AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 0, 0)
                 || AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 4, 0)
                 || !AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 2, 0)
@@ -3703,6 +3708,40 @@ namespace AutoTerrainDesignations.Access
             AccessV2History history,
             Tile2i? connectedFixedOrigin)
         {
+            float traversalCost = current.HasValue
+                ? Manhattan(
+                    GetV2CanonicalCenter(current.Value),
+                    GetV2CanonicalCenter(transition.Next))
+                : 0f;
+
+            bool exactTerrainBand = !V2BandHasTerrainDelta(
+                snapshot, transition.Next);
+            // Exact straight/turn successors are real zero-work G seams. Keep
+            // one terminal V state so the ordinary handoff evaluator can prove
+            // the width-two boundary, but prohibit any further V expansion.
+            // Ground-originated exact bands are similarly dominated by staying
+            // in G. Synthetic fixed-source companions remain the sole exception.
+            if (!connectedFixedOrigin.HasValue
+                && exactTerrainBand
+                && transition.Kind != AccessV2TransitionKind.Strafe)
+                return new AccessV2TransitionEvaluation(
+                    true, string.Empty,
+                    traversalCost, 0f, 0f,
+                    requiresGroundTransition: true);
+
+            // Every newly owned V origin must survive materialization. This is
+            // the swept 2x2 rule for strafes and the width-two brush rule for
+            // straight/turn deltas. A mixed exact/work delta otherwise leaves
+            // either an illegal one-cell passage or a redundant appendix.
+            if (!connectedFixedOrigin.HasValue
+                && transition.Delta.Any(item =>
+                    !V2ProfileHasTerrainDelta(
+                        snapshot, item.Origin, item.Profile)))
+                return AccessV2TransitionEvaluation.Reject(
+                    transition.Kind == AccessV2TransitionKind.Strafe
+                        ? "StrafeRequiresCompleteMaterializedDelta"
+                        : "TransitionRequiresCompleteMaterializedDelta");
+
             var rayConstraints = new List<AccessRayHeightConstraint>();
             var cleanupKeys = new HashSet<string>(StringComparer.Ordinal);
             float directCost = 0f;
@@ -3773,11 +3812,6 @@ namespace AutoTerrainDesignations.Access
                     out string rayReason))
                 return AccessV2TransitionEvaluation.Reject(rayReason);
 
-            float traversalCost = current.HasValue
-                ? Manhattan(
-                    GetV2CanonicalCenter(current.Value),
-                    GetV2CanonicalCenter(transition.Next))
-                : 0f;
             return new AccessV2TransitionEvaluation(
                 true, string.Empty,
                 traversalCost,
@@ -3797,6 +3831,38 @@ namespace AutoTerrainDesignations.Access
                 cleanupCost += snapshot.LandscapingCostDistanceScale
                     * AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree);
             }
+        }
+
+        private static bool V2BandHasTerrainDelta(
+            AccessSearchSnapshot snapshot,
+            AccessV2BandState state)
+        {
+            for (int lane = 0; lane < 2; lane++)
+            {
+                Tile2i origin = state.GetLaneOrigin(lane);
+                AccessHeightProfile profile = state.GetLane(lane).Profile;
+                if (V2ProfileHasTerrainDelta(snapshot, origin, profile))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool V2ProfileHasTerrainDelta(
+            AccessSearchSnapshot snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile)
+        {
+            for (int y = 0; y <= 4; y++)
+                for (int x = 0; x <= 4; x++)
+                {
+                    Tile2i tile = origin + new RelTile2i(x, y);
+                    if (!snapshot.TryGetGroundHeight2(
+                            tile, out int terrainHeight2)
+                        || profile.GetHeight2NumeratorAt(x, y)
+                            != terrainHeight2 * 16)
+                        return true;
+                }
+            return false;
         }
 
         internal static IReadOnlyList<AccessV2HandoffCandidate>
@@ -3832,6 +3898,12 @@ namespace AutoTerrainDesignations.Access
             out string reason)
         {
             AccessV2BandState next = transition.Next;
+            if (transition.Kind == AccessV2TransitionKind.Strafe
+                && current.HasValue)
+                return TryAddV2StrafeExteriorRays(
+                    snapshot, transition, connectedFixedOrigin,
+                    constraints, ref rayCost, out reason);
+
             bool scoreLane0 = transition.Delta.Any(
                 item => item.Origin == next.GetLaneOrigin(0));
             bool scoreLane1 = transition.Delta.Any(
@@ -3892,6 +3964,53 @@ namespace AutoTerrainDesignations.Access
                 }
             }
 
+            reason = string.Empty;
+            return true;
+        }
+
+        private static bool TryAddV2StrafeExteriorRays(
+            AccessSearchSnapshot snapshot,
+            AccessV2Transition transition,
+            Tile2i? connectedFixedOrigin,
+            ICollection<AccessRayHeightConstraint> constraints,
+            ref float rayCost,
+            out string reason)
+        {
+            AccessV2BandState next = transition.Next;
+            bool ownsLane0 = transition.Delta.Any(
+                item => item.Origin == next.GetLaneOrigin(0));
+            bool ownsLane1 = transition.Delta.Any(
+                item => item.Origin == next.GetLaneOrigin(1));
+            int transverseSign = ownsLane0 && !ownsLane1 ? -1
+                : ownsLane1 && !ownsLane0 ? 1
+                : 0;
+            if (transverseSign == 0)
+            {
+                reason = "StrafeRayInvalidShift";
+                return false;
+            }
+            for (int index = 0; index < transition.Delta.Count; index++)
+            {
+                AccessV2OriginProfile item = transition.Delta[index];
+                if (!TryGetExitRayGeometry(
+                        item.Origin, item.Profile,
+                        next.EntryDirection,
+                        out Tile2i lowCorner, out float lowHeight,
+                        out Tile2i lowDirection,
+                        out Tile2i highCorner, out float highHeight,
+                        out Tile2i highDirection))
+                {
+                    reason = "StrafeRayInvalidGeometry";
+                    return false;
+                }
+                if (!TryAddV2Ray(
+                        snapshot, constraints, ref rayCost,
+                        transverseSign < 0 ? lowCorner : highCorner,
+                        transverseSign < 0 ? lowHeight : highHeight,
+                        transverseSign < 0 ? lowDirection : highDirection,
+                        connectedFixedOrigin, out reason))
+                    return false;
+            }
             reason = string.Empty;
             return true;
         }

@@ -15,6 +15,7 @@ namespace AutoTerrainDesignations.Access.V2
         public float GeneratedFixedCost { get; }
         public float ExteriorRayCost { get; }
         public float CleanupCost { get; }
+        public bool RequiresGroundTransition { get; }
         public IReadOnlyList<AccessRayHeightConstraint> RayConstraints { get; }
         public IReadOnlyCollection<string> CleanupKeys { get; }
         public float TotalCost => TraversalCost + GeneratedWorkCost + CleanupCost;
@@ -29,7 +30,8 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<string>? cleanupKeys = null,
             float directWorkCost = 0f,
             float generatedFixedCost = 0f,
-            float exteriorRayCost = 0f)
+            float exteriorRayCost = 0f,
+            bool requiresGroundTransition = false)
         {
             IsValid = isValid;
             RejectionReason = rejectionReason ?? string.Empty;
@@ -39,6 +41,7 @@ namespace AutoTerrainDesignations.Access.V2
             GeneratedFixedCost = generatedFixedCost;
             ExteriorRayCost = exteriorRayCost;
             CleanupCost = cleanupCost;
+            RequiresGroundTransition = requiresGroundTransition;
             RayConstraints = rayConstraints ?? Array.Empty<AccessRayHeightConstraint>();
             CleanupKeys = cleanupKeys ?? Array.Empty<string>();
         }
@@ -340,7 +343,8 @@ namespace AutoTerrainDesignations.Access.V2
                     EnqueueFixedGoal(current, fixedGoal!);
 
                 EnqueueHandoffGoals(current);
-                Expand(current);
+                if (!current.RequiresGroundTransition)
+                    Expand(current);
             }
 
             if (!IsComplete && m_queueCount == 0)
@@ -400,6 +404,7 @@ namespace AutoTerrainDesignations.Access.V2
                 generatedFixedCost = evaluation.GeneratedFixedCost;
                 exteriorRayCost = evaluation.ExteriorRayCost;
                 cleanupCost = evaluation.CleanupCost;
+
             }
 
             var node = new SearchNode(
@@ -422,23 +427,73 @@ namespace AutoTerrainDesignations.Access.V2
 
             for (int sign = -1; sign <= 1; sign += 2)
             {
-                if (AccessV2Geometry.TryStrafe(
-                        current.State, sign,
-                        out AccessV2Transition strafe, out string strafeReason))
+                AccessV2Transition? turn = null;
+                string turnReason = string.Empty;
+                SearchNode? predecessor = current.Parent;
+                bool hasVPredecessor = predecessor != null
+                    && !predecessor.GroundCenter.HasValue;
+                if (hasVPredecessor
+                    && AccessV2Geometry.TryTurn(
+                        predecessor!.State, current.State, sign,
+                        out AccessV2Transition candidateTurn,
+                        out turnReason))
+                    turn = candidateTurn;
+                else if (hasVPredecessor)
+                    Reject(turnReason);
+
+                // A flat strafe and the corresponding turn path can emit the
+                // same terrain plan. Keep one canonical representation so
+                // incremental ray cost and blockage cannot differ by graph path.
+                if (!hasVPredecessor)
+                    Reject("StrafeRequiresPredecessorSlice");
+                else if (turn != null && current.State.Band.IsCompletelyFlat)
+                    Reject("FlatStrafeDominatedByTurn");
+                else if (!TryGetStrafePredecessorProfile(
+                    current, sign,
+                    out AccessHeightProfile predecessorProfile))
+                    Reject("StrafePredecessorProfileMissing");
+                else if (AccessV2Geometry.TryStrafe(
+                    current.State, sign, predecessorProfile,
+                    out AccessV2Transition strafe, out string strafeReason))
                     TryRelax(current, strafe);
                 else
                     Reject(strafeReason);
 
-                if (current.Parent != null)
+                if (turn != null)
                 {
-                    if (AccessV2Geometry.TryTurn(
-                            current.Parent.State, current.State, sign,
-                            out AccessV2Transition turn, out string turnReason))
-                        TryRelax(current, turn);
-                    else
-                        Reject(turnReason);
+                    TryRelax(current, turn);
                 }
             }
+        }
+
+        private static bool TryGetStrafePredecessorProfile(
+            SearchNode current,
+            int transverseSign,
+            out AccessHeightProfile profile)
+        {
+            int retainedLane = transverseSign < 0 ? 0 : 1;
+            Tile2i retainedOrigin = AccessV2Geometry.Subtract(
+                current.State.GetLaneOrigin(retainedLane),
+                current.State.EntryDirection);
+            if (current.History.TryGetProfile(retainedOrigin, out profile))
+                return true;
+
+            SearchNode? predecessor = current.Parent;
+            if (predecessor == null || predecessor.GroundCenter.HasValue)
+            {
+                profile = default;
+                return false;
+            }
+            for (int lane = 0; lane < 2; lane++)
+            {
+                if (predecessor.State.GetLaneOrigin(lane) == retainedOrigin)
+                {
+                    profile = predecessor.State.Band.GetLane(lane);
+                    return true;
+                }
+            }
+            profile = default;
+            return false;
         }
 
         private void TryRelax(
@@ -446,7 +501,7 @@ namespace AutoTerrainDesignations.Access.V2
             AccessV2Transition transition)
         {
             if (!AccessV2Geometry.IsInsideBounds(
-                    transition.Next, m_boundsMin, m_boundsMax))
+                    transition, m_boundsMin, m_boundsMax))
             {
                 Reject("HorizontalBounds");
                 return;
@@ -491,7 +546,9 @@ namespace AutoTerrainDesignations.Access.V2
                 current.GeneratedFixedCost + evaluation.GeneratedFixedCost,
                 current.ExteriorRayCost + evaluation.ExteriorRayCost,
                 current.CleanupCost + evaluation.CleanupCost,
-                current, transition, null);
+                current, transition, null,
+                requiresGroundTransition:
+                    evaluation.RequiresGroundTransition);
             Enqueue(next);
         }
 
@@ -675,6 +732,8 @@ namespace AutoTerrainDesignations.Access.V2
                             Reject(evaluation.RejectionReason);
                             continue;
                         }
+                        if (evaluation.RequiresGroundTransition)
+                            continue;
                         if (!current.History.TryApply(
                                 transition.Delta,
                                 transition.LocalContextOrigins,
@@ -951,6 +1010,7 @@ namespace AutoTerrainDesignations.Access.V2
             public AccessV2HandoffCandidate? Handoff { get; }
             public Tile2i? GroundCenter { get; }
             public bool IsFixedGoalTerminal { get; }
+            public bool RequiresGroundTransition { get; }
 
             public SearchNode(
                 AccessV2BandState state,
@@ -966,7 +1026,8 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessV2Transition? transition,
                 AccessV2HandoffCandidate? handoff,
                 Tile2i? groundCenter = null,
-                bool isFixedGoalTerminal = false)
+                bool isFixedGoalTerminal = false,
+                bool requiresGroundTransition = false)
             {
                 State = state;
                 History = history;
@@ -982,6 +1043,7 @@ namespace AutoTerrainDesignations.Access.V2
                 Handoff = handoff;
                 GroundCenter = groundCenter;
                 IsFixedGoalTerminal = isFixedGoalTerminal;
+                RequiresGroundTransition = requiresGroundTransition;
             }
         }
 

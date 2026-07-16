@@ -253,7 +253,9 @@ All reviewed recommendations have been accepted and folded in. No semantic desig
 
 ### Accepted lateral-strafe semantics
 
-A direct one-origin strafe carries one old lane into the successor frontier and introduces one new lane. The retained lane is immutable context: it is not added to the transition delta, re-added to history, re-costed, revalidated as new work, or rematerialized. The new lane is the complete generated delta and must agree with every shared corner and profile constraint.
+A direct one-origin strafe requires a V predecessor slice, carries one old lane into the successor frontier, and introduces one new lane beside both the current and predecessor longitudinal slices. Those two new origins form the complete generated delta, producing a 2x3 swept footprint that preserves a width-two brush through the sideways move. The retained lane is immutable context: it is not added to the transition delta, re-added to history, re-costed, revalidated as new work, or rematerialized. Both new origins must agree with every shared corner and profile constraint. A start frontage or fresh G-to-V entry must advance once before strafing because it does not yet own that predecessor slice.
+
+On a flat landing where the corresponding turn is legal, the finder suppresses the strafe successor. A flat strafe and the canonical turn path can materialize the same terrain profiles with different incremental ray and traversal accounting, so admitting both would make cost and blockage depend on graph representation. Uniform-slope strafes remain available because turns are illegal there.
 
 Consequently, “origin revisit” means that a transition attempts to reintroduce an origin in its generated delta. Merely retaining the unchanged lane in a successor frontier is not a revisit. This preserves direct uniform-slope strafing for cost-efficient mountainside routes without permitting duplicate work or exploration of an identical full state.
 
@@ -275,7 +277,7 @@ Each stage must build and be reviewable independently. Width two remains explici
 
 * Encode the accepted band-slice state specification; do not implement the rejected sliding four-origin brush.
 * Codify canonical anchor, lane order, travel axis, entry direction, and turn footprint with coordinate examples for X+/X-/Y+/Y- travel.
-* Codify direct strafe as a one-origin lateral shift with one immutable retained lane and one newly generated lane, and make the delta-based history invariant explicit.
+* Codify direct strafe as a one-origin lateral shift with one immutable retained lane and a two-origin copied outer lane across the current and predecessor slices, and make the delta-based history invariant explicit.
 * Codify profile-pair generation from concrete corner profiles, initially exposing only flat and uniform same-sign pairs.
 * Codify common-span width-two handoff semantics, per-lane operation rules, and the canonical-center spoke cost.
 * Update the older pathfinding/framework notes to reference these accepted decisions.
@@ -330,11 +332,11 @@ Live result: an exposed one-origin endpoint produced the expected synthetic fron
 * Score direct work for newly introduced origins and rays only on the external band perimeter.
 * Run Dijkstra only and return a V2-specific in-memory result; do not place it.
 
-Implementation note: width-two requests with fixed-provider frontages use the same incremental V2 session. The graph expands flat/ramp straight successors, one-lane retained strafes, and explicit flat 2x2 turns; generated history owns only transition deltas and carries source profiles, charged cleanup keys, and elevation-aware exterior-ray constraints. Production evaluation applies snapshot profile feasibility, projected work, prior ray envelopes, four-corner direct work, generated-origin overhead, deduplicated dense-debris cleanup, two outer band rays, and all three old-direction turn rays. Dijkstra remains available as the optimality reference; production A* uses the request-scoped potential.
+Implementation note: width-two requests with fixed-provider frontages use the same incremental V2 session. The graph expands flat/ramp straight successors, two-origin swept strafes on slopes or where no equivalent turn exists, and explicit flat 2x2 turns; generated history owns only transition deltas and carries source profiles, charged cleanup keys, and elevation-aware exterior-ray constraints. Production evaluation applies snapshot profile feasibility, projected work, prior ray envelopes, four-corner direct work, generated-origin overhead, deduplicated dense-debris cleanup, exterior band rays, and all three old-direction turn rays. Dijkstra remains available as the optimality reference; production A* uses the request-scoped potential.
 
 Exit gate: deterministic routes include flat straight, uniform ramp, the accepted lateral behavior, switchback with 8x8 landing, no-path narrow area, durability block, and cheaper-G reuse. Costs contain no overlap double-counting.
 
-Fixture result: flat straight, uniform ramp, retained-lane strafe, 2x2 flat turn, injected durability/no-path, and cleanup-key deduplication pass in the explicit V2 runner. The already verified Mega ground graph remains the cheaper traversal substrate; connecting it to V2 is intentionally the Stage 5 seam rather than an implicit Stage 4 edge.
+Fixture result: flat straight, uniform ramp, two-origin swept strafe, consecutive strafe, flat-strafe dominance, 2x2 flat turn, injected durability/no-path, and cleanup-key deduplication pass in the explicit V2 runner. The already verified Mega ground graph remains the cheaper traversal substrate; connecting it to V2 is intentionally the Stage 5 seam rather than an implicit Stage 4 edge.
 
 Live result: AUTO resolved a fleet Mega to vehicle width five and `requiredWidth=2`; frontage discovery found six starts and ten fixed frontages. Dijkstra found a 16-state route with 23 generated origins, seven straight and eight strafe transitions, bounded history/ray high-water counts, and zero terrain-designation mutations. Delta ownership reconciled exactly as 14 straight origins plus eight strafe origins plus one synthetic start companion.
 

@@ -139,14 +139,18 @@ namespace AutoTerrainDesignations.Access.V2
                     return false;
                 }
                 if (!AccessV2Geometry.TryStrafe(
-                        state, -1, out AccessV2Transition strafeLow,
+                        straight.Next, -1, out AccessV2Transition strafeLow,
                         out failure)
-                    || strafeLow.Delta.Count != 1
-                    || strafeLow.LocalContextOrigins.Count != 1
+                    || strafeLow.Delta.Count != 2
+                    || strafeLow.LocalContextOrigins.Count != 2
+                    || !ValidateStrafeFootprint(
+                        straight.Next, strafeLow, -1, out failure)
                     || !AccessV2Geometry.TryStrafe(
-                        state, 1, out AccessV2Transition strafeHigh,
+                        straight.Next, 1, out AccessV2Transition strafeHigh,
                         out failure)
-                    || strafeHigh.Delta.Count != 1
+                    || strafeHigh.Delta.Count != 2
+                    || !ValidateStrafeFootprint(
+                        straight.Next, strafeHigh, 1, out failure)
                     || strafeHigh.Next.EntryDirection != direction)
                 {
                     failure = "Strafe symmetry failed for " + direction;
@@ -154,13 +158,133 @@ namespace AutoTerrainDesignations.Access.V2
                 }
 
                 if (!CreateHistoryForState(state, out AccessV2History history, out failure)
+                    || !history.TryApply(straight, out history, out failure)
                     || !history.TryApply(strafeLow, out AccessV2History strafedHistory, out failure)
-                    || strafedHistory.OriginCount != 3)
+                    || strafedHistory.OriginCount != 6
+                    || !ValidateSweptCorridor(
+                        strafedHistory, straight.Next, -1, 3, out failure)
+                    || !AccessV2Geometry.TryStrafe(
+                        strafeHigh.Next, 1,
+                        out AccessV2Transition consecutiveStrafe, out failure)
+                    || !history.TryApply(strafeHigh, out AccessV2History firstStrafeHistory, out failure)
+                    || !firstStrafeHistory.TryApply(
+                        consecutiveStrafe,
+                        out AccessV2History secondStrafeHistory,
+                        out failure)
+                    || secondStrafeHistory.OriginCount != 8
+                    || !ValidateSweptCorridor(
+                        secondStrafeHistory, straight.Next, 0, 4, out failure)
+                    || !AccessV2Geometry.TryStrafe(
+                        consecutiveStrafe.Next, 1,
+                        out AccessV2Transition thirdStrafe, out failure)
+                    || !secondStrafeHistory.TryApply(
+                        thirdStrafe,
+                        out AccessV2History thirdStrafeHistory,
+                        out failure)
+                    || thirdStrafeHistory.OriginCount != 10
+                    || !ValidateSweptCorridor(
+                        thirdStrafeHistory, straight.Next, 0, 5, out failure))
                 {
-                    failure = "Strafe retained-lane ownership failed for " + direction
+                    failure = "Strafe swept-footprint ownership failed for " + direction
                         + ": " + failure;
                     return false;
                 }
+            }
+
+            if (!TryCreateUniformState(
+                    new Tile2i(20, 20), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState flatState, out failure))
+                return false;
+            AccessV2Transition? flatToRamp =
+                AccessV2Geometry.EnumerateStraight(flatState)
+                    .FirstOrDefault(item => item.Next.Band.Kind
+                        == AccessV2BandProfileKind.UniformRamp);
+            if (flatToRamp == null
+                || !CreateHistoryForState(
+                    flatState, out AccessV2History transitionHistory,
+                    out failure)
+                || !transitionHistory.TryApply(
+                    flatToRamp, out transitionHistory, out failure)
+                || !AccessV2Geometry.TryStrafe(
+                    flatToRamp.Next, 1, flatState.Band.Lane1,
+                    out AccessV2Transition transitionStrafe, out failure)
+                || !transitionHistory.TryApply(
+                    transitionStrafe, out transitionHistory, out failure)
+                || transitionHistory.OriginCount != 6)
+            {
+                failure = "Strafe did not copy the concrete predecessor profile: "
+                    + failure;
+                return false;
+            }
+            failure = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateSweptCorridor(
+            AccessV2History history,
+            AccessV2BandState current,
+            int firstLaneOffset,
+            int laneCount,
+            out string failure)
+        {
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> profiles =
+                history.Flatten();
+            Tile2i laneDirection =
+                AccessV2Geometry.GetCanonicalLaneDirection(current.Axis);
+            for (int slice = -1; slice <= 0; slice++)
+            for (int lane = 0; lane < laneCount; lane++)
+            {
+                Tile2i origin = AccessV2Geometry.Add(
+                    AccessV2Geometry.Add(
+                        current.Anchor,
+                        AccessV2Geometry.Scale(current.EntryDirection, slice)),
+                    AccessV2Geometry.Scale(
+                        laneDirection, firstLaneOffset + lane));
+                if (!profiles.ContainsKey(origin))
+                {
+                    failure = "Strafe history does not contain a full swept corridor";
+                    return false;
+                }
+            }
+            failure = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateStrafeFootprint(
+            AccessV2BandState current,
+            AccessV2Transition transition,
+            int transverseSign,
+            out string failure)
+        {
+            Tile2i laneDirection =
+                AccessV2Geometry.GetCanonicalLaneDirection(current.Axis);
+            Tile2i shift = AccessV2Geometry.Scale(
+                laneDirection, transverseSign);
+            Tile2i expectedNext = AccessV2Geometry.Add(
+                current.Anchor, shift);
+            if (transition.Next.Anchor != expectedNext)
+            {
+                failure = "Strafe endpoint changed its longitudinal position";
+                return false;
+            }
+
+            var actual = new HashSet<Tile2i>(
+                transition.Delta.Select(item => item.Origin));
+            int newLane = transverseSign < 0 ? 0 : 1;
+            Tile2i currentOuter = transition.Next.GetLaneOrigin(newLane);
+            Tile2i predecessorOuter = AccessV2Geometry.Subtract(
+                currentOuter, current.EntryDirection);
+            if (!actual.Remove(currentOuter)
+                || !actual.Remove(predecessorOuter))
+            {
+                failure = "Strafe did not copy the new lane across both slices";
+                return false;
+            }
+            if (actual.Count != 0)
+            {
+                failure = "Strafe generated an unexpected footprint origin";
+                return false;
             }
             failure = string.Empty;
             return true;
@@ -369,6 +493,20 @@ namespace AutoTerrainDesignations.Access.V2
                     state, new Tile2i(0, 0), new Tile2i(8, 8)))
             {
                 failure = "Band bounds must include both complete 4x4 origins";
+                return false;
+            }
+            if (!TryCreateUniformState(
+                    new Tile2i(0, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState edgeState, out failure)
+                || !AccessV2Geometry.TryStrafe(
+                    edgeState, 1,
+                    out AccessV2Transition edgeStrafe, out failure))
+                return false;
+            if (AccessV2Geometry.IsInsideBounds(
+                    edgeStrafe, new Tile2i(0, 0), new Tile2i(16, 16)))
+            {
+                failure = "Strafe bounds omitted the copied predecessor origin";
                 return false;
             }
             failure = string.Empty;
@@ -692,9 +830,11 @@ namespace AutoTerrainDesignations.Access.V2
                 || straight.Result.States.Count != 3
                 || straight.Result.GeneratedProfiles.Count != 4
                 || Math.Abs(straight.Result.Cost - 19f) > 0.0001f
-                || Math.Abs(straight.Result.TraversalCost - 15f) > 0.0001f)
+                || Math.Abs(straight.Result.TraversalCost - 15f) > 0.0001f
+                || !straight.Result.Rejections.ContainsKey(
+                    "FlatStrafeDominatedByTurn"))
             {
-                failure = "V2 Dijkstra fixed-provider terminal fee or route cost failed";
+                failure = "V2 Dijkstra fixed-provider cost or flat-strafe dominance failed";
                 return false;
             }
 
@@ -824,18 +964,18 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             if (!AccessV2Geometry.TryStrafe(
-                    start, 1, out AccessV2Transition desiredStrafe,
-                    out failure))
+                    rampStep1.Next, 1, out AccessV2Transition desiredStrafe,
+                    out failure)
+                || !AccessV2Geometry.TryStraight(
+                    desiredStrafe.Next,
+                    out AccessV2Transition strafeExit, out failure))
                 return false;
-            Tile2i strafeGoalAnchor = AccessV2Geometry.Add(
-                desiredStrafe.Next.Anchor,
-                desiredStrafe.Next.EntryDirection);
             var strafeGoal = new AccessV2BandState(
-                strafeGoalAnchor,
-                desiredStrafe.Next.Band,
-                desiredStrafe.Next.EntryDirection);
+                strafeExit.Next.Anchor,
+                strafeExit.Next.Band,
+                strafeExit.Next.EntryDirection);
             var strafeEndpoints = new AccessV2EndpointSet(
-                endpoints.Starts,
+                rampEndpoints.Starts,
                 new[]
                 {
                     new AccessV2FixedFrontage(
@@ -843,16 +983,20 @@ namespace AutoTerrainDesignations.Access.V2
                 },
                 new AccessV2FrontageDiagnostics());
             var strafe = new AccessV2SearchSession(
-                strafeEndpoints, Tile2i.Zero, new Tile2i(32, 32),
+                strafeEndpoints, Tile2i.Zero, new Tile2i(40, 36),
                 UnitEvaluator, 10000, float.MaxValue);
             while (!strafe.IsComplete) strafe.Step(5);
             if (!strafe.Result.Success
-                || strafe.Result.States.Count != 2
-                || strafe.Result.States[1].Anchor
+                || strafe.Result.States.Count != 3
+                || strafe.Result.States[2].Anchor
                     != desiredStrafe.Next.Anchor
-                || strafe.Result.GeneratedProfiles.Count != 1)
+                || strafe.Result.GeneratedProfiles.Count != 4)
             {
-                failure = "V2 Dijkstra retained-lane strafe or delta ownership failed";
+                failure = "V2 Dijkstra swept-width strafe or delta ownership failed"
+                    + $": success={strafe.Result.Success}"
+                    + $" states={strafe.Result.States.Count}"
+                    + $" generated={strafe.Result.GeneratedProfiles.Count}"
+                    + $" reason={strafe.Result.FailureReason}";
                 return false;
             }
 
@@ -954,9 +1098,9 @@ namespace AutoTerrainDesignations.Access.V2
             var groundTiles = new List<Tile2i>();
             for (int y = 0; y <= 20; y++)
                 for (int x = 0; x <= 28; x++)
-                    if (x != 8 || y != 6)
+                    if (x != 8 || y != 8)
                         groundTiles.Add(new Tile2i(x, y));
-            Tile2i cleanupTile = new Tile2i(8, 6);
+            Tile2i cleanupTile = new Tile2i(8, 8);
             var cleanup = new AccessPropCleanupInfo(
                 cleanupTile,
                 AccessPropCleanupClass.DenseDebris,
@@ -984,30 +1128,33 @@ namespace AutoTerrainDesignations.Access.V2
                 Tile2i outward = new Tile2i(
                     Math.Sign(origin.X - predecessor.X),
                     Math.Sign(origin.Y - predecessor.Y));
-                Tile2i contact = outward.X != 0
-                    ? new Tile2i(origin.X + (outward.X > 0 ? 4 : 0), origin.Y + 2)
-                    : new Tile2i(origin.X + 2, origin.Y + (outward.Y > 0 ? 4 : 0));
                 AccessHandoffOperation operation = (origin.X + origin.Y) % 8 == 0
                     ? AccessHandoffOperation.Mining
                     : AccessHandoffOperation.Dumping;
-                return new[]
-                {
-                    new AccessGroundHandoff(contact, operation, new[] { contact }),
-                };
+                return Enumerable.Range(0, 5)
+                    .Select(offset => outward.X != 0
+                        ? new Tile2i(
+                            origin.X + (outward.X > 0 ? 4 : 0),
+                            origin.Y + offset)
+                        : new Tile2i(
+                            origin.X + offset,
+                            origin.Y + (outward.Y > 0 ? 4 : 0)))
+                    .Select(contact => new AccessGroundHandoff(
+                        contact, operation, new[] { contact }))
+                    .ToArray();
             }
 
             IReadOnlyList<AccessGroundHandoff> Span(
                 IReadOnlyList<AccessHandoffSpanCell> cells)
             {
                 AccessHandoffSpanCell last = cells[cells.Count - 1];
-                Tile2i contact = new Tile2i(
-                    last.Origin.X + 4, last.Origin.Y + 2);
-                return new[]
-                {
-                    new AccessGroundHandoff(
+                return Enumerable.Range(0, 5)
+                    .Select(offset => new Tile2i(
+                        last.Origin.X + 4, last.Origin.Y + offset))
+                    .Select(contact => new AccessGroundHandoff(
                         contact, AccessHandoffOperation.Mining,
-                        new[] { contact }, cells.Count),
-                };
+                        new[] { contact }, cells.Count))
+                    .ToArray();
             }
 
             IReadOnlyList<AccessV2HandoffCandidate> candidates =
@@ -1022,7 +1169,11 @@ namespace AutoTerrainDesignations.Access.V2
                 || Math.Abs(forward.CenterSpokeCost - 4.5f) > 0.0001f
                 || Math.Abs(forward.CleanupCost - 8f) > 0.0001f)
             {
-                failure = "V2 forward seam must retain mixed lane operations, cleanup, and the configured center spoke";
+                failure = "V2 forward seam must retain mixed lane operations, cleanup, and the configured center spoke"
+                    + $": candidates={candidates.Count}"
+                    + $" forward={(forward == null ? "none" : forward.ToString())}"
+                    + $" cleanup={(forward == null ? -1f : forward.CleanupCost)}"
+                    + $" spoke={(forward == null ? -1f : forward.CenterSpokeCost)}";
                 return false;
             }
 
@@ -1112,11 +1263,13 @@ namespace AutoTerrainDesignations.Access.V2
                     item => item.ExitDirection == new Tile2i(4, 0));
             if (extendedForward == null
                 || !extendedForward.EscapeCenters.Contains(
-                    new Tile2i(10, 6))
+                    new Tile2i(10, 7))
                 || !extendedForward.EscapeCenters.Contains(
-                    new Tile2i(10, 10)))
+                    new Tile2i(10, 8)))
             {
-                failure = "V2 seam must extend each escape until the complete resolved-vehicle mask clears projected work";
+                failure = "V2 seam must extend each escape until the complete resolved-vehicle mask clears projected work"
+                    + $": forward={(extendedForward == null ? "none" : extendedForward.ToString())}"
+                    + $" centers={(extendedForward == null ? "none" : string.Join(",", extendedForward.EscapeCenters))}";
                 return false;
             }
 
@@ -1236,12 +1389,22 @@ namespace AutoTerrainDesignations.Access.V2
                 Tile2i exit,
                 Tile2i entry)
             {
+                Tile2i Contact(int lane)
+                {
+                    Tile2i origin = state.GetLaneOrigin(lane);
+                    return exit.X > 0 ? origin + new RelTile2i(4, 2)
+                        : exit.X < 0 ? origin + new RelTile2i(-1, 2)
+                        : exit.Y > 0 ? origin + new RelTile2i(2, 4)
+                        : origin + new RelTile2i(2, -1);
+                }
+                Tile2i contact0 = Contact(0);
+                Tile2i contact1 = Contact(1);
                 var lane0 = new AccessGroundHandoff(
-                    entry, AccessHandoffOperation.Leveling,
-                    new[] { entry });
+                    contact0, AccessHandoffOperation.Leveling,
+                    new[] { contact0, entry });
                 var lane1 = new AccessGroundHandoff(
-                    entry, AccessHandoffOperation.Leveling,
-                    new[] { entry });
+                    contact1, AccessHandoffOperation.Leveling,
+                    new[] { contact1, entry });
                 return new AccessV2HandoffCandidate(
                     exit, 1, lane0, lane1,
                     new[] { state.GetLaneOrigin(0) },
@@ -1393,6 +1556,105 @@ namespace AutoTerrainDesignations.Access.V2
                 vehicleWidth: 5,
                 v2WorkableHandoffs: Single,
                 v2WorkableHandoffSpans: Span);
+            AccessV2TransitionEvaluation omittedInternalBand =
+                AccessPathSearch.EvaluateV2Transition(
+                    replaySnapshot, first, secondStep,
+                    AccessV2History.Empty, null);
+            if (!omittedInternalBand.IsValid
+                || !omittedInternalBand.RequiresGroundTransition
+                || Math.Abs(omittedInternalBand.GeneratedWorkCost) > 0.0001f)
+            {
+                failure = "V2 internal exact-terrain bands must become zero-work terminal G passages";
+                return false;
+            }
+            Tile2i exactGroundGoal = new Tile2i(24, 24);
+            var exactGroundGraph = new AccessV2GroundGraph(
+                new[] { exactGroundGoal },
+                new[] { exactGroundGoal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            var exactGroundEndpoints = new AccessV2EndpointSet(
+                new[]
+                {
+                    new AccessV2StartFrontage(
+                        first, first.GetLaneOrigin(0), null),
+                },
+                Array.Empty<AccessV2FixedFrontage>(),
+                new AccessV2FrontageDiagnostics());
+            var exactGroundSession = new AccessV2SearchSession(
+                exactGroundEndpoints,
+                Tile2i.Zero, new Tile2i(32, 32),
+                (current, transition, history, connected) =>
+                    transition.Next.Equals(secondStep.Next)
+                        ? AccessPathSearch.EvaluateV2Transition(
+                            replaySnapshot, current, transition,
+                            history, connected)
+                        : AccessV2TransitionEvaluation.Reject(
+                            "FixtureOnlyExactSuccessor"),
+                1000, float.MaxValue,
+                (recent, _) => recent[0].Equals(secondStep.Next)
+                    ? new[]
+                    {
+                        new AccessV2HandoffCandidate(
+                            secondStep.Next.EntryDirection, 1,
+                            new AccessGroundHandoff(
+                                new Tile2i(20, 20),
+                                AccessHandoffOperation.None),
+                            new AccessGroundHandoff(
+                                new Tile2i(20, 21),
+                                AccessHandoffOperation.None),
+                            new[] { secondStep.Next.GetLaneOrigin(0) },
+                            new[] { secondStep.Next.GetLaneOrigin(1) },
+                            new[] { exactGroundGoal },
+                            new[] { exactGroundGoal },
+                            Array.Empty<string>(), 0f,
+                            isQuickPath: true),
+                    }
+                    : Array.Empty<AccessV2HandoffCandidate>(),
+                groundGraph: exactGroundGraph);
+            while (!exactGroundSession.IsComplete)
+                exactGroundSession.Step(10);
+            if (!exactGroundSession.Result.Success
+                || exactGroundSession.Result.RouteSteps.Count != 3
+                || exactGroundSession.Result.RouteSteps[1].IsGround
+                || !exactGroundSession.Result.RouteSteps[2].IsGround
+                || exactGroundSession.Result.RouteSteps[2].GroundCenter
+                    != exactGroundGoal
+                || Math.Abs(
+                    exactGroundSession.Result.GeneratedWorkCost) > 0.0001f)
+            {
+                failure = "V2 exact successor must hand off to G without expanding another V transition";
+                return false;
+            }
+            if (!AccessV2Geometry.TryStrafe(
+                    first, 1, out AccessV2Transition exactStrafe,
+                    out failure))
+                return false;
+            AccessV2TransitionEvaluation omittedStrafeCell =
+                AccessPathSearch.EvaluateV2Transition(
+                    replaySnapshot, first, exactStrafe,
+                    AccessV2History.Empty, null);
+            if (omittedStrafeCell.IsValid
+                || omittedStrafeCell.RejectionReason
+                    != "StrafeRequiresCompleteMaterializedDelta")
+            {
+                failure = "V2 strafe must materialize its complete swept two-origin delta";
+                return false;
+            }
+            var syntheticTransition = new AccessV2Transition(
+                AccessV2TransitionKind.Strafe,
+                first,
+                new[] { first.GetLane(1) },
+                new[] { first.GetLaneOrigin(0) });
+            AccessV2TransitionEvaluation exactStartCompanion =
+                AccessPathSearch.EvaluateV2Transition(
+                    replaySnapshot, null, syntheticTransition,
+                    AccessV2History.Empty, first.GetLaneOrigin(0));
+            if (!exactStartCompanion.IsValid)
+            {
+                failure = "V2 exact-terrain synthetic start companion must remain admissible: "
+                    + exactStartCompanion.RejectionReason;
+                return false;
+            }
             var materializationRoute = new AccessV2RouteData(
                 new[] { first },
                 new Dictionary<Tile2i, AccessHeightProfile>
