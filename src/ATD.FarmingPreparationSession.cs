@@ -521,6 +521,7 @@ namespace AutoTerrainDesignations
             if (s_desigManager == null)
                 return;
 
+            InvalidateTowerReachabilityFlood();
             s_farmingAutomationTickIndex++;
             BootstrapFarmingAutomationForExistingTowers();
 

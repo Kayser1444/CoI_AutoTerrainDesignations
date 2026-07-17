@@ -48,8 +48,8 @@ namespace AutoTerrainDesignations.Access
 
     /// <summary>
     /// Immutable dense upper/lower useful-height fields for one captured access
-    /// snapshot. Construction is currently diagnostic-only; search pruning will
-    /// consume the same center-height queries in a later rollout stage.
+    /// snapshot. The experimental V1 search uses it to prune generated-profile
+    /// centers only; fixed and ground nodes remain explicit search nodes.
     /// </summary>
     internal sealed class AccessUsefulHeightEnvelope
     {

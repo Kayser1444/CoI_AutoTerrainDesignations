@@ -30,6 +30,8 @@ namespace AutoTerrainDesignations.Access.V2
 
         private readonly HashSet<Tile2i> m_groundNodes;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_cleanupByTile;
+        private readonly Dictionary<Tile2i, AccessPropCleanupInfo>
+            m_generatedClearableByTile;
         private readonly HashSet<Tile2i> m_goals;
         private readonly Dictionary<Tile2i, int> m_componentByTile;
         private readonly HashSet<int> m_goalComponents;
@@ -51,9 +53,15 @@ namespace AutoTerrainDesignations.Access.V2
             m_groundNodes = new HashSet<Tile2i>(groundNodes);
             m_goals = new HashSet<Tile2i>(goals);
             m_cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            m_generatedClearableByTile =
+                new Dictionary<Tile2i, AccessPropCleanupInfo>();
             foreach (KeyValuePair<Tile2i, AccessPropCleanupInfo> pair in cleanupByTile)
                 if (!m_groundNodes.Contains(pair.Key) && pair.Value.IsEligible)
                     m_cleanupByTile.Add(pair.Key, pair.Value);
+                else if (!m_groundNodes.Contains(pair.Key)
+                    && pair.Value.IsEligibleWithinGeneratedV
+                    && pair.Value.HasDenseDebrisCleanup)
+                    m_generatedClearableByTile.Add(pair.Key, pair.Value);
             BuildComponents(out m_componentByTile, out m_goalComponents);
             m_goalDistanceByTile = BuildGoalDistances();
         }
@@ -65,6 +73,12 @@ namespace AutoTerrainDesignations.Access.V2
 
         public bool IsTraversable(Tile2i tile)
             => IsGround(tile) || IsCleanupGround(tile);
+
+        internal bool IsTraversable(
+            Tile2i tile,
+            AccessV2History history)
+            => IsTraversable(tile)
+                || IsClearedByGeneratedWork(tile, history);
 
         public bool IsGoal(Tile2i tile) => m_goals.Contains(tile);
 
@@ -89,6 +103,25 @@ namespace AutoTerrainDesignations.Access.V2
                 && CanTraverseCardinal(sideX, to)
                 && CanTraverseCardinal(from, sideY)
                 && CanTraverseCardinal(sideY, to);
+        }
+
+        internal bool CanTraverse(
+            Tile2i from,
+            Tile2i to,
+            AccessV2History history)
+        {
+            int dx = Math.Abs(from.X - to.X);
+            int dy = Math.Abs(from.Y - to.Y);
+            if (dx + dy == 1)
+                return CanTraverseCardinal(from, to, history);
+            if (dx != 1 || dy != 1)
+                return false;
+            Tile2i sideX = new Tile2i(to.X, from.Y);
+            Tile2i sideY = new Tile2i(from.X, to.Y);
+            return CanTraverseCardinal(from, sideX, history)
+                && CanTraverseCardinal(sideX, to, history)
+                && CanTraverseCardinal(from, sideY, history)
+                && CanTraverseCardinal(sideY, to, history);
         }
 
         public static float GetStepCost(Tile2i from, Tile2i to)
@@ -121,6 +154,21 @@ namespace AutoTerrainDesignations.Access.V2
                 && toInfo.HasTreeCleanup && !toInfo.HasDenseDebrisCleanup)
                 return true;
             return ShareCleanupObject(fromInfo, toInfo);
+        }
+
+        private bool CanTraverseCardinal(
+            Tile2i from,
+            Tile2i to,
+            AccessV2History history)
+        {
+            if (Math.Abs(from.X - to.X) + Math.Abs(from.Y - to.Y) != 1
+                || !IsTraversable(from, history)
+                || !IsTraversable(to, history))
+                return false;
+            if (IsClearedByGeneratedWork(from, history)
+                || IsClearedByGeneratedWork(to, history))
+                return true;
+            return CanTraverseCardinal(from, to);
         }
 
         public IReadOnlyCollection<string> CollectUnchargedCleanupKeys(
@@ -179,15 +227,18 @@ namespace AutoTerrainDesignations.Access.V2
             cleanupCost = 0f;
             if (centers.Count == 0) return false;
 
-            int component = -1;
+            var baseComponents = new HashSet<int>();
+            var overlayCenters = new HashSet<Tile2i>();
             foreach (Tile2i center in centers)
             {
-                if (!m_componentByTile.TryGetValue(center, out int found))
+                if (!IsTraversable(center, history))
                     return false;
-                if (component < 0) component = found;
-                else if (component != found) return false;
+                if (m_componentByTile.TryGetValue(center, out int found))
+                    baseComponents.Add(found);
+                else
+                    overlayCenters.Add(center);
 
-                if (!m_cleanupByTile.TryGetValue(
+                if (!TryGetCleanupInfo(
                         center, out AccessPropCleanupInfo info))
                     continue;
                 if (info.Samples.Count == 0)
@@ -203,8 +254,18 @@ namespace AutoTerrainDesignations.Access.V2
                     AddKey(sample.CleanupObjectKey, sample.IsTree);
                 }
             }
+            if (baseComponents.Count == 0)
+                return false;
+            if (overlayCenters.Count > 0
+                && !EveryOverlayCenterReachesBase(
+                    centers, overlayCenters, history))
+                return false;
+            if (baseComponents.Count > 1
+                && !AllRequiredCentersConnected(centers, history))
+                return false;
             cleanupCost = cost;
-            return !requireGoalComponent || m_goalComponents.Contains(component);
+            return !requireGoalComponent
+                || baseComponents.Any(item => m_goalComponents.Contains(item));
 
             void AddKey(string key, bool isTree)
             {
@@ -212,6 +273,91 @@ namespace AutoTerrainDesignations.Access.V2
                     return;
                 cost += cleanupCostScale * AccessPropCleanupPolicy
                     .GetCleanupLandscapingCost(isTree);
+            }
+        }
+
+        private bool IsClearedByGeneratedWork(
+            Tile2i tile,
+            AccessV2History history)
+        {
+            if (!m_generatedClearableByTile.TryGetValue(
+                    tile, out AccessPropCleanupInfo info))
+                return false;
+            bool foundDense = false;
+            if (info.Samples.Count == 0)
+                return history.ContainsCleanupKey(
+                    $"cleanup-origin:{info.Origin.X},{info.Origin.Y}");
+            for (int index = 0; index < info.Samples.Count; index++)
+            {
+                AccessPropSample sample = info.Samples[index];
+                if (!sample.IsDenseDebris)
+                    continue;
+                foundDense = true;
+                if (!sample.IsRemovable
+                    || !history.ContainsCleanupKey(sample.CleanupObjectKey))
+                    return false;
+            }
+            return foundDense;
+        }
+
+        private bool TryGetCleanupInfo(
+            Tile2i tile,
+            out AccessPropCleanupInfo info)
+        {
+            if (m_cleanupByTile.TryGetValue(tile, out info))
+                return true;
+            return m_generatedClearableByTile.TryGetValue(tile, out info);
+        }
+
+        private bool EveryOverlayCenterReachesBase(
+            ISet<Tile2i> centers,
+            ISet<Tile2i> overlayCenters,
+            AccessV2History history)
+        {
+            var reached = new HashSet<Tile2i>();
+            var queue = new Queue<Tile2i>();
+            foreach (Tile2i center in centers)
+                if (m_componentByTile.ContainsKey(center))
+                {
+                    reached.Add(center);
+                    queue.Enqueue(center);
+                }
+            FloodRequiredCenters(centers, history, reached, queue);
+            return overlayCenters.All(reached.Contains);
+        }
+
+        private bool AllRequiredCentersConnected(
+            ISet<Tile2i> centers,
+            AccessV2History history)
+        {
+            var reached = new HashSet<Tile2i>();
+            var queue = new Queue<Tile2i>();
+            Tile2i seed = centers.First();
+            reached.Add(seed);
+            queue.Enqueue(seed);
+            FloodRequiredCenters(centers, history, reached, queue);
+            return reached.Count == centers.Count;
+        }
+
+        private void FloodRequiredCenters(
+            ISet<Tile2i> centers,
+            AccessV2History history,
+            ISet<Tile2i> reached,
+            Queue<Tile2i> queue)
+        {
+            while (queue.Count > 0)
+            {
+                Tile2i current = queue.Dequeue();
+                for (int index = 0; index < s_cardinalDirections.Length; index++)
+                {
+                    Tile2i next = current + s_cardinalDirections[index];
+                    if (!centers.Contains(next)
+                        || reached.Contains(next)
+                        || !CanTraverse(current, next, history))
+                        continue;
+                    reached.Add(next);
+                    queue.Enqueue(next);
+                }
             }
         }
 

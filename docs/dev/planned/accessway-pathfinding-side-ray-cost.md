@@ -419,33 +419,43 @@ cost equality and show the intended route ordering.
 
 ### Deferred follow-up
 
-V/G handoff feasibility is separate from side-ray costing.  A handoff cell has
-two distinct faces:
+V/G handoff feasibility is separate from side-ray costing. A handoff lane or
+multi-origin lane span has two distinct faces:
 
 * Its **V-facing / working edge** connects to the predecessor or successor V
   cell and must be mutually traversible after both cells finish.  For a mining
   handoff its planned height is at or below natural ground; for a dumping
   handoff it is at or above natural ground.
-* Its opposite **G-facing / handoff edge** must be level with ground or lie on
-  the opposite side of natural ground from the V-facing edge.  The profile then
-  cuts the natural terrain somewhere in the cell, creating the bridge between
-  artificial `V` terrain and natural `G` terrain.  It is incorrect to require
-  the G-facing edge itself to be level.
+* Its opposite **G-facing / handoff edge** must have both extreme corners level
+  with ground, or both extreme corners must lie on the opposite side of natural
+  ground from the two extreme V-facing corners. The profile then cuts the
+  natural terrain somewhere in the cell or span, creating the bridge between
+  artificial `V` terrain and natural `G` terrain. Intermediate origins may be
+  added to complete that crest.
 
-The candidate must prove that this ground-crossing is adjacent to at least one
-target-vehicle-mask-pathable `G` tile.  That tile may be immediately outside
-the handoff cell (a conventional edge handoff), or it may lie within the
-handoff cell where the final profile crosses rough natural terrain.  The latter
-case is essential when entering or leaving a slope.  An in-cell `G` tile alone
-is not sufficient: it must have a cardinal path out of the handoff cell after
-the cell's work is accounted for.  The local path-out test treats every tile
-the handoff designation will alter as blocked—mining: `target < ground`;
-dumping: `target > ground`; leveling: either non-zero delta—and must reach a
-target-vehicle-mask-pathable `G` tile outside the V corridor.  In particular,
-the predecessor/successor V footprint that determines the working-edge
-direction is also V, not a valid natural-G exit merely because its pre-work
-snapshot terrain was green.  This prevents an apparent green crossing from
-being accepted when its dumping/mining face seals it inside the handoff cell.
+V2 uses this corner-crest proof directly and does not reconstruct vanilla's
+prospective fulfilled bitmap. A G-facing edge on ground selects leveling;
+opposite-side spans select mining or dumping according to the V-facing side.
+The crest proves rank one next to the V face. The usable-route proof starts at
+rank two of the complete eight-file corridor, in one of files 3..6; files 1..2
+and 7..8 are clearance-only. A cardinal flood must then cross every remaining
+rank of every origin in the terminal span and enter captured clearance-2 `G`
+beyond its G-facing rank.
+
+The flood classifies each middle-file center after the chosen operation.
+Leveling is always pathable. Mining is pathable when vanilla terrain-only
+Mega pathability passes with props disregarded, or when the mining cell works
+that center (`target < ground`). Dumping is pathable when ordinary vanilla
+Mega pathability passes with trees ignored and no uncleared non-tree prop, or
+when the dumping cell works that center (`target > ground`). A previously
+accepted cleanup may remove the non-tree blocker only when the prop's actual
+occupied tiles protrude into a neighboring 4x4 origin that remains free of
+fixed/generated work, buildings, reservations, and other handoff designations.
+A cleanup on the dumping origin itself does not qualify because replacement by
+the dumping designation would erase it. Without such a free occupied neighbor,
+the prop is a hard blocker for every handoff center it blocks. This avoids
+both false rejection of a real cut/fill route and acceptance of a profile that
+crests at its corners but seals the middle of the handoff.
 
 The search may provisionally score a generated V cell as leveling before it
 knows that the cell will terminate at G.  Once a V-to-G transition resolves the
@@ -470,7 +480,7 @@ cannot evaluate the future post-operation terrain profile without mutating the
 world, so the crossing test is the conservative proxy until a prospective
 vehicle profile query is available.
 
-Future `V2+` corridors must derive eligible handoff lanes from the corridor's
+V2 corridors derive eligible handoff lanes from the corridor's
 total frontage in terrain tiles, not apply the single-cell rule independently
 to each 4-tile V cell.  They are assumed to target Mega/T3 vehicles requiring
 five-tile-wide clearance: two lanes at each outside edge of the complete

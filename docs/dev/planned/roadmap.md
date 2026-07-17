@@ -14,8 +14,9 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
    eligible V origins if measurements justify it
 
 Harmonize V1 and V2
+Roadmap
 
-Remaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
+* Landscaping rebate when digging useful oreemaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
 
 ## Generated mining-body vehicle clearance — future refinement
 

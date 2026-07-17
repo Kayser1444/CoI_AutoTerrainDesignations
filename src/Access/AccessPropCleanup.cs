@@ -41,15 +41,19 @@ namespace AutoTerrainDesignations.Access
         public bool IsDenseDebris { get; }
         public bool IsRemovable { get; }
         public string CleanupObjectKey { get; }
+        public IReadOnlyList<Tile2i> EligibleCleanupOrigins { get; }
 
         public AccessPropSample(Tile2i tile, bool isTree, bool isDenseDebris, bool isRemovable,
-            string? cleanupObjectKey = null)
+            string? cleanupObjectKey = null,
+            IReadOnlyList<Tile2i>? eligibleCleanupOrigins = null)
         {
             Tile = tile;
             IsTree = isTree;
             IsDenseDebris = isDenseDebris;
             IsRemovable = isRemovable;
             CleanupObjectKey = cleanupObjectKey ?? $"{(isTree ? "tree" : isDenseDebris ? "debris" : "prop")}:{tile.X},{tile.Y}";
+            EligibleCleanupOrigins = eligibleCleanupOrigins
+                ?? Array.Empty<Tile2i>();
         }
     }
 

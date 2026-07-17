@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Mafi;
 
@@ -20,6 +21,7 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyCollection<string> CleanupKeys { get; }
         public float CleanupCost { get; }
         public bool IsQuickPath { get; }
+        public bool IsMonotonicProof { get; }
         public float CenterSpokeCost { get; }
         public float TotalCost => CenterSpokeCost + CleanupCost;
 
@@ -35,7 +37,8 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<string> cleanupKeys,
             float cleanupCost,
             bool isQuickPath = false,
-            float centerSpokeCost = 2f)
+            float centerSpokeCost = 2f,
+            bool isMonotonicProof = false)
         {
             ExitDirection = exitDirection;
             SpanLength = spanLength;
@@ -50,6 +53,7 @@ namespace AutoTerrainDesignations.Access.V2
             CleanupKeys = cleanupKeys;
             CleanupCost = cleanupCost;
             IsQuickPath = isQuickPath;
+            IsMonotonicProof = isMonotonicProof;
             CenterSpokeCost = Math.Max(2f, centerSpokeCost);
         }
 
@@ -60,7 +64,7 @@ namespace AutoTerrainDesignations.Access.V2
                 $"({Lane1Contact.X},{Lane1Contact.Y}) " +
                 $"escapeCenters={EscapeCenters.Count} " +
                 $"entries={GroundEntryCenters.Count} " +
-                $"quick={IsQuickPath}";
+                $"quick={IsQuickPath} monotonic={IsMonotonicProof}";
     }
 
     internal delegate IReadOnlyList<AccessGroundHandoff>
@@ -74,9 +78,68 @@ namespace AutoTerrainDesignations.Access.V2
         AccessV2LaneSpanHandoffEvaluator(
             IReadOnlyList<AccessHandoffSpanCell> cells);
 
+    internal delegate bool AccessV2HandoffCenterEvaluator(
+        Tile2i origin,
+        AccessHandoffOperation operation,
+        Tile2i center,
+        AccessV2History history);
+
+    internal delegate bool AccessV2HandoffGroundEntryEvaluator(
+        Tile2i center,
+        IReadOnlyCollection<Tile2i> handoffClearingOrigins,
+        AccessV2History history);
+
     internal static class AccessV2Handoffs
     {
-        public const int MaxSpanLength = 3;
+        // One initially exposed origin plus up to
+        // 1 + ceil(mega-clearance / 4) additional origins. The current V2
+        // target is the five-tile Mega footprint, hence 1 + 3 = 4 rows.
+        public const int MaxSpanLength = 4;
+
+        internal static bool TryCreateDirectLevelingBridge(
+            AccessV2BandState state,
+            Tile2i groundEntry,
+            float centerSpokeCost,
+            out AccessV2HandoffCandidate candidate)
+        {
+            Tile2i exitDirection = new Tile2i(
+                -state.EntryDirection.X, -state.EntryDirection.Y);
+            Tile2i lane0Origin = state.GetLaneOrigin(0);
+            Tile2i lane1Origin = state.GetLaneOrigin(1);
+            bool travelsX = exitDirection.X != 0;
+            int transverse = travelsX ? groundEntry.Y : groundEntry.X;
+            int lane0Min = travelsX ? lane0Origin.Y : lane0Origin.X;
+            bool bridgeIsLane0 = transverse >= lane0Min
+                && transverse <= lane0Min + 4;
+            Tile2i lane0Contact = bridgeIsLane0
+                ? groundEntry
+                : GetLevelingCompanionContact(
+                    lane0Origin, exitDirection, groundEntry);
+            Tile2i lane1Contact = bridgeIsLane0
+                ? GetLevelingCompanionContact(
+                    lane1Origin, exitDirection, groundEntry)
+                : groundEntry;
+            var lane0 = new AccessGroundHandoff(
+                lane0Contact, AccessHandoffOperation.Leveling,
+                new[] { groundEntry }, 1);
+            var lane1 = new AccessGroundHandoff(
+                lane1Contact, AccessHandoffOperation.Leveling,
+                new[] { groundEntry }, 1);
+            if (!TryBuildLevelingBridgeEscape(
+                    lane0, lane1, exitDirection, 1, groundEntry,
+                    out IReadOnlyList<Tile2i> escape,
+                    out IReadOnlyList<Tile2i> entries))
+            {
+                candidate = null!;
+                return false;
+            }
+            candidate = new AccessV2HandoffCandidate(
+                exitDirection, 1, lane0, lane1,
+                new[] { lane0Origin }, new[] { lane1Origin },
+                escape, entries, Array.Empty<string>(), 0f,
+                isQuickPath: true, centerSpokeCost: centerSpokeCost);
+            return true;
+        }
 
         public static IReadOnlyList<AccessV2HandoffCandidate> Evaluate(
             IReadOnlyList<AccessV2BandState> recentNewestFirst,
@@ -87,13 +150,18 @@ namespace AutoTerrainDesignations.Access.V2
             float cleanupCostScale = 1f,
             Func<Tile2i, AccessV2History, bool>? projectedCenterValidator = null,
             Func<Tile2i, AccessV2History, bool>? projectedCenterOverlapsWork = null,
+            AccessV2HandoffCenterEvaluator? postWorkCenterValidator = null,
+            AccessV2HandoffGroundEntryEvaluator? groundEntryValidator = null,
             int vehicleWidth = 0,
-            float centerSpokeCost = 2f)
+            float centerSpokeCost = 2f,
+            Tile2i? requiredGroundEntry = null,
+            AccessSearchDiagnostics? diagnostics = null)
         {
             var result = new List<AccessV2HandoffCandidate>();
             if (recentNewestFirst.Count == 0) return result;
             AccessV2BandState current = recentNewestFirst[0];
 
+            long laneEvaluationStart = Stopwatch.GetTimestamp();
             IReadOnlyList<AccessGroundHandoff> firstLane0 =
                 EvaluateForwardLane(
                     recentNewestFirst, 1, 0,
@@ -102,12 +170,23 @@ namespace AutoTerrainDesignations.Access.V2
                 EvaluateForwardLane(
                     recentNewestFirst, 1, 1,
                     singleEvaluator, spanEvaluator);
-            AccessV2HandoffCandidate? quick = TryBuildQuickForwardHandoff(
-                current, history, ground,
-                firstLane0, firstLane1, vehicleWidth,
-                cleanupCostScale, projectedCenterValidator,
-                centerSpokeCost);
-            if (quick != null)
+            if (diagnostics != null)
+                diagnostics.V2HandoffLaneEvaluationTicks +=
+                    Stopwatch.GetTimestamp() - laneEvaluationStart;
+            // Production V2 supplies a post-work center classifier and must
+            // prove the complete rank-two-to-G corridor below.  Retain the
+            // legacy quick path only for callers without that classifier.
+            AccessV2HandoffCandidate? quick = postWorkCenterValidator == null
+                ? TryBuildQuickForwardHandoff(
+                    current, history, ground,
+                    firstLane0, firstLane1, vehicleWidth,
+                    cleanupCostScale, projectedCenterValidator,
+                    centerSpokeCost)
+                : null;
+            if (quick != null
+                && (!requiredGroundEntry.HasValue
+                    || quick.GroundEntryCenters.Contains(
+                        requiredGroundEntry.Value)))
                 return new[] { quick };
 
             int available = CountRecentStraightRows(recentNewestFirst);
@@ -115,6 +194,7 @@ namespace AutoTerrainDesignations.Access.V2
                 span <= Math.Min(MaxSpanLength, available);
                 span++)
             {
+                laneEvaluationStart = Stopwatch.GetTimestamp();
                 IReadOnlyList<AccessGroundHandoff> lane0 = span == 1
                     ? firstLane0
                     : EvaluateForwardLane(
@@ -125,6 +205,9 @@ namespace AutoTerrainDesignations.Access.V2
                     : EvaluateForwardLane(
                         recentNewestFirst, span, 1,
                         singleEvaluator, spanEvaluator);
+                if (diagnostics != null)
+                    diagnostics.V2HandoffLaneEvaluationTicks +=
+                        Stopwatch.GetTimestamp() - laneEvaluationStart;
                 IReadOnlyList<Tile2i> lane0Origins = GetForwardOrigins(
                     recentNewestFirst, span, 0);
                 IReadOnlyList<Tile2i> lane1Origins = GetForwardOrigins(
@@ -135,7 +218,10 @@ namespace AutoTerrainDesignations.Access.V2
                     history, ground,
                     cleanupCostScale, projectedCenterValidator,
                     projectedCenterOverlapsWork,
-                    centerSpokeCost, result);
+                    postWorkCenterValidator,
+                    groundEntryValidator,
+                    centerSpokeCost, requiredGroundEntry, result,
+                    diagnostics);
             }
 
             if (available >= 2)
@@ -164,11 +250,19 @@ namespace AutoTerrainDesignations.Access.V2
                         history, ground,
                         cleanupCostScale, projectedCenterValidator,
                         projectedCenterOverlapsWork,
-                        centerSpokeCost, result);
+                        postWorkCenterValidator,
+                        groundEntryValidator,
+                        centerSpokeCost, requiredGroundEntry, result,
+                        diagnostics);
                 }
             }
 
-            return result
+            IEnumerable<AccessV2HandoffCandidate> selected = result;
+            if (requiredGroundEntry.HasValue)
+                selected = selected.Where(candidate =>
+                    candidate.GroundEntryCenters.Contains(
+                        requiredGroundEntry.Value));
+            return selected
                 .OrderBy(item => item.TotalCost)
                 .ThenBy(item => item.SpanLength)
                 .ThenBy(item => item.ExitDirection.X)
@@ -216,7 +310,7 @@ namespace AutoTerrainDesignations.Access.V2
             for (int offset = minOffset; offset <= maxOffset; offset++)
             {
                 Tile2i center = GetForwardCenter(current, offset);
-                if (!ground.IsTraversable(center)
+                if (!ground.IsTraversable(center, history)
                     || (projectedCenterValidator != null
                         && !projectedCenterValidator(center, history))
                     || HasOutwardHistoryBlocker(
@@ -257,7 +351,11 @@ namespace AutoTerrainDesignations.Access.V2
                 {
                     AccessGroundHandoff left = lane0[leftIndex];
                     AccessGroundHandoff right = lane1[rightIndex];
-                    if (IsAheadOfBand(left.Tile, state)
+                    if (left.Operation == right.Operation
+                        && (left.Operation == AccessHandoffOperation.Mining
+                            || left.Operation
+                                == AccessHandoffOperation.Dumping)
+                        && IsAheadOfBand(left.Tile, state)
                         && IsAheadOfBand(right.Tile, state)
                         && AreConsecutiveContacts(left.Tile, right.Tile))
                     {
@@ -406,51 +504,420 @@ namespace AutoTerrainDesignations.Access.V2
             float cleanupCostScale,
             Func<Tile2i, AccessV2History, bool>? projectedCenterValidator,
             Func<Tile2i, AccessV2History, bool>? projectedCenterOverlapsWork,
+            AccessV2HandoffCenterEvaluator? postWorkCenterValidator,
+            AccessV2HandoffGroundEntryEvaluator? groundEntryValidator,
             float centerSpokeCost,
-            ICollection<AccessV2HandoffCandidate> result)
+            Tile2i? requiredGroundEntry,
+            ICollection<AccessV2HandoffCandidate> result,
+            AccessSearchDiagnostics? diagnostics)
         {
+            AccessGroundHandoff? levelBridge = SelectLevelBridge();
+            if (levelBridge.HasValue)
+            {
+                AccessGroundHandoff bridge = levelBridge.Value;
+                bool bridgeIsLane0 = lane0.Any(candidate =>
+                    candidate.Operation == AccessHandoffOperation.Leveling
+                    && candidate.Tile == bridge.Tile);
+                Tile2i lane0Contact = bridgeIsLane0
+                    ? bridge.Tile
+                    : GetLevelingCompanionContact(
+                        lane0TerminalOrigins[lane0TerminalOrigins.Count - 1],
+                        exitDirection, bridge.Tile);
+                Tile2i lane1Contact = bridgeIsLane0
+                    ? GetLevelingCompanionContact(
+                        lane1TerminalOrigins[lane1TerminalOrigins.Count - 1],
+                        exitDirection, bridge.Tile)
+                    : bridge.Tile;
+                var leveledLane0 = new AccessGroundHandoff(
+                    lane0Contact, AccessHandoffOperation.Leveling,
+                    new[] { bridge.Tile }, spanLength);
+                var leveledLane1 = new AccessGroundHandoff(
+                    lane1Contact, AccessHandoffOperation.Leveling,
+                    new[] { bridge.Tile }, spanLength);
+                if (TryBuildLevelingBridgeEscape(
+                        leveledLane0, leveledLane1, exitDirection,
+                        lane0TerminalOrigins.Count, bridge.Tile,
+                        out IReadOnlyList<Tile2i> leveledCenters,
+                        out IReadOnlyList<Tile2i> leveledEntries))
+                {
+                    if (diagnostics != null)
+                        diagnostics.V2LevelingBridgeAccepts++;
+                    result.Add(new AccessV2HandoffCandidate(
+                        exitDirection, spanLength,
+                        leveledLane0, leveledLane1,
+                        lane0TerminalOrigins,
+                        lane1TerminalOrigins,
+                        leveledCenters,
+                        leveledEntries,
+                        Array.Empty<string>(), 0f,
+                        isQuickPath: true,
+                        centerSpokeCost: centerSpokeCost));
+                }
+                return;
+            }
+
             for (int leftIndex = 0; leftIndex < lane0.Count; leftIndex++)
             {
                     AccessGroundHandoff left = lane0[leftIndex];
                     for (int rightIndex = 0; rightIndex < lane1.Count; rightIndex++)
                     {
                         AccessGroundHandoff right = lane1[rightIndex];
-                        if (!AreConsecutiveContacts(left.Tile, right.Tile))
+                        if (left.Operation != right.Operation)
+                        {
+                            if (diagnostics != null)
+                                diagnostics.V2MixedLanePairRejects++;
                             continue;
-                        if (!TryBuildCompleteEscape(
-                            left, exitDirection, history, ground,
-                            projectedCenterValidator,
-                            projectedCenterOverlapsWork,
-                            out IReadOnlyList<Tile2i> leftEscape)
-                        || !TryBuildCompleteEscape(
-                            right, exitDirection, history, ground,
-                            projectedCenterValidator,
-                            projectedCenterOverlapsWork,
-                            out IReadOnlyList<Tile2i> rightEscape))
-                        continue;
-                    var centers = new HashSet<Tile2i>(leftEscape);
-                    centers.UnionWith(rightEscape);
-                    if (!ground.TryValidateLocalEscape(
-                            centers, history, cleanupCostScale,
-                            out IReadOnlyCollection<string> cleanupKeys,
-                            out float cleanupCost))
-                        continue;
+                        }
+                        if (left.Operation != AccessHandoffOperation.Mining
+                            && left.Operation
+                                != AccessHandoffOperation.Dumping)
+                            continue;
+                        if (diagnostics != null)
+                            diagnostics.V2HandoffPairChecks++;
+                        bool levelingBridge =
+                            left.Operation == AccessHandoffOperation.Leveling
+                            && right.Operation == AccessHandoffOperation.Leveling;
+                        if (!AreConsecutiveContacts(left.Tile, right.Tile)
+                            && !(levelingBridge && left.Tile == right.Tile))
+                            continue;
+                        IReadOnlyList<Tile2i> entryCenters;
+                        IReadOnlyList<Tile2i> centers;
+                        if (levelingBridge)
+                        {
+                            if (!TryBuildLevelingBridgeEscape(
+                                    left, right, exitDirection,
+                                    lane0TerminalOrigins.Count,
+                                    requiredGroundEntry,
+                                    out centers, out entryCenters))
+                                continue;
+                        }
+                        else if (postWorkCenterValidator != null)
+                        {
+                            if (diagnostics != null)
+                                diagnostics.V2CorridorAttempts++;
+                            long corridorStart = Stopwatch.GetTimestamp();
+                            bool corridorValid = TryBuildPostWorkCorridorEscape(
+                                    left, right,
+                                    lane0TerminalOrigins,
+                                    lane1TerminalOrigins,
+                                    exitDirection, history, ground,
+                                    projectedCenterValidator,
+                                    postWorkCenterValidator,
+                                    groundEntryValidator,
+                                    requiredGroundEntry,
+                                    out centers, out entryCenters,
+                                    diagnostics);
+                            if (diagnostics != null)
+                                diagnostics.V2CorridorTicks +=
+                                    Stopwatch.GetTimestamp() - corridorStart;
+                            if (!corridorValid)
+                                continue;
+                        }
+                        else
+                        {
+                            if (!TryBuildCompleteEscape(
+                                    left, exitDirection, history, ground,
+                                    projectedCenterValidator,
+                                    projectedCenterOverlapsWork,
+                                    out IReadOnlyList<Tile2i> leftEscape)
+                                || !TryBuildCompleteEscape(
+                                    right, exitDirection, history, ground,
+                                    projectedCenterValidator,
+                                    projectedCenterOverlapsWork,
+                                    out IReadOnlyList<Tile2i> rightEscape))
+                                continue;
+                            var legacyCenters = new HashSet<Tile2i>(leftEscape);
+                            legacyCenters.UnionWith(rightEscape);
+                            centers = legacyCenters.OrderBy(item => item.X)
+                                .ThenBy(item => item.Y).ToArray();
+                            entryCenters = new[]
+                            {
+                                leftEscape[leftEscape.Count - 1],
+                                rightEscape[rightEscape.Count - 1],
+                            }.Distinct().ToArray();
+                        }
+                    IReadOnlyCollection<string> cleanupKeys;
+                    float cleanupCost;
+                    if (levelingBridge)
+                    {
+                        // Leveling contacts came from the captured pathable
+                        // mask. Interior ownership and the bridge are already
+                        // proven, so no further pathability/cleanup query is
+                        // needed.
+                        cleanupKeys = Array.Empty<string>();
+                        cleanupCost = 0f;
+                    }
+                    else
+                    {
+                        long localEscapeStart = Stopwatch.GetTimestamp();
+                        bool localEscapeValid = ground.TryValidateLocalEscape(
+                            entryCenters, history, cleanupCostScale,
+                            out cleanupKeys, out cleanupCost);
+                        if (diagnostics != null)
+                            diagnostics.V2LocalEscapeTicks +=
+                                Stopwatch.GetTimestamp() - localEscapeStart;
+                        if (!localEscapeValid)
+                            continue;
+                    }
                     result.Add(new AccessV2HandoffCandidate(
                         exitDirection, spanLength,
                         left, right,
                         lane0TerminalOrigins,
                         lane1TerminalOrigins,
-                        centers.OrderBy(item => item.X)
-                            .ThenBy(item => item.Y).ToArray(),
-                        new[]
-                        {
-                            leftEscape[leftEscape.Count - 1],
-                            rightEscape[rightEscape.Count - 1],
-                        }.Distinct().ToArray(),
+                        centers,
+                        entryCenters,
                         cleanupKeys, cleanupCost,
+                        isQuickPath: levelingBridge,
                         centerSpokeCost: centerSpokeCost));
                 }
             }
+
+            AccessGroundHandoff? SelectLevelBridge()
+            {
+                IEnumerable<AccessGroundHandoff> bridges = lane0.Concat(lane1)
+                    .Where(candidate =>
+                        candidate.Operation == AccessHandoffOperation.Leveling);
+                if (requiredGroundEntry.HasValue)
+                    bridges = bridges.Where(candidate =>
+                        candidate.Tile == requiredGroundEntry.Value);
+                foreach (AccessGroundHandoff candidate in bridges
+                    .OrderBy(item => item.Tile.X)
+                    .ThenBy(item => item.Tile.Y))
+                    return candidate;
+                return null;
+            }
+        }
+
+        private static Tile2i GetLevelingCompanionContact(
+            Tile2i origin,
+            Tile2i exitDirection,
+            Tile2i bridge)
+        {
+            if (exitDirection.X != 0)
+                return new Tile2i(
+                    exitDirection.X > 0 ? origin.X + 4 : origin.X,
+                    Math.Max(origin.Y, Math.Min(origin.Y + 4, bridge.Y)));
+            return new Tile2i(
+                Math.Max(origin.X, Math.Min(origin.X + 4, bridge.X)),
+                exitDirection.Y > 0 ? origin.Y + 4 : origin.Y);
+        }
+
+        /// <summary>
+        /// A captured mask-pathable edge tile that is level with the target
+        /// surface is a complete bridge into a leveling designation. Leveling
+        /// owns the full post-work surface, so the straight center corridor is
+        /// known geometrically and does not need per-center classification or
+        /// a flood fill.
+        /// </summary>
+        private static bool TryBuildLevelingBridgeEscape(
+            AccessGroundHandoff lane0,
+            AccessGroundHandoff lane1,
+            Tile2i exitDirection,
+            int spanLength,
+            Tile2i? requiredGroundEntry,
+            out IReadOnlyList<Tile2i> escape,
+            out IReadOnlyList<Tile2i> groundEntries)
+        {
+            escape = Array.Empty<Tile2i>();
+            groundEntries = Array.Empty<Tile2i>();
+            if (spanLength <= 0)
+                return false;
+
+            Tile2i entry;
+            if (requiredGroundEntry.HasValue)
+            {
+                entry = requiredGroundEntry.Value;
+                if (entry != lane0.Tile && entry != lane1.Tile)
+                    return false;
+            }
+            else
+            {
+                entry = lane0.Tile;
+            }
+
+            int forwardX = Math.Sign(exitDirection.X);
+            int forwardY = Math.Sign(exitDirection.Y);
+            if ((forwardX == 0) == (forwardY == 0))
+                return false;
+            var outward = new Tile2i(forwardX, forwardY);
+            int rankCount = checked(spanLength * 4);
+            var path = new List<Tile2i>(rankCount);
+            for (int offset = rankCount - 1; offset >= 0; offset--)
+                path.Add(AccessV2Geometry.Add(
+                    entry, AccessV2Geometry.Scale(outward, -offset)));
+            escape = path;
+            groundEntries = new[] { entry };
+            return true;
+        }
+
+        /// <summary>
+        /// Proves a continuous post-work vehicle-center route through the
+        /// complete eight-file handoff corridor.  Rank one is already joined
+        /// to V by the corner-crest seam, so the flood starts on rank two.
+        /// Only files three through six (one-based) are legal centers; the
+        /// outer two files on each side are the Mega-mask clearance margin.
+        /// </summary>
+        private static bool TryBuildPostWorkCorridorEscape(
+            AccessGroundHandoff lane0,
+            AccessGroundHandoff lane1,
+            IReadOnlyList<Tile2i> lane0Origins,
+            IReadOnlyList<Tile2i> lane1Origins,
+            Tile2i exitDirection,
+            AccessV2History history,
+            AccessV2GroundGraph ground,
+            Func<Tile2i, AccessV2History, bool>? projectedCenterValidator,
+            AccessV2HandoffCenterEvaluator postWorkCenterValidator,
+            AccessV2HandoffGroundEntryEvaluator? groundEntryValidator,
+            Tile2i? requiredGroundEntry,
+            out IReadOnlyList<Tile2i> escape,
+            out IReadOnlyList<Tile2i> groundEntries,
+            AccessSearchDiagnostics? diagnostics)
+        {
+            escape = Array.Empty<Tile2i>();
+            groundEntries = Array.Empty<Tile2i>();
+            if (lane0Origins.Count == 0
+                || lane0Origins.Count != lane1Origins.Count)
+                return false;
+
+            int forwardX = Math.Sign(exitDirection.X);
+            int forwardY = Math.Sign(exitDirection.Y);
+            if ((forwardX == 0) == (forwardY == 0))
+                return false;
+            bool travelsX = forwardX != 0;
+            int rankCount = checked(lane0Origins.Count * 4);
+            var pathable = new HashSet<Tile2i>();
+            var rankByTile = new Dictionary<Tile2i, int>();
+            var handoffClearingOrigins = new HashSet<Tile2i>();
+            if (lane0.Operation == AccessHandoffOperation.Mining
+                || lane0.Operation == AccessHandoffOperation.Leveling)
+                handoffClearingOrigins.UnionWith(lane0Origins);
+            if (lane1.Operation == AccessHandoffOperation.Mining
+                || lane1.Operation == AccessHandoffOperation.Leveling)
+                handoffClearingOrigins.UnionWith(lane1Origins);
+
+            for (int segment = 0; segment < lane0Origins.Count; segment++)
+            {
+                Tile2i origin0 = lane0Origins[segment];
+                Tile2i origin1 = lane1Origins[segment];
+                int longitudinal0 = travelsX ? origin0.X : origin0.Y;
+                int longitudinal1 = travelsX ? origin1.X : origin1.Y;
+                int transverse0 = travelsX ? origin0.Y : origin0.X;
+                int transverse1 = travelsX ? origin1.Y : origin1.X;
+                if (longitudinal0 != longitudinal1
+                    || Math.Abs(transverse0 - transverse1) != 4)
+                    return false;
+                if (segment > 0)
+                {
+                    Tile2i expected0 = new Tile2i(
+                        lane0Origins[segment - 1].X + exitDirection.X,
+                        lane0Origins[segment - 1].Y + exitDirection.Y);
+                    Tile2i expected1 = new Tile2i(
+                        lane1Origins[segment - 1].X + exitDirection.X,
+                        lane1Origins[segment - 1].Y + exitDirection.Y);
+                    if (origin0 != expected0 || origin1 != expected1)
+                        return false;
+                }
+
+                int transverseMin = Math.Min(transverse0, transverse1);
+                for (int withinRank = 0; withinRank < 4; withinRank++)
+                {
+                    int rank = segment * 4 + withinRank;
+                    if (rank == 0)
+                        continue;
+                    int longitudinal = longitudinal0 + (travelsX
+                        ? forwardX > 0 ? withinRank : 3 - withinRank
+                        : forwardY > 0 ? withinRank : 3 - withinRank);
+                    for (int file = 2; file <= 5; file++)
+                    {
+                        int transverse = transverseMin + file;
+                        Tile2i center = travelsX
+                            ? new Tile2i(longitudinal, transverse)
+                            : new Tile2i(transverse, longitudinal);
+                        bool inLane0 = IsInsideOrigin(center, origin0);
+                        bool inLane1 = IsInsideOrigin(center, origin1);
+                        if (inLane0 == inLane1)
+                            return false;
+                        Tile2i owner = inLane0 ? origin0 : origin1;
+                        AccessHandoffOperation operation = inLane0
+                            ? lane0.Operation
+                            : lane1.Operation;
+                        if (diagnostics != null)
+                            diagnostics.V2CorridorCenterChecks++;
+                        if (!postWorkCenterValidator(
+                                owner, operation, center, history))
+                            continue;
+                        pathable.Add(center);
+                        rankByTile[center] = rank;
+                    }
+                }
+            }
+
+            var queue = new Queue<Tile2i>();
+            var visited = new HashSet<Tile2i>();
+            var parent = new Dictionary<Tile2i, Tile2i>();
+            foreach (KeyValuePair<Tile2i, int> pair in rankByTile
+                .Where(pair => pair.Value == 1)
+                .OrderBy(pair => pair.Key.X)
+                .ThenBy(pair => pair.Key.Y))
+            {
+                visited.Add(pair.Key);
+                queue.Enqueue(pair.Key);
+            }
+            if (queue.Count == 0)
+                return false;
+
+            RelTile2i[] directions =
+            {
+                new RelTile2i(1, 0), new RelTile2i(-1, 0),
+                new RelTile2i(0, 1), new RelTile2i(0, -1),
+            };
+            RelTile2i outward = new RelTile2i(forwardX, forwardY);
+            while (queue.Count > 0)
+            {
+                if (diagnostics != null)
+                    diagnostics.V2CorridorBfsPops++;
+                Tile2i current = queue.Dequeue();
+                if (rankByTile[current] == rankCount - 1)
+                {
+                    Tile2i outside = current + outward;
+                    if ((!requiredGroundEntry.HasValue
+                            || outside == requiredGroundEntry.Value)
+                        && ground.IsTraversable(outside)
+                        && (projectedCenterValidator == null
+                            || projectedCenterValidator(outside, history))
+                        && (groundEntryValidator == null
+                            || groundEntryValidator(
+                                outside,
+                                handoffClearingOrigins,
+                                history)))
+                    {
+                        var path = new List<Tile2i> { outside, current };
+                        while (parent.TryGetValue(current, out Tile2i previous))
+                        {
+                            current = previous;
+                            path.Add(current);
+                        }
+                        path.Reverse();
+                        escape = path;
+                        groundEntries = new[] { outside };
+                        return true;
+                    }
+                }
+
+                for (int index = 0; index < directions.Length; index++)
+                {
+                    Tile2i next = current + directions[index];
+                    if (!pathable.Contains(next) || !visited.Add(next))
+                        continue;
+                    parent[next] = current;
+                    queue.Enqueue(next);
+                }
+            }
+            return false;
+
+            bool IsInsideOrigin(Tile2i tile, Tile2i origin)
+                => tile.X >= origin.X && tile.X < origin.X + 4
+                    && tile.Y >= origin.Y && tile.Y < origin.Y + 4;
         }
 
         private static bool TryBuildCompleteEscape(
@@ -471,7 +938,7 @@ namespace AutoTerrainDesignations.Access.V2
             for (int index = 0; index < prefix.Count; index++)
             {
                 Tile2i center = prefix[index];
-                if (!ground.IsTraversable(center)
+                if (!ground.IsTraversable(center, history)
                     || (projectedCenterValidator != null
                         && !projectedCenterValidator(center, history)))
                 {
@@ -481,8 +948,7 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             Tile2i start = prefix[prefix.Count - 1];
-            if (projectedCenterOverlapsWork == null
-                || !projectedCenterOverlapsWork(start, history))
+            if (!OverlapsWork(start) && ground.IsTraversable(start))
             {
                 escape = prefix;
                 return true;
@@ -505,11 +971,12 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i current = start;
             for (int step = 0;
                 step < maxAdditionalDistance
-                    && projectedCenterOverlapsWork(current, history);
+                    && (OverlapsWork(current)
+                        || !ground.IsTraversable(current));
                 step++)
             {
                 Tile2i next = current + continuation;
-                if (!ground.CanTraverse(current, next)
+                if (!ground.CanTraverse(current, next, history)
                     || (projectedCenterValidator != null
                         && !projectedCenterValidator(next, history)))
                 {
@@ -519,13 +986,18 @@ namespace AutoTerrainDesignations.Access.V2
                 prefix.Add(next);
                 current = next;
             }
-            if (projectedCenterOverlapsWork(current, history))
+            if (OverlapsWork(current)
+                || !ground.IsTraversable(current))
             {
                 escape = Array.Empty<Tile2i>();
                 return false;
             }
             escape = prefix;
             return true;
+
+            bool OverlapsWork(Tile2i center)
+                => projectedCenterOverlapsWork != null
+                    && projectedCenterOverlapsWork(center, history);
         }
     }
 }

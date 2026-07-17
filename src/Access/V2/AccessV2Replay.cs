@@ -190,6 +190,9 @@ namespace AutoTerrainDesignations.Access.V2
                     return false;
             }
 
+            AccessV2HandoffCandidate? pendingGroundToV = null;
+            Tile2i? pendingGroundCenter = null;
+            var pendingGroundToVStates = new List<AccessV2BandState>();
             for (int index = 1; index < route.RouteSteps.Count; index++)
             {
                 AccessV2RouteStep previous = route.RouteSteps[index - 1];
@@ -216,26 +219,66 @@ namespace AutoTerrainDesignations.Access.V2
                             reason = "V2ReplayGroundToVSeamMissing";
                             return false;
                         }
-                        var reverse = new AccessV2BandState(
-                            step.State.Anchor, step.State.Band,
-                            new Tile2i(
-                                -step.State.EntryDirection.X,
-                                -step.State.EntryDirection.Y));
+                        pendingGroundToV = step.Handoff;
+                        pendingGroundCenter = previous.GroundCenter;
+                        pendingGroundToVStates.Clear();
+                    }
+                    if (pendingGroundToV != null)
+                    {
+                        pendingGroundToVStates.Add(step.State);
+                        if (pendingGroundToVStates.Count
+                            < pendingGroundToV.SpanLength)
+                            continue;
+
+                        if (IsDirectLevelingBridge(
+                                pendingGroundToV,
+                                pendingGroundCenter)
+                            || IsInheritedMonotonicHandoff(
+                                pendingGroundToV,
+                                pendingGroundCenter))
+                        {
+                            history = history.ApplyCleanupKeys(
+                                pendingGroundToV.CleanupKeys);
+                            pendingGroundToV = null;
+                            pendingGroundCenter = null;
+                            pendingGroundToVStates.Clear();
+                            continue;
+                        }
+
+                        Tile2i travel = pendingGroundToVStates[0]
+                            .EntryDirection;
+                        var reverseDirection = new Tile2i(
+                            -travel.X, -travel.Y);
+                        AccessV2BandState[] reverse = pendingGroundToVStates
+                            .Select(state => new AccessV2BandState(
+                                state.Anchor, state.Band, reverseDirection))
+                            .ToArray();
                         AccessV2HandoffCandidate? seam =
                             AccessPathSearch.EvaluateV2Handoffs(
-                                    snapshot, new[] { reverse }, history)
+                                    snapshot, reverse, history,
+                                    pendingGroundCenter)
                                 .FirstOrDefault(candidate =>
-                                    HandoffsEqual(candidate, step.Handoff)
+                                    HandoffsEqual(
+                                        candidate, pendingGroundToV)
                                     && candidate.GroundEntryCenters.Contains(
-                                        previous.GroundCenter!.Value));
+                                        pendingGroundCenter!.Value));
                         if (seam == null)
                         {
                             reason = "V2ReplayGroundToVSeamMismatch";
                             return false;
                         }
                         history = history.ApplyCleanupKeys(seam.CleanupKeys);
+                        pendingGroundToV = null;
+                        pendingGroundCenter = null;
+                        pendingGroundToVStates.Clear();
                     }
                     continue;
+                }
+
+                if (pendingGroundToV != null)
+                {
+                    reason = "V2ReplayGroundToVSpanIncomplete";
+                    return false;
                 }
 
                 Tile2i center = step.GroundCenter!.Value;
@@ -292,6 +335,12 @@ namespace AutoTerrainDesignations.Access.V2
                 }
             }
 
+            if (pendingGroundToV != null)
+            {
+                reason = "V2ReplayGroundToVSpanIncomplete";
+                return false;
+            }
+
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> flattened =
                 history.Flatten();
             if (flattened.Count != route.GeneratedProfiles.Count
@@ -315,6 +364,29 @@ namespace AutoTerrainDesignations.Access.V2
             reason = string.Empty;
             return true;
         }
+
+        private static bool IsDirectLevelingBridge(
+            AccessV2HandoffCandidate handoff,
+            Tile2i? groundCenter)
+            => groundCenter.HasValue
+                && handoff.IsQuickPath
+                && handoff.SpanLength == 1
+                && handoff.Lane0Operation == AccessHandoffOperation.Leveling
+                && handoff.Lane1Operation == AccessHandoffOperation.Leveling
+                && handoff.GroundEntryCenters.Contains(groundCenter.Value)
+                && handoff.CleanupKeys.Count == 0;
+
+        private static bool IsInheritedMonotonicHandoff(
+            AccessV2HandoffCandidate handoff,
+            Tile2i? groundCenter)
+            => groundCenter.HasValue
+                && handoff.IsMonotonicProof
+                && handoff.SpanLength > 0
+                && handoff.Lane0Operation == handoff.Lane1Operation
+                && (handoff.Lane0Operation == AccessHandoffOperation.Mining
+                    || handoff.Lane0Operation
+                        == AccessHandoffOperation.Dumping)
+                && handoff.GroundEntryCenters.Contains(groundCenter.Value);
 
         private static bool ReplayGroundPath(
             AccessSearchSnapshot snapshot,

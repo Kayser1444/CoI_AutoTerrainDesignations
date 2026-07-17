@@ -376,7 +376,7 @@ public sealed class AtdConsoleCommands
             : "[ATD] Experimental access search overlay OFF.";
     }
 
-    [ConsoleCommand(false, false, "Builds and logs the experimental access useful-height hull for newly created snapshots. This session-only diagnostic does not yet prune search nodes. Optionally pass 'on' or 'off'.", null)]
+    [ConsoleCommand(false, false, "Builds the experimental access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
     private string atdAccessHeightEnvelope(string value = "")
     {
         bool current = AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope;
@@ -384,8 +384,8 @@ public sealed class AtdConsoleCommands
             parsed = !current;
         AutoTerrainDesignationsMod.SetExperimentalAccessUsefulHeightEnvelope(parsed);
         return parsed
-            ? "[ATD] Experimental access useful-height hull diagnostics ON (pruning remains OFF)."
-            : "[ATD] Experimental access useful-height hull diagnostics OFF.";
+            ? "[ATD] Experimental access useful-height hull and V1/V2 center pruning ON."
+            : "[ATD] Experimental access useful-height hull and V1/V2 center pruning OFF.";
     }
 
     private static bool TryParseConsoleBool(string value, out bool parsed)

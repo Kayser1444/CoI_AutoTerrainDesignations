@@ -652,6 +652,7 @@ namespace AutoTerrainDesignations
             ClearFarmingRuntimeState();
             ClearFarmPlacementAssistRuntimeState();
             ClearIdleVehicleReleaseState();
+            ClearTowerReachabilityFlood();
         }
 
         public static void Initialize(

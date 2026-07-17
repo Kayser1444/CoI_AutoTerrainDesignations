@@ -333,6 +333,28 @@ namespace AutoTerrainDesignations.Access
                 || AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: false)
                     != AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)
             { failure = "trees must remain cost-free while dense prop cleanup retains its configured route cost"; return false; }
+            AccessPropCleanupInfo treeOne = AccessPropCleanupPolicy.BuildOriginInfo(
+                new Tile2i(1, 0), new[]
+                {
+                    new AccessPropSample(new Tile2i(1, 0), true, false, true),
+                });
+            AccessPropCleanupInfo treeTwo = AccessPropCleanupPolicy.BuildOriginInfo(
+                new Tile2i(2, 0), new[]
+                {
+                    new AccessPropSample(new Tile2i(2, 0), true, false, true),
+                });
+            var groundGoalDistance = new AccessV1GroundGoalDistance(
+                new[] { Tile2i.Zero, new Tile2i(3, 0), new Tile2i(10, 10) },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>
+                {
+                    [treeOne.Origin] = treeOne,
+                    [treeTwo.Origin] = treeTwo,
+                },
+                new[] { new Tile2i(3, 0) });
+            if (!groundGoalDistance.TryGetDistance(Tile2i.Zero, out float treeCorridorDistance)
+                || Math.Abs(treeCorridorDistance - 3f) > 0.0001f
+                || groundGoalDistance.TryGetDistance(new Tile2i(10, 10), out _))
+            { failure = "V1 ground potential must follow tree cleanup corridors without crossing disconnected G"; return false; }
             AccessPropCleanupInfo durabilityCleanup =
                 AccessPropCleanupPolicy.BuildOriginInfo(
                     new Tile2i(0, 0),
@@ -1323,6 +1345,7 @@ namespace AutoTerrainDesignations.Access
         public static AccessPathSearchSession CreateSession(AccessPathRequest request)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
+            var diagnostics = new AccessSearchDiagnostics();
             Tile2i start = request.Start.Nodes.Count > 0 ? request.Start.Nodes[0] : default;
             if (request.RequiredWidth == 2)
             {
@@ -1354,8 +1377,10 @@ namespace AutoTerrainDesignations.Access
                     request.MaxCostLimit,
                     request.Snapshot.V2GroundGraph != null
                         && request.Snapshot.HasV2WorkableHandoffEvaluator
-                            ? (recent, history) => EvaluateV2Handoffs(
-                                request.Snapshot, recent, history)
+                            ? (recent, history, requiredGroundEntry) =>
+                                EvaluateV2Handoffs(
+                                    request.Snapshot, recent, history,
+                                    requiredGroundEntry, diagnostics)
                             : (AccessV2HandoffEvaluator?)null,
                     heuristicEvaluator: null,
                     groundGraph: request.Snapshot.V2GroundGraph,
@@ -1368,8 +1393,18 @@ namespace AutoTerrainDesignations.Access
                     terrainCenterHeightProvider:
                         request.Snapshot.GetTerrainCenterHeight2,
                     groundToVMinimumGeneratedCost:
-                        2f * GeneratedVFixedOverhead);
-                return new AccessPathSearchSession(v2Session, start);
+                        2f * GeneratedVFixedOverhead,
+                    usefulHeightEnvelope: request.Snapshot.UsefulHeightEnvelope,
+                    generatedOriginValidator: request.Snapshot.IsOriginInside,
+                    diagnostics: diagnostics,
+                    preciseTerrainHeightProvider: tile =>
+                        request.Snapshot.TryGetPreciseTerrainHeight(
+                            tile, out float height) ? height : (float?)null,
+                    groundToVCenterSpokeCost:
+                        AccessV2CostModel.GetCenterSpokeCost(
+                            GeneratedVFixedOverhead));
+                return new AccessPathSearchSession(
+                    v2Session, start, diagnostics);
             }
             if (request.RequiredWidth != 1)
                 return AccessPathSearchSession.Completed(Failed("UnsupportedWidth", start, 0, rejections));
@@ -1417,6 +1452,7 @@ namespace AutoTerrainDesignations.Access
             float maxCostLimit)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
+            var diagnostics = new AccessSearchDiagnostics();
             Tile2i startOrigin = SelectStart(clusterOrigins);
             if (clusterOrigins.Count == 0)
                 return AccessPathSearchSession.Completed(Failed("NoStart", startOrigin, 0, rejections));
@@ -1446,7 +1482,8 @@ namespace AutoTerrainDesignations.Access
             }
             HeightAwareGoalIndex goalIndex =
                 snapshot.UseAStar && useAStarHeuristic
-                    ? HeightAwareGoalIndex.Build(snapshot, goalsByHeight2)
+                    ? HeightAwareGoalIndex.Build(
+                        snapshot, goalsByHeight2, includeGroundGoals)
                     : HeightAwareGoalIndex.Empty;
 
             void AddGoal(int height2, Tile2i goal)
@@ -1463,7 +1500,6 @@ namespace AutoTerrainDesignations.Access
             var previous = new Dictionary<AccessSearchNode, AccessSearchNode>();
             var generatedHistory = new Dictionary<AccessSearchNode, GeneratedPathHistory>();
             var queue = new MinQueue();
-            var diagnostics = new AccessSearchDiagnostics();
             var startNode = new AccessSearchNode(startOrigin, startProfile.Center2, AccessSearchMode.Existing);
             distance[startNode] = 0f;
             generatedHistory[startNode] = GeneratedPathHistory.Empty;
@@ -1831,7 +1867,8 @@ namespace AutoTerrainDesignations.Access
 
             internal AccessPathSearchSession(
                 AccessV2SearchSession v2Session,
-                Tile2i startOrigin)
+                Tile2i startOrigin,
+                AccessSearchDiagnostics diagnostics)
             {
                 m_v2Session = v2Session;
                 m_snapshot = null!;
@@ -1845,8 +1882,8 @@ namespace AutoTerrainDesignations.Access
                 m_previous = null!;
                 m_generatedHistory = null!;
                 m_queue = null!;
-                m_rejections = new Dictionary<string, int>(StringComparer.Ordinal);
-                m_diagnostics = new AccessSearchDiagnostics();
+                m_rejections = v2Session.LiveRejections;
+                m_diagnostics = diagnostics;
                 m_lastGoalRejectionReason = string.Empty;
                 m_goalIndex = HeightAwareGoalIndex.Empty;
                 m_maxCostLimit = float.MaxValue;
@@ -2446,6 +2483,14 @@ namespace AutoTerrainDesignations.Access
                     Trace(mode, null, "EdgeProfile");
                     continue;
                 }
+                if (!IsGeneratedCenterWithinUsefulHeightEnvelope(
+                        snapshot, nextOrigin, nextProfile, diagnostics,
+                        out string heightEnvelopeRejection))
+                {
+                    Reject(rejections, heightEnvelopeRejection);
+                    Trace(mode, nextProfile, heightEnvelopeRejection);
+                    continue;
+                }
                 diagnostics.GeneratedProfileFeasibleChecks++;
                 long phaseStart = Stopwatch.GetTimestamp();
                 bool profileFeasible = IsGeneratedProfileFeasible(
@@ -2577,6 +2622,10 @@ namespace AutoTerrainDesignations.Access
                 incomingX = Math.Sign(current.Position.X - groundParent.Position.X);
                 incomingY = Math.Sign(current.Position.Y - groundParent.Position.Y);
             }
+            bool currentHandoffClearsProp =
+                (current.HandoffOperation == AccessHandoffOperation.Mining
+                    || current.HandoffOperation == AccessHandoffOperation.Leveling)
+                && snapshot.HasRemovableNonTreePropAtTile(current.Position);
             foreach (RelTile2i direction in s_tileDirections)
             {
                 if (incomingX * direction.X + incomingY * direction.Y < 0)
@@ -2585,7 +2634,8 @@ namespace AutoTerrainDesignations.Access
                 diagnostics.GroundSuccessorChecks++;
                 bool nextIsGround = snapshot.IsGroundNode(nextTile);
                 bool nextIsCleanup = !nextIsGround
-                    && snapshot.CanTraverseToCleanupGround(current.Position, nextTile);
+                    && snapshot.CanTraverseToCleanupGround(
+                        current.Position, nextTile, currentHandoffClearsProp);
                 if (!nextIsGround && !nextIsCleanup)
                     continue;
                 if (direction.X != 0 && direction.Y != 0)
@@ -2638,6 +2688,13 @@ namespace AutoTerrainDesignations.Access
                     {
                         if (!AccessHeightProfile.TryForMode(mode, center2 + delta, out AccessHeightProfile profile)) continue;
                         diagnostics.GroundToGeneratedProfileAttempts++;
+                        if (!IsGeneratedCenterWithinUsefulHeightEnvelope(
+                                snapshot, origin, profile, diagnostics,
+                                out string heightEnvelopeRejection))
+                        {
+                            Reject(rejections, heightEnvelopeRejection);
+                            continue;
+                        }
                         diagnostics.GeneratedProfileFeasibleChecks++;
                         long phaseStart = Stopwatch.GetTimestamp();
                         bool profileFeasible = IsGeneratedProfileFeasible(
@@ -2743,6 +2800,49 @@ namespace AutoTerrainDesignations.Access
                     : (Tile2i?)null;
             return IsCompatibleWithPathHistory(
                 nextOrigin, nextProfile, history, allowedEdgeNeighbor, out reason);
+        }
+
+        private static bool IsGeneratedCenterWithinUsefulHeightEnvelope(
+            AccessSearchSnapshot snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            AccessSearchDiagnostics diagnostics,
+            out string rejection)
+        {
+            AccessUsefulHeightEnvelope? envelope = snapshot.UsefulHeightEnvelope;
+            if (envelope == null)
+            {
+                rejection = string.Empty;
+                return true;
+            }
+
+            diagnostics.HeightEnvelopeChecks++;
+            Tile2i center = origin + new RelTile2i(2, 2);
+            if (!envelope.TryGetBand(center, out int lowerHeight32, out int upperHeight32))
+            {
+                // A partial snapshot must never turn the experimental gate into
+                // an unexpected hard rejection.
+                diagnostics.HeightEnvelopeMissingSamples++;
+                rejection = string.Empty;
+                return true;
+            }
+
+            int centerHeight32 = checked(profile.Center2 * 16);
+            if (centerHeight32 > upperHeight32)
+            {
+                diagnostics.HeightEnvelopeAboveRejections++;
+                rejection = "HeightEnvelopeAbove";
+                return false;
+            }
+            if (centerHeight32 < lowerHeight32)
+            {
+                diagnostics.HeightEnvelopeBelowRejections++;
+                rejection = "HeightEnvelopeBelow";
+                return false;
+            }
+
+            rejection = string.Empty;
+            return true;
         }
 
         private static bool IsCompatibleWithPathHistory(
@@ -3134,7 +3234,8 @@ namespace AutoTerrainDesignations.Access
         {
             if (!snapshot.UseAStar || !useAStarHeuristic)
                 return 0f;
-            return goalIndex.GetLowerBound(node.CostPosition, node.Height2);
+            return goalIndex.GetLowerBound(
+                node.CostPosition, node.Height2, node.IsGround);
         }
 
         internal sealed class HeightAwareGoalIndex
@@ -3146,22 +3247,26 @@ namespace AutoTerrainDesignations.Access
             private readonly int m_width;
             private readonly int m_height;
             private readonly GoalHeightBand[] m_bands;
+            private readonly AccessV1GroundGoalDistance? m_groundGoalDistance;
 
             private HeightAwareGoalIndex(
                 Tile2i boundsMin,
                 int width,
                 int height,
-                GoalHeightBand[] bands)
+                GoalHeightBand[] bands,
+                AccessV1GroundGoalDistance? groundGoalDistance = null)
             {
                 m_boundsMin = boundsMin;
                 m_width = width;
                 m_height = height;
                 m_bands = bands;
+                m_groundGoalDistance = groundGoalDistance;
             }
 
             public static HeightAwareGoalIndex Build(
                 AccessSearchSnapshot snapshot,
-                IReadOnlyDictionary<int, List<Tile2i>> goalsByHeight2)
+                IReadOnlyDictionary<int, List<Tile2i>> goalsByHeight2,
+                bool includeGroundGoals = false)
             {
                 var bands = new List<GoalHeightBand>(goalsByHeight2.Count);
                 foreach (KeyValuePair<int, List<Tile2i>> pair in goalsByHeight2)
@@ -3178,11 +3283,16 @@ namespace AutoTerrainDesignations.Access
                     snapshot.GoalDistanceMin,
                     snapshot.GoalDistanceWidth,
                     snapshot.GoalDistanceHeight,
-                    bands.ToArray());
+                    bands.ToArray(),
+                    includeGroundGoals ? snapshot.V1GroundGoalDistance : null);
             }
 
-            public float GetLowerBound(Tile2i tile, int height2)
+            public float GetLowerBound(
+                Tile2i tile, int height2, bool isGround = false)
             {
+                if (isGround && m_groundGoalDistance != null
+                    && m_groundGoalDistance.TryGetDistance(tile, out float groundDistance))
+                    return groundDistance;
                 if (m_bands.Length == 0) return 0f;
                 int x = tile.X - m_boundsMin.X;
                 int y = tile.Y - m_boundsMin.Y;
@@ -3869,7 +3979,9 @@ namespace AutoTerrainDesignations.Access
             EvaluateV2Handoffs(
                 AccessSearchSnapshot snapshot,
                 IReadOnlyList<AccessV2BandState> recentNewestFirst,
-                AccessV2History history)
+                AccessV2History history,
+                Tile2i? requiredGroundEntry = null,
+                AccessSearchDiagnostics? diagnostics = null)
         {
             if (snapshot.V2GroundGraph == null
                 || !snapshot.HasV2WorkableHandoffEvaluator)
@@ -3883,9 +3995,13 @@ namespace AutoTerrainDesignations.Access
                 snapshot.LandscapingCostDistanceScale,
                 snapshot.IsProjectedV2CenterPathable,
                 snapshot.DoesProjectedV2CenterOverlapWork,
+                snapshot.IsV2HandoffCenterPathable,
+                snapshot.IsV2HandoffGroundEntryPathable,
                 snapshot.VehicleWidth,
                 AccessV2CostModel.GetCenterSpokeCost(
-                    GeneratedVFixedOverhead));
+                    GeneratedVFixedOverhead),
+                requiredGroundEntry,
+                diagnostics);
         }
 
         private static bool TryAddV2ExteriorRays(
@@ -4093,9 +4209,15 @@ namespace AutoTerrainDesignations.Access
             rejectionReason = string.Empty;
             treeCleanupCost = 0f;
             denseDebrisCleanupCost = 0f;
-            if (!snapshot.TryGetPropCleanupInfo(origin, out AccessPropCleanupInfo info)
-                || !info.IsEligibleWithinGeneratedV)
+            if (!snapshot.TryGetPropCleanupInfo(origin, out AccessPropCleanupInfo info))
                 return 0f;
+            if (!info.IsEligibleWithinGeneratedV)
+            {
+                if (operation == AccessHandoffOperation.Dumping
+                    && info.HasDenseDebrisCleanup)
+                    rejectionReason = "DumpOnlyPropBlocker";
+                return 0f;
+            }
             if (!info.HasDenseDebrisCleanup)
                 return 0f;
 
@@ -4107,10 +4229,9 @@ namespace AutoTerrainDesignations.Access
             {
                 if (info.HasDenseDebrisCleanup)
                 {
-                    if (operation == AccessHandoffOperation.Dumping
-                        || operation == AccessHandoffOperation.None)
+                    if (operation == AccessHandoffOperation.None)
                     {
-                        rejectionReason = "DumpOnlyPropBlocker";
+                        rejectionReason = "ZeroWorkPropBlocker";
                         return 0f;
                     }
                     denseDebrisCleanupCost += denseCleanupUnit;
@@ -4124,23 +4245,7 @@ namespace AutoTerrainDesignations.Access
                 // deliberately contribute no feasibility rejection or cost.
                 if (!sample.IsDenseDebris)
                     continue;
-                if (!snapshot.TryGetGroundHeight2(sample.Tile, out int terrainHeight2))
-                    continue;
-                int localX = Math.Max(0, Math.Min(4, sample.Tile.X - origin.X));
-                int localY = Math.Max(0, Math.Min(4, sample.Tile.Y - origin.Y));
-                int targetHeight2Numerator = profile.GetHeight2NumeratorAt(localX, localY);
-                int terrainHeight2Numerator = terrainHeight2 * 16;
-                int deltaNumerator = targetHeight2Numerator - terrainHeight2Numerator;
-
-                if (operation == AccessHandoffOperation.Dumping)
-                {
-                    if (deltaNumerator <= AccessPropCleanupPolicy.NonTreeDumpRemovalThresholdHeight2 * 16)
-                    {
-                        rejectionReason = "DumpOnlyPropBlocker";
-                        return 0f;
-                    }
-                }
-                else if (operation == AccessHandoffOperation.None)
+                if (operation == AccessHandoffOperation.None)
                 {
                     rejectionReason = "ZeroWorkPropBlocker";
                     return 0f;

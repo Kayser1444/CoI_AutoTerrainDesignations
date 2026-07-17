@@ -20,6 +20,7 @@ namespace AutoTerrainDesignations.Access.V2
             if (!ValidateGroundGraph(out failure)) return false;
             if (!ValidateHandoffs(out failure)) return false;
             if (!ValidateFrontages(out failure)) return false;
+            if (!ValidateUsefulHeightEnvelope(out failure)) return false;
             if (!ValidateSearch(out failure)) return false;
             if (!ValidateBounds(out failure)) return false;
             failure = string.Empty;
@@ -632,6 +633,10 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i cleanupB = new Tile2i(2, 0);
             Tile2i unrelatedDebris = new Tile2i(3, 0);
             Tile2i blocked = new Tile2i(4, 0);
+            Tile2i treeNw = new Tile2i(20, 20);
+            Tile2i treeNe = new Tile2i(21, 20);
+            Tile2i treeSw = new Tile2i(20, 21);
+            Tile2i treeSe = new Tile2i(21, 21);
             var cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>
             {
                 [cleanupA] = AccessPropCleanupPolicy.BuildOriginInfo(
@@ -663,6 +668,10 @@ namespace AutoTerrainDesignations.Access.V2
                             blocked, false, true, true, "prop:blocked"),
                     },
                     AccessPropBlockerKind.Building),
+                [treeNw] = TreeCenter(treeNw, "tree:nw"),
+                [treeNe] = TreeCenter(treeNe, "tree:ne"),
+                [treeSw] = TreeCenter(treeSw, "tree:sw"),
+                [treeSe] = TreeCenter(treeSe, "tree:se"),
             };
             var graph = new AccessV2GroundGraph(
                 new[] { new Tile2i(0, 0), new Tile2i(10, 10) },
@@ -676,6 +685,79 @@ namespace AutoTerrainDesignations.Access.V2
                 || graph.CanTraverse(cleanupB, unrelatedDebris))
             {
                 failure = "Mega cleanup ground topology classification failed";
+                return false;
+            }
+            Tile2i handoffPropCenter = new Tile2i(6, 0);
+            Tile2i handoffEscapeGround = new Tile2i(7, 0);
+            const string handoffPropKey = "prop:handoff";
+            AccessPropCleanupInfo handoffProp =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    new Tile2i(4, 0),
+                    new[]
+                    {
+                        new AccessPropSample(
+                            handoffPropCenter,
+                            false, true, true, handoffPropKey),
+                    },
+                    AccessPropBlockerKind.UnderlyingTerrain);
+            var handoffPropGraph = new AccessV2GroundGraph(
+                new[] { handoffEscapeGround },
+                new[] { handoffEscapeGround },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>
+                {
+                    [handoffPropCenter] = handoffProp,
+                });
+            AccessV2History handoffClearedHistory =
+                AccessV2History.Empty.ApplyCleanupKeys(
+                    new[] { handoffPropKey });
+            if (handoffPropGraph.IsTraversable(handoffPropCenter)
+                || handoffPropGraph.IsTraversable(
+                    handoffPropCenter, AccessV2History.Empty)
+                || !handoffPropGraph.IsTraversable(
+                    handoffPropCenter, handoffClearedHistory)
+                || !handoffPropGraph.CanTraverse(
+                    handoffPropCenter, handoffEscapeGround,
+                    handoffClearedHistory)
+                || !handoffPropGraph.TryValidateLocalEscape(
+                    new[] { handoffPropCenter, handoffEscapeGround },
+                    handoffClearedHistory, cleanupCostScale: 9f,
+                    out IReadOnlyCollection<string> handoffCleanupKeys,
+                    out float handoffCleanupCost)
+                || handoffCleanupKeys.Count != 0
+                || Math.Abs(handoffCleanupCost) > 0.0001f)
+            {
+                failure = "Mining/leveling handoff work must clear an intersecting non-tree prop for the local G escape";
+                return false;
+            }
+            IReadOnlyList<Tile2i> treeDiagonalCenters =
+                AccessV2GroundGraph.GetSweptCenters(treeNw, treeSe);
+            if (!graph.CanTraverse(treeNw, treeSe)
+                || !graph.TryValidateLocalEscape(
+                    treeDiagonalCenters, AccessV2History.Empty,
+                    cleanupCostScale: 9f,
+                    out IReadOnlyCollection<string> treeCleanupKeys,
+                    out float treeCleanupCost)
+                || treeCleanupKeys.Count != 3
+                || Math.Abs(treeCleanupCost) > 0.0001f)
+            {
+                failure = "Tree G diagonal must record both orthogonal corridors at zero cost";
+                return false;
+            }
+            AccessPropCleanupInfo blockedTreeOrigin =
+                AccessPropCleanupInfo.HardBlocked(
+                    new Tile2i(20, 20),
+                    AccessPropBlockerKind.UnderlyingTerrain);
+            if (blockedTreeOrigin.IsEligible
+                || !global::AutoTerrainDesignations.AutoDepthDesignation
+                    .IsExperimentalAccessGroundOrCleanupCenter(
+                        new HashSet<Tile2i>(),
+                        new Dictionary<Tile2i, AccessPropCleanupInfo>
+                        {
+                            [treeNw] = TreeCenter(treeNw, "tree:perimeter"),
+                        },
+                        treeNw))
+            {
+                failure = "V/G seam must use eligible tree center, not blocked origin aggregate";
                 return false;
             }
             HashSet<Tile2i> reached = graph.Flood(new Tile2i(0, 0));
@@ -714,6 +796,392 @@ namespace AutoTerrainDesignations.Access.V2
                 failure = "Mega diagonal ground edge must not cut a blocked corner";
                 return false;
             }
+
+            // A tree-shadow center is admitted by the game's terrain-only Mega
+            // mask before the immutable graph is built. Search must not erase
+            // that captured decision with a second, approximate static slope
+            // scan. Generated V history touching the footprint still requires
+            // projected-height validation.
+            Tile2i treeOrigin = new Tile2i(4, 4);
+            Tile2i treeCenter = new Tile2i(6, 6);
+            AccessPropCleanupInfo treeCleanup =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    treeOrigin,
+                    new[]
+                    {
+                        new AccessPropSample(
+                            treeCenter, true, false, true, "tree:fixture"),
+                    });
+            var treeHeights2 = new Dictionary<Tile2i, int>();
+            var treePreciseHeights = new Dictionary<Tile2i, float>();
+            for (int y = 0; y <= 12; y++)
+                for (int x = 0; x <= 12; x++)
+                {
+                    var tile = new Tile2i(x, y);
+                    treeHeights2[tile] = 0;
+                    treePreciseHeights[tile] = 0f;
+                }
+            // Deliberately disagree with the approximate slope scan: the graph
+            // represents the authoritative mask result captured from the game.
+            treePreciseHeights[new Tile2i(7, 6)] = 2f;
+            var treeSnapshot = new AccessSearchSnapshot(
+                Tile2i.Zero, new Tile2i(12, 12), new Tile2i(10, 10),
+                -2, 2, true, true, false, 1f, 1f,
+                treeHeights2,
+                new Dictionary<Tile2i, int>(),
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                propCleanupByOrigin:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [treeOrigin] = treeCleanup,
+                    },
+                preciseTerrainHeights: treePreciseHeights,
+                physicalTerrainMin: Tile2i.Zero,
+                physicalTerrainMax: new Tile2i(12, 12),
+                vehicleWidth: 5,
+                vehicleMaxSteepnessDelta: 0.1f);
+            if (treeSnapshot.V2GroundGraph == null
+                || !treeSnapshot.V2GroundGraph.IsCleanupGround(treeCenter)
+                || !treeSnapshot.IsProjectedV2CenterPathable(
+                    treeCenter, AccessV2History.Empty))
+            {
+                failure = "Captured terrain-only tree center must remain valid G";
+                return false;
+            }
+            if (!AccessHeightProfile.TryForMode(
+                    AccessSearchMode.XPositive, 1,
+                    out AccessHeightProfile generatedRamp))
+            {
+                failure = "Tree-center projected ramp profile unavailable";
+                return false;
+            }
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(treeOrigin, generatedRamp),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History generatedHistory,
+                    out string generatedHistoryReason))
+            {
+                failure = "Tree-center projected-history fixture failed: "
+                    + generatedHistoryReason;
+                return false;
+            }
+            if (treeSnapshot.IsProjectedV2CenterPathable(
+                    treeCenter, generatedHistory))
+            {
+                failure = "Generated V history must still revalidate a G tree center";
+                return false;
+            }
+
+            Tile2i generatedPropOrigin = new Tile2i(4, 4);
+            Tile2i generatedPropCenter = new Tile2i(6, 6);
+            const string generatedPropKey = "prop:8,6";
+            AccessPropCleanupInfo generatedPropCleanup =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    generatedPropOrigin,
+                    new[]
+                    {
+                        new AccessPropSample(
+                            generatedPropCenter,
+                            false, true, true, generatedPropKey,
+                            new[] { new Tile2i(8, 4) }),
+                    },
+                    AccessPropBlockerKind.UnderlyingTerrain);
+            var propHeights2 = new Dictionary<Tile2i, int>();
+            var propPreciseHeights = new Dictionary<Tile2i, float>();
+            for (int y = 0; y <= 12; y++)
+                for (int x = 0; x <= 12; x++)
+                {
+                    var tile = new Tile2i(x, y);
+                    propHeights2[tile] = 0;
+                    propPreciseHeights[tile] = 0f;
+                }
+            var propSnapshot = new AccessSearchSnapshot(
+                Tile2i.Zero, new Tile2i(12, 12), new Tile2i(10, 10),
+                -2, 2, true, true, false, 1f, 1f,
+                propHeights2,
+                new Dictionary<Tile2i, int>(),
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                new[] { new Tile2i(10, 10) },
+                new[] { new Tile2i(10, 10) },
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                propCleanupByOrigin:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropOrigin] = generatedPropCleanup,
+                    },
+                preciseTerrainHeights: propPreciseHeights,
+                physicalTerrainMin: Tile2i.Zero,
+                physicalTerrainMax: new Tile2i(12, 12),
+                vehicleWidth: 5,
+                propCleanupByTile:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropCenter] = generatedPropCleanup,
+                    });
+            string generatedPropHistoryReason = string.Empty;
+            if (!AccessHeightProfile.TryForMode(
+                    AccessSearchMode.Flat, 0,
+                    out AccessHeightProfile generatedPropFlat)
+                || !AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            generatedPropOrigin, generatedPropFlat),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History generatedPropHistory,
+                    out generatedPropHistoryReason))
+            {
+                failure = "Generated-prop handoff history fixture failed: "
+                    + generatedPropHistoryReason;
+                return false;
+            }
+            generatedPropHistory = generatedPropHistory.ApplyCleanupKeys(
+                new[] { generatedPropKey });
+            if (propSnapshot.IsProjectedV2CenterPathable(
+                    generatedPropCenter, AccessV2History.Empty)
+                || !propSnapshot.IsProjectedV2CenterPathable(
+                    generatedPropCenter, generatedPropHistory))
+            {
+                failure = "Projected Mega pathability must treat a generated-handoff prop as cleared only after its cleanup key is owned";
+                return false;
+            }
+
+            string handoffLevelReason = string.Empty;
+            string handoffCutReason = string.Empty;
+            string handoffFillReason = string.Empty;
+            if (!AccessHeightProfile.TryForMode(
+                    AccessSearchMode.Flat, -2,
+                    out AccessHeightProfile handoffCut)
+                || !AccessHeightProfile.TryForMode(
+                    AccessSearchMode.Flat, 2,
+                    out AccessHeightProfile handoffFill)
+                || !AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            generatedPropOrigin, generatedPropFlat),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History handoffLevelHistory,
+                    out handoffLevelReason)
+                || !AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            generatedPropOrigin, handoffCut),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History handoffCutHistory,
+                    out handoffCutReason)
+                || !AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            generatedPropOrigin, handoffFill),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History handoffFillHistory,
+                    out handoffFillReason))
+            {
+                failure = "V2 post-work operation fixture history failed: "
+                    + handoffLevelReason + "/"
+                    + handoffCutReason + "/" + handoffFillReason;
+                return false;
+            }
+            if (!propSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Leveling,
+                    generatedPropCenter, handoffLevelHistory)
+                || propSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Mining,
+                    generatedPropCenter, handoffLevelHistory)
+                || propSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, handoffLevelHistory)
+                || !propSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Mining,
+                    generatedPropCenter, handoffCutHistory)
+                || !propSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, handoffFillHistory))
+            {
+                failure = "V2 post-work operation classifier must distinguish unconditional leveling, vanilla terrain, cut work, and fill work";
+                return false;
+            }
+
+            AccessPropCleanupInfo eligibleDenseCleanup =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    generatedPropOrigin,
+                    new[]
+                    {
+                        new AccessPropSample(
+                            generatedPropCenter,
+                            false, true, true, generatedPropKey,
+                            new[] { new Tile2i(8, 4) }),
+                    });
+            var eligibleDenseSnapshot = new AccessSearchSnapshot(
+                Tile2i.Zero, new Tile2i(12, 12), new Tile2i(10, 10),
+                -2, 2, true, true, false, 1f, 1f,
+                propHeights2,
+                new Dictionary<Tile2i, int>(),
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                propCleanupByOrigin:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropOrigin] = eligibleDenseCleanup,
+                    },
+                preciseTerrainHeights: propPreciseHeights,
+                physicalTerrainMin: Tile2i.Zero,
+                physicalTerrainMax: new Tile2i(12, 12),
+                vehicleWidth: 5,
+                propCleanupByTile:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropCenter] = eligibleDenseCleanup,
+                    });
+            if (eligibleDenseSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, handoffLevelHistory)
+                || !eligibleDenseSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, generatedPropHistory))
+            {
+                failure = "V2 dumping handoff must keep dense props blocking until a side/generated cleanup key clears them";
+                return false;
+            }
+
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            generatedPropOrigin, generatedPropFlat),
+                        new AccessV2OriginProfile(
+                            new Tile2i(8, 4), generatedPropFlat),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History occupiedSideHistory,
+                    out string occupiedSideReason))
+            {
+                failure = "V2 occupied side-cleanup fixture history failed: "
+                    + occupiedSideReason;
+                return false;
+            }
+            occupiedSideHistory = occupiedSideHistory.ApplyCleanupKeys(
+                new[] { generatedPropKey });
+            if (eligibleDenseSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, occupiedSideHistory))
+            {
+                failure = "V2 dumping handoff must treat a protruding prop as hard when its only neighboring cleanup origin is occupied by V";
+                return false;
+            }
+            Tile2i sideCleanupOrigin = new Tile2i(8, 4);
+            if (!eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                    generatedPropCenter,
+                    Array.Empty<Tile2i>(), generatedPropHistory)
+                || eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                    generatedPropCenter,
+                    Array.Empty<Tile2i>(), occupiedSideHistory)
+                || !eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                    generatedPropCenter,
+                    new[] { sideCleanupOrigin }, occupiedSideHistory))
+            {
+                failure = "V2 G entry must require either a genuinely free occupied neighbor or mining/leveling work that owns that neighbor";
+                return false;
+            }
+
+            const string sameOriginPropKey = "prop:6,6";
+            AccessPropCleanupInfo sameOriginDenseCleanup =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    generatedPropOrigin,
+                    new[]
+                    {
+                        new AccessPropSample(
+                            generatedPropCenter,
+                            false, true, true, sameOriginPropKey,
+                            new[] { generatedPropOrigin }),
+                    });
+            var sameOriginDenseSnapshot = new AccessSearchSnapshot(
+                Tile2i.Zero, new Tile2i(12, 12), new Tile2i(10, 10),
+                -2, 2, true, true, false, 1f, 1f,
+                propHeights2,
+                new Dictionary<Tile2i, int>(),
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                propCleanupByOrigin:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropOrigin] = sameOriginDenseCleanup,
+                    },
+                preciseTerrainHeights: propPreciseHeights,
+                physicalTerrainMin: Tile2i.Zero,
+                physicalTerrainMax: new Tile2i(12, 12),
+                vehicleWidth: 5,
+                propCleanupByTile:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [generatedPropCenter] = sameOriginDenseCleanup,
+                    });
+            if (sameOriginDenseSnapshot.IsV2HandoffCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter,
+                    handoffLevelHistory.ApplyCleanupKeys(
+                        new[] { sameOriginPropKey })))
+            {
+                failure = "V2 dumping handoff must not count a cleanup on its own origin as the required side prop clearing";
+                return false;
+            }
+            if (sameOriginDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                    generatedPropCenter,
+                    Array.Empty<Tile2i>(),
+                    handoffLevelHistory.ApplyCleanupKeys(
+                        new[] { sameOriginPropKey })))
+            {
+                failure = "V2 G entry must keep a same-origin dumping prop hard when no neighboring occupied cleanup origin exists";
+                return false;
+            }
+
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            treeOrigin, generatedPropFlat),
+                    },
+                    Array.Empty<Tile2i>(),
+                    out AccessV2History treeHandoffHistory,
+                    out string treeHandoffReason)
+                || !treeSnapshot.IsV2HandoffCenterPathable(
+                    treeOrigin, AccessHandoffOperation.Dumping,
+                    treeCenter, treeHandoffHistory))
+            {
+                failure = "V2 dumping handoff must ignore trees in its vanilla post-work pathability test: "
+                    + treeHandoffReason;
+                return false;
+            }
+
             var disconnectedGround = new[]
             {
                 new Tile2i(0, 0), new Tile2i(1, 0), new Tile2i(2, 0),
@@ -761,6 +1229,15 @@ namespace AutoTerrainDesignations.Access.V2
 
             failure = string.Empty;
             return true;
+
+            AccessPropCleanupInfo TreeCenter(Tile2i center, string key)
+                => AccessPropCleanupPolicy.BuildOriginInfo(
+                    new Tile2i(center.X & -4, center.Y & -4),
+                    new[]
+                    {
+                        new AccessPropSample(
+                            center, true, false, true, key),
+                    });
         }
 
         private static bool TryCreateUniformState(
@@ -784,6 +1261,64 @@ namespace AutoTerrainDesignations.Access.V2
                     out AccessV2BandProfile band, out failure))
                 return false;
             state = new AccessV2BandState(anchor, band, direction);
+            failure = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateUsefulHeightEnvelope(out string failure)
+        {
+            var terrain = new Dictionary<Tile2i, float>();
+            for (int y = 0; y <= 24; y++)
+                for (int x = 0; x <= 24; x++)
+                    terrain.Add(new Tile2i(x, y), 0f);
+            if (!AccessUsefulHeightEnvelope.TryCreate(
+                    terrain, Array.Empty<Tile2i>(),
+                    new Dictionary<Tile2i, AccessHeightProfile>(),
+                    out AccessUsefulHeightEnvelope? envelope,
+                    out string envelopeFailure)
+                || envelope == null)
+            {
+                failure = "V2 envelope fixture build failed: " + envelopeFailure;
+                return false;
+            }
+
+            if (!TryCreateUniformState(
+                    new Tile2i(4, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState flat, out failure))
+                return false;
+            AccessV2Transition? ramp = AccessV2Geometry
+                .EnumerateStraight(flat)
+                .FirstOrDefault(transition => transition.Delta.Any(
+                    item => item.Profile.Center2 != 0));
+            if (ramp == null
+                || AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
+                    envelope, ramp, out string rampRejection)
+                || (rampRejection != "HeightEnvelopeAbove"
+                    && rampRejection != "HeightEnvelopeBelow"))
+            {
+                failure = "V2 hull must reject each newly reached ramp-lane center";
+                return false;
+            }
+
+            if (!TryCreateUniformState(
+                    new Tile2i(4, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 2,
+                    out AccessV2BandState highPredecessor, out failure)
+                || !TryCreateUniformState(
+                    new Tile2i(8, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 2,
+                    out AccessV2BandState highCurrent, out failure)
+                || !AccessV2Geometry.TryTurn(
+                    highPredecessor, highCurrent, 1,
+                    out AccessV2Transition highTurn, out _)
+                || !AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
+                    envelope, highTurn, out _))
+            {
+                failure = "V2 in-place turns must inherit their already admitted centers";
+                return false;
+            }
+
             failure = string.Empty;
             return true;
         }
@@ -1092,7 +1627,9 @@ namespace AutoTerrainDesignations.Access.V2
                 || !AccessV2Geometry.TryStraight(
                     first, out AccessV2Transition secondStep, out failure)
                 || !AccessV2Geometry.TryStraight(
-                    secondStep.Next, out AccessV2Transition thirdStep, out failure))
+                    secondStep.Next, out AccessV2Transition thirdStep, out failure)
+                || !AccessV2Geometry.TryStraight(
+                    thirdStep.Next, out AccessV2Transition fourthStep, out failure))
                 return false;
 
             var groundTiles = new List<Tile2i>();
@@ -1157,19 +1694,52 @@ namespace AutoTerrainDesignations.Access.V2
                     .ToArray();
             }
 
+            IReadOnlyList<AccessGroundHandoff> UniformSingle(
+                Tile2i origin,
+                AccessHeightProfile profile,
+                Tile2i predecessor,
+                AccessHeightProfile predecessorProfile)
+                => Single(origin, profile, predecessor, predecessorProfile)
+                    .Select(candidate => new AccessGroundHandoff(
+                        candidate.Tile, AccessHandoffOperation.Mining,
+                        candidate.EscapeTiles, candidate.SpanLength))
+                    .ToArray();
+
+            var mixedDiagnostics = new AccessSearchDiagnostics();
             IReadOnlyList<AccessV2HandoffCandidate> candidates =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
                     graph, Single, Span,
+                    centerSpokeCost: 4.5f,
+                    diagnostics: mixedDiagnostics);
+            if (candidates.Count != 0
+                || mixedDiagnostics.V2MixedLanePairRejects == 0)
+            {
+                failure = "V2 handoffs must reject mixed mining/dumping lane pairs before corridor evaluation";
+                return false;
+            }
+            IReadOnlyList<AccessV2HandoffCandidate> mixedQuick =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, Single, Span, vehicleWidth: 5);
+            if (mixedQuick.Count != 0)
+            {
+                failure = "V2 legacy quick handoffs must also reject mixed mining/dumping lanes";
+                return false;
+            }
+
+            candidates = AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, UniformSingle, Span,
                     centerSpokeCost: 4.5f);
             AccessV2HandoffCandidate? forward = candidates.FirstOrDefault(
                 item => item.ExitDirection == new Tile2i(4, 0));
             if (forward == null
-                || forward.Lane0Operation == forward.Lane1Operation
+                || forward.Lane0Operation != forward.Lane1Operation
                 || Math.Abs(forward.CenterSpokeCost - 4.5f) > 0.0001f
                 || Math.Abs(forward.CleanupCost - 8f) > 0.0001f)
             {
-                failure = "V2 forward seam must retain mixed lane operations, cleanup, and the configured center spoke"
+                failure = "V2 forward seam must retain uniform lane operation, cleanup, and the configured center spoke"
                     + $": candidates={candidates.Count}"
                     + $" forward={(forward == null ? "none" : forward.ToString())}"
                     + $" cleanup={(forward == null ? -1f : forward.CleanupCost)}"
@@ -1180,7 +1750,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> quickCandidates =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
-                    graph, Single, Span,
+                    graph, UniformSingle, Span,
                     vehicleWidth: 5);
             if (quickCandidates.Count != 1
                 || !quickCandidates[0].IsQuickPath
@@ -1198,7 +1768,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> disconnectedQuick =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
-                    disconnectedLocalGraph, Single, Span,
+                    disconnectedLocalGraph, UniformSingle, Span,
                     vehicleWidth: 5);
             if (disconnectedQuick.Count != 1
                 || !disconnectedQuick[0].IsQuickPath)
@@ -1231,7 +1801,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> rayBlockedQuick =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, rayBlockedQuickHistory,
-                    graph, Single, Span,
+                    graph, UniformSingle, Span,
                     vehicleWidth: 5);
             if (rayBlockedQuick.Count == 0
                 || rayBlockedQuick.Any(item => item.IsQuickPath))
@@ -1243,7 +1813,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> projectedRejected =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
-                    graph, Single, Span, 1f,
+                    graph, UniformSingle, Span, 1f,
                     (center, _) => center != cleanupTile);
             if (projectedRejected.Any(
                     item => item.ExitDirection == new Tile2i(4, 0)))
@@ -1255,7 +1825,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2HandoffCandidate> projectedExtended =
                 AccessV2Handoffs.Evaluate(
                     new[] { first }, AccessV2History.Empty,
-                    graph, Single, Span, 1f,
+                    graph, UniformSingle, Span, 1f,
                     (center, _) => true,
                     (center, _) => center.X < 10);
             AccessV2HandoffCandidate? extendedForward =
@@ -1273,16 +1843,144 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
+            IReadOnlyList<AccessV2HandoffCandidate> postWorkCorridor =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, UniformSingle, Span,
+                    postWorkCenterValidator:
+                        (origin, operation, center, history) => true);
+            AccessV2HandoffCandidate? corridorForward = postWorkCorridor
+                .FirstOrDefault(item =>
+                    item.ExitDirection == new Tile2i(4, 0));
+            int corridorMinY = Math.Min(
+                first.GetLaneOrigin(0).Y,
+                first.GetLaneOrigin(1).Y);
+            if (corridorForward == null
+                || corridorForward.IsQuickPath
+                || corridorForward.EscapeCenters.Count != 4
+                || corridorForward.EscapeCenters[0].X
+                    != first.GetLaneOrigin(0).X + 1
+                || corridorForward.EscapeCenters[0].Y < corridorMinY + 2
+                || corridorForward.EscapeCenters[0].Y > corridorMinY + 5
+                || corridorForward.GroundEntryCenters.Count != 1
+                || corridorForward.GroundEntryCenters[0].X
+                    != first.GetLaneOrigin(0).X + 4)
+            {
+                failure = "V2 post-work handoff must start on rank two inside files three through six and end on G"
+                    + $": candidate={(corridorForward == null ? "none" : corridorForward.ToString())}"
+                    + $" escape={(corridorForward == null ? "none" : string.Join(",", corridorForward.EscapeCenters))}";
+                return false;
+            }
+
+            Tile2i alternateGroundEntry = new Tile2i(
+                first.GetLaneOrigin(0).X + 4,
+                corridorMinY + 5);
+            IReadOnlyList<AccessV2HandoffCandidate> requiredCorridorEntry =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, UniformSingle, Span,
+                    postWorkCenterValidator:
+                        (origin, operation, center, history) => true,
+                    requiredGroundEntry: alternateGroundEntry);
+            if (!requiredCorridorEntry.Any(candidate =>
+                    candidate.ExitDirection == new Tile2i(4, 0)
+                    && candidate.GroundEntryCenters.Count == 1
+                    && candidate.GroundEntryCenters[0]
+                        == alternateGroundEntry))
+            {
+                failure = "V2 reverse G-to-V proof must target the requested reachable G entry instead of a different middle file";
+                return false;
+            }
+
+            IReadOnlyList<AccessGroundHandoff> LevelingSingle(
+                Tile2i origin,
+                AccessHeightProfile profile,
+                Tile2i predecessor,
+                AccessHeightProfile predecessorProfile)
+            {
+                // Only one terminal cell exposes a level bridge. The paired
+                // surface must still be approved for leveling as a whole.
+                if (origin != first.GetLaneOrigin(0))
+                    return Array.Empty<AccessGroundHandoff>();
+                Tile2i outward = new Tile2i(
+                    Math.Sign(origin.X - predecessor.X),
+                    Math.Sign(origin.Y - predecessor.Y));
+                return Enumerable.Range(0, 5)
+                    .Select(offset => outward.X != 0
+                        ? new Tile2i(
+                            origin.X + (outward.X > 0 ? 4 : 0),
+                            origin.Y + offset)
+                        : new Tile2i(
+                            origin.X + offset,
+                            origin.Y + (outward.Y > 0 ? 4 : 0)))
+                    .Select(contact => new AccessGroundHandoff(
+                        contact, AccessHandoffOperation.Leveling,
+                        new[] { contact }))
+                    .ToArray();
+            }
+            int levelingCenterChecks = 0;
+            Tile2i levelingEntry = new Tile2i(
+                first.GetLaneOrigin(0).X + 4,
+                first.GetLaneOrigin(0).Y + 3);
+            IReadOnlyList<AccessV2HandoffCandidate> levelingBridge =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, LevelingSingle, Span,
+                    postWorkCenterValidator:
+                        (origin, operation, center, history) =>
+                        {
+                            levelingCenterChecks++;
+                            return false;
+                        },
+                    requiredGroundEntry: levelingEntry);
+            AccessV2HandoffCandidate? leveled = levelingBridge.FirstOrDefault(
+                candidate =>
+                    candidate.ExitDirection == new Tile2i(4, 0)
+                    && candidate.GroundEntryCenters.Contains(levelingEntry));
+            if (leveled == null
+                || !leveled.IsQuickPath
+                || leveled.Lane0Operation != AccessHandoffOperation.Leveling
+                || leveled.Lane1Operation != AccessHandoffOperation.Leveling
+                || leveled.EscapeCenters.Count != 4
+                || leveled.EscapeCenters[leveled.EscapeCenters.Count - 1]
+                    != levelingEntry
+                || levelingCenterChecks != 0)
+            {
+                failure = "V2 leveling bridge must bypass post-work center classification and BFS"
+                    + $": candidate={(leveled == null ? "none" : leveled.ToString())}"
+                    + $" checks={levelingCenterChecks}";
+                return false;
+            }
+
+            IReadOnlyList<AccessV2HandoffCandidate> brokenPostWorkCorridor =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, UniformSingle, Span,
+                    postWorkCenterValidator:
+                        (origin, operation, center, history) =>
+                            center.X != origin.X + 2);
+            if (brokenPostWorkCorridor.Any(item =>
+                    item.ExitDirection == new Tile2i(4, 0)))
+            {
+                failure = "V2 post-work handoff must reject a full-rank break between rank two and G";
+                return false;
+            }
+
             IReadOnlyList<AccessV2HandoffCandidate> recent =
                 AccessV2Handoffs.Evaluate(
-                    new[] { thirdStep.Next, secondStep.Next, first },
+                    new[]
+                    {
+                        fourthStep.Next, thirdStep.Next,
+                        secondStep.Next, first,
+                    },
                     AccessV2History.Empty,
-                    graph, Single, Span);
+                    graph, UniformSingle, Span);
             if (!recent.Any(item => item.SpanLength == 2)
                 || !recent.Any(item => item.SpanLength == 3)
+                || !recent.Any(item => item.SpanLength == 4)
                 || !recent.Any(item => item.ExitDirection.Y != 0))
             {
-                failure = "V2 seam must expose lateral exits and common two-/three-row spans";
+                failure = "V2 seam must expose lateral exits and common two-/three-/four-row spans";
                 return false;
             }
 
@@ -1318,7 +2016,8 @@ namespace AutoTerrainDesignations.Access.V2
             var session = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
                 UnitEvaluator, 10000, float.MaxValue,
-                (states, history) => states[0].Anchor == first.Anchor
+                (states, history, requiredGroundEntry) =>
+                    states[0].Anchor == first.Anchor
                     ? new[] { forward }
                     : Array.Empty<AccessV2HandoffCandidate>(),
                 groundGraph: graph);
@@ -1349,10 +2048,12 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             Tile2i sparseGoal = new Tile2i(28, 10);
+            var aStarDiagnostics = new AccessSearchDiagnostics();
             var aStarSession = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
                 UnitEvaluator, 10000, float.MaxValue,
-                (states, history) => states[0].Anchor == first.Anchor
+                (states, history, requiredGroundEntry) =>
+                    states[0].Anchor == first.Anchor
                     ? new[] { forward }
                     : Array.Empty<AccessV2HandoffCandidate>(),
                 state => Math.Abs(
@@ -1361,16 +2062,21 @@ namespace AutoTerrainDesignations.Access.V2
                     + Math.Abs(
                         AccessPathSearch.GetV2CanonicalCenter(state).Y
                         - sparseGoal.Y),
-                graph);
+                graph,
+                diagnostics: aStarDiagnostics);
             while (!aStarSession.IsComplete) aStarSession.Step(7);
             if (!aStarSession.Result.Success
                 || !aStarSession.Result.UsedAStar
                 || Math.Abs(aStarSession.Result.Cost
                     - session.Result.Cost) > 0.0001f
                 || !aStarSession.Result.States.SequenceEqual(
-                    session.Result.States))
+                    session.Result.States)
+                || aStarDiagnostics.V2GroundSuffixSuccesses == 0
+                || aStarDiagnostics.V2GroundSuffixSteps == 0)
             {
-                failure = "V2 A* and Dijkstra must retain the same ground-terminal route and exact cost";
+                failure = "V2 A* must retain the exact Dijkstra result while completing a validated potential-field G suffix"
+                    + $": suffix={aStarDiagnostics.V2GroundSuffixSuccesses}/"
+                    + $"{aStarDiagnostics.V2GroundSuffixSteps}";
                 return false;
             }
 
@@ -1412,27 +2118,288 @@ namespace AutoTerrainDesignations.Access.V2
                     new[] { entry }, new[] { entry },
                     Array.Empty<string>(), 0f);
             }
+            AccessV2HandoffCandidate MakeSpanSeam(
+                IReadOnlyList<AccessV2BandState> states,
+                Tile2i exit,
+                Tile2i entry,
+                AccessHandoffOperation operation =
+                    AccessHandoffOperation.Leveling)
+            {
+                AccessV2BandState outer = states[0];
+                Tile2i Contact(int lane)
+                {
+                    Tile2i origin = outer.GetLaneOrigin(lane);
+                    return exit.X > 0 ? origin + new RelTile2i(4, 2)
+                        : exit.X < 0 ? origin + new RelTile2i(-1, 2)
+                        : exit.Y > 0 ? origin + new RelTile2i(2, 4)
+                        : origin + new RelTile2i(2, -1);
+                }
+                Tile2i contact0 = Contact(0);
+                Tile2i contact1 = Contact(1);
+                var lane0 = new AccessGroundHandoff(
+                    contact0, operation,
+                    new[] { contact0, entry }, states.Count);
+                var lane1 = new AccessGroundHandoff(
+                    contact1, operation,
+                    new[] { contact1, entry }, states.Count);
+                return new AccessV2HandoffCandidate(
+                    exit, states.Count, lane0, lane1,
+                    states.Reverse().Select(state =>
+                        state.GetLaneOrigin(0)).ToArray(),
+                    states.Reverse().Select(state =>
+                        state.GetLaneOrigin(1)).ToArray(),
+                    new[] { entry }, new[] { entry },
+                    Array.Empty<string>(), 0f);
+            }
             AccessV2HandoffCandidate startSeam = MakeSeam(
                 first, new Tile2i(4, 0), new Tile2i(18, 8));
+            Tile2i[] canonicalDirections =
+            {
+                new Tile2i(4, 0), new Tile2i(-4, 0),
+                new Tile2i(0, 4), new Tile2i(0, -4),
+            };
+            foreach (int baseX in new[] { 0, -8 })
+            foreach (int baseY in new[] { 0, -8 })
+            for (int y = 0; y < 4; y++)
+            for (int x = 0; x < 4; x++)
+            {
+                var center = new Tile2i(baseX + x, baseY + y);
+                Tile2i[] actual = canonicalDirections
+                    .Where(direction =>
+                        AccessV2SearchSession.CanGroundEnterV(
+                            center, direction))
+                    .ToArray();
+                var expected = new List<Tile2i>(2);
+                if (x == 3) expected.Add(new Tile2i(4, 0));
+                if (x == 0) expected.Add(new Tile2i(-4, 0));
+                if (y == 3) expected.Add(new Tile2i(0, 4));
+                if (y == 0) expected.Add(new Tile2i(0, -4));
+                if (!actual.SequenceEqual(expected))
+                {
+                    failure = "G-to-V canonical-grid direction filter failed "
+                        + $"at {center}: actual=[{string.Join(",", actual)}] "
+                        + $"expected=[{string.Join(",", expected)}]";
+                    return false;
+                }
+            }
+            Tile2i xBandAnchor = new Tile2i(8, 12);
+            Tile2i yBandAnchor = new Tile2i(12, 8);
+            var eligibleOrigins = new HashSet<Tile2i>
+            {
+                xBandAnchor,
+                xBandAnchor + new RelTile2i(0, 4),
+                yBandAnchor,
+                yBandAnchor + new RelTile2i(4, 0),
+            };
+            if (!AccessV2SearchSession.AreGroundToVBandOriginsEligible(
+                    xBandAnchor, AccessV2TravelAxis.X,
+                    eligibleOrigins.Contains)
+                || !AccessV2SearchSession.AreGroundToVBandOriginsEligible(
+                    yBandAnchor, AccessV2TravelAxis.Y,
+                    eligibleOrigins.Contains)
+                || AccessV2SearchSession.AreGroundToVBandOriginsEligible(
+                    xBandAnchor, AccessV2TravelAxis.X,
+                    origin => origin == xBandAnchor)
+                || AccessV2SearchSession.AreGroundToVBandOriginsEligible(
+                    yBandAnchor, AccessV2TravelAxis.Y,
+                    origin => origin != yBandAnchor))
+            {
+                failure = "G-to-V managed-area prefilter must require both width-two lane origins";
+                return false;
+            }
+            Tile2i mirroredGround = new Tile2i(755, 1526);
+            Tile2i mirroredAnchor = new Tile2i(756, 1524);
+            if (!AccessV2SearchSession.CanGroundEnterV(
+                    mirroredGround, new Tile2i(4, 0))
+                || !AccessV2SearchSession.CandidateBandAnchors(
+                    mirroredGround, new Tile2i(4, 0))
+                    .SequenceEqual(new[]
+                    {
+                        mirroredAnchor,
+                        mirroredAnchor + new RelTile2i(0, -4),
+                    })
+                || !AccessV2SearchSession.IsGroundToVAnchorCandidate(
+                    mirroredGround, mirroredAnchor,
+                    AccessV2TravelAxis.X, new Tile2i(4, 0)))
+            {
+                failure = "G-to-V anchor discovery must include the exact reverse of a normal five-tile V-to-G seam";
+                return false;
+            }
+            Tile2i negativeGround = new Tile2i(-6, -8);
+            if (!AccessV2SearchSession.CandidateBandAnchors(
+                    negativeGround, new Tile2i(0, -4))
+                    .SequenceEqual(new[]
+                    {
+                        new Tile2i(-8, -12),
+                        new Tile2i(-12, -12),
+                    }))
+            {
+                failure = "G-to-V exact anchors must preserve canonical negative-coordinate ownership";
+                return false;
+            }
+            Tile2i[][] sharedFrontierAnchors = Enumerable.Range(0, 4)
+                .Select(y => AccessV2SearchSession.CandidateBandAnchors(
+                    new Tile2i(755, 1526 + y), new Tile2i(4, 0))
+                    .ToArray())
+                .ToArray();
+            int[] anchorFrequencies = sharedFrontierAnchors
+                .SelectMany(anchors => anchors)
+                .GroupBy(anchor => anchor)
+                .Select(group => group.Count())
+                .OrderByDescending(count => count)
+                .ToArray();
+            if (!anchorFrequencies.SequenceEqual(new[] { 4, 2, 2 }))
+            {
+                failure = "Four G centers on one eight-file frontier must converge as one four-way and two two-way cacheable V bands";
+                return false;
+            }
+
+            AccessV2SearchSession.GroundToVProfileCandidate[] levelProfiles =
+                AccessV2SearchSession.EnumerateGroundToVProfiles(
+                    3f, AccessV2TravelAxis.X, new Tile2i(4, 0))
+                .ToArray();
+            AccessV2SearchSession.GroundToVProfileCandidate[] unevenProfiles =
+                AccessV2SearchSession.EnumerateGroundToVProfiles(
+                    3.25f, AccessV2TravelAxis.X, new Tile2i(4, 0))
+                .ToArray();
+            AccessSearchMode[] levelModes =
+            {
+                AccessSearchMode.Flat,
+                AccessSearchMode.XPositive,
+                AccessSearchMode.XNegative,
+            };
+            AccessSearchMode[] unevenModes =
+            {
+                AccessSearchMode.XPositive,
+                AccessSearchMode.Flat,
+                AccessSearchMode.XNegative,
+                AccessSearchMode.XNegative,
+                AccessSearchMode.Flat,
+                AccessSearchMode.XPositive,
+            };
+            int[] unevenLevels = { 3, 3, 3, 4, 4, 4 };
+            if (levelProfiles.Length != 3
+                || levelProfiles.Any(item => !item.DirectLeveling)
+                || unevenProfiles.Length != 6
+                || unevenProfiles.Any(item => item.DirectLeveling)
+                || unevenProfiles.Take(3).Any(item =>
+                    item.ExpectedOperation != AccessHandoffOperation.Mining)
+                || unevenProfiles.Skip(3).Any(item =>
+                    item.ExpectedOperation != AccessHandoffOperation.Dumping))
+            {
+                failure = "G-to-V vertical derivation must emit three direct level profiles or six uneven fallbacks";
+                return false;
+            }
+            for (int index = 0; index < levelProfiles.Length; index++)
+            {
+                int center2 = index == 0 ? 6 : index == 1 ? 7 : 5;
+                AccessHeightProfile.TryForMode(
+                    levelModes[index], center2, out AccessHeightProfile expected);
+                if (!levelProfiles[index].Profile.Equals(expected)
+                    || levelProfiles[index].Profile
+                        .GetHeight2NumeratorAt(0, 2) != 3 * 32)
+                {
+                    failure = "Level G-to-V profiles must be flat/up/down at the bridge level";
+                    return false;
+                }
+            }
+            for (int index = 0; index < unevenProfiles.Length; index++)
+            {
+                if (unevenProfiles[index].Profile
+                        .GetHeight2NumeratorAt(0, 2)
+                    != unevenLevels[index] * 32)
+                {
+                    failure = "Uneven G-to-V profiles must use nearest digging/filling-side bridge levels";
+                    return false;
+                }
+                AccessSearchMode mode = unevenModes[index];
+                bool modeMatches = mode == AccessSearchMode.Flat
+                    ? unevenProfiles[index].Profile.Nw2
+                        == unevenProfiles[index].Profile.Ne2
+                    : mode == AccessSearchMode.XPositive
+                        ? unevenProfiles[index].Profile.Nw2
+                            < unevenProfiles[index].Profile.Ne2
+                        : unevenProfiles[index].Profile.Nw2
+                            > unevenProfiles[index].Profile.Ne2;
+                if (!modeMatches)
+                {
+                    failure = "Uneven G-to-V profile order must be mine up/flat/down then dump down/flat/up";
+                    return false;
+                }
+            }
+            for (int y = 0; y <= 4; y++)
+                for (int x = 0; x <= 4; x++)
+                {
+                    int miningUp = unevenProfiles[0].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    int miningFlat = unevenProfiles[1].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    int miningDown = unevenProfiles[2].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    int dumpingDown = unevenProfiles[3].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    int dumpingFlat = unevenProfiles[4].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    int dumpingUp = unevenProfiles[5].Profile
+                        .GetHeight2NumeratorAt(x, y);
+                    if (miningUp < miningFlat
+                        || miningFlat < miningDown
+                        || dumpingDown > dumpingFlat
+                        || dumpingFlat > dumpingUp)
+                    {
+                        failure = "G-to-V monotonic proof order must hold pointwise across every profile sample";
+                        return false;
+                    }
+                }
+
+            AccessHeightProfile.TryForMode(
+                AccessSearchMode.Flat, 6, out AccessHeightProfile bridgeProfile);
+            AccessV2BandProfile.TryCreateEnabled(
+                AccessV2TravelAxis.X, bridgeProfile, bridgeProfile,
+                out AccessV2BandProfile bridgeBand, out _);
+            var bridgeState = new AccessV2BandState(
+                mirroredAnchor, bridgeBand, new Tile2i(4, 0));
+            if (!AccessV2Handoffs.TryCreateDirectLevelingBridge(
+                    bridgeState, mirroredGround, 7f,
+                    out AccessV2HandoffCandidate directBridge)
+                || !directBridge.IsQuickPath
+                || directBridge.SpanLength != 1
+                || directBridge.Lane0Operation
+                    != AccessHandoffOperation.Leveling
+                || directBridge.Lane1Operation
+                    != AccessHandoffOperation.Leveling
+                || !directBridge.GroundEntryCenters.SequenceEqual(
+                    new[] { mirroredGround })
+                || directBridge.CleanupKeys.Count != 0
+                || Math.Abs(directBridge.CenterSpokeCost - 7f) > 0.0001f)
+            {
+                failure = "Level G-to-V bridge must synthesize a direct, cleanup-free leveling seam";
+                return false;
+            }
+            var alternatingDiagnostics = new AccessSearchDiagnostics();
             var alternating = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
                 UnitEvaluator, 10000, float.MaxValue,
-                (states, history) =>
+                (states, history, requiredGroundEntry) =>
                 {
                     AccessV2BandState state = states[0];
                     if (state.Anchor == first.Anchor)
                         return new[] { startSeam };
-                    if (state.Anchor == new Tile2i(16, 4)
+                    if (state.Anchor == new Tile2i(20, 4)
                         && state.EntryDirection == new Tile2i(-4, 0)
+                        && states.Count >= 2
+                        && states[1].Anchor == new Tile2i(24, 4)
                         && state.Band.IsCompletelyFlat
                         && state.Band.Lane0.Center2 == 0)
                         return new[]
                         {
-                            MakeSeam(
-                                state, new Tile2i(-4, 0),
-                                new Tile2i(19, 8)),
+                            MakeSpanSeam(
+                                states.Take(2).ToArray(),
+                                new Tile2i(-4, 0),
+                                new Tile2i(19, 8),
+                                AccessHandoffOperation.Mining),
                         };
-                    if (state.Anchor == new Tile2i(20, 4)
+                    if (state.Anchor == new Tile2i(24, 4)
                         && state.EntryDirection == new Tile2i(4, 0)
                         && state.Band.IsCompletelyFlat
                         && state.Band.Lane0.Center2 == 0)
@@ -1440,15 +2407,14 @@ namespace AutoTerrainDesignations.Access.V2
                         {
                             MakeSeam(
                                 state, new Tile2i(4, 0),
-                                new Tile2i(18, 8)),
-                            MakeSeam(
-                                state, new Tile2i(4, 0),
                                 new Tile2i(26, 8)),
                         };
                     return Array.Empty<AccessV2HandoffCandidate>();
                 },
                 groundGraph: alternatingGround,
-                terrainCenterHeightProvider: _ => 0);
+                terrainCenterHeightProvider: _ => 0,
+                diagnostics: alternatingDiagnostics,
+                preciseTerrainHeightProvider: _ => 0.25f);
             while (!alternating.IsComplete) alternating.Step(31);
             int groundToV = 0;
             int vToGround = 0;
@@ -1466,14 +2432,31 @@ namespace AutoTerrainDesignations.Access.V2
             if (!alternating.Result.Success
                 || groundToV != 1
                 || vToGround != 2
+                || !alternating.Result.RouteSteps.Any(step =>
+                    !step.IsGround
+                    && step.Handoff?.SpanLength == 2)
                 || alternating.Result.RouteSteps.Last().GroundCenter
-                    != new Tile2i(30, 8))
+                    != new Tile2i(30, 8)
+                || alternatingDiagnostics.V2GroundExpansions == 0
+                || alternatingDiagnostics.V2BandExpansions == 0
+                || alternatingDiagnostics.V2GroundToVSeedCalls == 0
+                || alternatingDiagnostics.V2HandoffEvaluations == 0
+                || alternatingDiagnostics.V2GroundToVMonotonicProofsEstablished == 0
+                || alternatingDiagnostics.V2GroundToVMonotonicAttempts == 0
+                || alternatingDiagnostics.V2GroundToVMonotonicAccepts == 0)
             {
-                failure = "V2 search must retain and cost an alternating V-G-V-G route: "
+                failure = "V2 search must retain and cost an alternating V-G-span-V-G route: "
                     + $"success={alternating.Result.Success} "
                     + $"reason={alternating.Result.FailureReason} "
                     + $"g2v={groundToV} v2g={vToGround} "
-                    + $"visited={alternating.Result.Visited}";
+                    + $"visited={alternating.Result.Visited} "
+                    + $"diag=[G:{alternatingDiagnostics.V2GroundExpansions},"
+                    + $"V:{alternatingDiagnostics.V2BandExpansions},"
+                    + $"g2vSeeds:{alternatingDiagnostics.V2GroundToVSeedCalls},"
+                    + $"proofs:{alternatingDiagnostics.V2GroundToVMonotonicProofsEstablished},"
+                    + $"proofAttempts:{alternatingDiagnostics.V2GroundToVMonotonicAttempts},"
+                    + $"monotonic:{alternatingDiagnostics.V2GroundToVMonotonicAccepts},"
+                    + $"handoffs:{alternatingDiagnostics.V2HandoffEvaluations}]";
                 return false;
             }
 
@@ -1554,7 +2537,7 @@ namespace AutoTerrainDesignations.Access.V2
                 physicalTerrainMin: Tile2i.Zero,
                 physicalTerrainMax: new Tile2i(32, 32),
                 vehicleWidth: 5,
-                v2WorkableHandoffs: Single,
+                v2WorkableHandoffs: UniformSingle,
                 v2WorkableHandoffSpans: Span);
             AccessV2TransitionEvaluation omittedInternalBand =
                 AccessPathSearch.EvaluateV2Transition(
@@ -1591,7 +2574,8 @@ namespace AutoTerrainDesignations.Access.V2
                         : AccessV2TransitionEvaluation.Reject(
                             "FixtureOnlyExactSuccessor"),
                 1000, float.MaxValue,
-                (recent, _) => recent[0].Equals(secondStep.Next)
+                (recent, _, requiredGroundEntry) =>
+                    recent[0].Equals(secondStep.Next)
                     ? new[]
                     {
                         new AccessV2HandoffCandidate(

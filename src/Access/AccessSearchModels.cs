@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mafi;
 using AutoTerrainDesignations.Access.V2;
 
@@ -320,6 +321,7 @@ namespace AutoTerrainDesignations.Access
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByTile;
         private readonly Dictionary<Tile2i, string> m_groundExclusionReasons;
         private readonly HashSet<Tile2i> m_validOrigins;
+        private readonly AccessV1GroundGoalDistance? m_v1GroundGoalDistance;
         private readonly float[] m_anyGoalDistance;
         private readonly int m_minGoalHeight2;
         private readonly int m_maxGoalHeight2;
@@ -369,10 +371,12 @@ namespace AutoTerrainDesignations.Access
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public V2.AccessV2GroundGraph? V2GroundGraph { get; }
+        internal AccessV1GroundGoalDistance? V1GroundGoalDistance
+            => m_v1GroundGoalDistance;
         /// <summary>
-        /// Diagnostic useful-height hull built from this immutable snapshot when
-        /// the experimental console flag is enabled. It is not yet used to prune
-        /// search states.
+        /// Experimental useful-height hull built from this immutable snapshot.
+        /// When present, V1 and V2 generated-profile centers are pruned against
+        /// it; ground and fixed-profile nodes are always retained.
         /// </summary>
         public AccessUsefulHeightEnvelope? UsefulHeightEnvelope { get; }
         public IEnumerable<Tile2i> GoalGroundNodes => m_goalGroundNodes;
@@ -501,6 +505,10 @@ namespace AutoTerrainDesignations.Access
             m_propCleanupByTile = propCleanupByTile != null
                 ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByTile)
                 : BuildCleanupByTile(m_propCleanupByOrigin);
+            m_v1GroundGoalDistance = useAStar
+                ? new AccessV1GroundGoalDistance(
+                    m_groundNodes, m_propCleanupByTile, m_goalGroundNodes)
+                : null;
             V2GroundGraph = VehicleWidth > 4
                 ? new V2.AccessV2GroundGraph(
                     m_groundNodes, m_goalGroundNodes, m_propCleanupByTile)
@@ -639,11 +647,18 @@ namespace AutoTerrainDesignations.Access
                 && info.IsEligible;
         }
         public bool CanTraverseToCleanupGround(Tile2i fromTile, Tile2i toTile)
+            => CanTraverseToCleanupGround(fromTile, toTile,
+                fromCountsAsPostWorkGround: false);
+
+        public bool CanTraverseToCleanupGround(
+            Tile2i fromTile,
+            Tile2i toTile,
+            bool fromCountsAsPostWorkGround)
         {
             if (!m_propCleanupByTile.TryGetValue(toTile, out AccessPropCleanupInfo toInfo)
                 || !toInfo.IsEligible)
                 return false;
-            if (m_groundNodes.Contains(fromTile))
+            if (m_groundNodes.Contains(fromTile) || fromCountsAsPostWorkGround)
                 return true;
             if (!m_propCleanupByTile.TryGetValue(fromTile, out AccessPropCleanupInfo fromInfo)
                 || !fromInfo.IsEligible)
@@ -663,6 +678,144 @@ namespace AutoTerrainDesignations.Access
             }
             return false;
         }
+
+        public bool HasRemovableNonTreePropAtTile(Tile2i tile)
+        {
+            if (!m_propCleanupByOrigin.TryGetValue(
+                    TerrainOriginForTile(tile), out AccessPropCleanupInfo info))
+                return false;
+            for (int index = 0; index < info.Samples.Count; index++)
+            {
+                AccessPropSample sample = info.Samples[index];
+                if (sample.Tile == tile
+                    && sample.IsDenseDebris && !sample.IsTree
+                    && sample.IsRemovable)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Classifies a vehicle-center tile inside a V2 handoff after the
+        /// selected terminal operation has completed.  Transverse clearance
+        /// is enforced by the corridor proof; this method only decides
+        /// whether the operation makes the requested interior center usable.
+        /// </summary>
+        public bool IsV2HandoffCenterPathable(
+            Tile2i origin,
+            AccessHandoffOperation operation,
+            Tile2i center,
+            V2.AccessV2History history)
+        {
+            int localX = center.X - origin.X;
+            int localY = center.Y - origin.Y;
+            if (localX < 0 || localX >= 4
+                || localY < 0 || localY >= 4)
+                return false;
+
+            // A leveling handoff owns the complete post-work surface.  Its
+            // two-file side margins are excluded by AccessV2Handoffs before
+            // any center reaches this classifier.
+            if (operation == AccessHandoffOperation.Leveling)
+                return true;
+
+            if (operation != AccessHandoffOperation.Mining
+                && operation != AccessHandoffOperation.Dumping)
+                return false;
+
+            if (TryGetV2HandoffProfile(
+                    origin, history, out AccessHeightProfile profile)
+                && DoesV2HandoffOperationWorkCenter(
+                    origin, profile, operation, center))
+                return true;
+
+            if (m_groundNodes.Contains(center))
+                return true;
+            if (!m_propCleanupByTile.TryGetValue(
+                    center, out AccessPropCleanupInfo cleanup)
+                || cleanup.BlockerKind != AccessPropBlockerKind.None)
+                return false;
+
+            // Mining tests vanilla terrain pathability with every prop bit
+            // ignored.  A cleanup sample with no non-prop blocker records
+            // exactly that terrain-only result.
+            if (operation == AccessHandoffOperation.Mining)
+                return true;
+
+            // Trees never block the post-work dumping test. Dense props do,
+            // unless each object actually protrudes into an occupied neighbor
+            // origin that remains free to retain its cleanup designation.
+            for (int index = 0; index < cleanup.Samples.Count; index++)
+            {
+                AccessPropSample sample = cleanup.Samples[index];
+                if (!sample.IsDenseDebris)
+                    continue;
+                if (!sample.IsRemovable
+                    || !history.ContainsCleanupKey(sample.CleanupObjectKey)
+                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
+                        cleanupOrigin != origin
+                        && !history.ContainsOrigin(cleanupOrigin)
+                        && !m_fixedProfiles.ContainsKey(cleanupOrigin)))
+                    return false;
+            }
+            return true;
+        }
+
+        public bool DoesV2HandoffOperationWorkCenter(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            AccessHandoffOperation operation,
+            Tile2i center)
+        {
+            int localX = center.X - origin.X;
+            int localY = center.Y - origin.Y;
+            if (localX < 0 || localX >= 4
+                || localY < 0 || localY >= 4
+                || !m_preciseTerrainHeights.TryGetValue(
+                    center, out float groundHeight))
+                return false;
+            float targetHeight = profile.GetHeight2NumeratorAt(
+                localX, localY) / 32f;
+            const float epsilon = 0.0001f;
+            return operation == AccessHandoffOperation.Mining
+                ? targetHeight < groundHeight - epsilon
+                : operation == AccessHandoffOperation.Dumping
+                    && targetHeight > groundHeight + epsilon;
+        }
+
+        public bool IsV2HandoffGroundEntryPathable(
+            Tile2i center,
+            IReadOnlyCollection<Tile2i> handoffClearingOrigins,
+            V2.AccessV2History history)
+        {
+            if (m_groundNodes.Contains(center))
+                return true;
+            if (!m_propCleanupByTile.TryGetValue(
+                    center, out AccessPropCleanupInfo cleanup)
+                || cleanup.BlockerKind != AccessPropBlockerKind.None)
+                return false;
+            for (int index = 0; index < cleanup.Samples.Count; index++)
+            {
+                AccessPropSample sample = cleanup.Samples[index];
+                if (!sample.IsDenseDebris)
+                    continue;
+                if (!sample.IsRemovable
+                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
+                        handoffClearingOrigins.Contains(cleanupOrigin)
+                        || (!history.ContainsOrigin(cleanupOrigin)
+                            && !m_fixedProfiles.ContainsKey(cleanupOrigin))))
+                    return false;
+            }
+            return true;
+        }
+
+        private bool TryGetV2HandoffProfile(
+            Tile2i origin,
+            V2.AccessV2History history,
+            out AccessHeightProfile profile)
+            => history.TryGetProfile(origin, out profile)
+                || m_fixedProfiles.TryGetValue(origin, out profile);
+
         public string DescribeGroundGoalStatus(Tile2i tile)
         {
             Tile2i alignedOrigin = TerrainOriginForTile(tile);
@@ -771,7 +924,12 @@ namespace AutoTerrainDesignations.Access
             V2.AccessV2History history)
         {
             EnsureProjectedV2ProfileCache(history);
-            if (V2GroundGraph == null || !V2GroundGraph.IsTraversable(center))
+            if (V2GroundGraph == null)
+                return false;
+            bool capturedGroundTraversable =
+                V2GroundGraph.IsTraversable(center);
+            if (!capturedGroundTraversable
+                && !V2GroundGraph.IsTraversable(center, history))
                 return false;
             int clearance = Math.Max(1, VehicleWidth);
             Tile2i corner = center + new RelTile2i(
@@ -779,6 +937,7 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyCollection<Tile2i> rayTiles = history.CollectRayTiles();
             var raySet = rayTiles as HashSet<Tile2i>
                 ?? new HashSet<Tile2i>(rayTiles);
+            bool touchesGeneratedProfile = false;
             const float epsilon = 0.0001f;
             for (int y = 0; y < clearance; y++)
                 for (int x = 0; x < clearance; x++)
@@ -787,6 +946,27 @@ namespace AutoTerrainDesignations.Access
                     if (raySet.Contains(tile)
                         && !history.ContainsGeneratedTile(tile))
                         return false;
+                    touchesGeneratedProfile |= HasProjectedV2ProfileAt(tile)
+                        || HasProjectedV2ProfileAt(
+                            tile + new RelTile2i(1, 0))
+                        || HasProjectedV2ProfileAt(
+                            tile + new RelTile2i(0, 1));
+                }
+
+            // The captured G graph is authoritative for untouched terrain. Its
+            // ordinary nodes came from the complete vanilla Mega mask, while
+            // tree cleanup nodes came from the same mask with only the generic
+            // prop/tree blocker bit removed. Re-running a separate slope scan
+            // here can disagree with that admission and silently erase the
+            // recorded zero-cost forest corridor. Only V history can change a
+            // captured center's height pathability after snapshot construction.
+            if (!touchesGeneratedProfile)
+                return capturedGroundTraversable;
+
+            for (int y = 0; y < clearance; y++)
+                for (int x = 0; x < clearance; x++)
+                {
+                    Tile2i tile = corner + new RelTile2i(x, y);
                     if (!TryGetProjectedV2Height(tile, history, out float height)
                         || !TryGetProjectedV2Height(
                             tile + new RelTile2i(1, 0), history,
@@ -802,6 +982,26 @@ namespace AutoTerrainDesignations.Access
                         return false;
                 }
             return true;
+        }
+
+        private bool HasProjectedV2ProfileAt(Tile2i tile)
+        {
+            Tile2i canonical = TerrainOriginForTile(tile);
+            if (m_projectedV2CachedProfiles.ContainsKey(canonical))
+                return true;
+
+            // Adjacent 4x4 origins share their outer row/column at local 4.
+            // Only a tile on the canonical origin's zero edge can therefore be
+            // covered by one of these predecessor profiles.
+            bool onWestEdge = tile.X == canonical.X;
+            bool onSouthEdge = tile.Y == canonical.Y;
+            return onWestEdge && m_projectedV2CachedProfiles.ContainsKey(
+                       canonical + new RelTile2i(-4, 0))
+                || onSouthEdge && m_projectedV2CachedProfiles.ContainsKey(
+                       canonical + new RelTile2i(0, -4))
+                || onWestEdge && onSouthEdge
+                    && m_projectedV2CachedProfiles.ContainsKey(
+                        canonical + new RelTile2i(-4, -4));
         }
 
         public bool DoesProjectedV2CenterOverlapWork(
@@ -901,6 +1101,9 @@ namespace AutoTerrainDesignations.Access
                 ? AccessTerrainSampleKind.Ocean
                 : AccessTerrainSampleKind.Terrain;
         }
+
+        public bool TryGetPreciseTerrainHeight(Tile2i tile, out float height)
+            => m_preciseTerrainHeights.TryGetValue(tile, out height);
 
         public bool TryGetMiningMaterialSlope(
             Tile2i tile,
@@ -1404,6 +1607,10 @@ namespace AutoTerrainDesignations.Access
         public int GeneratedProfileFeasibleChecks;
         public int GeneratedProfileFeasibleFailures;
         public int GeneratedPathHistoryFailures;
+        public int HeightEnvelopeChecks;
+        public int HeightEnvelopeAboveRejections;
+        public int HeightEnvelopeBelowRejections;
+        public int HeightEnvelopeMissingSamples;
         public int SideRayCostChecks;
         public int SideRayCostRejections;
         public int SideRayCostSamples;
@@ -1432,6 +1639,45 @@ namespace AutoTerrainDesignations.Access
         public long PathHistoryTicks;
         public long SideRayCostTicks;
         public long PropCleanupTicks;
+        public int V2GroundExpansions;
+        public int V2BandExpansions;
+        public int V2GroundSuffixAttempts;
+        public int V2GroundSuffixSuccesses;
+        public int V2GroundSuffixFallbacks;
+        public int V2GroundSuffixSteps;
+        public int V2GroundToVCalls;
+        public int V2GroundToVSeedCalls;
+        public int V2GroundToVSeedExtensions;
+        public int V2GroundToVAnchorCandidates;
+        public int V2GroundToVProfileCandidates;
+        public int V2GroundToVCacheHits;
+        public int V2GroundToVDirectLevelingAccepts;
+        public int V2GroundToVMonotonicAccepts;
+        public int V2GroundToVMonotonicProofsEstablished;
+        public int V2GroundToVMonotonicCandidates;
+        public int V2GroundToVMonotonicAttempts;
+        public int V2GroundToVMonotonicCacheSkips;
+        public int V2GroundToVMonotonicPrefilterRejects;
+        public int V2GroundToVMonotonicTransitionRejects;
+        public int V2GroundToVMonotonicGeometryRejects;
+        public int V2GroundToVMonotonicEmitRejects;
+        public int V2HandoffEvaluations;
+        public int V2QuickHandoffAccepts;
+        public int V2HandoffPairChecks;
+        public int V2MixedLanePairRejects;
+        public int V2LevelingBridgeAccepts;
+        public int V2CorridorAttempts;
+        public int V2CorridorCenterChecks;
+        public int V2CorridorBfsPops;
+        public long V2GroundExpansionTicks;
+        public long V2BandExpansionTicks;
+        public long V2GroundSuffixTicks;
+        public long V2GroundToVTicks;
+        public long V2TransitionEvaluationTicks;
+        public long V2HandoffEvaluationTicks;
+        public long V2HandoffLaneEvaluationTicks;
+        public long V2CorridorTicks;
+        public long V2LocalEscapeTicks;
         public List<string> StartSuccessorDetails { get; } = new List<string>();
         public List<string> FirstGeneratedHandoffDetails { get; } = new List<string>();
         public string V2DryRunSummary = string.Empty;

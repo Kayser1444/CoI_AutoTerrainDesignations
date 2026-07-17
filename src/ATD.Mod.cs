@@ -136,7 +136,7 @@ public static string Tt(string text) => text;
         SetTurningRampsExperimental(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
-        SetExperimentalAccessUsefulHeightEnvelope(false);
+        SetExperimentalAccessUsefulHeightEnvelope(true);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -333,10 +333,10 @@ public static string Tt(string text) => text;
     }
 
     /// <summary>
-    /// Builds and logs the experimental access useful-height hull. This is a
-    /// session-only diagnostic switch; it does not yet enable search pruning.
+    /// Builds the access useful-height hull and enables experimental V1
+    /// generated-center pruning. This session-only switch defaults to on.
     /// </summary>
-    public static bool ExperimentalAccessUsefulHeightEnvelope { get; private set; }
+    public static bool ExperimentalAccessUsefulHeightEnvelope { get; private set; } = true;
 
     public static void SetExperimentalAccessUsefulHeightEnvelope(bool value)
     {
