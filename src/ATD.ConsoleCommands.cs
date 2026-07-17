@@ -7,6 +7,7 @@
 // intended to contain only original mod code/configuration; if MaFi Games material
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 // Auto Terrain Designations - In-Game Console Commands
+using System.Globalization;
 using System.Text;
 using Mafi;
 using Mafi.Core.Console;
@@ -26,6 +27,7 @@ public sealed class AtdConsoleCommands
     {
         var sb = new StringBuilder();
         sb.AppendLine("[ATD] Current settings:");
+        sb.AppendLine($"  DiagnosticLevel       = {AtdDiagnostics.Describe()}");
         sb.AppendLine($"  MaxHeightDiff         = {AutoTerrainDesignationsMod.MaxHeightDiff}");
         sb.AppendLine($"  RampWidth             = {AutoTerrainDesignationsMod.RampWidth}");
         sb.AppendLine($"  MaxLayersToExcavate   = {AutoTerrainDesignationsMod.MaxLayersToExcavate}");
@@ -45,6 +47,10 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
         sb.AppendLine($"  ExperimentalHeightHull = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
+        sb.AppendLine($"  HeightHullV1LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}");
+        sb.AppendLine($"  HeightHullV2LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}");
+        sb.AppendLine($"  HeightHullV1UpperAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}");
+        sb.AppendLine($"  HeightHullV2UpperAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}");
         sb.AppendLine($"  SafetyPolicy          = {AutoTerrainDesignationsMod.GetSafetyPolicy().ToString().ToUpperInvariant()}");
         sb.AppendLine($"  LandslideSlopeFactor  = {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}");
         sb.AppendLine($"  LandslideBuffer       = {AutoTerrainDesignationsMod.AccessRayEndBuffer}");
@@ -350,6 +356,18 @@ public sealed class AtdConsoleCommands
         return AutoDepthDesignation.FormatAssignedVehiclesDump();
     }
 
+    [ConsoleCommand(false, false, "Gets or sets the session-only ATD diagnostic level. Allowed: default, warning, info, debug, trace.", "atd_diagnostic_level")]
+    private string atdDiagnosticLevel(string value = "")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return $"[ATD] Diagnostic level: {AtdDiagnostics.Describe()}.";
+
+        if (!AtdDiagnostics.TrySetSessionLevel(value, out string error))
+            return $"[ATD] Invalid diagnostic level '{value}'. {error}";
+
+        return $"[ATD] Diagnostic level set for this session: {AtdDiagnostics.Describe()}.";
+    }
+
     [ConsoleCommand(false, false, "Toggles the cursor tile-position overlay (bottom-left corner) for this session. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
     private string atdCursorOverlay(string value = "")
     {
@@ -388,6 +406,50 @@ public sealed class AtdConsoleCommands
             : "[ATD] Experimental access useful-height hull and V1/V2 center pruning OFF.";
     }
 
+    [ConsoleCommand(false, false, "Sets the session-only V1 useful-height hull lower allowance. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_lower_allowance")]
+    private string atdAccessHeightEnvelopeV1LowerAllowance(string value)
+    {
+        if (!TryParseConsoleFloat(value, out float parsed))
+            return $"[ATD] Invalid V1 lower allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+        if (!AutoTerrainDesignationsMod
+                .TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(parsed))
+            return $"[ATD] Invalid V1 lower allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+        return $"[ATD] V1 height-hull lower allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the session-only V2 useful-height hull lower allowance. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
+    private string atdAccessHeightEnvelopeV2LowerAllowance(string value)
+    {
+        if (!TryParseConsoleFloat(value, out float parsed))
+            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+        if (!AutoTerrainDesignationsMod
+                .TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(parsed))
+            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+        return $"[ATD] V2 height-hull lower allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the session-only V1 useful-height hull upper allowance. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
+    private string atdAccessHeightEnvelopeV1UpperAllowance(string value)
+    {
+        if (!TryParseConsoleFloat(value, out float parsed))
+            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+        if (!AutoTerrainDesignationsMod
+                .TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(parsed))
+            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+        return $"[ATD] V1 height-hull upper allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the session-only V2 useful-height hull upper allowance. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
+    private string atdAccessHeightEnvelopeV2UpperAllowance(string value)
+    {
+        if (!TryParseConsoleFloat(value, out float parsed))
+            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+        if (!AutoTerrainDesignationsMod
+                .TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(parsed))
+            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+        return $"[ATD] V2 height-hull upper allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
+    }
+
     private static bool TryParseConsoleBool(string value, out bool parsed)
     {
         switch ((value ?? string.Empty).Trim().ToLowerInvariant())
@@ -408,5 +470,16 @@ public sealed class AtdConsoleCommands
                 parsed = false;
                 return false;
         }
+    }
+
+    private static bool TryParseConsoleFloat(string value, out float parsed)
+    {
+        string text = (value ?? string.Empty).Trim();
+        return float.TryParse(
+                text, NumberStyles.Float, CultureInfo.InvariantCulture,
+                out parsed)
+            || float.TryParse(
+                text, NumberStyles.Float, CultureInfo.CurrentCulture,
+                out parsed);
     }
 }

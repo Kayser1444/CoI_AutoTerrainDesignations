@@ -81,7 +81,7 @@ namespace AutoTerrainDesignations
                 }
                 else
                 {
-                    AutoDepthDesignation.s_log.Info($"Pending allocations: Expired stale pending ticket for proto {ticket.ProtoId.Value} at depot {ticket.DepotId.Value}.");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Pending allocations: Expired stale pending ticket for proto {ticket.ProtoId.Value} at depot {ticket.DepotId.Value}.");
                 }
             }
             while (temp.Count > 0)
@@ -134,7 +134,7 @@ namespace AutoTerrainDesignations
 
                 if (matchedTicket != null)
                 {
-                    AutoDepthDesignation.s_log.Info($"Pending allocations: Discarded ticket for {protoId.Value} at depot {depotId.Value} due to AddVehicleToBuildQueue failure.");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Pending allocations: Discarded ticket for {protoId.Value} at depot {depotId.Value} due to AddVehicleToBuildQueue failure.");
                 }
             }
         }
@@ -511,7 +511,7 @@ namespace AutoTerrainDesignations
                         }
                     }
                 }
-                AutoDepthDesignation.s_log.Info($"Pending allocations: loaded from {store.StorageKind}.");
+                AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Pending allocations: loaded from {store.StorageKind}.");
             }
             catch (Exception ex)
             {
@@ -566,7 +566,7 @@ namespace AutoTerrainDesignations
                     AutoDepthDesignation.s_log.Warning($"Pending allocations: failed to stage in {result.StorageKind}: {result.ErrorMessage}");
                     return;
                 }
-                AutoDepthDesignation.s_log.Info($"Pending allocations: staged in {store.StorageKind}.");
+                AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Pending allocations: staged in {store.StorageKind}.");
             }
             catch (Exception ex)
             {

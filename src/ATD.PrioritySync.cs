@@ -122,7 +122,8 @@ namespace AutoTerrainDesignations
 
             if (towersSeeded > 0)
             {
-                Log.Info($"[ATD] Startup priority sync seeded {towersSeeded} tower(s) from assigned excavator priorities");
+                if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+                    Log.Info($"[ATD] Startup priority sync seeded {towersSeeded} tower(s) from assigned excavator priorities");
             }
 
             // Complete once towers were observed, or after retry budget is exhausted.

@@ -36,7 +36,7 @@ namespace AutoTerrainDesignations
             string json = store.LoadJson();
             if (string.IsNullOrWhiteSpace(json))
             {
-                s_log.Info($"Persistence: no tower settings found in {store.StorageKind}; using defaults.");
+                LogInfo($"Persistence: no tower settings found in {store.StorageKind}; using defaults.");
                 return;
             }
 
@@ -46,7 +46,7 @@ namespace AutoTerrainDesignations
             {
                 if (TryApplyTowerSettingsStateJson(json, out int loadedCount))
                 {
-                    s_log.Info($"Persistence: loaded {loadedCount} tower setting record(s) from {store.StorageKind}.");
+                    LogInfo($"Persistence: loaded {loadedCount} tower setting record(s) from {store.StorageKind}.");
                 }
             }
             catch (Exception ex)
@@ -65,7 +65,7 @@ namespace AutoTerrainDesignations
                 return;
             }
 
-            s_log.Info($"Persistence: staged {savedCount} tower setting override record(s) in {store.StorageKind}.");
+            LogInfo($"Persistence: staged {savedCount} tower setting override record(s) in {store.StorageKind}.");
         }
 
         internal static string BuildTowerSettingsStateJsonForConfig()

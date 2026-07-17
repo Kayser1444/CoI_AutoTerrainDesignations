@@ -132,7 +132,7 @@ namespace AutoTerrainDesignations
                     FarmProto farmProto = assisted.Item2;
                     TileTransform transform = assisted.Item3;
                     IAreaManagingTower tower = assisted.Item4;
-                    s_log.Info($"[ATD FarmPlacementAssist] Intercepted farm placement: " +
+                    LogDebug($"[ATD FarmPlacementAssist] Intercepted farm placement: " +
                         $"proto={farmProto.Id}, pos={transform.Position.Xy}, rot={transform.Rotation}, " +
                         $"reflected={transform.IsReflected}, tower={tower.Id}.");
                 }
@@ -343,7 +343,7 @@ namespace AutoTerrainDesignations
             // If the site is already fully prepared, replay immediately — no deferral needed.
             if (AreCellsAlreadyFarmable(cells))
             {
-                s_log.Info($"[ATD FarmPlacementAssist] Site already farmable — replaying batch immediately.");
+                LogDebug($"[ATD FarmPlacementAssist] Site already farmable — replaying batch immediately.");
                 ReplayFarmPlacementBatch(items, applyConfiguration);
                 return;
             }
@@ -364,7 +364,7 @@ namespace AutoTerrainDesignations
             }
 
             s_pendingFarmPlacementBatches.Add(intent);
-            s_log.Info($"[ATD FarmPlacementAssist] Deferred batch. items={items.Length}, " +
+            LogDebug($"[ATD FarmPlacementAssist] Deferred batch. items={items.Length}, " +
                 $"cells={cells.Count}, injected={intent.AtdInjectedCells.Count}.");
         }
 
@@ -393,7 +393,7 @@ namespace AutoTerrainDesignations
                 allowValidationSuppression: false,
                 applyConfiguration: applyConfiguration);
             s_inputScheduler.ScheduleInputCmd(cmd);
-            s_log.Info($"[ATD FarmPlacementAssist] Replayed farm placement batch: items={items.Length}.");
+            LogDebug($"[ATD FarmPlacementAssist] Replayed farm placement batch: items={items.Length}.");
         }
 
         // ---------------------------------------------------------------------------------
@@ -479,7 +479,7 @@ namespace AutoTerrainDesignations
             }
 
             if (s_pendingFarmPlacementBatches.Count > 0)
-                s_log.Info($"[ATD FarmPlacementAssist] Restored {s_pendingFarmPlacementBatches.Count} pending farm placement batch(es) from save state.");
+                LogDebug($"[ATD FarmPlacementAssist] Restored {s_pendingFarmPlacementBatches.Count} pending farm placement batch(es) from save state.");
         }
 
         private static FarmPlacementBatchRecord CreatePendingFarmPlacementBatchRecord(PlacementIntentBatch intent)

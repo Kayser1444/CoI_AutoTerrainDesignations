@@ -56,6 +56,7 @@ namespace AutoTerrainDesignations
         internal static void ResetSettingsToDefaults()
         {
             AutoTerrainDesignationsMod.ResetGlobalDefaults();
+            AtdDiagnostics.ResetToBuildDefault();
             ShowCursorOverlay = false;
             ShowExperimentalAccessSearchOverlay = false;
             ResetWorldPathfinderSettingsToDefaults();
@@ -407,6 +408,17 @@ namespace AutoTerrainDesignations
                 }
 
                 // Top-level scalar settings
+                string? diagnosticLevel = ParseString(json, "diagnosticLevel");
+                if (diagnosticLevel != null
+                    && !AtdDiagnostics.TryApplyConfiguredLevel(
+                        diagnosticLevel,
+                        out string diagnosticLevelError))
+                {
+                    s_log.Warning(
+                        $"Invalid diagnosticLevel '{diagnosticLevel}' in ATDsettings.json. " +
+                        diagnosticLevelError + $" Using {AtdDiagnostics.Level}.");
+                }
+
                 int? batchSize = ParseInt(json, "batchSize");
                 if (batchSize.HasValue && ShouldPreserveInt(batchSize.Value, migrateGeneratedDefaults, BATCH_SIZE))
                     s_batchSize = ClampBatchSize(batchSize.Value);
@@ -884,6 +896,9 @@ namespace AutoTerrainDesignations
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("{");
             sb.AppendLine($"  \"settingsVersion\": \"{AutoTerrainDesignationsMod.ModVersion}\",");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_diagnosticLevel\": \"Controls ATD diagnostic output. Default selects Debug in Debug builds and Info in Release builds. Warning keeps only warnings/errors; Info adds concise operational messages; Debug adds search summaries and timings; Trace adds full paths, plan tiles, successors, and handoffs. The atd_diagnostic_level command overrides this for the current session. Allowed: Default, Warning, Info, Debug, Trace.\",");
+            sb.AppendLine($"  \"diagnosticLevel\": \"{AtdDiagnostics.ConfiguredLevel}\",");
             sb.AppendLine();
             sb.AppendLine("  \"_comment\": \"AutoTerrainDesignations settings. These values set the defaults loaded at game start. Most parameters below can also be changed per mine tower directly in-game via the tower inspector \u2014 this file is for your convenience so you don't have to adjust them every new save.\",");
             sb.AppendLine();

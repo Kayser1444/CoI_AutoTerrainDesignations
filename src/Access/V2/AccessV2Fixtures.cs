@@ -426,6 +426,35 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
+            var validatedDelta = new[]
+            {
+                new AccessV2OriginProfile(new Tile2i(12, 8), flat),
+            };
+            var validatedContext = new[] { first.Origin };
+            if (!history.TryValidateApply(
+                    validatedDelta, validatedContext,
+                    out string validationReason))
+            {
+                failure = "Allocation-free V2 history preflight rejected valid geometry: "
+                    + validationReason;
+                return false;
+            }
+            AccessV2History validatedHistory = history.ApplyValidated(
+                validatedDelta,
+                Array.Empty<AccessRayHeightConstraint>(),
+                Array.Empty<string>());
+            if (validatedHistory.OriginCount != 2
+                || !validatedHistory.TryGetProfile(
+                    validatedDelta[0].Origin, out AccessHeightProfile applied)
+                || !AccessV2BandProfile.ProfilesEqual(
+                    applied, validatedDelta[0].Profile)
+                || history.TryValidateApply(
+                    new[] { first }, Array.Empty<Tile2i>(), out _))
+            {
+                failure = "Allocation-free V2 history preflight and single commit diverged from TryApply";
+                return false;
+            }
+
             if (!history.TryApply(
                     new[]
                     {
@@ -531,37 +560,43 @@ namespace AutoTerrainDesignations.Access.V2
             };
             AccessV2EndpointSet synthetic = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>(),
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
-            if (synthetic.Starts.Count != 8
-                || synthetic.Diagnostics.SyntheticStartCount != 8
+                Array.Empty<Tile2i>());
+            if (synthetic.Starts.Count != 0
+                || synthetic.Diagnostics.SyntheticStartCount != 0
                 || synthetic.Diagnostics.ExistingPairStartCount != 0)
             {
-                failure = "One-wide flat seed must produce eight synthetic frontage orientations";
+                failure = "One-wide flat seed must not become a V2 source frontage";
+                return false;
+            }
+            if (!synthetic.Diagnostics.Rejections.TryGetValue(
+                    "StartSourceMegaPairMissing", out int flatPairMissing)
+                || flatPairMissing != 4)
+            {
+                failure = "One-wide flat seed must report each missing same-cluster Mega companion";
                 return false;
             }
 
             oneWide[seed] = xPositive;
             AccessV2EndpointSet ramp = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>(),
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
-            if (ramp.Starts.Count != 4
-                || ramp.Starts.Any(start => start.State.Axis != AccessV2TravelAxis.X))
+                Array.Empty<Tile2i>());
+            if (ramp.Starts.Count != 0
+                || !ramp.Diagnostics.Rejections.TryGetValue(
+                    "StartSourceMegaPairMissing", out int rampPairMissing)
+                || rampPairMissing != 2)
             {
-                failure = "One-wide ramp seed must produce only along-axis companions";
+                failure = "One-wide ramp seed must report its two missing along-axis Mega companions";
                 return false;
             }
 
             AccessV2EndpointSet blocked = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>(),
-                (origin, profile) => new AccessV2SyntheticValidation(
-                    false, "Building"));
+                Array.Empty<Tile2i>());
             if (blocked.Starts.Count != 0
-                || !blocked.Diagnostics.Rejections.ContainsKey("Building"))
+                || !blocked.Diagnostics.Rejections.ContainsKey(
+                    "StartSourceMegaPairMissing"))
             {
-                failure = "Blocked synthetic companions must fail diagnostically";
+                failure = "Missing source pairs must fail deterministically";
                 return false;
             }
 
@@ -572,9 +607,8 @@ namespace AutoTerrainDesignations.Access.V2
                 [paired] = flat,
             };
             AccessV2EndpointSet existing = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, fixedPair, new[] { seed },
-                Array.Empty<Tile2i>(),
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
+                boundsMin, boundsMax, fixedPair, new[] { seed, paired },
+                Array.Empty<Tile2i>());
             if (!existing.Starts.Any(start => !start.HasSyntheticCompanion))
             {
                 failure = "Existing compatible companion must form a start frontage";
@@ -583,8 +617,7 @@ namespace AutoTerrainDesignations.Access.V2
 
             AccessV2EndpointSet exposedGoals = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, fixedPair, Array.Empty<Tile2i>(),
-                new[] { seed, paired },
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
+                new[] { seed, paired });
             if (exposedGoals.FixedGoals.Count != 2)
             {
                 failure = "Adjacent fixed pair must expose both open outer frontages";
@@ -599,8 +632,7 @@ namespace AutoTerrainDesignations.Access.V2
             };
             AccessV2EndpointSet verticalGoals = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, verticalPair, Array.Empty<Tile2i>(),
-                new[] { seed, yAxisPair },
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
+                new[] { seed, yAxisPair });
             if (verticalGoals.FixedGoals.Count != 2
                 || verticalGoals.FixedGoals.Any(
                     goal => goal.State.Axis != AccessV2TravelAxis.Y))
@@ -613,8 +645,7 @@ namespace AutoTerrainDesignations.Access.V2
             fixedPair[new Tile2i(12, 12)] = flat;
             AccessV2EndpointSet oneSideExposed = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, fixedPair, Array.Empty<Tile2i>(),
-                new[] { seed, paired },
-                (origin, profile) => AccessV2SyntheticValidation.Valid);
+                new[] { seed, paired });
             if (oneSideExposed.FixedGoals.Count != 1
                 || oneSideExposed.FixedGoals[0].ExposedDirection
                     != new Tile2i(-4, 0))
@@ -1295,11 +1326,10 @@ namespace AutoTerrainDesignations.Access.V2
                 .FirstOrDefault(transition => transition.Delta.Any(
                     item => item.Profile.Center2 > 0));
             if (ramp == null
-                || AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
-                    envelope, ramp, out string rampRejection)
-                || rampRejection != "HeightEnvelopeAbove")
+                || !AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
+                    envelope, ramp, out _))
             {
-                failure = "V2 hull must retain its upper bound for each newly reached ramp-lane center";
+                failure = "V2 upper allowance must admit the first newly reached rising ramp-lane centers";
                 return false;
             }
 
@@ -1331,9 +1361,53 @@ namespace AutoTerrainDesignations.Access.V2
                     allowanceSample, -32, out _)
                 || envelope.IsV2CenterHeightUseful(
                     allowanceSample, -33, out string v2Rejection)
-                || v2Rejection != "HeightEnvelopeBelow")
+                || v2Rejection != "HeightEnvelopeBelow"
+                || !envelope.IsV1CenterHeightUseful(
+                    allowanceSample, 16, out _)
+                || envelope.IsV1CenterHeightUseful(
+                    allowanceSample, 17, out string v1UpperRejection)
+                || v1UpperRejection != "HeightEnvelopeAbove"
+                || !envelope.IsV2CenterHeightUseful(
+                    allowanceSample, 32, out _)
+                || envelope.IsV2CenterHeightUseful(
+                    allowanceSample, 33, out string v2UpperRejection)
+                || v2UpperRejection != "HeightEnvelopeAbove")
             {
-                failure = "Useful-height hull must allow V1 centers 0.5 and V2 centers 1.0 below its lower bound";
+                failure = "Useful-height hull must allow V1 centers 0.5 and V2 centers 1.0 beyond either bound";
+                return false;
+            }
+
+            if (!AccessUsefulHeightEnvelope.TryCreate(
+                    terrain, Array.Empty<Tile2i>(),
+                    new Dictionary<Tile2i, AccessHeightProfile>(),
+                    out AccessUsefulHeightEnvelope? customEnvelope,
+                    out string customEnvelopeFailure,
+                    v1LowerAllowance32: 0,
+                    v2LowerAllowance32: 48,
+                    v1UpperAllowance32: 8,
+                    v2UpperAllowance32: 64)
+                || customEnvelope == null
+                || customEnvelope.V1LowerAllowance32 != 0
+                || customEnvelope.V2LowerAllowance32 != 48
+                || customEnvelope.V1UpperAllowance32 != 8
+                || customEnvelope.V2UpperAllowance32 != 64
+                || customEnvelope.IsV1CenterHeightUseful(
+                    allowanceSample, -1, out _)
+                || !customEnvelope.IsV2CenterHeightUseful(
+                    allowanceSample, -48, out _)
+                || customEnvelope.IsV2CenterHeightUseful(
+                    allowanceSample, -49, out _)
+                || !customEnvelope.IsV1CenterHeightUseful(
+                    allowanceSample, 8, out _)
+                || customEnvelope.IsV1CenterHeightUseful(
+                    allowanceSample, 9, out _)
+                || !customEnvelope.IsV2CenterHeightUseful(
+                    allowanceSample, 64, out _)
+                || customEnvelope.IsV2CenterHeightUseful(
+                    allowanceSample, 65, out _))
+            {
+                failure = "Useful-height hull must capture custom V1/V2 upper/lower allowances per snapshot: "
+                    + customEnvelopeFailure;
                 return false;
             }
 
@@ -1375,19 +1449,22 @@ namespace AutoTerrainDesignations.Access.V2
                     transition.Delta.Count,
                     0f);
 
+            var straightDiagnostics = new AccessSearchDiagnostics();
             var straight = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue);
+                UnitEvaluator, 10000, float.MaxValue,
+                diagnostics: straightDiagnostics);
             while (!straight.IsComplete) straight.Step(7);
             if (!straight.Result.Success
                 || straight.Result.States.Count != 3
                 || straight.Result.GeneratedProfiles.Count != 4
                 || Math.Abs(straight.Result.Cost - 19f) > 0.0001f
                 || Math.Abs(straight.Result.TraversalCost - 15f) > 0.0001f
+                || straightDiagnostics.V2EarlyLabelDominancePrunes == 0
                 || !straight.Result.Rejections.ContainsKey(
                     "FlatStrafeDominatedByTurn"))
             {
-                failure = "V2 Dijkstra fixed-provider cost or flat-strafe dominance failed";
+                failure = "V2 Dijkstra cost, early label dominance, or flat-strafe dominance failed";
                 return false;
             }
 
@@ -1814,6 +1891,59 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 failure = "V2 quick handoff ray fixture history failed: "
                     + quickHistoryReason;
+                return false;
+            }
+
+            Tile2i ownedRayOrigin = first.GetLaneOrigin(0);
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            ownedRayOrigin, first.Band.Lane0),
+                    },
+                    Array.Empty<Tile2i>(),
+                    new[]
+                    {
+                        new AccessRayHeightConstraint(
+                            new Tile2i(8, 4),
+                            AccessSideRayOperation.Fill, 1f,
+                            ownedRayOrigin),
+                        new AccessRayHeightConstraint(
+                            new Tile2i(8, 8),
+                            AccessSideRayOperation.Cut, 0f,
+                            ownedRayOrigin),
+                    },
+                    Array.Empty<string>(),
+                    out AccessV2History ownedRayHistory,
+                    out string ownedRayHistoryReason))
+            {
+                failure = "V2 owned-ray fixture history failed: "
+                    + ownedRayHistoryReason;
+                return false;
+            }
+            if (!ownedRayHistory.IsProfileBlockedByRayEnvelope(
+                    secondStep.Next.GetLaneOrigin(0),
+                    secondStep.Next.Band.Lane0,
+                    out AccessSideRayOperation ownedBlock)
+                || ownedBlock != AccessSideRayOperation.Fill
+                || ownedRayHistory.IsProfileBlockedByRayEnvelope(
+                    secondStep.Next.GetLaneOrigin(0),
+                    secondStep.Next.Band.Lane0,
+                    new[] { ownedRayOrigin },
+                    out _))
+            {
+                failure = "V2 direct continuation must supersede only the predecessor-owned ray envelope";
+                return false;
+            }
+            IReadOnlyList<AccessV2HandoffCandidate> ownedRayQuick =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, ownedRayHistory,
+                    graph, UniformSingle, Span,
+                    vehicleWidth: 5);
+            if (ownedRayQuick.Count != 1
+                || !ownedRayQuick[0].IsQuickPath)
+            {
+                failure = "V2 quick handoff must ignore the current generated lane's own fringe ray";
                 return false;
             }
             IReadOnlyList<AccessV2HandoffCandidate> rayBlockedQuick =
@@ -2455,32 +2585,38 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 cleanupTile,
             };
-            var replaySnapshot = new AccessSearchSnapshot(
-                Tile2i.Zero, new Tile2i(32, 32), new Tile2i(28, 10),
-                -2, 2, true, true, false, 1f, 1f,
-                heightByTile,
-                centerByOrigin,
-                new Dictionary<Tile2i, AccessHeightProfile>
-                {
-                    [first.GetLaneOrigin(0)] = first.GetLane(0).Profile,
-                },
-                Array.Empty<Tile2i>(),
-                replayGroundTiles,
-                new[] { new Tile2i(28, 10) },
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                Array.Empty<AccessDurabilityCorner>(),
-                propCleanupByOrigin:
-                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+            AccessSearchSnapshot CreateReplaySnapshot(
+                IEnumerable<Tile2i>? levelingRayOrigins = null,
+                IDictionary<Tile2i, float>? preciseTerrain = null)
+                => new AccessSearchSnapshot(
+                    Tile2i.Zero, new Tile2i(32, 32),
+                    new Tile2i(28, 10),
+                    -2, 2, true, true, false, 1f, 1f,
+                    heightByTile,
+                    centerByOrigin,
+                    new Dictionary<Tile2i, AccessHeightProfile>
                     {
-                        [syntheticOrigin] = syntheticCleanup,
+                        [first.GetLaneOrigin(0)] = first.GetLane(0).Profile,
                     },
-                preciseTerrainHeights: preciseByTile,
-                physicalTerrainMin: Tile2i.Zero,
-                physicalTerrainMax: new Tile2i(32, 32),
-                vehicleWidth: 5,
-                v2WorkableHandoffs: UniformSingle,
-                v2WorkableHandoffSpans: Span);
+                    Array.Empty<Tile2i>(),
+                    replayGroundTiles,
+                    new[] { new Tile2i(28, 10) },
+                    Array.Empty<Tile2i>(),
+                    Array.Empty<Tile2i>(),
+                    Array.Empty<AccessDurabilityCorner>(),
+                    propCleanupByOrigin:
+                        new Dictionary<Tile2i, AccessPropCleanupInfo>
+                        {
+                            [syntheticOrigin] = syntheticCleanup,
+                        },
+                    preciseTerrainHeights: preciseTerrain ?? preciseByTile,
+                    physicalTerrainMin: Tile2i.Zero,
+                    physicalTerrainMax: new Tile2i(32, 32),
+                    rayLevelingDesignationOrigins: levelingRayOrigins,
+                    vehicleWidth: 5,
+                    v2WorkableHandoffs: UniformSingle,
+                    v2WorkableHandoffSpans: Span);
+            AccessSearchSnapshot replaySnapshot = CreateReplaySnapshot();
             AccessV2TransitionEvaluation omittedInternalBand =
                 AccessPathSearch.EvaluateV2Transition(
                     replaySnapshot, first, secondStep,
@@ -2579,6 +2715,33 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 failure = "V2 exact-terrain synthetic start companion must remain admissible: "
                     + exactStartCompanion.RejectionReason;
+                return false;
+            }
+            Tile2i fixedLaneOuterNeighbor = AccessV2Geometry.Add(
+                first.GetLaneOrigin(0), new Tile2i(0, -4));
+            var nonzeroOuterRayTerrain =
+                new Dictionary<Tile2i, float>(preciseByTile)
+                {
+                    // X-positive travel exposes lane 0's north ray from
+                    // (8,4). Lowering the corner and its first outward sample
+                    // makes the designation intersect an active fill ray,
+                    // independent of any configured termination-buffer size.
+                    [new Tile2i(8, 4)] = -1f,
+                    [new Tile2i(8, 3)] = -2f,
+                };
+            AccessV2TransitionEvaluation blockedSourceMouth =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        new[] { fixedLaneOuterNeighbor },
+                        nonzeroOuterRayTerrain),
+                    null, syntheticTransition,
+                    AccessV2History.Empty, first.GetLaneOrigin(0));
+            if (blockedSourceMouth.IsValid
+                || blockedSourceMouth.RejectionReason
+                    != "SideRayDesignation")
+            {
+                failure = "V2 synthetic source mouth must validate the reused cluster lane's outer Mega clearance: "
+                    + blockedSourceMouth.RejectionReason;
                 return false;
             }
             var materializationRoute = new AccessV2RouteData(

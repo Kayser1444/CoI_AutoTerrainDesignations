@@ -137,6 +137,10 @@ public static string Tt(string text) => text;
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
         SetExperimentalAccessUsefulHeightEnvelope(true);
+        TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(0.5f);
+        TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(1f);
+        TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(0.5f);
+        TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1f);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -341,6 +345,73 @@ public static string Tt(string text) => text;
     public static void SetExperimentalAccessUsefulHeightEnvelope(bool value)
     {
         ExperimentalAccessUsefulHeightEnvelope = value;
+    }
+
+    public static float ExperimentalAccessV1HeightEnvelopeLowerAllowance
+        => s_experimentalAccessV1HeightEnvelopeLowerAllowance32 / 32f;
+
+    public static float ExperimentalAccessV2HeightEnvelopeLowerAllowance
+        => s_experimentalAccessV2HeightEnvelopeLowerAllowance32 / 32f;
+
+    public static float ExperimentalAccessV1HeightEnvelopeUpperAllowance
+        => s_experimentalAccessV1HeightEnvelopeUpperAllowance32 / 32f;
+
+    public static float ExperimentalAccessV2HeightEnvelopeUpperAllowance
+        => s_experimentalAccessV2HeightEnvelopeUpperAllowance32 / 32f;
+
+    internal static int ExperimentalAccessV1HeightEnvelopeLowerAllowance32
+        => s_experimentalAccessV1HeightEnvelopeLowerAllowance32;
+
+    internal static int ExperimentalAccessV2HeightEnvelopeLowerAllowance32
+        => s_experimentalAccessV2HeightEnvelopeLowerAllowance32;
+
+    internal static int ExperimentalAccessV1HeightEnvelopeUpperAllowance32
+        => s_experimentalAccessV1HeightEnvelopeUpperAllowance32;
+
+    internal static int ExperimentalAccessV2HeightEnvelopeUpperAllowance32
+        => s_experimentalAccessV2HeightEnvelopeUpperAllowance32;
+
+    private static int s_experimentalAccessV1HeightEnvelopeLowerAllowance32 = 16;
+    private static int s_experimentalAccessV2HeightEnvelopeLowerAllowance32 = 32;
+    private static int s_experimentalAccessV1HeightEnvelopeUpperAllowance32 = 16;
+    private static int s_experimentalAccessV2HeightEnvelopeUpperAllowance32 = 32;
+
+    public static bool TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(
+        float value)
+        => TrySetExperimentalAccessHeightEnvelopeAllowance(
+            value, ref s_experimentalAccessV1HeightEnvelopeLowerAllowance32);
+
+    public static bool TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(
+        float value)
+        => TrySetExperimentalAccessHeightEnvelopeAllowance(
+            value, ref s_experimentalAccessV2HeightEnvelopeLowerAllowance32);
+
+    public static bool TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(
+        float value)
+        => TrySetExperimentalAccessHeightEnvelopeAllowance(
+            value, ref s_experimentalAccessV1HeightEnvelopeUpperAllowance32);
+
+    public static bool TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(
+        float value)
+        => TrySetExperimentalAccessHeightEnvelopeAllowance(
+            value, ref s_experimentalAccessV2HeightEnvelopeUpperAllowance32);
+
+    private static bool TrySetExperimentalAccessHeightEnvelopeAllowance(
+        float value,
+        ref int destination32)
+    {
+        double scaled = Math.Round(
+            (double)value * 32d, MidpointRounding.AwayFromZero);
+        if (double.IsNaN(scaled)
+            || double.IsInfinity(scaled)
+            || scaled < 0d
+            || scaled > int.MaxValue)
+            return false;
+        int converted = (int)scaled;
+        if (destination32 != converted)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        destination32 = converted;
+        return true;
     }
 
     /// <summary>Rejects accessway rays whose projected disturbance reaches ocean.</summary>
@@ -680,7 +751,8 @@ public static string Tt(string text) => text;
         gameLoopEvents.RegisterRendererInitState(this, () =>
         {
             AutoDepthDesignation.s_log.Info($"AutoTerrainDesignations v{ModVersion} | dll: {ModLogger.GetDllBuildTimestamp(typeof(AutoTerrainDesignationsMod).Assembly)}");
-            AutoDepthDesignation.s_log.Info("Localization: late apply at renderer init state.");
+            AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Diagnostics: {AtdDiagnostics.Describe()}.");
+            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Localization: late apply at renderer init state.");
             ApplyAutoHelpersLocalization();
             RegisterSettingsTabs(resolver);
         });
@@ -710,7 +782,7 @@ public static string Tt(string text) => text;
     private void ApplyAutoHelpersLocalization()
     {
         string translationsDirectory = Path.Combine(Manifest.RootDirectoryPath, "translations");
-        AutoDepthDesignation.s_log.Info($"Localization: probing directory '{translationsDirectory}'.");
+        AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: probing directory '{translationsDirectory}'.");
 
         if (!Directory.Exists(translationsDirectory))
         {
@@ -723,19 +795,19 @@ public static string Tt(string text) => text;
         if (jsonFiles.Length == 0)
             AutoDepthDesignation.s_log.Warning("Localization: no translation JSON files found.");
         else
-            AutoDepthDesignation.s_log.Info($"Localization: discovered {jsonFiles.Length} file(s): {string.Join(", ", jsonFiles)}");
+            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: discovered {jsonFiles.Length} file(s): {string.Join(", ", jsonFiles)}");
 
         string currentCulture;
         try { currentCulture = LocalizationManager.CurrentLangInfo.CultureInfoId; }
         catch { currentCulture = "<unavailable>"; }
-        AutoDepthDesignation.s_log.Info($"Localization: current game culture before apply = '{currentCulture}'.");
+        AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: current game culture before apply = '{currentCulture}'.");
 
         ModTranslationsApplyResult result = new ModTranslations().Apply(new ModTranslationsApplyOptions(
             translationsDirectory,
             typeof(AutoTerrainDesignationsMod).Assembly,
             Array.Empty<string>()));
 
-        AutoDepthDesignation.s_log.Info(
+        AtdDiagnostics.Info(AutoDepthDesignation.s_log,
             $"Localization: applied locale='{result.AppliedLocaleCode}', upserted={result.UpsertedEntryCount}, scannedFields={result.ScannedFieldCount}, reboundFields={result.ReboundFieldCount}, readonlySkipped={result.SkippedReadonlyFieldCount}, missingTranslationSkipped={result.SkippedMissingTranslationFieldCount}, failedWrites={result.FailedFieldCount}, diagnostics={result.Diagnostics.Count}.");
 
         foreach (TranslationDiagnostic diagnostic in result.Diagnostics)
@@ -743,7 +815,7 @@ public static string Tt(string text) => text;
             string itemInfo = diagnostic.ItemIndex.HasValue ? $", itemIndex={diagnostic.ItemIndex.Value}" : string.Empty;
             string message = $"Localization diagnostic [{diagnostic.Severity}] source='{diagnostic.SourcePath}'{itemInfo}: {diagnostic.Message}";
             if (diagnostic.Severity == TranslationDiagnosticSeverity.Info)
-                AutoDepthDesignation.s_log.Info(message);
+                AtdDiagnostics.Debug(AutoDepthDesignation.s_log, message);
             else
                 AutoDepthDesignation.s_log.Warning(message);
         }

@@ -19,6 +19,7 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly IReadOnlyList<AccessRayHeightConstraint> m_rayDelta;
         private readonly IReadOnlyCollection<string> m_cleanupKeyDelta;
         private HashSet<Tile2i>? m_cachedRayTiles;
+        private HashSet<Tile2i>? m_cachedHandoffRayTiles;
         private HashSet<Tile2i>? m_cachedOrigins;
 
         public int OriginCount { get; }
@@ -129,15 +130,30 @@ namespace AutoTerrainDesignations.Access.V2
             out string reason)
         {
             next = this;
+            if (!TryValidateApply(delta, localContextOrigins, out reason))
+                return false;
+
+            next = ApplyValidated(delta, rayDelta, cleanupKeyDelta);
+            return true;
+        }
+
+        /// <summary>
+        /// Checks immutable geometry without constructing the temporary sets,
+        /// dictionaries, copied deltas, and history node that TryApply needs.
+        /// Search uses this before expensive terrain evaluation, then commits
+        /// the already-validated delta exactly once if the label survives.
+        /// </summary>
+        public bool TryValidateApply(
+            IReadOnlyList<AccessV2OriginProfile> delta,
+            IReadOnlyCollection<Tile2i> localContextOrigins,
+            out string reason)
+        {
             if (delta.Count == 0)
             {
                 reason = "EmptyTransitionDelta";
                 return false;
             }
 
-            var deltaOrigins = new HashSet<Tile2i>();
-            var context = new HashSet<Tile2i>(localContextOrigins);
-            var deltaProfiles = new Dictionary<Tile2i, AccessHeightProfile>();
             for (int index = 0; index < delta.Count; index++)
             {
                 AccessV2OriginProfile item = delta[index];
@@ -151,27 +167,36 @@ namespace AutoTerrainDesignations.Access.V2
                     reason = "HalfLevelCorner";
                     return false;
                 }
-                if (!deltaOrigins.Add(item.Origin))
+                for (int prior = 0; prior < index; prior++)
                 {
-                    reason = "DuplicateDeltaOrigin";
-                    return false;
+                    if (delta[prior].Origin == item.Origin)
+                    {
+                        reason = "DuplicateDeltaOrigin";
+                        return false;
+                    }
                 }
                 if (ContainsOrigin(item.Origin))
                 {
                     reason = "OriginRevisit";
                     return false;
                 }
-                deltaProfiles.Add(item.Origin, item.Profile);
             }
 
             for (int index = 0; index < delta.Count; index++)
-            {
-                AccessV2OriginProfile item = delta[index];
                 if (!ValidateContacts(
-                        item, deltaProfiles, context,
+                        delta[index], delta, localContextOrigins,
                         out reason))
                     return false;
-            }
+
+            reason = string.Empty;
+            return true;
+        }
+
+        public AccessV2History ApplyValidated(
+            IReadOnlyList<AccessV2OriginProfile> delta,
+            IReadOnlyList<AccessRayHeightConstraint> rayDelta,
+            IReadOnlyCollection<string> cleanupKeyDelta)
+        {
 
             var copiedDelta = new AccessV2OriginProfile[delta.Count];
             for (int index = 0; index < delta.Count; index++)
@@ -181,10 +206,8 @@ namespace AutoTerrainDesignations.Access.V2
                 copiedRays[index] = rayDelta[index];
             var copiedCleanup = new HashSet<string>(
                 cleanupKeyDelta, StringComparer.Ordinal);
-            next = new AccessV2History(
+            return new AccessV2History(
                 this, copiedDelta, copiedRays, copiedCleanup);
-            reason = string.Empty;
-            return true;
         }
 
         public bool ContainsCleanupKey(string key)
@@ -216,9 +239,33 @@ namespace AutoTerrainDesignations.Access.V2
         public bool IsProfileBlockedByRayEnvelope(
             Tile2i origin,
             AccessHeightProfile profile,
+            IReadOnlyCollection<Tile2i>? supersededRayOwners,
             out AccessSideRayOperation operation)
         {
             const float epsilon = 0.0001f;
+            // Straight continuations supersede the newest lane-owned fringe.
+            // Handoff evaluation has already built this filtered tile set for
+            // the current label, so most candidates can reject a history scan
+            // with only 25 hash lookups.
+            if (supersededRayOwners != null)
+            {
+                IReadOnlyCollection<Tile2i> activeTiles =
+                    CollectHandoffRayTiles();
+                bool canOverlap = false;
+                for (int y = 0; y <= 4 && !canOverlap; y++)
+                    for (int x = 0; x <= 4; x++)
+                        if (activeTiles.Contains(
+                                origin + new RelTile2i(x, y)))
+                        {
+                            canOverlap = true;
+                            break;
+                        }
+                if (!canOverlap)
+                {
+                    operation = AccessSideRayOperation.None;
+                    return false;
+                }
+            }
             for (AccessV2History? history = this;
                 history != null;
                 history = history.m_parent)
@@ -226,6 +273,11 @@ namespace AutoTerrainDesignations.Access.V2
                 for (int index = 0; index < history.m_rayDelta.Count; index++)
                 {
                     AccessRayHeightConstraint constraint = history.m_rayDelta[index];
+                    if (constraint.OwnerOrigin.HasValue
+                        && supersededRayOwners != null
+                        && supersededRayOwners.Contains(
+                            constraint.OwnerOrigin.Value))
+                        continue;
                     int localX = constraint.Tile.X - origin.X;
                     int localY = constraint.Tile.Y - origin.Y;
                     if (localX < 0 || localX > 4 || localY < 0 || localY > 4)
@@ -249,6 +301,13 @@ namespace AutoTerrainDesignations.Access.V2
             operation = AccessSideRayOperation.None;
             return false;
         }
+
+        public bool IsProfileBlockedByRayEnvelope(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            out AccessSideRayOperation operation)
+            => IsProfileBlockedByRayEnvelope(
+                origin, profile, null, out operation);
 
         public IReadOnlyDictionary<Tile2i, AccessHeightProfile> Flatten()
         {
@@ -284,10 +343,39 @@ namespace AutoTerrainDesignations.Access.V2
             return result;
         }
 
+        public IReadOnlyCollection<Tile2i> CollectHandoffRayTiles()
+        {
+            if (m_cachedHandoffRayTiles != null)
+                return m_cachedHandoffRayTiles;
+            var currentOwners = new HashSet<Tile2i>();
+            for (AccessV2History? history = this;
+                history != null && currentOwners.Count == 0;
+                history = history.m_parent)
+                for (int index = 0; index < history.m_delta.Count; index++)
+                    currentOwners.Add(history.m_delta[index].Origin);
+
+            if (currentOwners.Count == 0)
+                return CollectRayTiles();
+
+            var result = new HashSet<Tile2i>();
+            for (AccessV2History? history = this;
+                history != null;
+                history = history.m_parent)
+                for (int index = 0; index < history.m_rayDelta.Count; index++)
+                {
+                    AccessRayHeightConstraint constraint = history.m_rayDelta[index];
+                    if (!constraint.OwnerOrigin.HasValue
+                        || !currentOwners.Contains(constraint.OwnerOrigin.Value))
+                        result.Add(constraint.Tile);
+                }
+            m_cachedHandoffRayTiles = result;
+            return result;
+        }
+
         private bool ValidateContacts(
             AccessV2OriginProfile candidate,
-            IReadOnlyDictionary<Tile2i, AccessHeightProfile> deltaProfiles,
-            ISet<Tile2i> localContext,
+            IReadOnlyList<AccessV2OriginProfile> deltaProfiles,
+            IReadOnlyCollection<Tile2i> localContext,
             out string reason)
         {
             for (int dx = -4; dx <= 4; dx += 4)
@@ -298,8 +386,9 @@ namespace AutoTerrainDesignations.Access.V2
                     Tile2i neighbor = new Tile2i(
                         candidate.Origin.X + dx,
                         candidate.Origin.Y + dy);
-                    bool inDelta = deltaProfiles.TryGetValue(
-                        neighbor, out AccessHeightProfile neighborProfile);
+                    bool inDelta = TryGetDeltaProfile(
+                        deltaProfiles, neighbor,
+                        out AccessHeightProfile neighborProfile);
                     bool inHistory = !inDelta && TryGetProfile(
                         neighbor, out neighborProfile);
                     if (!inDelta && !inHistory) continue;
@@ -324,6 +413,21 @@ namespace AutoTerrainDesignations.Access.V2
             }
             reason = string.Empty;
             return true;
+        }
+
+        private static bool TryGetDeltaProfile(
+            IReadOnlyList<AccessV2OriginProfile> delta,
+            Tile2i origin,
+            out AccessHeightProfile profile)
+        {
+            for (int index = 0; index < delta.Count; index++)
+            {
+                if (delta[index].Origin != origin) continue;
+                profile = delta[index].Profile;
+                return true;
+            }
+            profile = default;
+            return false;
         }
 
         private static bool SharedContactMatches(

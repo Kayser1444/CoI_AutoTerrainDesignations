@@ -1063,7 +1063,8 @@ namespace AutoTerrainDesignations.Access
             int clearance = Math.Max(1, VehicleWidth);
             Tile2i corner = center + new RelTile2i(
                 -(clearance / 2), -(clearance / 2));
-            IReadOnlyCollection<Tile2i> rayTiles = history.CollectRayTiles();
+            IReadOnlyCollection<Tile2i> rayTiles =
+                history.CollectHandoffRayTiles();
             var raySet = rayTiles as HashSet<Tile2i>
                 ?? new HashSet<Tile2i>(rayTiles);
             bool touchesGeneratedProfile = false;
@@ -1631,13 +1632,18 @@ namespace AutoTerrainDesignations.Access
         public Tile2i Tile { get; }
         public AccessSideRayOperation Operation { get; }
         public float Height { get; }
+        public Tile2i? OwnerOrigin { get; }
 
         public AccessRayHeightConstraint(
-            Tile2i tile, AccessSideRayOperation operation, float height)
+            Tile2i tile,
+            AccessSideRayOperation operation,
+            float height,
+            Tile2i? ownerOrigin = null)
         {
             Tile = tile;
             Operation = operation;
             Height = height;
+            OwnerOrigin = ownerOrigin;
         }
     }
 
@@ -1777,6 +1783,8 @@ namespace AutoTerrainDesignations.Access
         public long PropCleanupTicks;
         public int V2GroundExpansions;
         public int V2BandExpansions;
+        public int V2EarlyLabelDominancePrunes;
+        public int V2ExactLabelDominancePrunes;
         public int V2GroundSuffixAttempts;
         public int V2GroundSuffixSuccesses;
         public int V2GroundSuffixFallbacks;
@@ -1822,12 +1830,14 @@ namespace AutoTerrainDesignations.Access
 
         public void RecordStartSuccessor(string detail)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
             if (StartSuccessorDetails.Count < MaxStartDiagnosticDetails)
                 StartSuccessorDetails.Add(detail);
         }
 
         public void RecordFirstGeneratedHandoff(string detail)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
             if (FirstGeneratedHandoffDetails.Count < MaxStartDiagnosticDetails)
                 FirstGeneratedHandoffDetails.Add(detail);
         }

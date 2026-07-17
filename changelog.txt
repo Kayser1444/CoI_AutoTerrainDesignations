@@ -1,20 +1,17 @@
 v0.5.0 | 2026-07-17
-* Improved: Mining designations and accessways better avoid buildings and ocean
-* Added: Trees disrupted by mining designations and accessways are marked for harvesting
-* Added: A landslide predictor to help keep terrain work clear of protected oceans and buildings
-* Added: Accessway pathfinding can be invoked with a phony designation
-* Changed: The **Ore: None** filter now ignores debris and dirf ;
-* Changed: **Ore: None** retains its previous behavior unless pathfinding designations are present in the tower area
-* Changed: **Ramp width** and **Corridor clearance** are replaced by a shared **Vehicle clearance** setting
-* Added: Experimental width-two accessways for Mega vehicles, with turns, switchbacks, and connections between mine work and the tower access network
-* Improved: Experimental accessways can join usable natural ground and reuse existing planned accessways, reducing unnecessary terrain designations
-* Improved: Accessway routing now evaluates mine, dump, and leveling endpoints and selects routes using terrain-work and travel costs
-* Improved: Accessway routes validate vehicle-width clearance and use safer terrain transitions when joining natural ground or existing designations
-* Added: A **Safety policy** setting with MIN through MAX presets for landslide slope and buffer limits
+* Added: Experimental two-tile-wide accessways for Mega vehicles, including turns, switchbacks, and connections between terrain work and the tower access network
+* Improved: Accessways can join usable natural terrain and reuse existing planned routes, reducing unnecessary terrain work
+* Improved: Accessway routing considers mining, dumping, and leveling endpoints, balancing landscaping work against travel distance
+* Improved: Accessways validate full vehicle clearance and use safer transitions to natural terrain and existing designations
+* Improved: Mining designations and accessways use landslide prediction to better avoid buildings and protected ocean tiles
+* Added: Trees disrupted by mining designations or accessways are automatically marked for harvesting
+* Changed: **Ramp width** and **Corridor clearance** are replaced by a unified **Vehicle clearance** setting, based on vehicle tier rather than an arbitrary number.
+* Added: A **Safety policy** setting with presets from MIN to MAX for landslide slope and buffer limits
+* Changed: **Ore: None** ignores debris and dirt when existing pathfinding designations are present; its previous behavior is unchanged otherwise
+* Changed: Corner designation mode is now configured in vanilla **Controls**, with existing custom bindings retained
+* Fixed: Corner designation mode bindings changed in vanilla **Controls** now persist across game restarts
 * Added: An optional bottom-left cursor-coordinate overlay, disabled by default
-* Changed: Corner designation mode is configured in vanilla Controls; existing custom bindings are retained
-* Fixed: Corner designation mode bindings changed in vanilla Controls now persist across game restarts
-* Updated: Settings UI labels, icons, and translations
+* Updated: Settings labels, icons, and translations
 
 v0.4.5a | 2026-06-21
 * Improved: Experimental turning accessways connect to uneven ground using vanilla mining and dumping workability rules, with the correct designation type on the final tile

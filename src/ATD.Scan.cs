@@ -142,12 +142,18 @@ namespace AutoTerrainDesignations
             string miningPlanFingerprint = BuildMiningPlanFingerprint(tower, towerSettings);
             bool autoScan = GetSelectedOre(tower) == null;
 
+            if (IsTowerMiningPlanCurrent(tower, miningPlanFingerprint))
+            {
+                LogDebug("Mining plan and terrain designations are unchanged; Create Designations is a no-op.");
+                yield break;
+            }
+
             if (autoScan && HasTerrainDesignationsInTowerArea(tower))
             {
                 LogDebug("AUTO scanning found existing terrain designations; treating them as access-pathfinding goals.");
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(
                     tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 if (inspectorInstance != null)
                 {
                     OreCompositionPanel.ResetContent(inspectorInstance);
@@ -156,17 +162,25 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
-            if (IsTowerMiningPlanCurrent(tower, miningPlanFingerprint))
+            if (autoScan)
             {
-                LogDebug("Mining plan parameters are unchanged; skipping mining designation regeneration.");
-                yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
-                if (inspectorInstance != null)
+                var plannedTowerAccess = new PlannedTowerAccessResult();
+                IEnumerator plannedTowerRoutine =
+                    TryConnectToPlannedMiningTowerGhostCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        plannedTowerAccess);
+                while (plannedTowerRoutine.MoveNext())
+                    yield return plannedTowerRoutine.Current;
+                if (plannedTowerAccess.MarkerFound)
                 {
-                    OreCompositionPanel.ResetContent(inspectorInstance);
-                    DesignationPanel.RefreshDisplays(inspectorInstance);
+                    MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
+                    if (inspectorInstance != null)
+                    {
+                        OreCompositionPanel.ResetContent(inspectorInstance);
+                        DesignationPanel.RefreshDisplays(inspectorInstance);
+                    }
+                    yield break;
                 }
-
-                yield break;
             }
 
             var bbMin = TerrainDesignation.GetOrigin(area.BoundingBoxMin);
@@ -174,9 +188,9 @@ namespace AutoTerrainDesignations
             List<LooseProductProto> scanProducts = GetCandidateScanProducts(tower);
             if (scanProducts.Count == 0)
             {
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(
                     tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 if (inspectorInstance != null)
                 {
                     OreCompositionPanel.ResetContent(inspectorInstance);
@@ -264,9 +278,9 @@ namespace AutoTerrainDesignations
 
             if (targetProducts.Count == 0)
             {
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(
                     tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
 
@@ -325,9 +339,9 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(
                     tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
 
@@ -336,9 +350,9 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(
                     tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
 
@@ -366,8 +380,8 @@ namespace AutoTerrainDesignations
             {
                 RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
                 ClearGeneratedHarvestTreesForTower(tower);
-                MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                 yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
 
@@ -387,8 +401,8 @@ namespace AutoTerrainDesignations
                 {
                     RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
                     ClearGeneratedHarvestTreesForTower(tower);
-                    MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
                     yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                    MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                     yield break;
                 }
                 cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
@@ -455,7 +469,6 @@ namespace AutoTerrainDesignations
             LogDebug(string.Format("Created {0} designations", designCount));
             if (AccessHarvestDisruptedTrees)
                 MarkMiningDisruptedTreesForHarvest(tower, maxOreDepths, terrMgr);
-            MarkTowerMiningPlanClean(tower, miningPlanFingerprint);
 
             if (generateRamps)
             {
@@ -489,6 +502,8 @@ namespace AutoTerrainDesignations
                 RemoveFulfilledDesignationsForTower(tower);
                 CleanupIsolatedLeftoverDesignationsForTower(tower, maxOreDepths);
             }
+
+            MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
 
             // Refresh ore composition panel and designation panel after creating designations
             if (inspectorInstance != null)
@@ -825,8 +840,28 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.AccessRaySlopeConservatism,
                 AutoTerrainDesignationsMod.AccessRayEndBuffer,
                 AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance,
+                BuildPlannedTowerGhostFingerprint(tower),
+                BuildTerrainDesignationFingerprint(tower),
                 BuildMiningBuildingSafetyFingerprint());
         }
+
+        private static string BuildTerrainDesignationFingerprint(
+            IAreaManagingTower tower)
+        {
+            Dictionary<Tile2i, string> state =
+                CaptureTerrainDesignationState(tower);
+            return string.Join(";", state
+                .OrderBy(pair => pair.Key.X)
+                .ThenBy(pair => pair.Key.Y)
+                .Select(pair =>
+                    $"{pair.Key.X}:{pair.Key.Y}={pair.Value}"));
+        }
+
+        private static void MarkTowerMiningPlanCleanFromWorld(
+            IAreaManagingTower tower,
+            ATDTowerSettings towerSettings)
+            => MarkTowerMiningPlanClean(
+                tower, BuildMiningPlanFingerprint(tower, towerSettings));
 
         private static string BuildMiningBuildingSafetyFingerprint()
         {

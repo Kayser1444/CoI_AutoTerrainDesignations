@@ -91,7 +91,7 @@ namespace AutoTerrainDesignations
         public static LocStr DesigScanningFilterLabel =
             Loc.Str("panel.designations.scanning_filter.label", "Scanning filter:", "Label for the scanning filter ore picker row.");
         public static LocStr DesigScanningFilterTip =
-            Loc.Str("panel.designations.scanning_filter.tooltip", "Choose what Create Designations scans for.\n\nAUTO:\n• If the tower area has no terrain designations, scan for useful products and generate their mining plan.\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted.", "Tooltip for the scanning filter ore picker.");
+            Loc.Str("panel.designations.scanning_filter.tooltip", "Choose what Create Designations scans for.\n\nAUTO:\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n• Otherwise, if an unstarted mine control tower ghost has its entrance inside this tower's area, use the ghost as the pathfinding target and commit the first valid route. A recognized ghost suppresses the product scan even when no route can be placed.\n• If no eligible ghost exists, scan for useful products and generate their mining plan.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted.", "Tooltip for the scanning filter ore picker.");
 
         // ------------------------------------------------------------------ //
         // Mod settings window

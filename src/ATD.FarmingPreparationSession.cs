@@ -176,7 +176,7 @@ namespace AutoTerrainDesignations
             string towerText = TryGetTowerEntityId(tower!, out EntityId towerId) && towerId.IsValid
                 ? towerId.ToString()
                 : "?";
-            s_log.Info($"[ATD Farming Perf] {operation}: {elapsedMs} ms, tower={towerText}, origins={session.Origins.Count}, {detail}");
+            LogRuntimeDebug($"[ATD Farming Perf] {operation}: {elapsedMs} ms, tower={towerText}, origins={session.Origins.Count}, {detail}");
         }
 
         private static void LogFarmingPerfBreakdownIfSlow(
@@ -197,7 +197,7 @@ namespace AutoTerrainDesignations
             string towerText = TryGetTowerEntityId(tower!, out EntityId towerId) && towerId.IsValid
                 ? towerId.ToString()
                 : "?";
-            s_log.Info($"[ATD Farming Perf] {operation}: {elapsedMs} ms, tower={towerText}, origins={session.Origins.Count}, {detail}");
+            LogRuntimeDebug($"[ATD Farming Perf] {operation}: {elapsedMs} ms, tower={towerText}, origins={session.Origins.Count}, {detail}");
         }
 
         internal static string StartFarmingPreparationForTower(IAreaManagingTower? tower)

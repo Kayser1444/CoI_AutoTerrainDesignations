@@ -4,9 +4,8 @@ namespace AutoTerrainDesignations.Access
 {
     public static class AccessDiagnostics
     {
-        // Reserved for a future diagnostics toggle. Legacy access-planning traces
-        // are intentionally silent by default; warnings remain unconditional.
-        internal static bool VerboseLoggingEnabled { get; set; }
+        internal static bool VerboseLoggingEnabled
+            => AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug);
 
         internal static void LogDebug(string message)
         {

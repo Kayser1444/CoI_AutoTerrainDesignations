@@ -56,7 +56,7 @@ namespace AutoTerrainDesignations
         {
             try
             {
-                AutoDepthDesignation.s_log.Info("Applying pre-allocation patches...");
+                AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Applying pre-allocation patches...");
 
                 var assembly = typeof(Mafi.Unity.Entities.EntityMb).Assembly;
 
@@ -72,7 +72,7 @@ namespace AutoTerrainDesignations
                 {
                     harmony.Patch(assignerCtor,
                         postfix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleProtoAssignerUi_Ctor_Postfix)));
-                    AutoDepthDesignation.s_log.Info("Patched VehicleProtoAssignerUi constructor");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Patched VehicleProtoAssignerUi constructor");
                 }
                 else
                 {
@@ -86,7 +86,7 @@ namespace AutoTerrainDesignations
                 {
                     harmony.Patch(ctor,
                         postfix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleDepotInspector_Ctor_Postfix)));
-                    AutoDepthDesignation.s_log.Info("Patched VehicleDepotInspector constructor");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Patched VehicleDepotInspector constructor");
                 }
                 else
                 {
@@ -100,7 +100,7 @@ namespace AutoTerrainDesignations
                 {
                     harmony.Patch(addQueueMethod,
                         postfix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleDepotBase_AddVehicleToBuildQueue_Postfix)));
-                    AutoDepthDesignation.s_log.Info("Patched VehicleDepotBase.AddVehicleToBuildQueue");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Patched VehicleDepotBase.AddVehicleToBuildQueue");
                 }
 
                 // Patch VehicleDepotBase.TryBuildVehicle (both Prefix and Postfix with state variable to track build type)
@@ -111,7 +111,7 @@ namespace AutoTerrainDesignations
                     harmony.Patch(tryBuildVehicleMethod,
                         prefix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleDepotBase_TryBuildVehicle_Prefix)),
                         postfix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleDepotBase_TryBuildVehicle_Postfix)));
-                    AutoDepthDesignation.s_log.Info("Patched VehicleDepotBase.TryBuildVehicle");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Patched VehicleDepotBase.TryBuildVehicle");
                 }
 
                 // Patch VehicleDepotBase.RemoveVehicleFromBuildOrReplaceQueue
@@ -121,7 +121,7 @@ namespace AutoTerrainDesignations
                 {
                     harmony.Patch(removeQueueMethod,
                         prefix: new HarmonyMethod(typeof(PreAllocationPatches), nameof(VehicleDepotBase_RemoveVehicleFromBuildOrReplaceQueue_Prefix)));
-                    AutoDepthDesignation.s_log.Info("Patched VehicleDepotBase.RemoveVehicleFromBuildOrReplaceQueue");
+                    AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Patched VehicleDepotBase.RemoveVehicleFromBuildOrReplaceQueue");
                 }
             }
             catch (Exception ex)
@@ -267,7 +267,7 @@ namespace AutoTerrainDesignations
                     }
                 }
             }
-            AutoDepthDesignation.s_log.Info($"Vehicle order depot selection: tower={tower.Id.Value} proto={proto.Id.Value} eligible={eligibleCount} method=StraightLine result={(closestDepot == null ? "None" : closestDepot.Id.Value.ToString())} distanceSqr={(closestDepot == null ? "n/a" : minDistanceSqr.ToString("F3"))}");
+            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Vehicle order depot selection: tower={tower.Id.Value} proto={proto.Id.Value} eligible={eligibleCount} method=StraightLine result={(closestDepot == null ? "None" : closestDepot.Id.Value.ToString())} distanceSqr={(closestDepot == null ? "n/a" : minDistanceSqr.ToString("F3"))}");
             return closestDepot;
         }
 
@@ -340,7 +340,7 @@ namespace AutoTerrainDesignations
                         {
                             PendingVehicleAllocations.Enqueue(closestDepot.Id, tower.Id, proto.Id);
                         }
-                        AutoDepthDesignation.s_log.Info($"Queued {count} vehicle(s) {proto.Id.Value} at depot {closestDepot.Id.Value} for tower {tower.Id.Value}");
+                        AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Queued {count} vehicle(s) {proto.Id.Value} at depot {closestDepot.Id.Value} for tower {tower.Id.Value}");
                     }
                     else
                     {
@@ -413,7 +413,7 @@ namespace AutoTerrainDesignations
 
             if (cancelled > 0)
             {
-                AutoDepthDesignation.s_log.Info($"Cancelled {cancelled} enqueued vehicle(s) for tower {tower.Id.Value}");
+                AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Cancelled {cancelled} enqueued vehicle(s) for tower {tower.Id.Value}");
             }
             else
             {
@@ -600,7 +600,7 @@ namespace AutoTerrainDesignations
                             if (!tower.IsDestroyed && tower.CanVehicleBeAssigned(vehicle.Prototype))
                             {
                                 tower.AssignVehicle(vehicle);
-                                AutoDepthDesignation.s_log.Info($"Assigned newly built vehicle {vehicle.Id.Value} ({vehicle.Prototype.Id.Value}) to tower {tower.Id.Value}.");
+                                AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Assigned newly built vehicle {vehicle.Id.Value} ({vehicle.Prototype.Id.Value}) to tower {tower.Id.Value}.");
                             }
                             else
                             {

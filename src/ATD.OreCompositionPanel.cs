@@ -504,9 +504,11 @@ namespace AutoTerrainDesignations
                 }
 
                 if (product != null)
-                    Log.Info($"[ATD] Set {excavators.Count} excavators to focus on {product.Strings.Name.TranslatedString}");
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Info))
+                        Log.Info($"[ATD] Set {excavators.Count} excavators to focus on {product.Strings.Name.TranslatedString}");
                 else
-                    Log.Info($"[ATD] Cleared mining focus for {excavators.Count} excavators");
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Info))
+                        Log.Info($"[ATD] Cleared mining focus for {excavators.Count} excavators");
             }
             catch (Exception ex)
             {

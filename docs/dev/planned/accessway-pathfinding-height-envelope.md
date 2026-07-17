@@ -26,11 +26,11 @@ newly generated `V` nodes. Terrain/G and the selected start always define the
 useful hull. Whether every provider-eligible fixed profile or only current
 request targets also seed it remains an open reuse-versus-pruning decision.
 Sources are not pruning candidates. V1 and V2 apply the same fields to their
-different generated-state shapes, but use different lower-bound allowances. V1
-may place a generated center up to `0.5` below the lower field and V2 up to
-`1.0` below it. This bounded exception preserves the flat landing that a
-descending ramp can need in order to turn toward a low fixed goal. Both widths
-retain the exact upper field:
+different generated-state shapes, but use different symmetric boundary
+allowances. V1 may place a generated center up to `0.5` beyond either field and
+V2 up to `1.0` beyond either field. These bounded exceptions preserve the flat
+landing that an ascending or descending ramp can need in order to turn toward a
+high or low fixed goal:
 
 * V1 tests the one newly generated `AccessHeightProfile` before history and
   side-ray evaluation.
@@ -167,14 +167,14 @@ The inverse applies below `LowerUsefulHeight`: raising an unsupported deep
 portion toward the lower hull reduces excavation and does not remove access to
 a lower source.
 
-There is one geometry exception to that center-height dominance argument. A
-descending ramp cannot turn until it reaches a flat landing. When approaching
-a low fixed goal, the landing center can need to sit below the scalar lower
-hull even though the route immediately turns back toward a represented terminal
-surface. Keep a bounded lower allowance for this maneuver: `0.5` for V1 and
-`1.0` for V2. V2 needs the larger allowance because its width-two band and flat
-turn landing introduce two lane centers together. This is a lower-bound
-exception only; it does not justify any state above the upper hull.
+There is one sign-symmetric geometry exception to that center-height dominance
+argument. A ramp cannot turn until it reaches a flat landing. When approaching
+a low or high fixed goal, the landing center can need to sit respectively below
+the scalar lower hull or above the scalar upper hull even though the route
+immediately turns back toward a represented terminal surface. Keep a bounded
+allowance on both sides for this maneuver: `0.5` for V1 and `1.0` for V2. V2
+needs the larger allowance because its width-two band and flat turn landing
+introduce two lane centers together.
 
 The graph uses the V state's canonical center height as the pathing-height
 abstraction. A rigid flat or slope footprint can cross a locally non-planar hull
@@ -251,25 +251,15 @@ too-narrow field.
 
 ### Closure under finder-generated surfaces
 
-For the upper field, retain the following invariant: a new surface placed by
-the finder cannot expand the upper hull because the finder can place it only at
-or below the existing upper hull. More formally, a new upper source sample at
-`q` satisfies
-`h(q) <= UpperUsefulHeight(q)`. Since `UpperUsefulHeight` is already the
-max-minus grade closure, its entire cone is dominated everywhere:
-
-```text
-h(q) - s * distance(p, q) <= UpperUsefulHeight(p)
-```
-
-The lower result is not symmetric after adding the downramp-turn allowance: a
-finder-generated V1 sample may be `0.5` below `LowerUsefulHeight(q)`, and a V2
-sample may be `1.0` below it. If such work later becomes a fixed/provider source,
-it can lower the raw lower field. A cached or incrementally updated envelope
-must therefore run the ordinary lower containment/update rule for these
-profiles rather than assuming byte-identical lower-field closure. Repeated
-provider promotion must be measured for cumulative lower-field widening; do
-not weaken the upper-field closure or silently compound the per-query allowance.
+The turn allowances remove strict closure on both sides. A finder-generated V1
+sample may be `0.5` below `LowerUsefulHeight(q)` or above
+`UpperUsefulHeight(q)`; a V2 sample may be `1.0` beyond either field. If such
+work later becomes a fixed/provider source, it can lower the raw lower field or
+raise the raw upper field. A cached or incrementally updated envelope must run
+the ordinary containment/update rule for both sides rather than assuming
+byte-identical closure for finder-generated profiles. Repeated provider
+promotion must be measured for cumulative widening; do not silently compound
+the per-query allowance.
 
 ## Numeric representation
 
@@ -414,16 +404,16 @@ Query the envelope only at each newly reached V lane/profile center and require:
 
 ```text
 V1: LowerUsefulHeight(center) - 0.5 <= profile.Center
-                                      <= UpperUsefulHeight(center)
+                                      <= UpperUsefulHeight(center) + 0.5
 V2: LowerUsefulHeight(center) - 1.0 <= profile.Center
-                                      <= UpperUsefulHeight(center)
+                                      <= UpperUsefulHeight(center) + 1.0
 ```
 
 Reject above or below on strict center separation after conservative fixed-point
-rounding. The version-specific lower allowance is the only outward margin; do
-not add a profile-level or upper margin. For V2, evaluate each newly reached
-lane center independently; do not substitute one band-center sample for two
-lane centers. V2 in-place turns inherit their existing centers and do not
+rounding. The version-specific upper and lower allowances are the only outward
+margins; do not add another profile-level margin. For V2, evaluate each newly
+reached lane center independently; do not substitute one band-center sample for
+two lane centers. V2 in-place turns inherit their existing centers and do not
 require an envelope test.
 
 The 5x5 bilinear target surface is still evaluated by ordinary profile
@@ -609,6 +599,7 @@ existing horizontal and physical bounds remain authoritative.
 Snapshot diagnostics should report:
 
 * preprocessing time;
+* the captured V1 and V2 upper/lower allowances;
 * source counts by category;
 * tile count and memory;
 * minimum, maximum, and average allowed-band width;
@@ -618,6 +609,13 @@ Snapshot diagnostics should report:
 
 Search result/performance logs should report above/below rejection counts next
 to visited and pending nodes.
+
+For runtime troubleshooting, expose separate session-only console parameters
+for the V1 and V2 upper and lower allowances. Accept finite nonnegative
+physical-height values, quantize them to `height32`, mark mining plans dirty,
+and capture the resulting values in newly built immutable envelopes. A value of
+`0` restores the corresponding strict raw hull boundary for an A/B comparison;
+changing a parameter must not mutate an already active sliced search.
 
 Extend the experimental marker tooling with an optional useful-height view:
 
@@ -644,8 +642,8 @@ Cover at least:
   hull, comparing both source policies;
 * promotion of a cluster/profile to a provider without changing the reusable
   area hull;
-* finder-generated surfaces added as providers, proving a byte-identical upper
-  field and validating any required lower containment/update;
+* finder-generated surfaces added as providers, validating containment and any
+  required update independently for both fields;
 * hybrid reuse when a new target is inside both fields, above only, below only,
   and outside both, verifying selective field updates against a full rebuild;
 * target at the snapshot boundary;
@@ -663,8 +661,8 @@ Cover:
 * pointless excavation below flat terrain;
 * necessary climb toward a mountain or raised fixed target;
 * necessary descent toward a trough or lowered fixed target;
-* switchback and 90-degree flat turn near the hull, including acceptance at
-  exactly `0.5` below the lower field and rejection beyond it;
+* switchback and 90-degree flat turns near both hull sides, including acceptance
+  at exactly `0.5` beyond either field and rejection beyond that allowance;
 * G-to-V and V-to-G handoffs;
 * fixed-provider continuation;
 * projected designation, ocean, building, durability, and prop interactions;
@@ -676,7 +674,7 @@ Repeat the V1 cases for:
 
 * equal flat bands;
 * uniform ramp bands;
-* acceptance at exactly `1.0` below the lower field and rejection beyond it;
+* acceptance at exactly `1.0` beyond either field and rejection beyond it;
 * straight and strafe center-moving transitions;
 * 2x2 flat turn transitions, verifying that turns inherit already admitted
   centers and are not independently envelope-tested;
@@ -772,19 +770,19 @@ regression oracle.
     monotone hybrid retains the current hull, checks new sources for containment,
     and updates only the upper and/or lower field that would expand. Keep this
     open until preprocessing cost, cluster count, containment frequency, and
-    lost pruning are measured. Finder-generated surfaces cannot expand either
-    field under any policy.
+    lost pruning are measured. Finder-generated surfaces admitted by a boundary
+    allowance can expand either field if later promoted to fixed sources.
 4. **Should raw terrain use every tile or extracted extrema only?** Every tile
     gives a simple exact linear transform. Peak/trough reduction is optional
     only if it produces byte-identical fields.
 5. **Should missing envelope samples reject?** No. Fail open initially; missing
     data is a snapshot diagnostic, not a new pathfinding failure.
-6. **How should repeated lower-field promotion be bounded?** The turn allowance
-   means a finder-generated profile can become a later fixed source below the
-   previous raw lower field. Measure whether repeated snapshot/provider cycles
-   cause material cumulative widening. If they do, distinguish original
-   terminal sources from finder-generated sources or retain provenance so the
-   allowance is applied once rather than recursively.
+6. **How should repeated field promotion be bounded?** The turn allowances mean
+   a finder-generated profile can become a later fixed source beyond either raw
+   field. Measure whether repeated snapshot/provider cycles cause material
+   cumulative widening. If they do, distinguish original terminal sources from
+   finder-generated sources or retain provenance so each allowance is applied
+   once rather than recursively.
 7. **Can the envelope later be direction-aware?** Yes. A state-mode/direction
     cone could prune an outward-rising slope earlier than the shared scalar
     field, but it is history-sensitive and outside this proposal.
@@ -801,8 +799,8 @@ The design is ready to become default behavior when:
   and pruning results rather than assumed upfront;
 * hybrid containment checks and selective upper/lower updates produce fields
   identical to a full rebuild from the same sources;
-* adding a finder-generated surface as a later provider leaves the upper field
-  unchanged and applies the normal containment/update rule to the lower field;
+* adding a finder-generated surface as a later provider applies the normal
+  containment/update rule independently to both fields;
 * the sequential cache permits mutation only between cluster searches, and V1,
   V2, replay, and diagnostics share the same frozen envelope during a search;
 * preprocessing is linear in snapshot area and has measured acceptable memory;
@@ -812,7 +810,7 @@ The design is ready to become default behavior when:
   no implementation/source defects and no unacceptable representative-route
   regressions; exact exhaustive optimal-cost equivalence is not required;
 * fixtures cover V2 per-lane centers, retained-lane and in-place-turn behavior,
-  the exact V1 `0.5` and V2 `1.0` lower allowances,
+  the exact V1 `0.5` and V2 `1.0` upper/lower allowances,
   the confirmed ocean upper source, and the constraint-only treatment of
   projected designations, props, buildings, and durability;
 * live marker tests show the useless high/low boundary exploration removed;

@@ -97,7 +97,7 @@
   ],
   [
     "panel.designations.scanning_filter.tooltip",
-    "Choose what Create Designations scans for.\n\nAUTO:\n• If the tower area has no terrain designations, scan for useful products and generate their mining plan.\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted."
+    "Choose what Create Designations scans for.\n\nAUTO:\n• If terrain designations already exist, preserve them, create no new mining field, and treat unfinished terrain work as pathfinding goals.\n• Otherwise, if an unstarted mine control tower ghost has its entrance inside this tower's area, use the ghost as the pathfinding target and commit the first valid route. A recognized ghost suppresses the product scan even when no route can be placed.\n• If no eligible ghost exists, scan for useful products and generate their mining plan.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted."
   ],
   [
     "settings.mod.name",
@@ -485,15 +485,15 @@
   ],
   [
     "notification.ramp_access_failed",
-    "[ATD] {entity} could not start an access ramp"
+    "[ATD] {entity} could not start an accessway"
   ],
   [
     "notification.ramp_access_truncated",
-    "[ATD] {entity} could not fit a full access ramp"
+    "[ATD] {entity} could not fit a full accessway"
   ],
   [
     "notification.ramp_access_not_accessible",
-    "[ATD] {entity} could not path to the ramp"
+    "[ATD] {entity} could not path to the accessway"
   ],
   [
     "notification.farming_complete",

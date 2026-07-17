@@ -5,21 +5,6 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access.V2
 {
-    internal readonly struct AccessV2SyntheticValidation
-    {
-        public bool IsValid { get; }
-        public string Reason { get; }
-
-        public AccessV2SyntheticValidation(bool isValid, string reason)
-        {
-            IsValid = isValid;
-            Reason = reason ?? string.Empty;
-        }
-
-        public static AccessV2SyntheticValidation Valid
-            => new AccessV2SyntheticValidation(true, string.Empty);
-    }
-
     internal sealed class AccessV2StartFrontage
     {
         public AccessV2BandState State { get; }
@@ -105,9 +90,7 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i boundsMax,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
             IEnumerable<Tile2i> startSeedOrigins,
-            IEnumerable<Tile2i> fixedGoalOrigins,
-            Func<Tile2i, AccessHeightProfile, AccessV2SyntheticValidation>
-                syntheticValidator)
+            IEnumerable<Tile2i> fixedGoalOrigins)
         {
             var diagnostics = new AccessV2FrontageDiagnostics();
             var starts = new Dictionary<AccessV2BandState, AccessV2StartFrontage>();
@@ -133,8 +116,8 @@ namespace AutoTerrainDesignations.Access.V2
                 for (int axisIndex = 0; axisIndex < axes.Count; axisIndex++)
                     AddStartsForAxis(
                         axes[axisIndex], seed, seedProfile,
-                        boundsMin, boundsMax, fixedProfiles,
-                        syntheticValidator, starts, diagnostics);
+                        boundsMin, boundsMax, fixedProfiles, seeds,
+                        starts, diagnostics);
             }
 
             foreach (Tile2i origin in allowedGoalOrigins
@@ -173,11 +156,7 @@ namespace AutoTerrainDesignations.Access.V2
                 snapshot.BoundsMax,
                 snapshot.FixedProfiles,
                 startSeedOrigins,
-                fixedGoalOrigins,
-                (origin, profile) => snapshot.IsCandidateProfileFeasible(
-                        origin, profile, out string reason)
-                    ? AccessV2SyntheticValidation.Valid
-                    : new AccessV2SyntheticValidation(false, reason));
+                fixedGoalOrigins);
 
         private static void AddStartsForAxis(
             AccessV2TravelAxis axis,
@@ -186,8 +165,7 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i boundsMin,
             Tile2i boundsMax,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
-            Func<Tile2i, AccessHeightProfile, AccessV2SyntheticValidation>
-                syntheticValidator,
+            ISet<Tile2i> sourceClusterOrigins,
             IDictionary<AccessV2BandState, AccessV2StartFrontage> starts,
             AccessV2FrontageDiagnostics diagnostics)
         {
@@ -198,9 +176,18 @@ namespace AutoTerrainDesignations.Access.V2
                     seed, AccessV2Geometry.Scale(laneDirection, side));
                 bool companionIsFixed = fixedProfiles.TryGetValue(
                     companion, out AccessHeightProfile companionProfile);
-                if (!companionIsFixed)
-                    companionProfile = seedProfile;
-
+                bool companionIsSource = companionIsFixed
+                    && sourceClusterOrigins.Contains(companion);
+                if (!companionIsSource)
+                {
+                    // A Mega vehicle approaches the cluster centered across
+                    // both lanes. A synthetic lane beside one incomplete work
+                    // origin is useful generated terrain, but it is not a
+                    // complete width-two work face and cannot prove that the
+                    // vehicle can enter or operate on the source cluster.
+                    diagnostics.Reject("StartSourceMegaPairMissing");
+                    continue;
+                }
                 Tile2i anchor = side < 0 ? companion : seed;
                 AccessHeightProfile lane0 = side < 0 ? companionProfile : seedProfile;
                 AccessHeightProfile lane1 = side < 0 ? seedProfile : companionProfile;
@@ -209,15 +196,6 @@ namespace AutoTerrainDesignations.Access.V2
                         out AccessV2BandProfile band, out string bandReason))
                 {
                     diagnostics.Reject(bandReason);
-                    continue;
-                }
-
-                AccessV2SyntheticValidation validation = companionIsFixed
-                    ? AccessV2SyntheticValidation.Valid
-                    : syntheticValidator(companion, companionProfile);
-                if (!validation.IsValid)
-                {
-                    diagnostics.Reject(validation.Reason);
                     continue;
                 }
 
@@ -243,7 +221,7 @@ namespace AutoTerrainDesignations.Access.V2
                             new AccessV2StartFrontage(
                                 state,
                                 seed,
-                                companionIsFixed ? (Tile2i?)null : companion));
+                                syntheticCompanionOrigin: null));
                 }
             }
         }

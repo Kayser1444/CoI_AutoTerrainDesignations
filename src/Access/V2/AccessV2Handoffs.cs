@@ -310,7 +310,7 @@ namespace AutoTerrainDesignations.Access.V2
             if (recentNewestFirst.Count == 0) return result;
             AccessV2BandState current = recentNewestFirst[0];
 
-            long laneEvaluationStart = Stopwatch.GetTimestamp();
+            long laneEvaluationStart = AtdDiagnostics.Timestamp();
             IReadOnlyList<AccessGroundHandoff> firstLane0 =
                 EvaluateForwardLane(
                     recentNewestFirst, 1, 0,
@@ -321,7 +321,7 @@ namespace AutoTerrainDesignations.Access.V2
                     singleEvaluator, spanEvaluator);
             if (diagnostics != null)
                 diagnostics.V2HandoffLaneEvaluationTicks +=
-                    Stopwatch.GetTimestamp() - laneEvaluationStart;
+                    AtdDiagnostics.ElapsedSince(laneEvaluationStart);
             // Production V2 supplies a post-work center classifier and must
             // prove the complete rank-two-to-G corridor below.  Retain the
             // legacy quick path only for callers without that classifier.
@@ -343,7 +343,7 @@ namespace AutoTerrainDesignations.Access.V2
                 span <= Math.Min(MaxSpanLength, available);
                 span++)
             {
-                laneEvaluationStart = Stopwatch.GetTimestamp();
+                laneEvaluationStart = AtdDiagnostics.Timestamp();
                 IReadOnlyList<AccessGroundHandoff> lane0 = span == 1
                     ? firstLane0
                     : EvaluateForwardLane(
@@ -356,7 +356,7 @@ namespace AutoTerrainDesignations.Access.V2
                         singleEvaluator, spanEvaluator);
                 if (diagnostics != null)
                     diagnostics.V2HandoffLaneEvaluationTicks +=
-                        Stopwatch.GetTimestamp() - laneEvaluationStart;
+                        AtdDiagnostics.ElapsedSince(laneEvaluationStart);
                 IReadOnlyList<Tile2i> lane0Origins = GetForwardOrigins(
                     recentNewestFirst, span, 0);
                 IReadOnlyList<Tile2i> lane1Origins = GetForwardOrigins(
@@ -454,7 +454,8 @@ namespace AutoTerrainDesignations.Access.V2
             int maxOffset = 8 - radius;
             if (minOffset > maxOffset)
                 return null;
-            IReadOnlyCollection<Tile2i> rayTiles = history.CollectRayTiles();
+            IReadOnlyCollection<Tile2i> rayTiles =
+                history.CollectHandoffRayTiles();
             Tile2i? selected = null;
             for (int offset = minOffset; offset <= maxOffset; offset++)
             {
@@ -744,7 +745,7 @@ namespace AutoTerrainDesignations.Access.V2
                         {
                             if (diagnostics != null)
                                 diagnostics.V2CorridorAttempts++;
-                            long corridorStart = Stopwatch.GetTimestamp();
+                            long corridorStart = AtdDiagnostics.Timestamp();
                             bool corridorValid = TryBuildPostWorkCorridorEscape(
                                     left, right,
                                     lane0TerminalOrigins,
@@ -758,7 +759,7 @@ namespace AutoTerrainDesignations.Access.V2
                                     diagnostics);
                             if (diagnostics != null)
                                 diagnostics.V2CorridorTicks +=
-                                    Stopwatch.GetTimestamp() - corridorStart;
+                                    AtdDiagnostics.ElapsedSince(corridorStart);
                             if (!corridorValid)
                                 continue;
                         }
@@ -798,13 +799,13 @@ namespace AutoTerrainDesignations.Access.V2
                     }
                     else
                     {
-                        long localEscapeStart = Stopwatch.GetTimestamp();
+                        long localEscapeStart = AtdDiagnostics.Timestamp();
                         bool localEscapeValid = ground.TryValidateLocalEscape(
                             entryCenters, history, cleanupCostScale,
                             out cleanupKeys, out cleanupCost);
                         if (diagnostics != null)
                             diagnostics.V2LocalEscapeTicks +=
-                                Stopwatch.GetTimestamp() - localEscapeStart;
+                                AtdDiagnostics.ElapsedSince(localEscapeStart);
                         if (!localEscapeValid)
                             continue;
                     }

@@ -250,31 +250,50 @@ namespace AutoTerrainDesignations
             AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
         }
 
-        // Reserved for a future public diagnostics toggle. Keep command-scoped
-        // tracing off by default without suppressing warnings or unrelated logs.
+        // Keep the broad create-designations trace quiet unless explicitly
+        // promoted; targeted access diagnostics use the central level policy.
         private const bool CreateDesignationsVerboseLoggingEnabled = false;
         private static bool s_createDesignationsDebugContext;
+
+        private static void LogInfo(string message)
+        {
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Info))
+                s_log.Info(message);
+        }
 
         [System.Diagnostics.Conditional("DEBUG")]
         private static void LogDebug(string message)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+                return;
             if (s_createDesignationsDebugContext && !CreateDesignationsVerboseLoggingEnabled)
                 return;
 
             s_log.Info(message);
         }
 
-        [System.Diagnostics.Conditional("DEBUG")]
-        private static void LogLegacyAccessDebug(string message)
+        private static void LogRuntimeDebug(string message)
         {
-            if (Access.AccessDiagnostics.VerboseLoggingEnabled)
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
                 s_log.Info(message);
         }
 
-        [System.Diagnostics.Conditional("DEBUG")]
+        private static void LogLegacyAccessDebug(string message)
+        {
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+                s_log.Info(message);
+        }
+
         private static void LogExperimentalAccessDebug(string message)
         {
-            s_log.Info(message);
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+                s_log.Info(message);
+        }
+
+        private static void LogExperimentalAccessTrace(string message)
+        {
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                s_log.Info(message);
         }
 
         internal static ProductProto? GetSelectedOre(IAreaManagingTower tower)

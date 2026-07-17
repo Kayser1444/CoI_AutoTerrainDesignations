@@ -35,7 +35,8 @@ namespace AutoTerrainDesignations
 
         internal static AccessSearchResult? LastExperimentalAccessSearch { get; private set; }
         internal static AccessDesignationPlan? LastExperimentalAccessPlan { get; private set; }
-        private static readonly bool s_enableVerboseHandoffDiagnostics = false;
+        private static bool s_enableVerboseHandoffDiagnostics
+            => AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace);
         private static UiRoot? s_uiRoot;
         private static bool s_cancelExperimentalAccessSearch;
         private static readonly List<PlacedExperimentalDesignation> s_lastExperimentalCleanupDesignations =
@@ -80,6 +81,8 @@ namespace AutoTerrainDesignations
             public void RecordSample(Tile2i tile, Tile2i origin, AccessPropSample sample,
                 AccessPropBlockerKind blockerKind)
             {
+                if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    return;
                 if (SampleDetails.Count >= 16)
                     return;
                 string kind = sample.IsTree ? "tree" : sample.IsDenseDebris ? "debris" : "prop";
@@ -90,6 +93,8 @@ namespace AutoTerrainDesignations
 
             public void RecordOrigin(AccessPropCleanupInfo info)
             {
+                if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    return;
                 List<string> target = info.IsEligible ? EligibleOriginDetails : BlockedOriginDetails;
                 if (target.Count >= 24)
                     return;
@@ -580,7 +585,15 @@ namespace AutoTerrainDesignations
                         oceanTiles,
                         fixedProfiles,
                         out usefulHeightEnvelope,
-                        out string envelopeFailure);
+                        out string envelopeFailure,
+                        v1LowerAllowance32: AutoTerrainDesignationsMod
+                            .ExperimentalAccessV1HeightEnvelopeLowerAllowance32,
+                        v2LowerAllowance32: AutoTerrainDesignationsMod
+                            .ExperimentalAccessV2HeightEnvelopeLowerAllowance32,
+                        v1UpperAllowance32: AutoTerrainDesignationsMod
+                            .ExperimentalAccessV1HeightEnvelopeUpperAllowance32,
+                        v2UpperAllowance32: AutoTerrainDesignationsMod
+                            .ExperimentalAccessV2HeightEnvelopeUpperAllowance32);
                     if (!envelopeBuilt || usefulHeightEnvelope == null)
                     {
                         envelopeTimer.Stop();
@@ -600,9 +613,22 @@ namespace AutoTerrainDesignations
                         AccessUsefulHeightEnvelope completedEnvelope = usefulHeightEnvelope;
                         AccessUsefulHeightEnvelopeDiagnostics diagnostics =
                             completedEnvelope.Diagnostics;
-                        s_log.Info(
+                        LogExperimentalAccessDebug(
                             "[ATD Access Height Envelope] build=complete v1Pruning=on v2Pruning=on "
                             + "sourcePolicy=allFixedSnapshot "
+                            + "allowance=[v1Upper:"
+                            + (completedEnvelope.V1UpperAllowance32 / 32d).ToString(
+                                "0.#####", CultureInfo.InvariantCulture)
+                            + ",v1Lower:"
+                            + (completedEnvelope.V1LowerAllowance32 / 32d).ToString(
+                                "0.#####", CultureInfo.InvariantCulture)
+                            + ",v2Upper:"
+                            + (completedEnvelope.V2UpperAllowance32 / 32d).ToString(
+                                "0.#####", CultureInfo.InvariantCulture)
+                            + ",v2Lower:"
+                            + (completedEnvelope.V2LowerAllowance32 / 32d).ToString(
+                                "0.#####", CultureInfo.InvariantCulture)
+                            + "] "
                             + "elapsedMs="
                             + envelopeTimer.Elapsed.TotalMilliseconds.ToString(
                                 "0.##", CultureInfo.InvariantCulture)
@@ -1256,13 +1282,13 @@ namespace AutoTerrainDesignations
                 return;
             }
             if (diagnostics.SampleDetails.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access Cleanup Samples] {string.Join("; ", diagnostics.SampleDetails)}");
             if (diagnostics.EligibleOriginDetails.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access Cleanup Eligible Origins] {string.Join("; ", diagnostics.EligibleOriginDetails)}");
             if (diagnostics.BlockedOriginDetails.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access Cleanup Blocked Origins] {string.Join("; ", diagnostics.BlockedOriginDetails)}");
         }
 
@@ -1479,7 +1505,7 @@ namespace AutoTerrainDesignations
                     showForever: true);
                 notification.Body.SetChildren(
                     new Label(new LocStrFormatted(
-                        $"[ATD] Terrain analysis — cluster {clusterIndex}/{clusterCount} · " +
+                        $"[ATD] Finding path {clusterIndex}/{clusterCount}, " +
                         $"visited {visitedNodes:N0}/{nodeLimit:N0} · queue {pendingNodes:N0} · " +
                         $"{elapsedSeconds}/{timeLimit}s"))
                         .FontSize(16),
@@ -1515,7 +1541,22 @@ namespace AutoTerrainDesignations
             TimeSpan maxSlice)
         {
             LastExperimentalAccessSearch = result;
-            string rejections = result.Rejections.Count == 0
+            AccessSearchDiagnostics diag = result.Diagnostics;
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Info)
+                && !AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+            {
+                string conciseReason = string.IsNullOrEmpty(result.FailureReason)
+                    ? "none"
+                    : result.FailureReason;
+                LogInfo(
+                    $"[ATD Experimental Access] request={request.RequestId} cluster={cluster.ClusterId} " +
+                    $"width={request.RequiredWidth} success={result.Success} reason={conciseReason} " +
+                    $"visited={result.VisitedNodes} pathNodes={result.Path.Count} " +
+                    $"searchMs={elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)}");
+            }
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+            {
+                string rejections = result.Rejections.Count == 0
                 ? "none"
                 : string.Join(",", result.Rejections
                     .OrderByDescending(pair => pair.Value)
@@ -1526,9 +1567,8 @@ namespace AutoTerrainDesignations
             string searchMs = elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
             string maxSliceMs = maxSlice.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
             string landslideRun = snapshot.LandslideRunPerHeight.ToString("0.##", CultureInfo.InvariantCulture);
-            AccessSearchDiagnostics diag = result.Diagnostics;
-            double ticksToMs = 1000d / Stopwatch.Frequency;
-            string diagnostics =
+                double ticksToMs = 1000d / Stopwatch.Frequency;
+                string diagnostics =
                 $"expansions=[G:{diag.GroundExpansions},V:{diag.OriginExpansions}] " +
                 $"ground=[checks:{diag.GroundSuccessorChecks},relax:{diag.GroundRelaxations},cleanupChecks:{diag.CleanupGroundSuccessorChecks},cleanupRelax:{diag.CleanupGroundRelaxations},suffix:{diag.V1GroundSuffixSuccesses}/{diag.V1GroundSuffixAttempts},suffixFallback:{diag.V1GroundSuffixFallbacks},suffixSteps:{diag.V1GroundSuffixSteps}] " +
                 $"generated=[neighbors:{diag.OriginNeighborChecks},modes:{diag.GeneratedModeAttempts},g2vOrigins:{diag.GroundToGeneratedOriginChecks},g2vProfiles:{diag.GroundToGeneratedProfileAttempts},g2vNoHandoff:{diag.GroundToGeneratedHandoffFailures},g2vDirectLevel:{diag.V1GroundToVDirectLevelingAccepts},relax:{diag.GeneratedRelaxations}] " +
@@ -1548,10 +1588,11 @@ namespace AutoTerrainDesignations
                 $"history:{(diag.PathHistoryTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                 $"sideRay:{(diag.SideRayCostTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                 $"prop:{(diag.PropCleanupTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}]";
-            if (request.RequiredWidth == 2)
-            {
-                diagnostics +=
+                if (request.RequiredWidth == 2)
+                {
+                    diagnostics +=
                     $" v2Expand=[G:{diag.V2GroundExpansions},V:{diag.V2BandExpansions}] " +
+                    $"v2LabelDominance=[early:{diag.V2EarlyLabelDominancePrunes},exact:{diag.V2ExactLabelDominancePrunes}] " +
                     $"v2Suffix=[attempts:{diag.V2GroundSuffixAttempts},success:{diag.V2GroundSuffixSuccesses}," +
                     $"fallback:{diag.V2GroundSuffixFallbacks},steps:{diag.V2GroundSuffixSteps}] " +
                     $"v2G2V=[calls:{diag.V2GroundToVCalls},areaReject:{diag.V2GroundToVTowerAreaRejects},seeds:{diag.V2GroundToVSeedCalls}," +
@@ -1577,8 +1618,8 @@ namespace AutoTerrainDesignations
                     $"lane:{(diag.V2HandoffLaneEvaluationTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                     $"corridor:{(diag.V2CorridorTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                     $"localEscape:{(diag.V2LocalEscapeTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}]";
-            }
-            LogExperimentalAccessDebug(
+                }
+                LogExperimentalAccessDebug(
                 $"[ATD Experimental Access] request={request.RequestId} " +
                 $"{FormatAccessPathRequest(request)} cluster={cluster.ClusterId} " +
                 $"algorithm={(request.RequiredWidth == 2 ? AccessPathSearch.ShouldUseV2AStar(request) ? "A*" : "Dijkstra" : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -1588,13 +1629,14 @@ namespace AutoTerrainDesignations
                 $"visited={result.VisitedNodes} pathNodes={result.Path.Count} frames={frames} " +
                 $"searchMs={searchMs} maxSliceMs={maxSliceMs} " +
                 $"{diagnostics} " +
-                $"rejections=[{rejections}]");
+                    $"rejections=[{rejections}]");
+            }
             if (diag.StartSuccessorDetails.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access Start Successors] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.StartSuccessorDetails));
             if (diag.FirstGeneratedHandoffDetails.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access First Handoffs] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.FirstGeneratedHandoffDetails));
             if (!string.IsNullOrEmpty(diag.V2DryRunSummary))
@@ -1602,25 +1644,28 @@ namespace AutoTerrainDesignations
                     $"[ATD V2 Search] cluster={cluster.ClusterId} " +
                     diag.V2DryRunSummary);
             if (!string.IsNullOrEmpty(diag.V2DryRunPath))
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD V2 Search Path] cluster={cluster.ClusterId} " +
                     diag.V2DryRunPath);
             if (result.Success)
             {
-                LogExperimentalAccessDebug($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
+                if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    LogExperimentalAccessTrace($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
                 LogExperimentalNonGoalGroundDiagnostics(snapshot, result, cluster.ClusterId);
                 LogExperimentalSelectedVToGHandoffDiagnostics(snapshot, result, cluster.ClusterId);
-                Stopwatch materializeTimer = Stopwatch.StartNew();
+                long materializeStart = AtdDiagnostics.Timestamp();
                 AccessDesignationPlan plan = AccessPathMaterializer.Materialize(snapshot, result);
-                materializeTimer.Stop();
                 LastExperimentalAccessPlan = plan;
-                string materializeMs = materializeTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture);
-                float selectedSideRayCost = result.LeftSideRayCost
-                    + result.RightSideRayCost
-                    + result.SideRayUnresolvedPenalty;
-                float selectedCenterOnlyCost = result.Cost
-                    - AccessPathSearch.SideRayWeight * selectedSideRayCost;
-                LogExperimentalAccessDebug(
+                if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+                {
+                    string materializeMs = (AtdDiagnostics.ElapsedSince(materializeStart)
+                        * 1000d / Stopwatch.Frequency).ToString("0.##", CultureInfo.InvariantCulture);
+                    float selectedSideRayCost = result.LeftSideRayCost
+                        + result.RightSideRayCost
+                        + result.SideRayUnresolvedPenalty;
+                    float selectedCenterOnlyCost = result.Cost
+                        - AccessPathSearch.SideRayWeight * selectedSideRayCost;
+                    LogExperimentalAccessDebug(
                     $"[ATD Experimental Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} " +
                     $"reason={(string.IsNullOrEmpty(plan.FailureReason) ? "none" : plan.FailureReason)} " +
                     $"designations={plan.Designations.Count} reused={plan.ReusedNodeCount} " +
@@ -1641,10 +1686,12 @@ namespace AutoTerrainDesignations
                     $"treeCleanupCost={result.TreeCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"denseDebrisCleanupCost={result.DenseDebrisCleanupCost.ToString("0.##", CultureInfo.InvariantCulture)} " +
                     $"handoff=({plan.HandoffGround.X},{plan.HandoffGround.Y}) " +
-                    $"handoffOperation={plan.HandoffOperation} materializeMs={materializeMs}");
+                        $"handoffOperation={plan.HandoffOperation} materializeMs={materializeMs}");
+                }
                 if (plan.IsValid)
                 {
-                    LogExperimentalAccessDebug($"[ATD Experimental Access Plan Tiles] cluster={cluster.ClusterId} {FormatExperimentalPlan(plan)}");
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        LogExperimentalAccessTrace($"[ATD Experimental Access Plan Tiles] cluster={cluster.ClusterId} {FormatExperimentalPlan(plan)}");
                     LogExperimentalCleanupRouteDiagnostics(snapshot, result, plan, cluster.ClusterId);
                 }
             }
@@ -1652,7 +1699,8 @@ namespace AutoTerrainDesignations
             {
                 LastExperimentalAccessPlan = null;
                 if (result.Path.Count > 0)
-                    LogExperimentalAccessDebug($"[ATD Experimental Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        LogExperimentalAccessTrace($"[ATD Experimental Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
         }
 
@@ -1661,6 +1709,8 @@ namespace AutoTerrainDesignations
             AccessSearchResult result,
             int clusterId)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                return;
             var firstDetails = new List<string>();
             var tailDetails = new Queue<string>();
             int nonGoalGroundCount = 0;
@@ -1681,7 +1731,7 @@ namespace AutoTerrainDesignations
             }
             if (nonGoalGroundCount == 0)
                 return;
-            LogExperimentalAccessDebug(
+            LogExperimentalAccessTrace(
                 $"[ATD Experimental Access NonGoalGround] cluster={clusterId} " +
                 $"count={nonGoalGroundCount} first=[{string.Join("; ", firstDetails)}] " +
                 $"tail=[{string.Join("; ", tailDetails)}]");
@@ -1697,6 +1747,8 @@ namespace AutoTerrainDesignations
             AccessSearchResult result,
             int clusterId)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                return;
             TerrainManager? terrainManager = s_desigManager?.TerrainManager;
             if (terrainManager == null)
                 return;
@@ -1756,7 +1808,7 @@ namespace AutoTerrainDesignations
                         $":{node.HandoffOperation}:span={node.HandoffSpanLength}");
 
             if (details.Count > 0)
-                LogExperimentalAccessDebug(
+                LogExperimentalAccessTrace(
                     $"[ATD Experimental Access Selected VToG] cluster={clusterId} " +
                     $"count={details.Count} details=[{string.Join("; ", details)}]");
         }
@@ -2192,7 +2244,7 @@ namespace AutoTerrainDesignations
                 nearExistingDesignation = s_desigManager.GetDesignationAt(origin + directions[i]).HasValue;
             if (!nearExistingDesignation)
                 return;
-            LogExperimentalAccessDebug(
+            LogExperimentalAccessTrace(
                 $"[ATD Experimental Access Handoff Diagnostic] origin=({origin.X},{origin.Y}) " +
                 $"predecessor=({predecessorOrigin.X},{predecessorOrigin.Y}) {details}");
         }
@@ -2493,11 +2545,11 @@ namespace AutoTerrainDesignations
                 + "] outgoing=["
                 + string.Join(",", outgoingCorners) + "]";
 
-            if (AccessPathSearch.IsSmoothLevelHandoffFace(
-                    outgoingEdgeSigns))
+            if (IsLevelingHandoffFaceCompatible(
+                    outgoingOrigin, outgoingProfile,
+                    handoffEdge, terrMgr))
             {
                 uint smoothFaceMask = 0;
-                bool smoothFacePathable = true;
                 for (int offset = 0;
                     offset < outgoingEdgeSigns.Length;
                     offset++)
@@ -2506,14 +2558,10 @@ namespace AutoTerrainDesignations
                         handoffEdge, offset,
                         out int x, out int y, out _, out _);
                     Tile2i bridge = outgoingOrigin + new RelTile2i(x, y);
-                    if (!bridgeTilePathable(bridge))
-                    {
-                        smoothFacePathable = false;
-                        break;
-                    }
-                    smoothFaceMask |= GetDesignationMask(x, y);
+                    if (bridgeTilePathable(bridge))
+                        smoothFaceMask |= GetDesignationMask(x, y);
                 }
-                if (smoothFacePathable)
+                if (smoothFaceMask != 0)
                 {
                     operation = AccessHandoffOperation.Leveling;
                     fulfilledBitmap = smoothFaceMask;
@@ -2667,11 +2715,11 @@ namespace AutoTerrainDesignations
                 origin, profile, handoffEdge, terrMgr,
                 collectDeltas: false, out _);
 
-            // A G-facing edge whose end corners are level with terrain has a
-            // legitimate leveling handoff, even when the profile body contains
-            // terrain work. Leveling is also the appropriate prop-clearing
-            // operation for that seam.
-            if (AccessPathSearch.IsSmoothLevelHandoffFace(outgoingSigns))
+            // A level G-facing terrain edge has a legitimate leveling handoff
+            // even when it is vertically offset from the candidate V face.
+            // Leveling is also the appropriate prop-clearing operation.
+            if (IsLevelingHandoffFaceCompatible(
+                    origin, profile, handoffEdge, terrMgr))
             {
                 operation = AccessHandoffOperation.Leveling;
                 fulfilledBitmap = BuildHandoffEdgeMask(handoffEdge);
@@ -2762,6 +2810,49 @@ namespace AutoTerrainDesignations
                 signs[offset] = CompareHeightDeltaToGround(delta);
             }
             return signs;
+        }
+
+        private static float[] GetEdgeTerrainHeights(
+            Tile2i origin,
+            int edge,
+            TerrainManager terrMgr)
+        {
+            var heights = new float[5];
+            for (int offset = 0; offset <= 4; offset++)
+            {
+                int x = edge == 0 ? 0 : edge == 1 ? 4 : offset;
+                int y = edge == 2 ? 0 : edge == 3 ? 4 : offset;
+                Tile2i tile = origin + new RelTile2i(x, y);
+                heights[offset] = terrMgr.GetHeight(tile).Value.ToFloat();
+            }
+            return heights;
+        }
+
+        private static bool IsLevelingHandoffFaceCompatible(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            int edge,
+            TerrainManager terrMgr)
+        {
+            float[] groundHeights = GetEdgeTerrainHeights(
+                origin, edge, terrMgr);
+            if (!AccessPathSearch.IsSmoothLevelHandoffFace(groundHeights))
+                return false;
+
+            float groundLevel = groundHeights[0];
+            var data = CreateDesignationData(origin, profile);
+            for (int offset = 0; offset <= 4; offset++)
+            {
+                GetHandoffLaneCoordinates(
+                    edge, offset,
+                    out int x, out int y, out _, out _);
+                float targetHeight = GetDesignationTargetHeightAt(
+                    data, x, y).Value.ToFloat();
+                if (!AccessPathSearch.IsLevelingHandoffHeightCompatible(
+                        targetHeight, groundLevel))
+                    return false;
+            }
+            return true;
         }
 
         private static int OppositeEdge(int edge)
@@ -3706,6 +3797,8 @@ namespace AutoTerrainDesignations
             AccessDesignationPlan plan,
             int clusterId)
         {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                return;
             var cleanupOrigins = snapshot.PropCleanupOrigins
                 .Where(info => info.IsEligible)
                 .OrderBy(info => info.Origin.X)
@@ -3746,7 +3839,7 @@ namespace AutoTerrainDesignations
                     $"nearPath=[{nearPath}] nearPlan=[{nearPlan}]");
             }
 
-            LogExperimentalAccessDebug(
+            LogExperimentalAccessTrace(
                 $"[ATD Experimental Access Cleanup Route] cluster={clusterId} {string.Join("; ", details)}");
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using Mafi;
 
@@ -369,25 +370,25 @@ namespace AutoTerrainDesignations.Access.V2
                         CompleteSuccess(current);
                         break;
                     }
-                    long suffixStart = Stopwatch.GetTimestamp();
+                    long suffixStart = AtdDiagnostics.Timestamp();
                     if (TryCompleteGroundSuffix(current, out SearchNode? terminal))
                     {
                         m_diagnostics.V2GroundSuffixTicks +=
-                            Stopwatch.GetTimestamp() - suffixStart;
+                            AtdDiagnostics.ElapsedSince(suffixStart);
                         CompleteSuccess(terminal!);
                         break;
                     }
                     m_diagnostics.V2GroundSuffixTicks +=
-                        Stopwatch.GetTimestamp() - suffixStart;
+                        AtdDiagnostics.ElapsedSince(suffixStart);
                     m_diagnostics.V2GroundExpansions++;
-                    long groundStart = Stopwatch.GetTimestamp();
+                    long groundStart = AtdDiagnostics.Timestamp();
                     ExpandGround(current);
                     m_diagnostics.V2GroundExpansionTicks +=
-                        Stopwatch.GetTimestamp() - groundStart;
+                        AtdDiagnostics.ElapsedSince(groundStart);
                     continue;
                 }
                 m_diagnostics.V2BandExpansions++;
-                long bandStart = Stopwatch.GetTimestamp();
+                long bandStart = AtdDiagnostics.Timestamp();
                 if (TryMatchGoal(current.State, out AccessV2FixedFrontage? fixedGoal))
                     EnqueueFixedGoal(current, fixedGoal!);
 
@@ -395,7 +396,7 @@ namespace AutoTerrainDesignations.Access.V2
                 if (!current.RequiresGroundTransition)
                     Expand(current);
                 m_diagnostics.V2BandExpansionTicks +=
-                    Stopwatch.GetTimestamp() - bandStart;
+                    AtdDiagnostics.ElapsedSince(bandStart);
             }
 
             if (!IsComplete && m_queueCount == 0)
@@ -431,33 +432,29 @@ namespace AutoTerrainDesignations.Access.V2
                     Reject(envelopeRejection);
                     return;
                 }
-                if (!history.TryApply(
-                        transition, out _, out string geometryReason))
+                if (!history.TryValidateApply(
+                        transition.Delta,
+                        transition.LocalContextOrigins,
+                        out string geometryReason))
                 {
                     Reject(geometryReason);
                     return;
                 }
-                long evaluationStart = Stopwatch.GetTimestamp();
+                long evaluationStart = AtdDiagnostics.Timestamp();
                 AccessV2TransitionEvaluation evaluation = m_evaluator(
                     null, transition, history, start.FixedSeedOrigin);
                 m_diagnostics.V2TransitionEvaluationTicks +=
-                    Stopwatch.GetTimestamp() - evaluationStart;
+                    AtdDiagnostics.ElapsedSince(evaluationStart);
                 if (!evaluation.IsValid)
                 {
-                    Reject(evaluation.RejectionReason);
+                    Reject("StartSourceMegaSeam:" +
+                        evaluation.RejectionReason);
                     return;
                 }
-                if (!history.TryApply(
-                        transition.Delta,
-                        transition.LocalContextOrigins,
-                        evaluation.RayConstraints,
-                        evaluation.CleanupKeys,
-                        out history,
-                        out geometryReason))
-                {
-                    Reject(geometryReason);
-                    return;
-                }
+                history = history.ApplyValidated(
+                    transition.Delta,
+                    evaluation.RayConstraints,
+                    evaluation.CleanupKeys);
                 cost = evaluation.TotalCost;
                 traversalCost = evaluation.TraversalCost;
                 generatedWorkCost = evaluation.GeneratedWorkCost;
@@ -561,10 +558,29 @@ namespace AutoTerrainDesignations.Access.V2
             SearchNode current,
             AccessV2Transition transition)
         {
+            bool traceStartSuccessor = current.Parent == null
+                && AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace);
+            void Trace(string outcome)
+            {
+                if (!traceStartSuccessor) return;
+                AccessV2BandProfile band = transition.Next.Band;
+                AccessV2BandProfile.TryGetProfileMode(
+                    band.Lane0, out AccessSearchMode mode);
+                m_diagnostics.RecordStartSuccessor(
+                    $"v2 from={current.State.Anchor} " +
+                    $"entry={current.State.EntryDirection} " +
+                    $"next={transition.Next.Anchor} kind={transition.Kind} " +
+                    $"mode={mode} band={band.Kind} " +
+                    $"lane0={FormatProfile2(band.Lane0)} " +
+                    $"lane1={FormatProfile2(band.Lane1)} " +
+                    $"outcome={outcome}");
+            }
+
             if (!AccessV2Geometry.IsInsideBounds(
                     transition, m_boundsMin, m_boundsMax))
             {
                 Reject("HorizontalBounds");
+                Trace("reject:HorizontalBounds");
                 return;
             }
             if (!IsTransitionWithinUsefulHeightEnvelope(
@@ -572,43 +588,60 @@ namespace AutoTerrainDesignations.Access.V2
                     out string envelopeRejection))
             {
                 Reject(envelopeRejection);
+                Trace("reject:" + envelopeRejection);
                 return;
             }
-            if (!current.History.TryApply(
-                    transition, out _, out string historyReason))
+            float traversalLowerBound = GetTransitionTraversalCost(
+                current.State, transition.Next);
+            if (IsVBandCostKnownNoWorse(
+                    transition.Next,
+                    current.Cost + traversalLowerBound))
+            {
+                m_diagnostics.V2EarlyLabelDominancePrunes++;
+                Trace("prune:EarlyLabelDominance");
+                return;
+            }
+            if (!current.History.TryValidateApply(
+                    transition.Delta,
+                    transition.LocalContextOrigins,
+                    out string historyReason))
             {
                 Reject(historyReason);
+                Trace("reject:" + historyReason);
                 return;
             }
 
-            long evaluationStart = Stopwatch.GetTimestamp();
+            long evaluationStart = AtdDiagnostics.Timestamp();
             AccessV2TransitionEvaluation evaluation = m_evaluator(
                 current.State, transition, current.History, null);
             m_diagnostics.V2TransitionEvaluationTicks +=
-                Stopwatch.GetTimestamp() - evaluationStart;
+                AtdDiagnostics.ElapsedSince(evaluationStart);
             if (!evaluation.IsValid)
             {
                 Reject(evaluation.RejectionReason);
+                Trace("reject:" + evaluation.RejectionReason);
                 return;
             }
-            if (!current.History.TryApply(
-                    transition.Delta,
-                    transition.LocalContextOrigins,
-                    evaluation.RayConstraints,
-                    evaluation.CleanupKeys,
-                    out AccessV2History nextHistory,
-                    out historyReason))
-            {
-                Reject(historyReason);
-                return;
-            }
-
             float nextCost = current.Cost + evaluation.TotalCost;
             if (nextCost > m_maxCost)
             {
                 Reject("CostLimitExceeded");
+                Trace("reject:CostLimitExceeded " +
+                    $"nextCost={FormatCost(nextCost)}");
                 return;
             }
+            if (IsVBandCostKnownNoWorse(transition.Next, nextCost))
+            {
+                m_diagnostics.V2ExactLabelDominancePrunes++;
+                Trace("prune:ExactLabelDominance " +
+                    $"step={FormatCost(evaluation.TotalCost)} " +
+                    $"nextCost={FormatCost(nextCost)}");
+                return;
+            }
+            AccessV2History nextHistory = current.History.ApplyValidated(
+                transition.Delta,
+                evaluation.RayConstraints,
+                evaluation.CleanupKeys);
             var next = new SearchNode(
                 transition.Next, nextHistory, nextCost,
                 current.TraversalCost + evaluation.TraversalCost,
@@ -621,6 +654,37 @@ namespace AutoTerrainDesignations.Access.V2
                 requiresGroundTransition:
                     evaluation.RequiresGroundTransition);
             Enqueue(next);
+            Trace("accepted " +
+                $"step={FormatCost(evaluation.TotalCost)} " +
+                $"travel={FormatCost(evaluation.TraversalCost)} " +
+                $"direct={FormatCost(evaluation.DirectWorkCost)} " +
+                $"fixed={FormatCost(evaluation.GeneratedFixedCost)} " +
+                $"rays={FormatCost(evaluation.ExteriorRayCost)} " +
+                $"cleanup={FormatCost(evaluation.CleanupCost)} " +
+                $"nextCost={FormatCost(nextCost)} " +
+                $"requiresG={evaluation.RequiresGroundTransition}");
+        }
+
+        private static string FormatProfile2(AccessHeightProfile profile)
+            => $"[{profile.Nw2},{profile.Ne2},{profile.Se2},{profile.Sw2}]/2";
+
+        private static string FormatCost(float cost)
+            => cost.ToString("0.##", CultureInfo.InvariantCulture);
+
+        private bool IsVBandCostKnownNoWorse(
+            AccessV2BandState state,
+            float candidateCost)
+            => m_best.TryGetValue(
+                    new SearchKey(state), out float knownCost)
+                && knownCost <= candidateCost + 0.0001f;
+
+        private static float GetTransitionTraversalCost(
+            AccessV2BandState current,
+            AccessV2BandState next)
+        {
+            Tile2i from = AccessV2PotentialField.GetCanonicalCenter(current);
+            Tile2i to = AccessV2PotentialField.GetCanonicalCenter(next);
+            return Math.Abs(from.X - to.X) + Math.Abs(from.Y - to.Y);
         }
 
         /// <summary>
@@ -679,11 +743,27 @@ namespace AutoTerrainDesignations.Access.V2
                 if (node.GroundCenter.HasValue) break;
                 recent.Add(node.State);
             }
-            long handoffStart = Stopwatch.GetTimestamp();
+            long handoffStart = AtdDiagnostics.Timestamp();
             IReadOnlyList<AccessV2HandoffCandidate> candidates =
                 m_handoffEvaluator(recent, current.History, null);
             m_diagnostics.V2HandoffEvaluationTicks +=
-                Stopwatch.GetTimestamp() - handoffStart;
+                AtdDiagnostics.ElapsedSince(handoffStart);
+            if (current.Parent != null
+                && current.Parent.Parent == null
+                && current.Transition != null
+                && AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+            {
+                m_diagnostics.RecordStartSuccessor(
+                    $"v2-handoff at={current.State.Anchor} " +
+                    $"band={current.State.Band.Kind} " +
+                    $"candidates={candidates.Count}" +
+                    (candidates.Count == 0
+                        ? " outcome=no-compatible-ground-seam"
+                        : " options=[" + string.Join(", ", candidates.Select(
+                            candidate => candidate +
+                                $" cost={FormatCost(candidate.TotalCost)}")) +
+                            "]"));
+            }
             m_handoffEvaluations++;
             m_diagnostics.V2HandoffEvaluations++;
             if (candidates.Any(item => item.IsQuickPath))
@@ -763,14 +843,14 @@ namespace AutoTerrainDesignations.Access.V2
                     && sweptCenters.Any(center =>
                         !m_groundValidator(center, current.History)))
                     continue;
-                long localEscapeStart = Stopwatch.GetTimestamp();
+                long localEscapeStart = AtdDiagnostics.Timestamp();
                 bool localEscapeValid = m_groundGraph.TryValidateLocalEscape(
                         sweptCenters, current.History,
                         m_cleanupCostScale,
                         out IReadOnlyCollection<string> cleanupKeys,
                         out float cleanupCost);
                 m_diagnostics.V2LocalEscapeTicks +=
-                    Stopwatch.GetTimestamp() - localEscapeStart;
+                    AtdDiagnostics.ElapsedSince(localEscapeStart);
                 if (!localEscapeValid)
                     continue;
                 AccessV2History nextHistory =
@@ -790,10 +870,10 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             m_diagnostics.V2GroundToVCalls++;
-            long groundToVStart = Stopwatch.GetTimestamp();
+            long groundToVStart = AtdDiagnostics.Timestamp();
             ExpandGroundToV(current);
             m_diagnostics.V2GroundToVTicks +=
-                Stopwatch.GetTimestamp() - groundToVStart;
+                AtdDiagnostics.ElapsedSince(groundToVStart);
         }
 
         private bool TryCompleteGroundSuffix(
@@ -854,14 +934,14 @@ namespace AutoTerrainDesignations.Access.V2
                         && sweptCenters.Any(center =>
                             !m_groundValidator(center, cursor.History)))
                         continue;
-                    long localEscapeStart = Stopwatch.GetTimestamp();
+                    long localEscapeStart = AtdDiagnostics.Timestamp();
                     bool localEscapeValid = m_groundGraph.TryValidateLocalEscape(
                         sweptCenters, cursor.History,
                         m_cleanupCostScale,
                         out IReadOnlyCollection<string> cleanupKeys,
                         out float cleanupCost);
                     m_diagnostics.V2LocalEscapeTicks +=
-                        Stopwatch.GetTimestamp() - localEscapeStart;
+                        AtdDiagnostics.ElapsedSince(localEscapeStart);
                     if (!localEscapeValid)
                         continue;
 
@@ -996,11 +1076,11 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
             m_diagnostics.V2GroundToVSeedExtensions++;
-            long evaluationStart = Stopwatch.GetTimestamp();
+            long evaluationStart = AtdDiagnostics.Timestamp();
             AccessV2TransitionEvaluation evaluation = m_evaluator(
                 null, transition, groundNode.History, null);
             m_diagnostics.V2TransitionEvaluationTicks +=
-                Stopwatch.GetTimestamp() - evaluationStart;
+                AtdDiagnostics.ElapsedSince(evaluationStart);
             if (!evaluation.IsValid || evaluation.RequiresGroundTransition)
             {
                 if (!evaluation.IsValid)
@@ -1030,12 +1110,12 @@ namespace AutoTerrainDesignations.Access.V2
             }
             else
             {
-                long handoffStart = Stopwatch.GetTimestamp();
+                long handoffStart = AtdDiagnostics.Timestamp();
                 seam = m_groundToVHandoffEvaluator(
                     state, groundCenter, candidate.ExpectedOperation,
                     nextHistory);
                 m_diagnostics.V2HandoffEvaluationTicks +=
-                    Stopwatch.GetTimestamp() - handoffStart;
+                    AtdDiagnostics.ElapsedSince(handoffStart);
                 m_handoffEvaluations++;
                 m_diagnostics.V2HandoffEvaluations++;
             }
@@ -1587,6 +1667,13 @@ namespace AutoTerrainDesignations.Access.V2
             private readonly AccessV2BandState m_state;
             private readonly Tile2i? m_groundCenter;
             private readonly bool m_isFixedGoalTerminal;
+
+            public SearchKey(AccessV2BandState state)
+            {
+                m_state = state;
+                m_groundCenter = null;
+                m_isFixedGoalTerminal = false;
+            }
 
             public SearchKey(SearchNode node)
             {

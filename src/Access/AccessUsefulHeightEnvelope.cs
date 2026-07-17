@@ -57,15 +57,25 @@ namespace AutoTerrainDesignations.Access
         private const int POSITIVE_INFINITY = int.MaxValue;
         private const int GRADE_STEP32 = 8;
         private const int OCEAN_MINIMUM_DRIVABLE_HEIGHT32 = 32;
-        private const int V1_LOWER_ALLOWANCE32 = 16;
-        private const int V2_LOWER_ALLOWANCE32 = 32;
+        internal const int DEFAULT_V1_LOWER_ALLOWANCE32 = 16;
+        internal const int DEFAULT_V2_LOWER_ALLOWANCE32 = 32;
+        internal const int DEFAULT_V1_UPPER_ALLOWANCE32 = 16;
+        internal const int DEFAULT_V2_UPPER_ALLOWANCE32 = 32;
 
         private readonly int[] m_upperHeight32;
         private readonly int[] m_lowerHeight32;
+        private readonly int m_v1LowerAllowance32;
+        private readonly int m_v2LowerAllowance32;
+        private readonly int m_v1UpperAllowance32;
+        private readonly int m_v2UpperAllowance32;
 
         public Tile2i Min { get; }
         public int Width { get; }
         public int Height { get; }
+        public int V1LowerAllowance32 => m_v1LowerAllowance32;
+        public int V2LowerAllowance32 => m_v2LowerAllowance32;
+        public int V1UpperAllowance32 => m_v1UpperAllowance32;
+        public int V2UpperAllowance32 => m_v2UpperAllowance32;
         public AccessUsefulHeightEnvelopeDiagnostics Diagnostics { get; }
 
         private AccessUsefulHeightEnvelope(
@@ -74,6 +84,10 @@ namespace AutoTerrainDesignations.Access
             int height,
             int[] upperHeight32,
             int[] lowerHeight32,
+            int v1LowerAllowance32,
+            int v2LowerAllowance32,
+            int v1UpperAllowance32,
+            int v2UpperAllowance32,
             AccessUsefulHeightEnvelopeDiagnostics diagnostics)
         {
             Min = min;
@@ -81,6 +95,10 @@ namespace AutoTerrainDesignations.Access
             Height = height;
             m_upperHeight32 = upperHeight32;
             m_lowerHeight32 = lowerHeight32;
+            m_v1LowerAllowance32 = v1LowerAllowance32;
+            m_v2LowerAllowance32 = v2LowerAllowance32;
+            m_v1UpperAllowance32 = v1UpperAllowance32;
+            m_v2UpperAllowance32 = v2UpperAllowance32;
             Diagnostics = diagnostics;
         }
 
@@ -108,7 +126,8 @@ namespace AutoTerrainDesignations.Access
             int centerHeight32,
             out string rejection)
             => IsCenterHeightUseful(
-                center, centerHeight32, V1_LOWER_ALLOWANCE32,
+                center, centerHeight32, m_v1LowerAllowance32,
+                m_v1UpperAllowance32,
                 out rejection);
 
         public bool IsV2CenterHeightUseful(
@@ -116,13 +135,15 @@ namespace AutoTerrainDesignations.Access
             int centerHeight32,
             out string rejection)
             => IsCenterHeightUseful(
-                center, centerHeight32, V2_LOWER_ALLOWANCE32,
+                center, centerHeight32, m_v2LowerAllowance32,
+                m_v2UpperAllowance32,
                 out rejection);
 
         private bool IsCenterHeightUseful(
             Tile2i center,
             int centerHeight32,
             int lowerAllowance32,
+            int upperAllowance32,
             out string rejection)
         {
             if (!TryGetBand(center, out int lowerHeight32, out int upperHeight32))
@@ -130,7 +151,7 @@ namespace AutoTerrainDesignations.Access
                 rejection = "HeightEnvelopeMissingSample";
                 return true;
             }
-            if (centerHeight32 > upperHeight32)
+            if ((long)centerHeight32 > (long)upperHeight32 + upperAllowance32)
             {
                 rejection = "HeightEnvelopeAbove";
                 return false;
@@ -150,10 +171,20 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyCollection<Tile2i> oceanTiles,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
             out AccessUsefulHeightEnvelope? envelope,
-            out string failureReason)
+            out string failureReason,
+            int v1LowerAllowance32 = DEFAULT_V1_LOWER_ALLOWANCE32,
+            int v2LowerAllowance32 = DEFAULT_V2_LOWER_ALLOWANCE32,
+            int v1UpperAllowance32 = DEFAULT_V1_UPPER_ALLOWANCE32,
+            int v2UpperAllowance32 = DEFAULT_V2_UPPER_ALLOWANCE32)
         {
             envelope = null;
             failureReason = string.Empty;
+            if (v1LowerAllowance32 < 0 || v2LowerAllowance32 < 0
+                || v1UpperAllowance32 < 0 || v2UpperAllowance32 < 0)
+            {
+                failureReason = "NegativeAllowance";
+                return false;
+            }
             if (preciseTerrainHeights.Count == 0)
             {
                 failureReason = "NoPreciseTerrainSamples";
@@ -277,7 +308,9 @@ namespace AutoTerrainDesignations.Access
                 maximumBandWidth32,
                 (double)totalBandWidth32 / measuredBandCount);
             envelope = new AccessUsefulHeightEnvelope(
-                min, width, height, upperHeight32, lowerHeight32, diagnostics);
+                min, width, height, upperHeight32, lowerHeight32,
+                v1LowerAllowance32, v2LowerAllowance32,
+                v1UpperAllowance32, v2UpperAllowance32, diagnostics);
             return true;
         }
 
@@ -311,13 +344,13 @@ namespace AutoTerrainDesignations.Access
                     + ",upper=" + upperHeight32;
                 return false;
             }
-            if (!envelope.IsV1CenterHeightUseful(new Tile2i(8, 2), 96, out _))
+            if (!envelope.IsV1CenterHeightUseful(new Tile2i(8, 2), 112, out _))
             {
-                failure = "CenterBoundaryRejected";
+                failure = "UpperAllowanceBoundaryRejected";
                 return false;
             }
             bool acceptedAbove = envelope.IsV1CenterHeightUseful(
-                new Tile2i(8, 2), 97, out string rejection);
+                new Tile2i(8, 2), 113, out string rejection);
             if (acceptedAbove || rejection != "HeightEnvelopeAbove")
             {
                 failure = "CenterRejectionMismatch:" + rejection;
