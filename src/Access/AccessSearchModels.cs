@@ -695,6 +695,125 @@ namespace AutoTerrainDesignations.Access
             return false;
         }
 
+        public bool HasV2DumpingPropBlockerAtTile(
+            V2.AccessV2BandState state,
+            Tile2i tile)
+        {
+            if (!m_propCleanupByTile.TryGetValue(
+                    tile, out AccessPropCleanupInfo info))
+                return false;
+            var checkedProps = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < info.Samples.Count; index++)
+            {
+                AccessPropSample sample = info.Samples[index];
+                if (sample.Tile == tile
+                    && sample.IsDenseDebris
+                    && !sample.IsTree
+                    && checkedProps.Add(sample.CleanupObjectKey)
+                    && !DoesV2DumpingBuryProp(state, sample))
+                    return true;
+            }
+            return false;
+        }
+
+        public bool TryGetV2GroundToVPostWorkHeight(
+            V2.AccessV2BandState state,
+            AccessHandoffOperation operation,
+            Tile2i tile,
+            V2.AccessV2History history,
+            out float height)
+        {
+            EnsureProjectedV2ProfileCache(history);
+            if (TryGetV2StateTargetHeight(state, tile, out float target))
+            {
+                if (!m_preciseTerrainHeights.TryGetValue(
+                        tile, out float natural))
+                {
+                    height = 0f;
+                    return false;
+                }
+                if (operation == AccessHandoffOperation.Mining)
+                    height = Math.Min(natural, target);
+                else if (operation == AccessHandoffOperation.Dumping)
+                    height = Math.Max(natural, target);
+                else
+                    height = target;
+                return true;
+            }
+            return TryGetProjectedV2Height(tile, history, out height);
+        }
+
+        private static bool TryGetV2StateTargetHeight(
+            V2.AccessV2BandState state,
+            Tile2i tile,
+            out float height)
+        {
+            for (int lane = 0; lane < 2; lane++)
+            {
+                Tile2i origin = state.GetLaneOrigin(lane);
+                int localX = tile.X - origin.X;
+                int localY = tile.Y - origin.Y;
+                if (localX < 0 || localX > 4
+                    || localY < 0 || localY > 4)
+                    continue;
+                height = state.GetLane(lane).Profile
+                    .GetHeight2NumeratorAt(localX, localY) / 32f;
+                return true;
+            }
+            height = 0f;
+            return false;
+        }
+
+        internal static bool DoesV2DumpingBuryProp(
+            V2.AccessV2BandState state,
+            AccessPropSample sample)
+        {
+            for (int lane = 0; lane < 2; lane++)
+                if (DoesDumpingBuryProp(
+                        state.GetLaneOrigin(lane),
+                        state.GetLane(lane).Profile, sample))
+                    return true;
+            return false;
+        }
+
+        internal static bool DoesDumpingBuryProp(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            AccessPropSample sample)
+            => sample.IsRemovable
+                && sample.HasDumpBurialProbe
+                && TryGetProfileTargetHeight(
+                    origin, profile, sample, out float target)
+                && AccessPropCleanupPolicy.DoesDumpingDestroyNonTreeProp(
+                    sample.PlacedHeight, target,
+                    sample.DumpBurialThreshold);
+
+        private static bool TryGetProfileTargetHeight(
+            Tile2i origin,
+            AccessHeightProfile profile,
+            AccessPropSample sample,
+            out float height)
+        {
+            float worldX = sample.DumpBurialProbeTile.X
+                + sample.DumpBurialProbeOffsetX;
+            float worldY = sample.DumpBurialProbeTile.Y
+                + sample.DumpBurialProbeOffsetY;
+            float localX = worldX - origin.X;
+            float localY = worldY - origin.Y;
+            if (localX < 0f || localX > 4f
+                || localY < 0f || localY > 4f)
+            {
+                height = 0f;
+                return false;
+            }
+            float north = profile.Nw2
+                + (profile.Ne2 - profile.Nw2) * localX / 4f;
+            float south = profile.Sw2
+                + (profile.Se2 - profile.Sw2) * localX / 4f;
+            height = (north + (south - north) * localY / 4f) / 2f;
+            return true;
+        }
+
         /// <summary>
         /// Classifies a vehicle-center tile inside a V2 handoff after the
         /// selected terminal operation has completed.  Transverse clearance
@@ -723,17 +842,22 @@ namespace AutoTerrainDesignations.Access
                 && operation != AccessHandoffOperation.Dumping)
                 return false;
 
-            if (TryGetV2HandoffProfile(
-                    origin, history, out AccessHeightProfile profile)
+            bool hasProfile = TryGetV2HandoffProfile(
+                origin, history, out AccessHeightProfile profile);
+            bool operationWorks = hasProfile
                 && DoesV2HandoffOperationWorkCenter(
-                    origin, profile, operation, center))
+                    origin, profile, operation, center);
+            if (operationWorks
+                && operation == AccessHandoffOperation.Mining)
                 return true;
 
             if (m_groundNodes.Contains(center))
                 return true;
             if (!m_propCleanupByTile.TryGetValue(
-                    center, out AccessPropCleanupInfo cleanup)
-                || cleanup.BlockerKind != AccessPropBlockerKind.None)
+                    center, out AccessPropCleanupInfo cleanup))
+                return operationWorks;
+            if (cleanup.BlockerKind != AccessPropBlockerKind.None
+                && !operationWorks)
                 return false;
 
             // Mining tests vanilla terrain pathability with every prop bit
@@ -742,13 +866,18 @@ namespace AutoTerrainDesignations.Access
             if (operation == AccessHandoffOperation.Mining)
                 return true;
 
-            // Trees never block the post-work dumping test. Dense props do,
-            // unless each object actually protrudes into an occupied neighbor
-            // origin that remains free to retain its cleanup designation.
+            // Trees never block the post-work dumping test. A dense prop is
+            // also gone when this profile rises strictly beyond its captured
+            // exact-position burial threshold. Otherwise it still needs an
+            // independent cleanup origin outside the generated history.
+            var checkedProps = new HashSet<string>(StringComparer.Ordinal);
             for (int index = 0; index < cleanup.Samples.Count; index++)
             {
                 AccessPropSample sample = cleanup.Samples[index];
-                if (!sample.IsDenseDebris)
+                if (!sample.IsDenseDebris
+                    || !checkedProps.Add(sample.CleanupObjectKey)
+                    || hasProfile && DoesDumpingBuryProp(
+                        origin, profile, sample))
                     continue;
                 if (!sample.IsRemovable
                     || !history.ContainsCleanupKey(sample.CleanupObjectKey)
@@ -1627,6 +1756,13 @@ namespace AutoTerrainDesignations.Access
         public int GroundToGeneratedOriginChecks;
         public int GroundToGeneratedProfileAttempts;
         public int GroundToGeneratedHandoffFailures;
+        public int V1GroundToVDirectLevelingAccepts;
+        public int V1HandoffDominanceSuccesses;
+        public int V1HandoffDominancePrunes;
+        public int V1GroundSuffixAttempts;
+        public int V1GroundSuffixSuccesses;
+        public int V1GroundSuffixFallbacks;
+        public int V1GroundSuffixSteps;
         public int GoalPops;
         public int GoalRejected;
         public int GoalAcceptedAtVisited;
@@ -1646,23 +1782,24 @@ namespace AutoTerrainDesignations.Access
         public int V2GroundSuffixFallbacks;
         public int V2GroundSuffixSteps;
         public int V2GroundToVCalls;
+        public int V2GroundToVTowerAreaRejects;
         public int V2GroundToVSeedCalls;
         public int V2GroundToVSeedExtensions;
         public int V2GroundToVAnchorCandidates;
         public int V2GroundToVProfileCandidates;
-        public int V2GroundToVCacheHits;
         public int V2GroundToVDirectLevelingAccepts;
-        public int V2GroundToVMonotonicAccepts;
-        public int V2GroundToVMonotonicProofsEstablished;
-        public int V2GroundToVMonotonicCandidates;
-        public int V2GroundToVMonotonicAttempts;
-        public int V2GroundToVMonotonicCacheSkips;
-        public int V2GroundToVMonotonicPrefilterRejects;
-        public int V2GroundToVMonotonicTransitionRejects;
-        public int V2GroundToVMonotonicGeometryRejects;
-        public int V2GroundToVMonotonicEmitRejects;
+        public int V2GroundToVRoughAccepts;
+        public int V2GroundToVCacheHits;
+        public int V2GroundToVCacheInsertions;
+        public int V2GroundToVFaceChecks;
+        public int V2GroundToVFaceRejects;
+        public int V2GroundToVBridgeSteps;
+        public int V2GroundToVBridgeRejects;
+        public int V2GroundToVPropRejects;
         public int V2HandoffEvaluations;
         public int V2QuickHandoffAccepts;
+        public int V2HandoffDominanceSuccesses;
+        public int V2HandoffDominancePrunes;
         public int V2HandoffPairChecks;
         public int V2MixedLanePairRejects;
         public int V2LevelingBridgeAccepts;

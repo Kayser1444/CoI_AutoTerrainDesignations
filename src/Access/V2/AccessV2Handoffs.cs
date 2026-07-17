@@ -21,7 +21,6 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyCollection<string> CleanupKeys { get; }
         public float CleanupCost { get; }
         public bool IsQuickPath { get; }
-        public bool IsMonotonicProof { get; }
         public float CenterSpokeCost { get; }
         public float TotalCost => CenterSpokeCost + CleanupCost;
 
@@ -37,8 +36,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<string> cleanupKeys,
             float cleanupCost,
             bool isQuickPath = false,
-            float centerSpokeCost = 2f,
-            bool isMonotonicProof = false)
+            float centerSpokeCost = 2f)
         {
             ExitDirection = exitDirection;
             SpanLength = spanLength;
@@ -53,7 +51,6 @@ namespace AutoTerrainDesignations.Access.V2
             CleanupKeys = cleanupKeys;
             CleanupCost = cleanupCost;
             IsQuickPath = isQuickPath;
-            IsMonotonicProof = isMonotonicProof;
             CenterSpokeCost = Math.Max(2f, centerSpokeCost);
         }
 
@@ -64,7 +61,7 @@ namespace AutoTerrainDesignations.Access.V2
                 $"({Lane1Contact.X},{Lane1Contact.Y}) " +
                 $"escapeCenters={EscapeCenters.Count} " +
                 $"entries={GroundEntryCenters.Count} " +
-                $"quick={IsQuickPath} monotonic={IsMonotonicProof}";
+                $"quick={IsQuickPath}";
     }
 
     internal delegate IReadOnlyList<AccessGroundHandoff>
@@ -88,6 +85,12 @@ namespace AutoTerrainDesignations.Access.V2
         Tile2i center,
         IReadOnlyCollection<Tile2i> handoffClearingOrigins,
         AccessV2History history);
+
+    internal delegate bool AccessV2PostWorkHeightEvaluator(
+        Tile2i tile,
+        out float height);
+
+    internal delegate bool AccessV2DumpingPropBlockerEvaluator(Tile2i tile);
 
     internal static class AccessV2Handoffs
     {
@@ -139,6 +142,152 @@ namespace AutoTerrainDesignations.Access.V2
                 escape, entries, Array.Empty<string>(), 0f,
                 isQuickPath: true, centerSpokeCost: centerSpokeCost);
             return true;
+        }
+
+        /// <summary>
+        /// Proves a reverse G-to-V handoff without searching inside the seam.
+        /// The complete vehicle-width face must finish within one quarter level
+        /// of the candidate V surface, then every cardinal step back to the
+        /// reached G center must remain within the vehicle's half-level limit.
+        /// </summary>
+        internal static bool TryCreateDeterministicGroundToVBridge(
+            AccessV2BandState state,
+            Tile2i groundEntry,
+            AccessHandoffOperation operation,
+            int vehicleWidth,
+            float centerSpokeCost,
+            AccessV2PostWorkHeightEvaluator postWorkHeight,
+            AccessV2DumpingPropBlockerEvaluator dumpingPropBlocker,
+            out AccessV2HandoffCandidate candidate,
+            AccessSearchDiagnostics? diagnostics = null)
+        {
+            candidate = null!;
+            if (vehicleWidth <= 0
+                || (operation != AccessHandoffOperation.Mining
+                    && operation != AccessHandoffOperation.Dumping))
+                return false;
+
+            bool travelsX = state.EntryDirection.X != 0;
+            int sign = Math.Sign(travelsX
+                ? state.EntryDirection.X
+                : state.EntryDirection.Y);
+            if (sign == 0)
+                return false;
+            Tile2i lane0Origin = state.GetLaneOrigin(0);
+            int faceLongitudinal = travelsX
+                ? lane0Origin.X + (sign > 0 ? 4 : 0)
+                : lane0Origin.Y + (sign > 0 ? 4 : 0);
+            int groundLongitudinal = travelsX ? groundEntry.X : groundEntry.Y;
+            int towardGround = Math.Sign(groundLongitudinal - faceLongitudinal);
+            if (towardGround != -sign && groundLongitudinal != faceLongitudinal)
+                return false;
+
+            int halfWidth = vehicleWidth / 2;
+            int groundTransverse = travelsX ? groundEntry.Y : groundEntry.X;
+            var escape = new List<Tile2i>();
+            for (int transverseOffset = -halfWidth;
+                transverseOffset <= halfWidth;
+                transverseOffset++)
+            {
+                int transverse = groundTransverse + transverseOffset;
+                Tile2i face = travelsX
+                    ? new Tile2i(faceLongitudinal, transverse)
+                    : new Tile2i(transverse, faceLongitudinal);
+                if (diagnostics != null)
+                    diagnostics.V2GroundToVFaceChecks++;
+                if (!TryGetBandTargetHeight(state, face, out float target)
+                    || !postWorkHeight(face, out float previousHeight)
+                    || Math.Abs(previousHeight - target) > 0.2501f)
+                {
+                    if (diagnostics != null)
+                        diagnostics.V2GroundToVFaceRejects++;
+                    return false;
+                }
+                if (operation == AccessHandoffOperation.Dumping
+                    && dumpingPropBlocker(face))
+                {
+                    if (diagnostics != null)
+                        diagnostics.V2GroundToVPropRejects++;
+                    return false;
+                }
+                if (transverseOffset == 0)
+                    escape.Add(face);
+
+                int longitudinal = faceLongitudinal;
+                while (longitudinal != groundLongitudinal)
+                {
+                    longitudinal += towardGround;
+                    Tile2i next = travelsX
+                        ? new Tile2i(longitudinal, transverse)
+                        : new Tile2i(transverse, longitudinal);
+                    if (diagnostics != null)
+                        diagnostics.V2GroundToVBridgeSteps++;
+                    if (!postWorkHeight(next, out float nextHeight)
+                        || Math.Abs(nextHeight - previousHeight) > 0.5001f)
+                    {
+                        if (diagnostics != null)
+                            diagnostics.V2GroundToVBridgeRejects++;
+                        return false;
+                    }
+                    if (operation == AccessHandoffOperation.Dumping
+                        && dumpingPropBlocker(next))
+                    {
+                        if (diagnostics != null)
+                            diagnostics.V2GroundToVPropRejects++;
+                        return false;
+                    }
+                    previousHeight = nextHeight;
+                    if (transverseOffset == 0)
+                        escape.Add(next);
+                }
+            }
+
+            var exitDirection = new Tile2i(
+                -state.EntryDirection.X, -state.EntryDirection.Y);
+            int groundCoordinate = travelsX ? groundEntry.Y : groundEntry.X;
+            int lane0Min = travelsX ? lane0Origin.Y : lane0Origin.X;
+            bool groundIsLane0 = groundCoordinate >= lane0Min
+                && groundCoordinate <= lane0Min + 4;
+            Tile2i lane0Contact = groundIsLane0
+                ? groundEntry
+                : GetLevelingCompanionContact(
+                    lane0Origin, exitDirection, groundEntry);
+            Tile2i lane1Origin = state.GetLaneOrigin(1);
+            Tile2i lane1Contact = groundIsLane0
+                ? GetLevelingCompanionContact(
+                    lane1Origin, exitDirection, groundEntry)
+                : groundEntry;
+            var lane0 = new AccessGroundHandoff(
+                lane0Contact, operation, new[] { groundEntry }, 1);
+            var lane1 = new AccessGroundHandoff(
+                lane1Contact, operation, new[] { groundEntry }, 1);
+            candidate = new AccessV2HandoffCandidate(
+                exitDirection, 1, lane0, lane1,
+                new[] { lane0Origin }, new[] { lane1Origin },
+                escape, new[] { groundEntry }, Array.Empty<string>(), 0f,
+                centerSpokeCost: centerSpokeCost);
+            return true;
+        }
+
+        private static bool TryGetBandTargetHeight(
+            AccessV2BandState state,
+            Tile2i tile,
+            out float height)
+        {
+            for (int lane = 0; lane < 2; lane++)
+            {
+                Tile2i origin = state.GetLaneOrigin(lane);
+                int localX = tile.X - origin.X;
+                int localY = tile.Y - origin.Y;
+                if (localX < 0 || localX > 4
+                    || localY < 0 || localY > 4)
+                    continue;
+                height = state.GetLane(lane).Profile
+                    .GetHeight2NumeratorAt(localX, localY) / 32f;
+                return true;
+            }
+            height = 0f;
+            return false;
         }
 
         public static IReadOnlyList<AccessV2HandoffCandidate> Evaluate(

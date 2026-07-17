@@ -57,6 +57,8 @@ namespace AutoTerrainDesignations.Access
         private const int POSITIVE_INFINITY = int.MaxValue;
         private const int GRADE_STEP32 = 8;
         private const int OCEAN_MINIMUM_DRIVABLE_HEIGHT32 = 32;
+        private const int V1_LOWER_ALLOWANCE32 = 16;
+        private const int V2_LOWER_ALLOWANCE32 = 32;
 
         private readonly int[] m_upperHeight32;
         private readonly int[] m_lowerHeight32;
@@ -101,9 +103,26 @@ namespace AutoTerrainDesignations.Access
             return true;
         }
 
-        public bool IsCenterHeightUseful(
+        public bool IsV1CenterHeightUseful(
             Tile2i center,
             int centerHeight32,
+            out string rejection)
+            => IsCenterHeightUseful(
+                center, centerHeight32, V1_LOWER_ALLOWANCE32,
+                out rejection);
+
+        public bool IsV2CenterHeightUseful(
+            Tile2i center,
+            int centerHeight32,
+            out string rejection)
+            => IsCenterHeightUseful(
+                center, centerHeight32, V2_LOWER_ALLOWANCE32,
+                out rejection);
+
+        private bool IsCenterHeightUseful(
+            Tile2i center,
+            int centerHeight32,
+            int lowerAllowance32,
             out string rejection)
         {
             if (!TryGetBand(center, out int lowerHeight32, out int upperHeight32))
@@ -116,7 +135,7 @@ namespace AutoTerrainDesignations.Access
                 rejection = "HeightEnvelopeAbove";
                 return false;
             }
-            if (centerHeight32 < lowerHeight32)
+            if ((long)centerHeight32 < (long)lowerHeight32 - lowerAllowance32)
             {
                 rejection = "HeightEnvelopeBelow";
                 return false;
@@ -292,12 +311,12 @@ namespace AutoTerrainDesignations.Access
                     + ",upper=" + upperHeight32;
                 return false;
             }
-            if (!envelope.IsCenterHeightUseful(new Tile2i(8, 2), 96, out _))
+            if (!envelope.IsV1CenterHeightUseful(new Tile2i(8, 2), 96, out _))
             {
                 failure = "CenterBoundaryRejected";
                 return false;
             }
-            bool acceptedAbove = envelope.IsCenterHeightUseful(
+            bool acceptedAbove = envelope.IsV1CenterHeightUseful(
                 new Tile2i(8, 2), 97, out string rejection);
             if (acceptedAbove || rejection != "HeightEnvelopeAbove")
             {

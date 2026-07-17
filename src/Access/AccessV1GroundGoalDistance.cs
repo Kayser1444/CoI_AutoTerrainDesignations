@@ -41,6 +41,24 @@ namespace AutoTerrainDesignations.Access
         public bool TryGetDistance(Tile2i tile, out float distance)
             => m_distances.TryGetValue(tile, out distance);
 
+        public IEnumerable<Tile2i> EnumerateDescendingSteps(Tile2i tile)
+        {
+            if (!m_distances.TryGetValue(tile, out float currentDistance))
+                yield break;
+            for (int index = 0; index < s_directions.Length; index++)
+            {
+                Tile2i next = tile + s_directions[index];
+                if (!CanTraverse(tile, next)
+                    || !m_distances.TryGetValue(next, out float nextDistance))
+                    continue;
+                float stepCost = tile.X != next.X && tile.Y != next.Y
+                    ? 1.41421356237f : 1f;
+                if (Math.Abs(currentDistance - stepCost - nextDistance)
+                    <= 0.0001f)
+                    yield return next;
+            }
+        }
+
         private Dictionary<Tile2i, float> BuildDistances(IEnumerable<Tile2i> goals)
         {
             var distances = new Dictionary<Tile2i, float>();

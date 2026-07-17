@@ -42,10 +42,21 @@ namespace AutoTerrainDesignations.Access
         public bool IsRemovable { get; }
         public string CleanupObjectKey { get; }
         public IReadOnlyList<Tile2i> EligibleCleanupOrigins { get; }
+        public bool HasDumpBurialProbe { get; }
+        public Tile2i DumpBurialProbeTile { get; }
+        public float DumpBurialProbeOffsetX { get; }
+        public float DumpBurialProbeOffsetY { get; }
+        public float PlacedHeight { get; }
+        public float DumpBurialThreshold { get; }
 
         public AccessPropSample(Tile2i tile, bool isTree, bool isDenseDebris, bool isRemovable,
             string? cleanupObjectKey = null,
-            IReadOnlyList<Tile2i>? eligibleCleanupOrigins = null)
+            IReadOnlyList<Tile2i>? eligibleCleanupOrigins = null,
+            Tile2i? dumpBurialProbeTile = null,
+            float dumpBurialProbeOffsetX = 0f,
+            float dumpBurialProbeOffsetY = 0f,
+            float placedHeight = 0f,
+            float dumpBurialThreshold = 0.5f)
         {
             Tile = tile;
             IsTree = isTree;
@@ -54,6 +65,12 @@ namespace AutoTerrainDesignations.Access
             CleanupObjectKey = cleanupObjectKey ?? $"{(isTree ? "tree" : isDenseDebris ? "debris" : "prop")}:{tile.X},{tile.Y}";
             EligibleCleanupOrigins = eligibleCleanupOrigins
                 ?? Array.Empty<Tile2i>();
+            HasDumpBurialProbe = dumpBurialProbeTile.HasValue;
+            DumpBurialProbeTile = dumpBurialProbeTile ?? default;
+            DumpBurialProbeOffsetX = dumpBurialProbeOffsetX;
+            DumpBurialProbeOffsetY = dumpBurialProbeOffsetY;
+            PlacedHeight = placedHeight;
+            DumpBurialThreshold = dumpBurialThreshold;
         }
     }
 
@@ -125,6 +142,12 @@ namespace AutoTerrainDesignations.Access
             int delta = targetHeight2 - terrainHeight2;
             return delta > NonTreeDumpRemovalThresholdHeight2;
         }
+
+        public static bool DoesDumpingDestroyNonTreeProp(
+            float placedHeight,
+            float targetHeight,
+            float burialThreshold)
+            => targetHeight - placedHeight > burialThreshold;
 
         public static bool OperationRemovesNonTreeProp(
             AccessHandoffOperation operation, int terrainHeight2, int targetHeight2)

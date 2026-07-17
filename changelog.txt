@@ -1,19 +1,20 @@
-v0.4.6a | Unreleased
-* Changed: Corner designation mode is now configured in vanilla Controls under **Kayser's Automatic Terrain Designations (Mod)** instead of the ATD Mod Settings tab
-* Migrated: Existing **cornerDesignationKey** values from **ATDsettings.json** are retained in vanilla Controls
+v0.5.0 | 2026-07-17
+* Improved: Mining designations and accessways better avoid buildings and ocean
+* Added: Trees disrupted by mining designations and accessways are marked for harvesting
+* Added: A landslide predictor to help keep terrain work clear of protected oceans and buildings
+* Added: Accessway pathfinding can be invoked with a phony designation
+* Changed: The **Ore: None** filter now ignores debris and dirf ;
+* Changed: **Ore: None** retains its previous behavior unless pathfinding designations are present in the tower area
+* Changed: **Ramp width** and **Corridor clearance** are replaced by a shared **Vehicle clearance** setting
+* Added: Experimental width-two accessways for Mega vehicles, with turns, switchbacks, and connections between mine work and the tower access network
+* Improved: Experimental accessways can join usable natural ground and reuse existing planned accessways, reducing unnecessary terrain designations
+* Improved: Accessway routing now evaluates mine, dump, and leveling endpoints and selects routes using terrain-work and travel costs
+* Improved: Accessway routes validate vehicle-width clearance and use safer terrain transitions when joining natural ground or existing designations
+* Added: A **Safety policy** setting with MIN through MAX presets for landslide slope and buffer limits
+* Added: An optional bottom-left cursor-coordinate overlay, disabled by default
+* Changed: Corner designation mode is configured in vanilla Controls; existing custom bindings are retained
 * Fixed: Corner designation mode bindings changed in vanilla Controls now persist across game restarts
-* Changed: Ore composition card priority button icon to the standard Priority icon
-* Changed: Pathfinder settings tab icon to Connect128
-* Added: Mod setting and public API configuration for prop cleanup landscaping cost in experimental access pathfinding, tuned to favor driving around obstacles when detours exist
-* Changed: Renamed the experimental access work cost scale setting to landscaping cost vs. distance scale
-* Updated: Mod settings UI labels and translations across all supported languages
-* Improved: Experimental accessways can connect active mining, dumping, and leveling work endpoints into the tower access network without rewriting those endpoint designations
-* Improved: Later clusters can reuse newly placed experimental accessways instead of creating duplicate ramps back to the tower
-* Fixed: Experimental routes can hand off to valid ground while still requiring final tower-reachable access, reducing unnecessary accessway designations over drivable terrain
-* Fixed: Endpoint starts can immediately hand off to ground when valid
-* Fixed: Existing planned access profiles can be reused as provider-join goals, including already-provided zero-new-designation paths
-* Added: **Suppress legacy ramps** experimental/debug setting and console command for testing V1 without straight-ramp fallback
-* Improved: Accessway diagnostics distinguish generated mining clusters from external terrain-work endpoints and report when legacy fallback was intentionally suppressed
+* Updated: Settings UI labels, icons, and translations
 
 v0.4.5a | 2026-06-21
 * Improved: Experimental turning accessways connect to uneven ground using vanilla mining and dumping workability rules, with the correct designation type on the final tile

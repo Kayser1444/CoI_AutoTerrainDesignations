@@ -12,9 +12,12 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
 2. [Lazy unavoidable-landscaping heuristic](accessway-pathfinding-lazy-landscaping-heuristic.md),
    evaluated only after the envelope; later restrict its relaxed frontier to
    eligible V origins if measurements justify it
-
-Harmonize V1 and V2
-Roadmap
+3. [V1 ground-to-V optimization backport](accessway-v1-ground-to-v-optimization.md)
+   is implemented; live measurement remains before considering monotonic
+   profile-proof reuse.
+4. [V2 deterministic ground-to-V handoff](accessway-v2-ground-to-v-grid-prefilter.md)
+   replaces reverse corridor BFS with an every-G, pre-enumerated profile test
+   and parallel post-work cardinal proofs from the future V face back to G.
 
 * Landscaping rebate when digging useful oreemaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
 

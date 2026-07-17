@@ -906,7 +906,17 @@ namespace AutoTerrainDesignations
                                 tile, isTree: false, isDenseDebris: true,
                                 isRemovable: orderedCleanupOrigins.Length > 0,
                                 cleanupObjectKey: BuildPropCleanupKey(prop.Id),
-                                eligibleCleanupOrigins: orderedCleanupOrigins);
+                                eligibleCleanupOrigins: orderedCleanupOrigins,
+                                dumpBurialProbeTile: prop.Position.Tile2i,
+                                dumpBurialProbeOffsetX:
+                                    prop.PositionWithinTile.X.ToFloat(),
+                                dumpBurialProbeOffsetY:
+                                    prop.PositionWithinTile.Y.ToFloat(),
+                                placedHeight:
+                                    prop.PlacedAtHeight.Value.ToFloat(),
+                                dumpBurialThreshold:
+                                    prop.Proto.DespawnBuriedThreshold
+                                        .ScaledBy(prop.Scale).Value.ToFloat());
                             AccessPropBlockerKind blocker = AddCleanupSample(
                                 tower,
                                 origin,
@@ -1520,8 +1530,8 @@ namespace AutoTerrainDesignations
             double ticksToMs = 1000d / Stopwatch.Frequency;
             string diagnostics =
                 $"expansions=[G:{diag.GroundExpansions},V:{diag.OriginExpansions}] " +
-                $"ground=[checks:{diag.GroundSuccessorChecks},relax:{diag.GroundRelaxations},cleanupChecks:{diag.CleanupGroundSuccessorChecks},cleanupRelax:{diag.CleanupGroundRelaxations}] " +
-                $"generated=[neighbors:{diag.OriginNeighborChecks},modes:{diag.GeneratedModeAttempts},g2vOrigins:{diag.GroundToGeneratedOriginChecks},g2vProfiles:{diag.GroundToGeneratedProfileAttempts},g2vNoHandoff:{diag.GroundToGeneratedHandoffFailures},relax:{diag.GeneratedRelaxations}] " +
+                $"ground=[checks:{diag.GroundSuccessorChecks},relax:{diag.GroundRelaxations},cleanupChecks:{diag.CleanupGroundSuccessorChecks},cleanupRelax:{diag.CleanupGroundRelaxations},suffix:{diag.V1GroundSuffixSuccesses}/{diag.V1GroundSuffixAttempts},suffixFallback:{diag.V1GroundSuffixFallbacks},suffixSteps:{diag.V1GroundSuffixSteps}] " +
+                $"generated=[neighbors:{diag.OriginNeighborChecks},modes:{diag.GeneratedModeAttempts},g2vOrigins:{diag.GroundToGeneratedOriginChecks},g2vProfiles:{diag.GroundToGeneratedProfileAttempts},g2vNoHandoff:{diag.GroundToGeneratedHandoffFailures},g2vDirectLevel:{diag.V1GroundToVDirectLevelingAccepts},relax:{diag.GeneratedRelaxations}] " +
                 $"profile=[checks:{diag.GeneratedProfileFeasibleChecks},fail:{diag.GeneratedProfileFeasibleFailures},historyFail:{diag.GeneratedPathHistoryFailures}] " +
                 $"hull=[checks:{diag.HeightEnvelopeChecks},above:{diag.HeightEnvelopeAboveRejections},below:{diag.HeightEnvelopeBelowRejections},missing:{diag.HeightEnvelopeMissingSamples}] " +
                 $"sideRay=[checks:{diag.SideRayCostChecks},reject:{diag.SideRayCostRejections},samples:{diag.SideRayCostSamples},cacheHit:{diag.SideRayCacheHits},cacheMiss:{diag.SideRayCacheMisses},historyReuse:{diag.GeneratedHistoryCostReuses},historyRecalc:{diag.GeneratedHistoryCostRecalculations}] " +
@@ -1530,6 +1540,7 @@ namespace AutoTerrainDesignations
                 $"fixed=[checks:{diag.FixedProfileSuccessorChecks},relax:{diag.FixedProfileRelaxations}] " +
                 $"goals=[pops:{diag.GoalPops},rejected:{diag.GoalRejected},acceptedAt:{diag.GoalAcceptedAtVisited}] " +
                 $"queue=[relax:{diag.QueueRelaxations},stale:{diag.QueueStalePops}] " +
+                $"v1HandoffDominance=[success:{diag.V1HandoffDominanceSuccesses},prune:{diag.V1HandoffDominancePrunes}] " +
                 $"timingMs=[ground:{(diag.GroundExpansionTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                 $"origin:{(diag.OriginExpansionTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
                 $"profile:{(diag.ProfileFeasibilityTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}," +
@@ -1543,17 +1554,16 @@ namespace AutoTerrainDesignations
                     $" v2Expand=[G:{diag.V2GroundExpansions},V:{diag.V2BandExpansions}] " +
                     $"v2Suffix=[attempts:{diag.V2GroundSuffixAttempts},success:{diag.V2GroundSuffixSuccesses}," +
                     $"fallback:{diag.V2GroundSuffixFallbacks},steps:{diag.V2GroundSuffixSteps}] " +
-                    $"v2G2V=[calls:{diag.V2GroundToVCalls},seeds:{diag.V2GroundToVSeedCalls}," +
+                    $"v2G2V=[calls:{diag.V2GroundToVCalls},areaReject:{diag.V2GroundToVTowerAreaRejects},seeds:{diag.V2GroundToVSeedCalls}," +
                     $"extensions:{diag.V2GroundToVSeedExtensions},anchors:{diag.V2GroundToVAnchorCandidates}," +
-                    $"profiles:{diag.V2GroundToVProfileCandidates},cacheHits:{diag.V2GroundToVCacheHits}," +
+                    $"profiles:{diag.V2GroundToVProfileCandidates}," +
                     $"directLevel:{diag.V2GroundToVDirectLevelingAccepts}," +
-                    $"monotonic:{diag.V2GroundToVMonotonicAccepts}] " +
-                    $"v2Monotonic=[proofs:{diag.V2GroundToVMonotonicProofsEstablished}," +
-                    $"candidates:{diag.V2GroundToVMonotonicCandidates},attempts:{diag.V2GroundToVMonotonicAttempts}," +
-                    $"cacheSkip:{diag.V2GroundToVMonotonicCacheSkips},prefilterReject:{diag.V2GroundToVMonotonicPrefilterRejects}," +
-                    $"transitionReject:{diag.V2GroundToVMonotonicTransitionRejects}," +
-                    $"geometryReject:{diag.V2GroundToVMonotonicGeometryRejects},emitReject:{diag.V2GroundToVMonotonicEmitRejects}] " +
+                    $"rough:{diag.V2GroundToVRoughAccepts},cacheHit:{diag.V2GroundToVCacheHits}," +
+                    $"cacheAdd:{diag.V2GroundToVCacheInsertions},face:{diag.V2GroundToVFaceChecks}," +
+                    $"faceReject:{diag.V2GroundToVFaceRejects},steps:{diag.V2GroundToVBridgeSteps}," +
+                    $"stepReject:{diag.V2GroundToVBridgeRejects},propReject:{diag.V2GroundToVPropRejects}] " +
                     $"v2Handoff=[evaluations:{diag.V2HandoffEvaluations},quick:{diag.V2QuickHandoffAccepts}," +
+                    $"dominanceSuccess:{diag.V2HandoffDominanceSuccesses},dominancePrune:{diag.V2HandoffDominancePrunes}," +
                     $"pairs:{diag.V2HandoffPairChecks},mixedRejected:{diag.V2MixedLanePairRejects}," +
                     $"leveling:{diag.V2LevelingBridgeAccepts}," +
                     $"corridors:{diag.V2CorridorAttempts},centerChecks:{diag.V2CorridorCenterChecks}," +
@@ -1787,7 +1797,7 @@ namespace AutoTerrainDesignations
             bool selected = useV2CornerCrestRule
                 ? TryGetV2DirectionalCornerCrestHandoff(
                     origin, profile, predecessorOrigin, terrMgr,
-                    groundNodes.Contains,
+                    terrainPathableWithoutProps.Contains,
                     out handoffEdge, out operation, out fulfilledBitmap,
                     out directionalDiagnostic)
                 : TryGetDirectionalHandoff(
@@ -1974,7 +1984,8 @@ namespace AutoTerrainDesignations
                 selected = TrySelectV2CornerCrestHandoff(
                     first.Origin, first.Profile,
                     last.Origin, last.Profile,
-                    handoffEdge, terrMgr, groundNodes.Contains,
+                    handoffEdge, terrMgr,
+                    terrainPathableWithoutProps.Contains,
                     out operation, out fulfilledBitmap, out _);
             }
             else if (useCornerSeamRule)
@@ -2236,11 +2247,29 @@ namespace AutoTerrainDesignations
                         CreateDesignationData(origin, profile), terrMgr,
                         operation, tile);
             if (operation == AccessHandoffOperation.Dumping)
-                return IsExperimentalAccessGroundOrCleanupCenter(
-                        groundNodes, propCleanupByTile, tile)
-                    || IsHandoffWorkTile(origin,
+            {
+                if (IsExperimentalAccessGroundOrCleanupCenter(
+                        groundNodes, propCleanupByTile, tile))
+                    return true;
+                if (!IsHandoffWorkTile(origin,
                         CreateDesignationData(origin, profile), terrMgr,
-                        operation, tile);
+                        operation, tile))
+                    return false;
+                if (!propCleanupByTile.TryGetValue(
+                        tile, out AccessPropCleanupInfo cleanup))
+                    return true;
+                var checkedProps = new HashSet<string>(StringComparer.Ordinal);
+                for (int index = 0; index < cleanup.Samples.Count; index++)
+                {
+                    AccessPropSample sample = cleanup.Samples[index];
+                    if (sample.IsDenseDebris
+                        && checkedProps.Add(sample.CleanupObjectKey)
+                        && !AccessSearchSnapshot.DoesDumpingBuryProp(
+                            origin, profile, sample))
+                        return false;
+                }
+                return true;
+            }
             return false;
         }
 
@@ -2464,6 +2493,35 @@ namespace AutoTerrainDesignations
                 + "] outgoing=["
                 + string.Join(",", outgoingCorners) + "]";
 
+            if (AccessPathSearch.IsSmoothLevelHandoffFace(
+                    outgoingEdgeSigns))
+            {
+                uint smoothFaceMask = 0;
+                bool smoothFacePathable = true;
+                for (int offset = 0;
+                    offset < outgoingEdgeSigns.Length;
+                    offset++)
+                {
+                    GetHandoffLaneCoordinates(
+                        handoffEdge, offset,
+                        out int x, out int y, out _, out _);
+                    Tile2i bridge = outgoingOrigin + new RelTile2i(x, y);
+                    if (!bridgeTilePathable(bridge))
+                    {
+                        smoothFacePathable = false;
+                        break;
+                    }
+                    smoothFaceMask |= GetDesignationMask(x, y);
+                }
+                if (smoothFacePathable)
+                {
+                    operation = AccessHandoffOperation.Leveling;
+                    fulfilledBitmap = smoothFaceMask;
+                    diagnostic += " smoothLeveling=true";
+                    return true;
+                }
+            }
+
             uint levelBridgeMask = 0;
             for (int offset = 0; offset < outgoingEdgeSigns.Length; offset++)
             {
@@ -2613,7 +2671,7 @@ namespace AutoTerrainDesignations
             // legitimate leveling handoff, even when the profile body contains
             // terrain work. Leveling is also the appropriate prop-clearing
             // operation for that seam.
-            if (outgoingSigns[0] == 0 && outgoingSigns[4] == 0)
+            if (AccessPathSearch.IsSmoothLevelHandoffFace(outgoingSigns))
             {
                 operation = AccessHandoffOperation.Leveling;
                 fulfilledBitmap = BuildHandoffEdgeMask(handoffEdge);

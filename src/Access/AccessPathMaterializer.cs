@@ -212,8 +212,11 @@ namespace AutoTerrainDesignations.Access
                                 : generatedCleanup;
                         if (!hasTerrainDelta)
                             MergeCleanupInfo(cleanupByOrigin, approvedGeneratedCleanup);
-                        else if (terminalOperation == AccessHandoffOperation.Dumping)
-                            MergeCleanupInfo(cleanupByOrigin, approvedGeneratedCleanup);
+                        else if (terminalOperation == AccessHandoffOperation.Dumping
+                            && TryBuildDumpingCleanupInfo(
+                                approvedGeneratedCleanup, node.Position,
+                                profile, out AccessPropCleanupInfo dumpingCleanup))
+                            MergeCleanupInfo(cleanupByOrigin, dumpingCleanup);
                         else if (TryBuildTreeOnlyCleanupInfo(
                             approvedGeneratedCleanup, out AccessPropCleanupInfo treeCleanup))
                             MergeCleanupInfo(cleanupByOrigin, treeCleanup);
@@ -390,19 +393,19 @@ namespace AutoTerrainDesignations.Access
                         continue;
                     if (terrainWorkOrigins.Contains(cleanup.Origin))
                     {
-                        bool dumpingNeedsSideCleanup =
-                            operations.TryGetValue(
+                        AccessHeightProfile profile = default;
+                        bool isDumping = operations.TryGetValue(
                                 cleanup.Origin,
                                 out AccessHandoffOperation operation)
                             && operation == AccessHandoffOperation.Dumping
                             && route.GeneratedProfiles.TryGetValue(
                                 cleanup.Origin,
-                                out AccessHeightProfile profile)
-                            && !snapshot.DoesV2HandoffOperationWorkCenter(
-                                cleanup.Origin, profile,
-                                AccessHandoffOperation.Dumping, center);
-                        if (dumpingNeedsSideCleanup)
-                            MergeCleanupInfo(cleanupByOrigin, cleanup);
+                                out profile);
+                        if (isDumping
+                            && TryBuildDumpingCleanupInfo(
+                                cleanup, cleanup.Origin, profile,
+                                out AccessPropCleanupInfo dumpingCleanup))
+                            MergeCleanupInfo(cleanupByOrigin, dumpingCleanup);
                         else if (TryBuildTreeOnlyCleanupInfo(
                                      cleanup,
                                      out AccessPropCleanupInfo trees))
@@ -507,6 +510,37 @@ namespace AutoTerrainDesignations.Access
                     usesTerrainRemovalPolicy:
                         cleanupInfo.UsesTerrainRemovalPolicy);
             return treeCleanupInfo.IsEligible;
+        }
+
+        private static bool TryBuildDumpingCleanupInfo(
+            AccessPropCleanupInfo cleanupInfo,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            out AccessPropCleanupInfo dumpingCleanupInfo)
+        {
+            if (cleanupInfo.Samples.Count == 0)
+            {
+                dumpingCleanupInfo = cleanupInfo;
+                return cleanupInfo.IsEligible;
+            }
+
+            AccessPropSample[] retained = cleanupInfo.Samples
+                .Where(sample => sample.IsTree
+                    || sample.IsDenseDebris
+                        && !AccessSearchSnapshot.DoesDumpingBuryProp(
+                            origin, profile, sample))
+                .ToArray();
+            if (retained.Length == 0)
+            {
+                dumpingCleanupInfo = AccessPropCleanupInfo.Clear(
+                    cleanupInfo.Origin);
+                return false;
+            }
+            dumpingCleanupInfo = AccessPropCleanupPolicy.BuildOriginInfo(
+                cleanupInfo.Origin, retained,
+                usesTerrainRemovalPolicy:
+                    cleanupInfo.UsesTerrainRemovalPolicy);
+            return dumpingCleanupInfo.IsEligible;
         }
 
         private static AccessDesignationPlan Invalid(string reason, AccessSearchResult result,
