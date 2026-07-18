@@ -180,6 +180,30 @@
     "Steuert, wie vorsichtig ATD Erdrutsche vorhersagt und welchen Abstand es zu geschützten Ozeanen und Gebäuden hält. Höhere Stufen reservieren mehr Platz; niedrigere Stufen erlauben Geländearbeiten näher an Gefahren. Standard: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: Neigungsfaktor der Erdrutschprognose {1}; Schutzabstand {2} Kacheln."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Minimal"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Niedrig"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Ausgeglichen"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Hoch"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Maximal"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Kosten für die Geländeausweisung"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Minimale Anzahl verbundener Markierungskacheln, damit ein Cluster den Isolationsfilter übersteht."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minimale Erzmächtigkeit {1:0.##} Geländekacheln; minimale Bodendichte {2:P0}; minimale Erzreinheit {3:P0}; minimale Clustergröße {4} verbundene Kacheln."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Aus"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Niedrig"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Mittel"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Hoch"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximum"
   ],
   [
     "settings.corner_mode.label",

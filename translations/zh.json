@@ -180,6 +180,30 @@
     "控制 ATD 预测山体滑坡的谨慎程度以及与受保护的海洋和建筑物的距离。更高的政策预留更多的空间；较低的政策允许地形更接近危险。默认值：BAL。"
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}：滑坡预测坡度系数 {1}；保护缓冲区 {2} 个地块。"
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "最低"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "低"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "平衡"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "高"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "最高"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "地形指定成本"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "连通指定格数量达到此值的矿簇才会通过孤立过滤器。"
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}：最低矿石高度 {1:0.##} 个地形格；最低底部密度 {2:P0}；最低矿石纯度 {3:P0}；最小连通矿簇大小 {4} 个地形格。"
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "关闭"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "低"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "中"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "高"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "最高"
   ],
   [
     "settings.corner_mode.label",

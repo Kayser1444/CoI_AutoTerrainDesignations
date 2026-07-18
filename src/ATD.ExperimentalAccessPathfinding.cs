@@ -652,8 +652,8 @@ namespace AutoTerrainDesignations
                             completedEnvelope.Diagnostics;
                         LogExperimentalAccessDebug(
                             "[ATD Access Height Envelope] build=complete v1Pruning=on v2Pruning=on "
-                            + "sourcePolicy=allFixedSnapshot "
-                            + "allowance=[v1Upper:"
+                            + "sourcePolicy=allFixedSnapshot+requestTargetExtension "
+                            + "targetExtension=[v1Upper:"
                             + (completedEnvelope.V1UpperAllowance32 / 32d).ToString(
                                 "0.#####", CultureInfo.InvariantCulture)
                             + ",v1Lower:"

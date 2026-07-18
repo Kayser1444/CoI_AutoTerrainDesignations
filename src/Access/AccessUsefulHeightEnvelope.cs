@@ -64,18 +64,18 @@ namespace AutoTerrainDesignations.Access
 
         private readonly int[] m_upperHeight32;
         private readonly int[] m_lowerHeight32;
-        private readonly int m_v1LowerAllowance32;
-        private readonly int m_v2LowerAllowance32;
-        private readonly int m_v1UpperAllowance32;
-        private readonly int m_v2UpperAllowance32;
+        private readonly int m_v1LowerTargetExtension32;
+        private readonly int m_v2LowerTargetExtension32;
+        private readonly int m_v1UpperTargetExtension32;
+        private readonly int m_v2UpperTargetExtension32;
 
         public Tile2i Min { get; }
         public int Width { get; }
         public int Height { get; }
-        public int V1LowerAllowance32 => m_v1LowerAllowance32;
-        public int V2LowerAllowance32 => m_v2LowerAllowance32;
-        public int V1UpperAllowance32 => m_v1UpperAllowance32;
-        public int V2UpperAllowance32 => m_v2UpperAllowance32;
+        public int V1LowerAllowance32 => m_v1LowerTargetExtension32;
+        public int V2LowerAllowance32 => m_v2LowerTargetExtension32;
+        public int V1UpperAllowance32 => m_v1UpperTargetExtension32;
+        public int V2UpperAllowance32 => m_v2UpperTargetExtension32;
         public AccessUsefulHeightEnvelopeDiagnostics Diagnostics { get; }
 
         private AccessUsefulHeightEnvelope(
@@ -95,10 +95,10 @@ namespace AutoTerrainDesignations.Access
             Height = height;
             m_upperHeight32 = upperHeight32;
             m_lowerHeight32 = lowerHeight32;
-            m_v1LowerAllowance32 = v1LowerAllowance32;
-            m_v2LowerAllowance32 = v2LowerAllowance32;
-            m_v1UpperAllowance32 = v1UpperAllowance32;
-            m_v2UpperAllowance32 = v2UpperAllowance32;
+            m_v1LowerTargetExtension32 = v1LowerAllowance32;
+            m_v2LowerTargetExtension32 = v2LowerAllowance32;
+            m_v1UpperTargetExtension32 = v1UpperAllowance32;
+            m_v2UpperTargetExtension32 = v2UpperAllowance32;
             Diagnostics = diagnostics;
         }
 
@@ -126,24 +126,18 @@ namespace AutoTerrainDesignations.Access
             int centerHeight32,
             out string rejection)
             => IsCenterHeightUseful(
-                center, centerHeight32, m_v1LowerAllowance32,
-                m_v1UpperAllowance32,
-                out rejection);
+                center, centerHeight32, out rejection);
 
         public bool IsV2CenterHeightUseful(
             Tile2i center,
             int centerHeight32,
             out string rejection)
             => IsCenterHeightUseful(
-                center, centerHeight32, m_v2LowerAllowance32,
-                m_v2UpperAllowance32,
-                out rejection);
+                center, centerHeight32, out rejection);
 
         private bool IsCenterHeightUseful(
             Tile2i center,
             int centerHeight32,
-            int lowerAllowance32,
-            int upperAllowance32,
             out string rejection)
         {
             if (!TryGetBand(center, out int lowerHeight32, out int upperHeight32))
@@ -151,12 +145,12 @@ namespace AutoTerrainDesignations.Access
                 rejection = "HeightEnvelopeMissingSample";
                 return true;
             }
-            if ((long)centerHeight32 > (long)upperHeight32 + upperAllowance32)
+            if (centerHeight32 > upperHeight32)
             {
                 rejection = "HeightEnvelopeAbove";
                 return false;
             }
-            if ((long)centerHeight32 < (long)lowerHeight32 - lowerAllowance32)
+            if (centerHeight32 < lowerHeight32)
             {
                 rejection = "HeightEnvelopeBelow";
                 return false;
@@ -164,6 +158,87 @@ namespace AutoTerrainDesignations.Access
 
             rejection = string.Empty;
             return true;
+        }
+
+        /// <summary>
+        /// Returns a request-local strict hull whose fixed targets have been
+        /// extended vertically before cone propagation. This localizes the
+        /// flat turn-landing exception to the target approach instead of
+        /// admitting the same excess height at every generated center.
+        /// </summary>
+        public AccessUsefulHeightEnvelope WithExtendedFixedTargets(
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
+            IEnumerable<Tile2i> targetOrigins,
+            bool useV2)
+        {
+            int lowerExtension32 = useV2
+                ? m_v2LowerTargetExtension32
+                : m_v1LowerTargetExtension32;
+            int upperExtension32 = useV2
+                ? m_v2UpperTargetExtension32
+                : m_v1UpperTargetExtension32;
+            if (lowerExtension32 == 0 && upperExtension32 == 0)
+                return this;
+
+            var targets = new List<KeyValuePair<Tile2i, AccessHeightProfile>>();
+            var seen = new HashSet<Tile2i>();
+            foreach (Tile2i origin in targetOrigins)
+                if (seen.Add(origin)
+                    && fixedProfiles.TryGetValue(
+                        origin, out AccessHeightProfile profile))
+                    targets.Add(new KeyValuePair<Tile2i, AccessHeightProfile>(
+                        origin, profile));
+            if (targets.Count == 0)
+                return this;
+
+            int[] upperHeight32 = (int[])m_upperHeight32.Clone();
+            int[] lowerHeight32 = (int[])m_lowerHeight32.Clone();
+            bool changedUpper = false;
+            bool changedLower = false;
+            foreach (KeyValuePair<Tile2i, AccessHeightProfile> target in targets)
+            {
+                Tile2i origin = target.Key;
+                AccessHeightProfile profile = target.Value;
+                for (int y = 0; y <= 4; y++)
+                {
+                    for (int x = 0; x <= 4; x++)
+                    {
+                        Tile2i tile = origin + new RelTile2i(x, y);
+                        if (!TryGetIndex(tile, Min, Width, Height, out int index))
+                            continue;
+                        int height32 = profile.GetHeight2NumeratorAt(x, y);
+                        if (upperExtension32 > 0)
+                        {
+                            int extended = SaturatingAdd(
+                                height32, upperExtension32);
+                            if (extended > upperHeight32[index])
+                            {
+                                upperHeight32[index] = extended;
+                                changedUpper = true;
+                            }
+                        }
+                        if (lowerExtension32 > 0)
+                        {
+                            int extended = SaturatingAdd(
+                                height32, -(long)lowerExtension32);
+                            if (extended < lowerHeight32[index])
+                            {
+                                lowerHeight32[index] = extended;
+                                changedLower = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (!changedUpper && !changedLower)
+                return this;
+            if (changedUpper) RelaxUpper(upperHeight32, Width, Height);
+            if (changedLower) RelaxLower(lowerHeight32, Width, Height);
+            return new AccessUsefulHeightEnvelope(
+                Min, Width, Height, upperHeight32, lowerHeight32,
+                m_v1LowerTargetExtension32, m_v2LowerTargetExtension32,
+                m_v1UpperTargetExtension32, m_v2UpperTargetExtension32,
+                Diagnostics);
         }
 
         public static bool TryCreate(
@@ -344,16 +419,34 @@ namespace AutoTerrainDesignations.Access
                     + ",upper=" + upperHeight32;
                 return false;
             }
-            if (!envelope.IsV1CenterHeightUseful(new Tile2i(8, 2), 112, out _))
+            if (!envelope.IsV1CenterHeightUseful(new Tile2i(8, 2), 96, out _))
             {
-                failure = "UpperAllowanceBoundaryRejected";
+                failure = "StrictUpperBoundaryRejected";
                 return false;
             }
             bool acceptedAbove = envelope.IsV1CenterHeightUseful(
-                new Tile2i(8, 2), 113, out string rejection);
+                new Tile2i(8, 2), 97, out string rejection);
             if (acceptedAbove || rejection != "HeightEnvelopeAbove")
             {
                 failure = "CenterRejectionMismatch:" + rejection;
+                return false;
+            }
+
+            AccessUsefulHeightEnvelope extended =
+                envelope.WithExtendedFixedTargets(
+                    fixedProfiles, new[] { Tile2i.Zero }, useV2: false);
+            if (!extended.TryGetBand(
+                    new Tile2i(8, 2), out int extendedLower32,
+                    out int extendedUpper32)
+                || extendedLower32 != 0
+                || extendedUpper32 != 112
+                || !extended.IsV1CenterHeightUseful(
+                    new Tile2i(8, 2), 112, out _)
+                || extended.IsV1CenterHeightUseful(
+                    new Tile2i(8, 2), 113, out _))
+            {
+                failure = "TargetExtensionMismatch:lower=" + extendedLower32
+                    + ",upper=" + extendedUpper32;
                 return false;
             }
 
@@ -387,6 +480,14 @@ namespace AutoTerrainDesignations.Access
 
         private static int ToLowerHeight32(float height)
             => checked((int)Math.Floor((double)height * 32d));
+
+        private static int SaturatingAdd(int value, long delta)
+        {
+            long result = (long)value + delta;
+            if (result > int.MaxValue) return int.MaxValue;
+            if (result < int.MinValue) return int.MinValue;
+            return (int)result;
+        }
 
         private static void RelaxUpper(int[] upperHeight32, int width, int height)
         {

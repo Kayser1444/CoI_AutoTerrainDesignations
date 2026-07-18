@@ -180,6 +180,30 @@
     "Определяет, насколько осторожно ATD прогнозирует оползни и какое расстояние сохраняет до защищаемого океана и зданий. Более высокие уровни резервируют больше места; более низкие позволяют проводить земляные работы ближе к опасным зонам. По умолчанию: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: коэффициент уклона для прогнозирования оползней — {1}; буфер безопасности — {2} тайл."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Минимум"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Низкий"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Сбалансированный"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Высокий"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Максимум"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Стоимость обозначения местности"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Минимальное число соединенных клеток обозначения, чтобы кластер прошел фильтр изоляции."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: минимальная мощность руды — {1:0.##} тайлов; минимальная плотность нижнего слоя — {2:P0}; минимальная чистота руды — {3:P0}; минимальный размер кластера — {4} соединённых тайла."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Отключено"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Низкий"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Средний"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Высокий"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Максимальный"
   ],
   [
     "settings.corner_mode.label",

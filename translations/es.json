@@ -180,6 +180,30 @@
     "Controla con qué cautela ATD predice los deslizamientos y la distancia que mantiene respecto a océanos y edificios protegidos. Los niveles superiores reservan más espacio; los inferiores permiten trabajar el terreno más cerca de los peligros. Predeterminado: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: factor de pendiente para la predicción de deslizamientos {1}; margen de seguridad {2} casillas."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Mínimo"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Bajo"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Equilibrado"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Alto"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Máximo"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Costo de designación del terreno"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Cantidad mínima de casillas de designación conectadas para que un grupo sobreviva al filtro de aislamiento."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altura mínima del mineral {1:0.##} casillas de terreno; densidad mínima inferior {2:P0}; pureza mínima del mineral {3:P0}; tamaño mínimo del grupo {4} casillas conectadas."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Desactivado"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Bajo"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Máximo"
   ],
   [
     "settings.corner_mode.label",

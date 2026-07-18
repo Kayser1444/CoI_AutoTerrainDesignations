@@ -180,6 +180,30 @@
     "Controlla la cautela con cui ATD prevede le frane e la distanza che mantiene dagli oceani e dagli edifici protetti. Politiche più elevate riservano più spazio; politiche più basse consentono di lavorare sul terreno più vicino ai pericoli. Predefinito: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: fattore di pendenza per la previsione delle frane {1}; distanza di sicurezza {2} caselle."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Minimo"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Basso"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Bilanciato"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Alto"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Massimo"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Costo della designazione del terreno"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Numero minimo di caselle di designazione connesse perché un gruppo superi il filtro di isolamento."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altezza minima del minerale {1:0.##} caselle di terreno; densità minima inferiore {2:P0}; purezza minima del minerale {3:P0}; dimensione minima del gruppo {4} caselle connesse."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Disattivato"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Basso"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Massimo"
   ],
   [
     "settings.corner_mode.label",

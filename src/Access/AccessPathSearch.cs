@@ -1569,6 +1569,11 @@ namespace AutoTerrainDesignations.Access
                 if (request.V2Endpoints.Starts.Count == 0)
                     return AccessPathSearchSession.Completed(Failed(
                         "NoWidth2StartCompanion", start, 0, rejections));
+                AccessUsefulHeightEnvelope? requestHeightEnvelope =
+                    BuildRequestUsefulHeightEnvelope(
+                        request.Snapshot,
+                        request.Goal.FixedProfileNodes,
+                        useV2: true);
                 bool useV2AStar = ShouldUseV2AStar(request);
                 AccessV2PotentialField? v2Potential = useV2AStar
                     ? new AccessV2PotentialField(
@@ -1635,7 +1640,7 @@ namespace AutoTerrainDesignations.Access
                         request.Snapshot.GetTerrainCenterHeight2,
                     groundToVMinimumGeneratedCost:
                         2f * GeneratedVFixedOverhead,
-                    usefulHeightEnvelope: request.Snapshot.UsefulHeightEnvelope,
+                    usefulHeightEnvelope: requestHeightEnvelope,
                     generatedOriginValidator: request.Snapshot.IsOriginInside,
                     diagnostics: diagnostics,
                     preciseTerrainHeightProvider: tile =>
@@ -1705,6 +1710,11 @@ namespace AutoTerrainDesignations.Access
                 return AccessPathSearchSession.Completed(Failed("NoStartProfile", startOrigin, 0, rejections));
             if (snapshot.IsProfileOceanBlocked(startOrigin, startProfile))
                 return AccessPathSearchSession.Completed(Failed("OceanStartBelowMinimum", startOrigin, 0, rejections));
+            AccessUsefulHeightEnvelope? requestHeightEnvelope =
+                BuildRequestUsefulHeightEnvelope(
+                    snapshot,
+                    fixedGoalOrigins ?? (IEnumerable<Tile2i>)Array.Empty<Tile2i>(),
+                    useV2: false);
 
             var goalsByHeight2 = new Dictionary<int, List<Tile2i>>();
             if (includeGroundGoals)
@@ -1749,20 +1759,30 @@ namespace AutoTerrainDesignations.Access
             string lastGoalRejectionReason = string.Empty;
             float lastRejectedGoalCost = 0f;
 
-            ExpandOrigin(snapshot, startNode, startProfile, 0f,
+            ExpandOrigin(snapshot, requestHeightEnvelope,
+                startNode, startProfile, 0f,
                 distance, previous, generatedHistory, queue, rejections,
                 useAStarHeuristic, goalIndex, diagnostics, handoffDominance);
 
             if (queue.Count == 0)
                 return AccessPathSearchSession.Completed(Failed("NoInitialSuccessor", startOrigin, 0, rejections));
 
-            return new AccessPathSearchSession(snapshot, startOrigin, startNode,
+            return new AccessPathSearchSession(snapshot, requestHeightEnvelope,
+                startOrigin, startNode,
                 fixedGoalOrigins, includeGroundGoals, rejectGoal,
                 useAStarHeuristic, goalIndex, maxCostLimit,
                 distance, previous, generatedHistory, queue, rejections, diagnostics, lastRejectedGoalPath,
                 lastGoalRejectionReason, lastRejectedGoalCost,
                 handoffDominance);
         }
+
+        private static AccessUsefulHeightEnvelope?
+            BuildRequestUsefulHeightEnvelope(
+                AccessSearchSnapshot snapshot,
+                IEnumerable<Tile2i> fixedGoalOrigins,
+                bool useV2)
+            => snapshot.UsefulHeightEnvelope?.WithExtendedFixedTargets(
+                snapshot.FixedProfiles, fixedGoalOrigins, useV2);
 
         internal static bool ShouldUseV2AStar(AccessPathRequest request)
             => request.RequiredWidth == 2
@@ -1777,6 +1797,7 @@ namespace AutoTerrainDesignations.Access
         {
             private readonly AccessV2SearchSession? m_v2Session;
             private readonly AccessSearchSnapshot m_snapshot;
+            private readonly AccessUsefulHeightEnvelope? m_usefulHeightEnvelope;
             private readonly Tile2i m_startOrigin;
             private readonly AccessSearchNode m_startNode;
             private readonly HashSet<Tile2i>? m_fixedGoalOrigins;
@@ -1830,6 +1851,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_v2Session = null;
                 m_snapshot = null!;
+                m_usefulHeightEnvelope = null;
                 m_startOrigin = result.StartOrigin;
                 m_startNode = default;
                 m_fixedGoalOrigins = null;
@@ -1854,6 +1876,7 @@ namespace AutoTerrainDesignations.Access
 
             internal AccessPathSearchSession(
                 AccessSearchSnapshot snapshot,
+                AccessUsefulHeightEnvelope? usefulHeightEnvelope,
                 Tile2i startOrigin,
                 AccessSearchNode startNode,
                 HashSet<Tile2i>? fixedGoalOrigins,
@@ -1875,6 +1898,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_v2Session = null;
                 m_snapshot = snapshot;
+                m_usefulHeightEnvelope = usefulHeightEnvelope;
                 m_startOrigin = startOrigin;
                 m_startNode = startNode;
                 m_fixedGoalOrigins = fixedGoalOrigins;
@@ -2010,14 +2034,16 @@ namespace AutoTerrainDesignations.Access
                             m_lastRejectedGoalCost = suffixCandidate.Cost;
                         }
                         long phaseStart = AtdDiagnostics.Timestamp();
-                        ExpandGround(m_snapshot, current, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
+                        ExpandGround(m_snapshot, m_usefulHeightEnvelope,
+                            current, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
                             m_useAStarHeuristic, m_goalIndex, m_diagnostics);
                         m_diagnostics.GroundExpansionTicks += AtdDiagnostics.ElapsedSince(phaseStart);
                     }
                     else if (TryGetProfile(m_snapshot, current, out AccessHeightProfile currentProfile))
                     {
                         long phaseStart = AtdDiagnostics.Timestamp();
-                        ExpandOrigin(m_snapshot, current, currentProfile, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
+                        ExpandOrigin(m_snapshot, m_usefulHeightEnvelope,
+                            current, currentProfile, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
                             m_useAStarHeuristic, m_goalIndex, m_diagnostics,
                             m_handoffDominance);
                         m_diagnostics.OriginExpansionTicks += AtdDiagnostics.ElapsedSince(phaseStart);
@@ -2262,6 +2288,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_v2Session = v2Session;
                 m_snapshot = null!;
+                m_usefulHeightEnvelope = null;
                 m_startOrigin = startOrigin;
                 m_startNode = default;
                 m_fixedGoalOrigins = null;
@@ -2305,7 +2332,10 @@ namespace AutoTerrainDesignations.Access
             return best;
         }
 
-        private static void ExpandOrigin(AccessSearchSnapshot snapshot, AccessSearchNode current,
+        private static void ExpandOrigin(
+            AccessSearchSnapshot snapshot,
+            AccessUsefulHeightEnvelope? usefulHeightEnvelope,
+            AccessSearchNode current,
             AccessHeightProfile currentProfile, float currentCost,
             Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous,
@@ -2827,13 +2857,16 @@ namespace AutoTerrainDesignations.Access
                     Reject(rejections, "OriginRevisit");
                     continue;
                 }
-                AddOriginSuccessors(snapshot, current.Position, currentProfile, nextOrigin, direction,
+                AddOriginSuccessors(snapshot, usefulHeightEnvelope,
+                    current.Position, currentProfile, nextOrigin, direction,
                     current, true, currentCost, distance, previous, generatedHistory, queue, rejections, useAStarHeuristic,
                     goalIndex, diagnostics, !previous.ContainsKey(current));
             }
         }
 
-        private static void AddOriginSuccessors(AccessSearchSnapshot snapshot,
+        private static void AddOriginSuccessors(
+            AccessSearchSnapshot snapshot,
+            AccessUsefulHeightEnvelope? usefulHeightEnvelope,
             Tile2i currentOrigin, AccessHeightProfile currentProfile, Tile2i nextOrigin, Tile2i direction,
             AccessSearchNode current, bool hasCurrent, float baseCost,
             Dictionary<AccessSearchNode, float> distance,
@@ -2895,7 +2928,7 @@ namespace AutoTerrainDesignations.Access
                     continue;
                 }
                 if (!IsGeneratedCenterWithinUsefulHeightEnvelope(
-                        snapshot, nextOrigin, nextProfile, diagnostics,
+                        usefulHeightEnvelope, nextOrigin, nextProfile, diagnostics,
                         out string heightEnvelopeRejection))
                 {
                     Reject(rejections, heightEnvelopeRejection);
@@ -3013,7 +3046,10 @@ namespace AutoTerrainDesignations.Access
             }
         }
 
-        private static void ExpandGround(AccessSearchSnapshot snapshot, AccessSearchNode current, float currentCost,
+        private static void ExpandGround(
+            AccessSearchSnapshot snapshot,
+            AccessUsefulHeightEnvelope? usefulHeightEnvelope,
+            AccessSearchNode current, float currentCost,
             Dictionary<AccessSearchNode, float> distance,
             Dictionary<AccessSearchNode, AccessSearchNode> previous,
             Dictionary<AccessSearchNode, GeneratedPathHistory> generatedHistory,
@@ -3162,7 +3198,7 @@ namespace AutoTerrainDesignations.Access
             {
                 diagnostics.GroundToGeneratedProfileAttempts++;
                 if (!IsGeneratedCenterWithinUsefulHeightEnvelope(
-                        snapshot, origin, profile, diagnostics,
+                        usefulHeightEnvelope, origin, profile, diagnostics,
                         out string heightEnvelopeRejection))
                 {
                     Reject(rejections, heightEnvelopeRejection);
@@ -3316,13 +3352,12 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static bool IsGeneratedCenterWithinUsefulHeightEnvelope(
-            AccessSearchSnapshot snapshot,
+            AccessUsefulHeightEnvelope? envelope,
             Tile2i origin,
             AccessHeightProfile profile,
             AccessSearchDiagnostics diagnostics,
             out string rejection)
         {
-            AccessUsefulHeightEnvelope? envelope = snapshot.UsefulHeightEnvelope;
             if (envelope == null)
             {
                 rejection = string.Empty;

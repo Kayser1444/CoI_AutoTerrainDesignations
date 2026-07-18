@@ -541,7 +541,7 @@ public static string Tt(string text) => text;
         SetAccessRaySlopeConservatism(slope);
         SetAccessRayEndBuffer(buffer);
     }
-    private static void GetSafetyPolicyParameters(
+    internal static void GetSafetyPolicyParameters(
         SafetyPolicy policy, out float slope, out int buffer)
     {
         switch (policy)

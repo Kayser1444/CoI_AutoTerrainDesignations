@@ -1326,10 +1326,11 @@ namespace AutoTerrainDesignations.Access.V2
                 .FirstOrDefault(transition => transition.Delta.Any(
                     item => item.Profile.Center2 > 0));
             if (ramp == null
-                || !AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
-                    envelope, ramp, out _))
+                || AccessV2SearchSession.IsTransitionWithinUsefulHeightEnvelope(
+                    envelope, ramp, out string rampRejection)
+                || rampRejection != "HeightEnvelopeAbove")
             {
-                failure = "V2 upper allowance must admit the first newly reached rising ramp-lane centers";
+                failure = "Strict flat-map hull must reject unsupported rising ramp-lane centers";
                 return false;
             }
 
@@ -1352,28 +1353,55 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             Tile2i allowanceSample = new Tile2i(12, 12);
-            if (!envelope.IsV1CenterHeightUseful(
-                    allowanceSample, -16, out _)
-                || envelope.IsV1CenterHeightUseful(
-                    allowanceSample, -17, out string v1Rejection)
-                || v1Rejection != "HeightEnvelopeBelow"
-                || !envelope.IsV2CenterHeightUseful(
-                    allowanceSample, -32, out _)
+            if (envelope.IsV1CenterHeightUseful(
+                    allowanceSample, -1, out string strictV1Lower)
+                || strictV1Lower != "HeightEnvelopeBelow"
                 || envelope.IsV2CenterHeightUseful(
-                    allowanceSample, -33, out string v2Rejection)
-                || v2Rejection != "HeightEnvelopeBelow"
-                || !envelope.IsV1CenterHeightUseful(
-                    allowanceSample, 16, out _)
+                    allowanceSample, -1, out string strictV2Lower)
+                || strictV2Lower != "HeightEnvelopeBelow"
                 || envelope.IsV1CenterHeightUseful(
-                    allowanceSample, 17, out string v1UpperRejection)
-                || v1UpperRejection != "HeightEnvelopeAbove"
-                || !envelope.IsV2CenterHeightUseful(
-                    allowanceSample, 32, out _)
+                    allowanceSample, 1, out string strictV1Upper)
+                || strictV1Upper != "HeightEnvelopeAbove"
                 || envelope.IsV2CenterHeightUseful(
-                    allowanceSample, 33, out string v2UpperRejection)
-                || v2UpperRejection != "HeightEnvelopeAbove")
+                    allowanceSample, 1, out string strictV2Upper)
+                || strictV2Upper != "HeightEnvelopeAbove")
             {
-                failure = "Useful-height hull must allow V1 centers 0.5 and V2 centers 1.0 beyond either bound";
+                failure = "Useful-height hull candidate checks must remain strict away from request targets";
+                return false;
+            }
+
+            Tile2i targetOrigin = new Tile2i(8, 8);
+            var targetProfiles = new Dictionary<Tile2i, AccessHeightProfile>
+            {
+                [targetOrigin] = new AccessHeightProfile(0, 0, 0, 0),
+            };
+            AccessUsefulHeightEnvelope v1TargetEnvelope =
+                envelope.WithExtendedFixedTargets(
+                    targetProfiles, new[] { targetOrigin }, useV2: false);
+            AccessUsefulHeightEnvelope v2TargetEnvelope =
+                envelope.WithExtendedFixedTargets(
+                    targetProfiles, new[] { targetOrigin }, useV2: true);
+            Tile2i targetCenter = targetOrigin + new RelTile2i(2, 2);
+            Tile2i v2ExtensionEdge = targetCenter + new RelTile2i(5, 0);
+            Tile2i outsideV2Extension = targetCenter + new RelTile2i(6, 0);
+            if (!v1TargetEnvelope.IsV1CenterHeightUseful(
+                    targetCenter, -16, out _)
+                || !v1TargetEnvelope.IsV1CenterHeightUseful(
+                    targetCenter, 16, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    targetCenter, -32, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    targetCenter, 32, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    v2ExtensionEdge, -1, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    v2ExtensionEdge, 1, out _)
+                || v2TargetEnvelope.IsV2CenterHeightUseful(
+                    outsideV2Extension, -1, out _)
+                || v2TargetEnvelope.IsV2CenterHeightUseful(
+                    outsideV2Extension, 1, out _))
+            {
+                failure = "Target extensions must localize V1/V2 turn-landing room to the fixed goal cone";
                 return false;
             }
 
@@ -1393,20 +1421,14 @@ namespace AutoTerrainDesignations.Access.V2
                 || customEnvelope.V2UpperAllowance32 != 64
                 || customEnvelope.IsV1CenterHeightUseful(
                     allowanceSample, -1, out _)
-                || !customEnvelope.IsV2CenterHeightUseful(
-                    allowanceSample, -48, out _)
                 || customEnvelope.IsV2CenterHeightUseful(
-                    allowanceSample, -49, out _)
-                || !customEnvelope.IsV1CenterHeightUseful(
-                    allowanceSample, 8, out _)
+                    allowanceSample, -1, out _)
                 || customEnvelope.IsV1CenterHeightUseful(
-                    allowanceSample, 9, out _)
-                || !customEnvelope.IsV2CenterHeightUseful(
-                    allowanceSample, 64, out _)
+                    allowanceSample, 1, out _)
                 || customEnvelope.IsV2CenterHeightUseful(
-                    allowanceSample, 65, out _))
+                    allowanceSample, 1, out _))
             {
-                failure = "Useful-height hull must capture custom V1/V2 upper/lower allowances per snapshot: "
+                failure = "Useful-height hull must capture custom target extensions while retaining strict base checks: "
                     + customEnvelopeFailure;
                 return false;
             }

@@ -180,6 +180,30 @@
     "Styr hur försiktigt ATD förutsäger jordskred och hur långt avstånd den håller från skyddade hav och byggnader. Högre policyer reserverar mer utrymme; lägre policyer tillåter terrängarbete närmare faror. Standard: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: lutningsfaktor för skredprognos {1}; skyddsavstånd {2} rutor."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Minimum"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Låg"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Balanserad"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Hög"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Maximum"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Kostnad för terränganvisning"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Minsta antal sammanhängande markeringsrutor för att ett kluster ska överleva isoleringsfiltret."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minsta malmhöjd {1:0.##} terrängrutor; minsta bottendensitet {2:P0}; minsta malmrenhet {3:P0}; minsta klusterstorlek {4} sammanhängande rutor."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Av"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Låg"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medel"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Hög"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximum"
   ],
   [
     "settings.corner_mode.label",

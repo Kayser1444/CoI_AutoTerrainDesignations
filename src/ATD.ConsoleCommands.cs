@@ -406,7 +406,7 @@ public sealed class AtdConsoleCommands
             : "[ATD] Experimental access useful-height hull and V1/V2 center pruning OFF.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V1 useful-height hull lower allowance. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_lower_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V1 fixed-target lower hull extension. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_lower_allowance")]
     private string atdAccessHeightEnvelopeV1LowerAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
@@ -414,10 +414,10 @@ public sealed class AtdConsoleCommands
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(parsed))
             return $"[ATD] Invalid V1 lower allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
-        return $"[ATD] V1 height-hull lower allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
+        return $"[ATD] V1 fixed-target lower hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V2 useful-height hull lower allowance. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-target lower hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
     private string atdAccessHeightEnvelopeV2LowerAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
@@ -425,10 +425,10 @@ public sealed class AtdConsoleCommands
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(parsed))
             return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
-        return $"[ATD] V2 height-hull lower allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
+        return $"[ATD] V2 fixed-target lower hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V1 useful-height hull upper allowance. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V1 fixed-target upper hull extension. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
     private string atdAccessHeightEnvelopeV1UpperAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
@@ -436,10 +436,10 @@ public sealed class AtdConsoleCommands
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(parsed))
             return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
-        return $"[ATD] V1 height-hull upper allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
+        return $"[ATD] V1 fixed-target upper hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V2 useful-height hull upper allowance. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-target upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
     private string atdAccessHeightEnvelopeV2UpperAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
@@ -447,7 +447,7 @@ public sealed class AtdConsoleCommands
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(parsed))
             return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
-        return $"[ATD] V2 height-hull upper allowance set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
+        return $"[ATD] V2 fixed-target upper hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
     }
 
     private static bool TryParseConsoleBool(string value, out bool parsed)

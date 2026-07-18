@@ -180,6 +180,30 @@
     "Controla a cautela com que o ATD prevê deslizamentos de terra e a distância que mantém dos oceanos e edifícios protegidos. Políticas mais elevadas reservam mais espaço; políticas mais baixas permitem o trabalho no terreno mais próximo dos perigos. Padrão: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: fator de inclinação da previsão de deslizamentos {1}; margem de segurança de {2} células."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Mínimo"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Baixo"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Equilibrado"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "Alto"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Máximo"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Custo de designação de terreno"
   ],
@@ -362,6 +386,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Número mínimo de blocos de designação conectados para que um grupo sobreviva ao filtro de isolamento."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altura mínima do minério {1:0.##} células de terreno; densidade mínima inferior {2:P0}; pureza mínima do minério {3:P0}; tamanho mínimo do grupo {4} células conectadas."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Desativado"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Baixo"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Médio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Máximo"
   ],
   [
     "settings.corner_mode.label",

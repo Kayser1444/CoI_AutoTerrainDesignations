@@ -214,25 +214,27 @@ namespace AutoTerrainDesignations
 
         private static Row BuildOreQualitySliderRow(List<Action> refreshers)
         {
-            var display = new Display(L(FormatOrePurityLevel(
-                AutoTerrainDesignationsMod.OrePurityLevel)))
-                .MinDigits(6).AlignSelfStretch().MarginTopBottom(2.px());
-            var slider = new SliderWithIncrements()
+            int currentLevel = AutoTerrainDesignationsMod.OrePurityLevel;
+            var slider = new SliderWithIncrements();
+            void UpdateValueTooltip(int value) =>
+                slider.Tooltip(BuildOreQualityValueTooltip(value));
+            slider
                 .Range(0, 4)
-                .Value(AutoTerrainDesignationsMod.OrePurityLevel)
+                .Value(currentLevel)
                 .OnValueChangedForPreview(value =>
-                    display.SetValue(L(FormatOrePurityLevel(value))))
+                    UpdateValueTooltip(value))
                 .OnValueChanged(value =>
                 {
                     AutoTerrainDesignationsMod.SetOrePurityLevel(value);
-                    display.SetValue(L(FormatOrePurityLevel(value)));
+                    UpdateValueTooltip(AutoTerrainDesignationsMod.OrePurityLevel);
                 });
             slider.FlexGrow(0f).Width(150.px());
+            UpdateValueTooltip(currentLevel);
             refreshers.Add(() =>
             {
                 int value = AutoTerrainDesignationsMod.OrePurityLevel;
                 slider.Value(value);
-                display.SetValue(L(FormatOrePurityLevel(value)));
+                UpdateValueTooltip(value);
             });
 
             var row = new Row().MarginTop(1.pt()).AlignItemsCenter().Gap(1.pt());
@@ -240,8 +242,90 @@ namespace AutoTerrainDesignations
                 .Tooltip(AtdLocalization.DesigOrePurityTip.AsFormatted));
             row.Add(new UiComponent().FlexGrow(1f));
             row.Add(slider);
-            row.Add(display);
             return row;
+        }
+
+        internal static LocStrFormatted BuildOreQualityValueTooltip(int level)
+        {
+            string qualityName = level switch
+            {
+                0 => AtdLocalization.OreQualityOff.TranslatedString,
+                1 => AtdLocalization.OreQualityLow.TranslatedString,
+                2 => AtdLocalization.OreQualityMedium.TranslatedString,
+                3 => AtdLocalization.OreQualityHigh.TranslatedString,
+                4 => AtdLocalization.OreQualityMaximum.TranslatedString,
+                _ => level.ToString(CultureInfo.InvariantCulture),
+            };
+            string tooltip = string.Format(
+                CultureInfo.InvariantCulture,
+                AtdLocalization.OreQualityValueTooltip.TranslatedString,
+                qualityName,
+                AutoDepthDesignation.GetMinOreHeightForLevel(level),
+                AutoDepthDesignation.GetMinBottomOreDensityForLevel(level),
+                AutoDepthDesignation.GetMinOrePurityForLevel(level),
+                AutoDepthDesignation.GetMinComponentSizeForLevel(level));
+            return new LocStrFormatted(tooltip);
+        }
+
+        private static Row BuildSafetyPolicySliderRow(List<Action> refreshers)
+        {
+            SafetyPolicy currentPolicy = AutoTerrainDesignationsMod.GetSafetyPolicy();
+            var slider = new SliderWithIncrements();
+            void UpdateValueTooltip(int value) =>
+                slider.Tooltip(BuildSafetyPolicyValueTooltip((SafetyPolicy)value));
+            slider
+                .Range((int)SafetyPolicy.Min, (int)SafetyPolicy.Max)
+                .Value((int)currentPolicy)
+                .OnValueChangedForPreview(value =>
+                {
+                    UpdateValueTooltip(value);
+                })
+                .OnValueChanged(value =>
+                {
+                    AutoTerrainDesignationsMod.SetSafetyPolicy((SafetyPolicy)value);
+                    SafetyPolicy selectedPolicy = AutoTerrainDesignationsMod.GetSafetyPolicy();
+                    UpdateValueTooltip((int)selectedPolicy);
+                });
+            slider.FlexGrow(0f).Width(150.px());
+            UpdateValueTooltip((int)currentPolicy);
+            refreshers.Add(() =>
+            {
+                int value = (int)AutoTerrainDesignationsMod.GetSafetyPolicy();
+                slider.Value(value);
+                UpdateValueTooltip(value);
+            });
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter().Gap(1.pt());
+            row.Add(new Label(AtdLocalization.SettingsSafetyPolicyLabel.AsFormatted)
+                .Tooltip(AtdLocalization.SettingsSafetyPolicyTooltip.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(slider);
+            return row;
+        }
+
+        private static LocStrFormatted BuildSafetyPolicyValueTooltip(SafetyPolicy policy)
+        {
+            AutoTerrainDesignationsMod.GetSafetyPolicyParameters(
+                policy, out float slope, out int buffer);
+            string tooltip = string.Format(
+                CultureInfo.InvariantCulture,
+                AtdLocalization.SettingsSafetyPolicyValueTooltip.TranslatedString,
+                FormatSafetyPolicyLong(policy),
+                slope,
+                buffer);
+            return new LocStrFormatted(tooltip);
+        }
+
+        private static string FormatSafetyPolicyLong(SafetyPolicy policy)
+        {
+            switch (policy)
+            {
+                case SafetyPolicy.Min: return AtdLocalization.SettingsSafetyPolicyMinimum.TranslatedString;
+                case SafetyPolicy.Low: return AtdLocalization.SettingsSafetyPolicyLow.TranslatedString;
+                case SafetyPolicy.High: return AtdLocalization.SettingsSafetyPolicyHigh.TranslatedString;
+                case SafetyPolicy.Max: return AtdLocalization.SettingsSafetyPolicyMaximum.TranslatedString;
+                default: return AtdLocalization.SettingsSafetyPolicyBalanced.TranslatedString;
+            }
         }
 
         private static void AddScanBehaviorSection(Column content, List<Action> refreshers)
@@ -338,15 +422,7 @@ namespace AutoTerrainDesignations
         private static void AddWorldSafetySection(Column content, List<Action> refreshers)
         {
             content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingWorldSafety.AsFormatted));
-            content.Add(BuildIntStepRow(
-                AtdLocalization.SettingsSafetyPolicyLabel.AsFormatted,
-                AtdLocalization.SettingsSafetyPolicyTooltip.AsFormatted,
-                () => (int)AutoTerrainDesignationsMod.GetSafetyPolicy(),
-                value => AutoTerrainDesignationsMod.SetSafetyPolicy(
-                    (SafetyPolicy)Math.Max((int)SafetyPolicy.Min,
-                        Math.Min((int)SafetyPolicy.Max, value))),
-                value => FormatSafetyPolicy((SafetyPolicy)value),
-                refreshers));
+            content.Add(BuildSafetyPolicySliderRow(refreshers));
             content.Add(BuildToggleRow(
                 AtdLocalization.SettingsAvoidOceanLabel.AsFormatted,
                 AtdLocalization.SettingsAvoidOceanTooltip.AsFormatted,

@@ -42,7 +42,6 @@ namespace AutoTerrainDesignations
             public Mafi.Unity.Ui.Library.Display MaxLayersDisplay { get; }
             public Mafi.Unity.Ui.Library.Display MinElevDisplay { get; }
             public SliderWithIncrements OrePuritySlider { get; }
-            public Mafi.Unity.Ui.Library.Display OrePurityDisplay { get; }
             public ButtonIcon ClearBtn { get; }
 
             public Bindings(
@@ -52,7 +51,6 @@ namespace AutoTerrainDesignations
                 Mafi.Unity.Ui.Library.Display maxLayersDisplay,
                 Mafi.Unity.Ui.Library.Display minElevDisplay,
                 SliderWithIncrements orePuritySlider,
-                Mafi.Unity.Ui.Library.Display orePurityDisplay,
                 ButtonIcon clearBtn)
             {
                 GetTower = getTower;
@@ -61,7 +59,6 @@ namespace AutoTerrainDesignations
                 MaxLayersDisplay = maxLayersDisplay;
                 MinElevDisplay = minElevDisplay;
                 OrePuritySlider = orePuritySlider;
-                OrePurityDisplay = orePurityDisplay;
                 ClearBtn = clearBtn;
             }
         }
@@ -91,7 +88,7 @@ namespace AutoTerrainDesignations
             b.MinElevDisplay.SetValue(new LocStrFormatted(MinElevText(AutoDepthDesignation.GetTowerMaxDepthToDigTo(tower))));
             int orePurity = AutoDepthDesignation.GetTowerOrePurityLevel(tower);
             b.OrePuritySlider.Value(orePurity);
-            b.OrePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(orePurity)));
+            b.OrePuritySlider.Tooltip(AtdModSettingsTab.BuildOreQualityValueTooltip(orePurity));
             bool hasGen = AutoDepthDesignation.HasGeneratedDesignationsForTower(tower);
             b.ClearBtn.Tooltip(AtdLocalization.Tip(hasGen ? AtdLocalization.DesigClearTipWithShiftClick : AtdLocalization.DesigClearTip));
         }
@@ -334,26 +331,27 @@ namespace AutoTerrainDesignations
             int initPurity = initialTower != null
                 ? AutoDepthDesignation.GetTowerOrePurityLevel(initialTower)
                 : AutoTerrainDesignationsMod.OrePurityLevel;
-            var orePurityDisplay = new Mafi.Unity.Ui.Library.Display(new LocStrFormatted(OrePurityLevelText(initPurity)))
-                .MinDigits(6).AlignSelfStretch().MarginTopBottom(2.px());
-            var orePuritySlider = new SliderWithIncrements()
+            var orePuritySlider = new SliderWithIncrements();
+            void UpdateOrePurityTooltip(int value) =>
+                orePuritySlider.Tooltip(AtdModSettingsTab.BuildOreQualityValueTooltip(value));
+            orePuritySlider
                 .Range(0, 4)
                 .Value(initPurity)
                 .OnValueChangedForPreview(value =>
-                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(value))))
+                    UpdateOrePurityTooltip(value))
                 .OnValueChanged(value =>
                 {
+                    UpdateOrePurityTooltip(value);
                     var tower = getTower(); if (tower == null) return;
                     AutoDepthDesignation.SetTowerOrePurityLevel(tower, value);
-                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(value)));
                 });
             orePuritySlider.FlexGrow(0f).Width(140.px());
+            UpdateOrePurityTooltip(initPurity);
             var orePurityRow = new Row().MarginTop(1.pt()).AlignItemsCenter().Gap(1.pt());
             orePurityRow.Add(new Label(AtdLocalization.DesigOrePurityLabel)
                 .Tooltip(AtdLocalization.DesigOrePurityTip));
             orePurityRow.Add(new UiComponent().FlexGrow(1f));
             orePurityRow.Add(orePuritySlider);
-            orePurityRow.Add(orePurityDisplay);
             panel.BodyAdd(orePurityRow);
 
             // --- Ore picker row ---
@@ -368,7 +366,7 @@ namespace AutoTerrainDesignations
             }
 
             s_bindings[key] = new Bindings(getTower, panel, accesswayModeDropdown,
-                maxLayersDisplay, minElevDisplay, orePuritySlider, orePurityDisplay, clearBtn);
+                maxLayersDisplay, minElevDisplay, orePuritySlider, clearBtn);
             return panel;
         }
 
@@ -445,17 +443,5 @@ namespace AutoTerrainDesignations
             return value.Value > 0 ? "+" + value.Value : value.Value.ToString();
         }
 
-        private static string OrePurityLevelText(int value)
-        {
-            switch (value)
-            {
-                case 0: return AtdLocalization.LevelOff.TranslatedString;
-                case 1: return AtdLocalization.LevelLow.TranslatedString;
-                case 2: return AtdLocalization.LevelMed.TranslatedString;
-                case 3: return AtdLocalization.LevelHigh.TranslatedString;
-                case 4: return AtdLocalization.LevelMax.TranslatedString;
-                default: return value.ToString();
-            }
-        }
     }
 }

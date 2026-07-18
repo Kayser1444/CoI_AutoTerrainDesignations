@@ -264,6 +264,30 @@
     "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL."
   ],
   [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: landslide predictor slope factor {1}; protected-area buffer {2} tiles."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "Minimum"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "Low"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "Balanced"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "High"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "Maximum"
+  ],
+  [
     "settings.pathfinder.generated_v_fixed.label",
     "Terrain designation cost"
   ],
@@ -446,6 +470,30 @@
   [
     "settings.ore_quality.min_component_size.tooltip",
     "Minimum connected designation tile count for a cluster to survive the isolation filter."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minimum ore height {1:0.##} terrain tiles; minimum bottom density {2:P0}; minimum ore purity {3:P0}; minimum component size {4} connected tiles."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Off"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Low"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medium"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "High"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximum"
   ],
   [
     "settings.corner_mode.label",

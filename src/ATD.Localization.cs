@@ -99,6 +99,18 @@ namespace AutoTerrainDesignations
                 "High: only rich tiles with a clean ore column.\n" +
                 "Max: apply the strictest overburden, depth, and ore-density filters.",
                 "Tooltip for the ore purity setting.");
+        public static LocStr OreQualityValueTooltip =
+            Loc.Str("settings.ore_quality.value_tooltip", "{0}: minimum ore height {1:0.##} terrain tiles; minimum bottom density {2:P0}; minimum ore purity {3:P0}; minimum component size {4} connected tiles.", "Tooltip for an individual Ore quality slider value. {0} = quality name, {1} = minimum ore height, {2} = minimum bottom density, {3} = minimum ore purity, {4} = minimum component size.");
+        public static LocStr OreQualityOff =
+            Loc.Str("settings.ore_quality.value.off", "Off", "Full name for the Off ore quality value.");
+        public static LocStr OreQualityLow =
+            Loc.Str("settings.ore_quality.value.low", "Low", "Full name for the Low ore quality value.");
+        public static LocStr OreQualityMedium =
+            Loc.Str("settings.ore_quality.value.medium", "Medium", "Full name for the Medium ore quality value.");
+        public static LocStr OreQualityHigh =
+            Loc.Str("settings.ore_quality.value.high", "High", "Full name for the High ore quality value.");
+        public static LocStr OreQualityMaximum =
+            Loc.Str("settings.ore_quality.value.maximum", "Maximum", "Full name for the Maximum ore quality value.");
         public static LocStr DesigCorridorClearanceLabel =
             Loc.Str("panel.designations.corridor_clearance.label", "Corridor clearance", "Label for the corridor clearance setting row.");
         public static LocStr DesigCorridorClearanceTip =
@@ -176,6 +188,18 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.safety_policy.label", "Safety policy", "World safety policy setting label.");
         public static LocStr SettingsSafetyPolicyTooltip =
             Loc.Str("settings.world.safety_policy.tooltip", "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL.", "World safety policy setting tooltip.");
+        public static LocStr SettingsSafetyPolicyValueTooltip =
+            Loc.Str("settings.world.safety_policy.value_tooltip", "{0}: landslide predictor slope factor {1}; protected-area buffer {2} tiles.", "Tooltip for an individual World safety policy slider value. {0} = policy, {1} = landslide predictor slope factor, {2} = protected-area buffer in tiles.");
+        public static LocStr SettingsSafetyPolicyMinimum =
+            Loc.Str("settings.world.safety_policy.minimum", "Minimum", "Full name for the Minimum safety policy value.");
+        public static LocStr SettingsSafetyPolicyLow =
+            Loc.Str("settings.world.safety_policy.low", "Low", "Full name for the Low safety policy value.");
+        public static LocStr SettingsSafetyPolicyBalanced =
+            Loc.Str("settings.world.safety_policy.balanced", "Balanced", "Full name for the Balanced safety policy value.");
+        public static LocStr SettingsSafetyPolicyHigh =
+            Loc.Str("settings.world.safety_policy.high", "High", "Full name for the High safety policy value.");
+        public static LocStr SettingsSafetyPolicyMaximum =
+            Loc.Str("settings.world.safety_policy.maximum", "Maximum", "Full name for the Maximum safety policy value.");
         public static LocStr SettingsTerrainDesignationCostLabel =
             Loc.Str("settings.pathfinder.generated_v_fixed.label", "Terrain designation cost", "Pathfinder cost setting label for generated terrain designations.");
         public static LocStr SettingsTerrainDesignationCostTooltip =

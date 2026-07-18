@@ -25,12 +25,12 @@ The envelope is shared snapshot-and-request infrastructure used only to prune
 newly generated `V` nodes. Terrain/G and the selected start always define the
 useful hull. Whether every provider-eligible fixed profile or only current
 request targets also seed it remains an open reuse-versus-pruning decision.
-Sources are not pruning candidates. V1 and V2 apply the same fields to their
-different generated-state shapes, but use different symmetric boundary
-allowances. V1 may place a generated center up to `0.5` beyond either field and
-V2 up to `1.0` beyond either field. These bounded exceptions preserve the flat
-landing that an ascending or descending ramp can need in order to turn toward a
-high or low fixed goal:
+Sources are not pruning candidates. V1 and V2 apply strict center checks to
+their request-effective fields. Before the final transform, fixed request
+targets receive symmetric source extensions: `0.5` for V1 and `1.0` for V2.
+The propagated extensions preserve the flat landing that an ascending or
+descending ramp can need in order to turn toward a high or low fixed goal,
+without relaxing unrelated generated centers:
 
 * V1 tests the one newly generated `AccessHeightProfile` before history and
   side-ray evaluation.
@@ -171,10 +171,12 @@ There is one sign-symmetric geometry exception to that center-height dominance
 argument. A ramp cannot turn until it reaches a flat landing. When approaching
 a low or high fixed goal, the landing center can need to sit respectively below
 the scalar lower hull or above the scalar upper hull even though the route
-immediately turns back toward a represented terminal surface. Keep a bounded
-allowance on both sides for this maneuver: `0.5` for V1 and `1.0` for V2. V2
-needs the larger allowance because its width-two band and flat turn landing
-introduce two lane centers together.
+immediately turns back toward a represented terminal surface. Represent this
+need at its cause: extend each fixed request target source by `0.5` on both hull
+sides for V1 or `1.0` for V2, then propagate the ordinary construction-grade
+cones. The final candidate check remains strict. V2 needs the larger extension
+because its width-two band and flat turn landing introduce two lane centers
+together.
 
 The graph uses the V state's canonical center height as the pathing-height
 abstraction. A rigid flat or slope footprint can cross a locally non-planar hull
@@ -251,15 +253,11 @@ too-narrow field.
 
 ### Closure under finder-generated surfaces
 
-The turn allowances remove strict closure on both sides. A finder-generated V1
-sample may be `0.5` below `LowerUsefulHeight(q)` or above
-`UpperUsefulHeight(q)`; a V2 sample may be `1.0` beyond either field. If such
-work later becomes a fixed/provider source, it can lower the raw lower field or
-raise the raw upper field. A cached or incrementally updated envelope must run
-the ordinary containment/update rule for both sides rather than assuming
-byte-identical closure for finder-generated profiles. Repeated provider
-promotion must be measured for cumulative widening; do not silently compound
-the per-query allowance.
+Generated centers remain inside the strict request-effective fields. If such
+work later becomes a fixed/provider target, apply the target extension once for
+that new request and run the ordinary containment/update rule for both sides.
+Do not fold a previous request's extended field back into the reusable base or
+compound target extensions across provider promotions.
 
 ## Numeric representation
 
@@ -400,21 +398,20 @@ next sequential cluster search.
 
 ## Center-height rejection rule
 
-Query the envelope only at each newly reached V lane/profile center and require:
+After applying request-target source extensions and propagating their cones,
+query the effective envelope only at each newly reached V lane/profile center
+and require:
 
 ```text
-V1: LowerUsefulHeight(center) - 0.5 <= profile.Center
-                                      <= UpperUsefulHeight(center) + 0.5
-V2: LowerUsefulHeight(center) - 1.0 <= profile.Center
-                                      <= UpperUsefulHeight(center) + 1.0
+LowerUsefulHeight(center) <= profile.Center <= UpperUsefulHeight(center)
 ```
 
 Reject above or below on strict center separation after conservative fixed-point
-rounding. The version-specific upper and lower allowances are the only outward
-margins; do not add another profile-level margin. For V2, evaluate each newly
-reached lane center independently; do not substitute one band-center sample for
-two lane centers. V2 in-place turns inherit their existing centers and do not
-require an envelope test.
+rounding. The version-specific upper and lower target extensions are applied to
+fixed goal samples before propagation; do not add another profile-level margin.
+For V2, evaluate each newly reached lane center independently; do not substitute
+one band-center sample for two lane centers. V2 in-place turns inherit their
+existing centers and do not require an envelope test.
 
 The 5x5 bilinear target surface is still evaluated by ordinary profile
 feasibility, fulfilled-work reconstruction, side rays, costing, and replay.
@@ -599,7 +596,7 @@ existing horizontal and physical bounds remain authoritative.
 Snapshot diagnostics should report:
 
 * preprocessing time;
-* the captured V1 and V2 upper/lower allowances;
+* the captured V1 and V2 upper/lower target extensions;
 * source counts by category;
 * tile count and memory;
 * minimum, maximum, and average allowed-band width;
@@ -611,7 +608,7 @@ Search result/performance logs should report above/below rejection counts next
 to visited and pending nodes.
 
 For runtime troubleshooting, expose separate session-only console parameters
-for the V1 and V2 upper and lower allowances. Accept finite nonnegative
+for the V1 and V2 upper and lower target extensions. Accept finite nonnegative
 physical-height values, quantize them to `height32`, mark mining plans dirty,
 and capture the resulting values in newly built immutable envelopes. A value of
 `0` restores the corresponding strict raw hull boundary for an A/B comparison;
@@ -661,8 +658,8 @@ Cover:
 * pointless excavation below flat terrain;
 * necessary climb toward a mountain or raised fixed target;
 * necessary descent toward a trough or lowered fixed target;
-* switchback and 90-degree flat turns near both hull sides, including acceptance
-  at exactly `0.5` beyond either field and rejection beyond that allowance;
+* switchback and 90-degree flat turns near both hull sides, including the exact
+  `0.5` target-source extension and strict rejection outside its propagated cone;
 * G-to-V and V-to-G handoffs;
 * fixed-provider continuation;
 * projected designation, ocean, building, durability, and prop interactions;
@@ -674,7 +671,8 @@ Repeat the V1 cases for:
 
 * equal flat bands;
 * uniform ramp bands;
-* acceptance at exactly `1.0` beyond either field and rejection beyond it;
+* the exact `1.0` target-source extension and strict rejection outside its
+  propagated cone;
 * straight and strafe center-moving transitions;
 * 2x2 flat turn transitions, verifying that turns inherit already admitted
   centers and are not independently envelope-tested;
@@ -771,18 +769,16 @@ regression oracle.
     and updates only the upper and/or lower field that would expand. Keep this
     open until preprocessing cost, cluster count, containment frequency, and
     lost pruning are measured. Finder-generated surfaces admitted by a boundary
-    allowance can expand either field if later promoted to fixed sources.
+    target extension can expand either request field if later promoted to a goal.
 4. **Should raw terrain use every tile or extracted extrema only?** Every tile
     gives a simple exact linear transform. Peak/trough reduction is optional
     only if it produces byte-identical fields.
 5. **Should missing envelope samples reject?** No. Fail open initially; missing
     data is a snapshot diagnostic, not a new pathfinding failure.
-6. **How should repeated field promotion be bounded?** The turn allowances mean
-   a finder-generated profile can become a later fixed source beyond either raw
-   field. Measure whether repeated snapshot/provider cycles cause material
-   cumulative widening. If they do, distinguish original terminal sources from
-   finder-generated sources or retain provenance so each allowance is applied
-   once rather than recursively.
+6. **How should repeated field promotion be bounded?** Keep request target
+   extensions out of the reusable base so repeated snapshot/provider cycles
+   cannot compound them. Apply an extension once to each goal in the current
+   request overlay.
 7. **Can the envelope later be direction-aware?** Yes. A state-mode/direction
     cone could prune an outward-rising slope earlier than the shared scalar
     field, but it is history-sensitive and outside this proposal.
@@ -810,7 +806,8 @@ The design is ready to become default behavior when:
   no implementation/source defects and no unacceptable representative-route
   regressions; exact exhaustive optimal-cost equivalence is not required;
 * fixtures cover V2 per-lane centers, retained-lane and in-place-turn behavior,
-  the exact V1 `0.5` and V2 `1.0` upper/lower allowances,
+  the exact V1 `0.5` and V2 `1.0` upper/lower target extensions with strict
+  checks outside their propagated cones,
   the confirmed ocean upper source, and the constraint-only treatment of
   projected designations, props, buildings, and durability;
 * live marker tests show the useless high/low boundary exploration removed;
