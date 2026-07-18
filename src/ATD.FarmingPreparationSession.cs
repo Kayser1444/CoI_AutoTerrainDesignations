@@ -24,6 +24,7 @@ using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Vehicles.Trucks;
 using UnityEngine;
+using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {

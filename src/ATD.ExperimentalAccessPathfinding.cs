@@ -264,6 +264,7 @@ namespace AutoTerrainDesignations
             bool isMining,
             bool allowsMixedWork,
             IReadOnlyCollection<Tile2i>? reachableFixedOrigins,
+            IReadOnlyCollection<Tile2i>? groundGoalOverride,
             out AccessSearchSnapshot snapshot,
             out string failureReason)
         {
@@ -523,39 +524,62 @@ namespace AutoTerrainDesignations
             var prospectiveV2HandoffSpanCache =
                 new Dictionary<string, IReadOnlyList<AccessGroundHandoff>>(StringComparer.Ordinal);
 
-            if (!TryBuildTowerReachableGround(tower, boundsMin, boundsMax,
-                groundNodes, provider, pathParams,
-                out HashSet<Tile2i> towerReachableGround, out Tile2i groundStart))
+            HashSet<Tile2i> towerReachableGround;
+            Tile2i groundStart;
+            int fullTowerGoalCount;
+            if (groundGoalOverride != null && groundGoalOverride.Count > 0)
             {
-                failureReason = "NoTowerGround";
-                return false;
+                towerReachableGround = groundGoalOverride
+                    .Where(groundNodes.Contains)
+                    .ToHashSet();
+                if (towerReachableGround.Count == 0)
+                {
+                    failureReason = "NoOverrideGroundGoalsInSnapshot";
+                    return false;
+                }
+                groundStart = towerReachableGround.First();
+                fullTowerGoalCount = towerReachableGround.Count;
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access Ground Goal Override] " +
+                    $"selected={towerReachableGround.Count} " +
+                    $"goals=[{string.Join(",", towerReachableGround)}]");
             }
-            if (towerReachableGround.Count == 0)
+            else
             {
-                failureReason = "NoTowerReachableGround";
-                return false;
-            }
-            int fullTowerGoalCount = towerReachableGround.Count;
-            if (fullTowerGoalCount <= 16)
-                LogTowerGroundFrontierDiagnostics(
-                    groundStart,
+                if (!TryBuildTowerReachableGround(tower, boundsMin, boundsMax,
+                    groundNodes, provider, pathParams,
+                    out towerReachableGround, out groundStart))
+                {
+                    failureReason = "NoTowerGround";
+                    return false;
+                }
+                if (towerReachableGround.Count == 0)
+                {
+                    failureReason = "NoTowerReachableGround";
+                    return false;
+                }
+                fullTowerGoalCount = towerReachableGround.Count;
+                if (fullTowerGoalCount <= 16)
+                    LogTowerGroundFrontierDiagnostics(
+                        groundStart,
+                        towerReachableGround,
+                        groundNodes,
+                        groundExclusionReasons,
+                        provider,
+                        pathParams);
+                towerReachableGround = SelectTowerRadialGroundGoals(
+                    towerCenter,
                     towerReachableGround,
-                    groundNodes,
-                    groundExclusionReasons,
-                    provider,
-                    pathParams);
-            towerReachableGround = SelectTowerRadialGroundGoals(
-                towerCenter,
-                towerReachableGround,
-                maxSteps: 12,
-                out string radialGoalDiagnostic);
-            LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Tower Radial Goals] center={towerCenter} " +
-                $"selected={towerReachableGround.Count} maxSteps=12 {radialGoalDiagnostic}");
-            if (towerReachableGround.Count == 0)
-            {
-                failureReason = "NoTowerRadialGroundGoals";
-                return false;
+                    maxSteps: 12,
+                    out string radialGoalDiagnostic);
+                LogExperimentalAccessDebug(
+                    $"[ATD Experimental Access Tower Radial Goals] center={towerCenter} " +
+                    $"selected={towerReachableGround.Count} maxSteps=12 {radialGoalDiagnostic}");
+                if (towerReachableGround.Count == 0)
+                {
+                    failureReason = "NoTowerRadialGroundGoals";
+                    return false;
+                }
             }
             if (vehicleClearance > 4)
                 LogV2GroundGraphDiagnostics(
@@ -1297,10 +1321,15 @@ namespace AutoTerrainDesignations
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
             IEnumerable<Tile2i> acceptedProviderOrigins,
-            float maxCostLimit = float.MaxValue)
+            float maxCostLimit = float.MaxValue,
+            IEnumerable<Tile2i>? groundGoalOverride = null)
         {
             int requiredWidth = snapshot.VehicleWidth > 4 ? 2 : 1;
             List<Tile2i> fixedGoals = fixedGoalOrigins.Distinct().ToList();
+            List<Tile2i> groundGoals = (groundGoalOverride
+                    ?? snapshot.GoalGroundNodes)
+                .Distinct()
+                .ToList();
             AccessV2EndpointSet? v2Endpoints = requiredWidth == 2
                 ? AccessV2FrontageDiscovery.Build(
                     snapshot,
@@ -1355,7 +1384,7 @@ namespace AutoTerrainDesignations
                     cluster.Origins.Select(origin => origin.Origin)),
                 new AccessPathEndpoint(
                     fixedGoals,
-                    snapshot.GoalGroundNodes),
+                    groundGoals),
                 requiredWidth,
                 AccessPathIntent.ConstructAccessway,
                 maxCostLimit,
@@ -3252,18 +3281,38 @@ namespace AutoTerrainDesignations
                 }
             }
 
-            IReadOnlyList<AccessV2HandoffCandidate> placedHandoffs =
-                result.V2Route.RouteSteps.Count > 0
-                    ? result.V2Route.RouteSteps
-                        .Where(step => step.Handoff != null)
-                        .Select(step => step.Handoff!)
-                        .ToArray()
-                    : result.V2Route.Handoff != null
-                        ? new[] { result.V2Route.Handoff! }
-                        : Array.Empty<AccessV2HandoffCandidate>();
+            var placedHandoffs = new List<(
+                AccessV2HandoffCandidate Handoff,
+                bool IsGroundToV)>();
+            if (result.V2Route.RouteSteps.Count > 0)
+            {
+                for (int stepIndex = 0;
+                    stepIndex < result.V2Route.RouteSteps.Count;
+                    stepIndex++)
+                {
+                    AccessV2RouteStep step =
+                        result.V2Route.RouteSteps[stepIndex];
+                    if (step.Handoff == null)
+                        continue;
+                    bool isGroundToV = stepIndex > 0
+                        && result.V2Route.RouteSteps[stepIndex - 1].IsGround
+                        && !step.IsGround;
+                    placedHandoffs.Add((step.Handoff, isGroundToV));
+                }
+            }
+            else if (result.V2Route.Handoff != null)
+            {
+                placedHandoffs.Add((result.V2Route.Handoff, false));
+            }
             for (int index = 0; index < placedHandoffs.Count; index++)
             {
-                AccessV2HandoffCandidate handoff = placedHandoffs[index];
+                AccessV2HandoffCandidate handoff =
+                    placedHandoffs[index].Handoff;
+                Tile2i liveExitDirection = placedHandoffs[index].IsGroundToV
+                    ? new Tile2i(
+                        -handoff.ExitDirection.X,
+                        -handoff.ExitDirection.Y)
+                    : handoff.ExitDirection;
                 if (handoff.IsQuickPath
                     && handoff.SpanLength == 1
                     && handoff.Lane0Operation
@@ -3277,7 +3326,7 @@ namespace AutoTerrainDesignations
                         handoff.Lane0Operation,
                         handoff.Lane0Contact,
                         handoff.GroundEntryCenters,
-                        handoff.ExitDirection,
+                        liveExitDirection,
                         lane: 0,
                         out string laneReason)
                     || !ValidateLiveLane(
@@ -3285,7 +3334,7 @@ namespace AutoTerrainDesignations
                         handoff.Lane1Operation,
                         handoff.Lane1Contact,
                         handoff.GroundEntryCenters,
-                        handoff.ExitDirection,
+                        liveExitDirection,
                         lane: 1,
                         out laneReason))
                 {

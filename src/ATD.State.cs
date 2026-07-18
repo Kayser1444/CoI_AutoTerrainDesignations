@@ -32,6 +32,7 @@ using Mafi.Core.Vehicles.Jobs;
 using Mafi.Core.World;
 using CoI.AutoHelpers.Logging;
 using UnityEngine;
+using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {

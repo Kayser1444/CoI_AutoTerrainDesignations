@@ -22,6 +22,7 @@ using UnityEngine;
 using AutoTerrainDesignations.Access;
 using Mafi.Core.Products;
 using Mafi.Core.Prototypes;
+using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {
@@ -453,10 +454,20 @@ namespace AutoTerrainDesignations
             bool useLocalSurfaceReference,
             bool allowExistingPlannedRampShortcut,
             RampGenerationResult result,
-            HashSet<Tile2i>? forbiddenApproachClusterOrigins = null)
+            HashSet<Tile2i>? forbiddenApproachClusterOrigins = null,
+            IReadOnlyList<Tile2i>? groundGoalOverride = null)
         {
             result.TopRowTile = default;
             result.Outcome = RampPlacementOutcome.Failed;
+
+            // World reset and a superseded Create Designations request both set this
+            // shared flag. Farming access generation is a separate operation, however;
+            // after a reload it must be allowed to start a fresh V2 search. Preserve a
+            // currently active Create Designations cancellation so that operation can
+            // still be superseded safely.
+            if (!s_createDesignationsOperationActive)
+                s_cancelExperimentalAccessSearch = false;
+
             if (s_desigManager == null || rampProto == null)
             {
                 result.Outcome = RampPlacementOutcome.Failed;
@@ -592,6 +603,17 @@ namespace AutoTerrainDesignations
                     Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                     return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                 });
+            bool usesGroundGoalOverride =
+                groundGoalOverride != null && groundGoalOverride.Count > 0;
+            if (usesGroundGoalOverride)
+            {
+                foreach (AccessOriginCluster cluster in originClusters)
+                    states[cluster] = AccessClusterState.NeedsAccessway;
+                LogExperimentalAccessDebug(
+                    $"[ATD Planned Tower Access] forcing {originClusters.Count} " +
+                    "terrain-work cluster(s) to use ghost goals instead of " +
+                    "active-tower reachability");
+            }
 
             // Log initial states
             foreach (var cluster in originClusters)
@@ -662,8 +684,14 @@ namespace AutoTerrainDesignations
                         .SelectMany(provider => provider.Tiles)
                         .Distinct()
                         .ToList();
+                    if (usesGroundGoalOverride)
+                    {
+                        accessibleFixedGoals.Clear();
+                        acceptedProviderOrigins.Clear();
+                    }
                     if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,
                         experimentalIsMining, accesswayAllowsMixedWork, accessibleFixedGoals,
+                        groundGoalOverride,
                         out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
                     {
                         experimentalSnapshot = refreshedSnapshot;
@@ -677,7 +705,8 @@ namespace AutoTerrainDesignations
 
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
                             refreshedSnapshot, cluster, accessibleFixedGoals,
-                            acceptedProviderOrigins);
+                            acceptedProviderOrigins,
+                            groundGoalOverride: groundGoalOverride);
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Width] cluster={cluster.ClusterId} " +
                             $"legacyRampWidth={configuredRampWidth} " +
@@ -728,7 +757,14 @@ namespace AutoTerrainDesignations
                             && experimentalPlan != null
                             && experimentalPlan.IsValid
                             && experimentalPlan.Designations.Count == 0
-                            && experimentalPlan.CleanupOrigins.Count == 0)
+                            && experimentalPlan.CleanupOrigins.Count == 0
+                            // A zero-work result is only an existing route if the live
+                            // designation can actually accept its vehicle. In particular,
+                            // farming may request access for a level/dumping designation
+                            // whose projected profile reaches a ground goal even though a
+                            // vehicle cannot reach or start that designation yet.
+                            && cluster.Origins.All(origin =>
+                                IsClusterOriginReadyAndPathable(tower, origin.Origin)))
                         {
                             states[cluster] = AccessClusterState.AccessibleViaProvider;
                             validatedExistingRoute = true;
@@ -739,12 +775,29 @@ namespace AutoTerrainDesignations
                             continue;
                         }
 
-                        if (!experimentalResult.Success)
+                        if (experimentalResult.Success
+                            && experimentalPlan != null
+                            && experimentalPlan.IsValid
+                            && experimentalPlan.Designations.Count == 0
+                            && experimentalPlan.CleanupOrigins.Count == 0)
+                        {
+                            experimentalFailureSummary =
+                                "zero-work route rejected because the live designation is not vehicle-ready";
+                            LogExperimentalAccessDebug(
+                                $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
+                                "rejected=zero-work-route reason=live-designation-not-ready");
+                        }
+                        else if (!experimentalResult.Success)
+                        {
                             experimentalFailureSummary =
                                 FormatExperimentalFailureSummary(experimentalResult);
+                        }
 
-                        experimentalCandidate = EvaluateExperimentalAccessCandidate(
-                            experimentalResult, experimentalPlan, towerPos, terrMgr);
+                        if (string.IsNullOrEmpty(experimentalFailureSummary))
+                        {
+                            experimentalCandidate = EvaluateExperimentalAccessCandidate(
+                                experimentalResult, experimentalPlan, towerPos, terrMgr);
+                        }
                     }
                     else
                     {
@@ -875,13 +928,17 @@ namespace AutoTerrainDesignations
                                  accesswayProto,
                                  terrMgr,
                                  out v2ValidationReason);
+                        bool overrideProviderValid = usesGroundGoalOverride
+                            && source.SearchResult.Success
+                            && (source.SearchResult.V2Route == null
+                                || v2ProviderValid);
                         if (source.SearchResult.V2Route != null)
                             LogExperimentalAccessDebug(
                                 $"[ATD V2 Placement Validation] cluster={cluster.ClusterId} " +
                                 $"success={v2ProviderValid} reason={v2ValidationReason} " +
                                 $"placedTerrain={localPlacedOrigins.Count} " +
                                 $"providerOrigins={providerOrigins.Count}");
-                        if (v2ProviderValid)
+                        if (v2ProviderValid || overrideProviderValid)
                             states[cluster] = AccessClusterState.AccessibleViaProvider;
                         if (states[cluster] == AccessClusterState.AccessibleViaProvider
                             || states[cluster] == AccessClusterState.AccessibleDirect)

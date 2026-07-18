@@ -108,10 +108,27 @@ namespace AutoTerrainDesignations
             int requiredWidth = ExtractVehicleClearance(pathParams).Value > 4
                 ? 2
                 : 1;
+            if (!(tower is MineTower homeTower))
+            {
+                LogExperimentalAccessDebug(
+                    "[ATD Planned Tower Access] active tower is not a mine tower; " +
+                    "AUTO request remains claimed by ghost marker");
+                yield break;
+            }
+            IReadOnlyList<Tile2i> ghostGroundGoals =
+                BuildPlannedTowerGhostGroundGoals(tower);
+            if (ghostGroundGoals.Count == 0)
+            {
+                LogExperimentalAccessDebug(
+                    "[ATD Planned Tower Access] eligible ghost ground goals=0; " +
+                    "AUTO request remains claimed by ghost marker");
+                yield break;
+            }
             List<PlannedTowerApproach> approaches =
                 BuildPlannedTowerApproaches(
-                    tower, ghosts, terrMgr, pathability, pathParams,
-                    requiredWidth);
+                    tower, new[] { homeTower }, terrMgr, pathability, pathParams,
+                    requiredWidth,
+                    allowExactNaturalSourcesOutsideArea: true);
             if (approaches.Count == 0)
             {
                 LogExperimentalAccessDebug(
@@ -153,6 +170,7 @@ namespace AutoTerrainDesignations
                     tower, workDepths, cornerHeights, terrMgr,
                     isMining: true, allowsMixedWork: true,
                     reachableFixedOrigins: null,
+                    groundGoalOverride: ghostGroundGoals,
                     out AccessSearchSnapshot snapshot,
                     out string snapshotFailure))
             {
@@ -172,7 +190,8 @@ namespace AutoTerrainDesignations
             AccessPathRequest request = BuildMergedGoalAccessRequest(
                 snapshot, cluster,
                 fixedGoalOrigins: Array.Empty<Tile2i>(),
-                acceptedProviderOrigins: Array.Empty<Tile2i>());
+                acceptedProviderOrigins: Array.Empty<Tile2i>(),
+                groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
             IEnumerator search = RunExperimentalAccessDryRunSliced(
                 request, cluster, 1, 1, dryRun);
@@ -183,10 +202,33 @@ namespace AutoTerrainDesignations
 
             AccessSearchResult? searchResult = dryRun.Result;
             AccessDesignationPlan? plan = LastExperimentalAccessPlan;
-            PlannedTowerApproach? selectedApproach = searchResult == null
+            PlannedTowerApproach? selectedSourceApproach = searchResult == null
                 ? null
                 : approaches.FirstOrDefault(item =>
                     item.Profiles.ContainsKey(searchResult.StartOrigin));
+            Tile2i reachedGoal = searchResult?.V2Route?.GroundPath.LastOrDefault()
+                ?? (searchResult != null && searchResult.Path.Count > 0
+                    ? searchResult.Path[searchResult.Path.Count - 1].Position
+                    : default);
+            MineTower? selectedGhost = searchResult == null
+                ? null
+                : ghosts.OrderBy(ghost => DistanceSquared(
+                    GetTowerAccessPosition(
+                        ghost,
+                        tower.Area.BoundingBoxMin,
+                        tower.Area.BoundingBoxMax),
+                    reachedGoal))
+                    .FirstOrDefault();
+            PlannedTowerApproach? selectedApproach =
+                selectedSourceApproach == null || selectedGhost == null
+                    ? null
+                    : new PlannedTowerApproach(
+                        selectedGhost,
+                        GetTowerAccessPosition(
+                            selectedGhost,
+                            tower.Area.BoundingBoxMin,
+                            tower.Area.BoundingBoxMax),
+                        selectedSourceApproach.Profiles);
             PlannedTowerCandidate? best = searchResult != null
                 && searchResult.Success
                 && plan != null
@@ -199,7 +241,8 @@ namespace AutoTerrainDesignations
             {
                 LogExperimentalAccessDebug(
                     $"[ATD Planned Tower Access] ghost={best.Approach.Ghost.Id} " +
-                    $"singleSearchStarts={mergedProfiles.Count} reached goal; committing route");
+                    $"homeStarts={mergedProfiles.Count} reachedGhostGoal={reachedGoal}; " +
+                    "committing route");
             }
 
             void AddCorner(Tile2i corner, int height)
@@ -330,6 +373,42 @@ namespace AutoTerrainDesignations
                 .OrderBy(value => value, StringComparer.Ordinal));
         }
 
+        private static IReadOnlyList<Tile2i> BuildPlannedTowerGhostGroundGoals(
+            IAreaManagingTower tower)
+        {
+            if (s_vehiclePathFindingManager == null)
+                return Array.Empty<Tile2i>();
+            List<MineTower> ghosts = FindUnstartedMiningTowerGhostsInArea(tower);
+            if (ghosts.Count == 0)
+                return Array.Empty<Tile2i>();
+            VehiclePathFindingParams pathParams =
+                GetExcavatorPathFindingParamsForTower(tower, out _);
+            IPathabilityProvider pathability =
+                s_vehiclePathFindingManager.PathabilityProvider;
+            List<Tile2i> goals = ghosts
+                .Select(ghost =>
+                {
+                    Tile2i access = GetTowerAccessPosition(
+                        ghost,
+                        tower.Area.BoundingBoxMin,
+                        tower.Area.BoundingBoxMax);
+                    return FindNearestPathableTile(
+                        access, pathability, pathParams);
+                })
+                .Where(goal => tower.Area.ContainsTile(goal)
+                    && pathability.IsPathable(
+                        goal, pathParams.PathabilityQueryMask))
+                .Distinct()
+                .ToList();
+            if (goals.Count > 0)
+            {
+                LogExperimentalAccessDebug(
+                    $"[ATD Planned Tower Access] using ghost ground goals " +
+                    $"instead of active-tower goals: [{string.Join(",", goals)}]");
+            }
+            return goals;
+        }
+
         private static bool IsUnstartedMiningTowerGhost(MineTower tower)
         {
             if (tower.IsDestroyed || tower.IsConstructed
@@ -351,7 +430,8 @@ namespace AutoTerrainDesignations
             TerrainManager terrMgr,
             IPathabilityProvider pathability,
             VehiclePathFindingParams pathParams,
-            int requiredWidth)
+            int requiredWidth,
+            bool allowExactNaturalSourcesOutsideArea = false)
         {
             var approaches = new List<PlannedTowerApproach>();
             foreach (MineTower ghost in ghosts)
@@ -378,6 +458,7 @@ namespace AutoTerrainDesignations
                                 tower, origin, seed, terrMgr,
                                 pathability, pathParams,
                                 reachableApproachGround,
+                                allowExactNaturalSourcesOutsideArea,
                                 out AccessHeightProfile profile))
                             profiles[origin] = profile;
                     }
@@ -444,10 +525,11 @@ namespace AutoTerrainDesignations
             IPathabilityProvider pathability,
             VehiclePathFindingParams pathParams,
             HashSet<Tile2i> reachableApproachGround,
+            bool allowOutsideArea,
             out AccessHeightProfile profile)
         {
             profile = default;
-            if (!IsOriginInsideTower(tower, origin)
+            if ((!allowOutsideArea && !IsOriginInsideTower(tower, origin))
                 || DistanceSquared(origin + new RelTile2i(2, 2), approachSeed)
                     > PLANNED_TOWER_APPROACH_RADIUS
                         * PLANNED_TOWER_APPROACH_RADIUS)

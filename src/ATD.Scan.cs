@@ -152,7 +152,8 @@ namespace AutoTerrainDesignations
             {
                 LogDebug("AUTO scanning found existing terrain designations; treating them as access-pathfinding goals.");
                 yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps);
+                    tower, terrMgr, towerSettings, generateRamps,
+                    usePlannedTowerGhostGoals: true);
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 if (inspectorInstance != null)
                 {
@@ -904,7 +905,8 @@ namespace AutoTerrainDesignations
             IAreaManagingTower tower,
             TerrainManager terrMgr,
             ATDTowerSettings towerSettings,
-            bool generateRamps)
+            bool generateRamps,
+            bool usePlannedTowerGhostGoals = false)
         {
             string? skipReason = !generateRamps
                 ? "accessway generation disabled"
@@ -935,6 +937,10 @@ namespace AutoTerrainDesignations
             var endpointCornerHeights = new Dict<Tile2i, int>();
             var placedAccesswayOrigins = new List<Tile2i>();
             var rampResult = new RampGenerationResult();
+            IReadOnlyList<Tile2i>? ghostGroundGoals =
+                usePlannedTowerGhostGoals
+                    ? BuildPlannedTowerGhostGroundGoals(tower)
+                    : null;
             yield return CreateAccessRampCoroutine(
                 tower,
                 emptyGeneratedPlan,
@@ -946,7 +952,10 @@ namespace AutoTerrainDesignations
                 null,
                 useLocalSurfaceReference: false,
                 allowExistingPlannedRampShortcut: true,
-                result: rampResult);
+                result: rampResult,
+                groundGoalOverride: ghostGroundGoals?.Count > 0
+                    ? ghostGroundGoals
+                    : null);
             SetTowerLastRampOutcome(tower, rampResult.Outcome);
         }
 

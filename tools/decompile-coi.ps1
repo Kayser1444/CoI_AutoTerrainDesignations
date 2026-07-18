@@ -33,6 +33,56 @@ Then re-run this script.
 }
 
 # ---------------------------------------------------------------------------
+# 1.5. Check for ilspycmd updates (once per day)
+# ---------------------------------------------------------------------------
+$versionOutput = & $ilspy --version 2>&1
+$currentVersion = $null
+foreach ($line in $versionOutput) {
+    if ($line -match 'ilspycmd:\s*([0-9a-zA-Z.-]+)') {
+        $currentVersion = $Matches[1]
+        break
+    }
+}
+
+$lastCheckFile = Join-Path ([System.IO.Path]::GetTempPath()) "ilspycmd-last-check.txt"
+$needsCheck = $true
+if (Test-Path -LiteralPath $lastCheckFile) {
+    $lastCheck = Get-Item -LiteralPath $lastCheckFile
+    if ((Get-Date) - $lastCheck.LastWriteTime -lt [TimeSpan]::FromDays(1)) {
+        $needsCheck = $false
+    }
+}
+
+if ($needsCheck) {
+    try {
+        $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/ilspycmd/index.json" -UseBasicParsing -TimeoutSec 3
+        if ($response -and $response.versions) {
+            $latestVersion = $response.versions[-1]
+            if ($currentVersion -and $latestVersion -and $currentVersion -ne $latestVersion) {
+                $cleanCurrent = $currentVersion -replace '-.*$'
+                $cleanLatest = $latestVersion -replace '-.*$'
+                $currVerObj = $null
+                $lateVerObj = $null
+                if ([System.Version]::TryParse($cleanCurrent, [ref]$currVerObj) -and [System.Version]::TryParse($cleanLatest, [ref]$lateVerObj)) {
+                    if ($lateVerObj -gt $currVerObj) {
+                        Write-Warning "A newer version of ilspycmd is available ($latestVersion). Installed version is $currentVersion. Update with: dotnet tool update -g ilspycmd"
+                    }
+                }
+            }
+        }
+        # Update the timestamp file
+        if (Test-Path -LiteralPath $lastCheckFile) {
+            (Get-Item -LiteralPath $lastCheckFile).LastWriteTime = Get-Date
+        } else {
+            New-Item -ItemType File -Path $lastCheckFile -Force | Out-Null
+        }
+    } catch {
+        # Silently ignore network or parsing failures
+        Write-Debug "Failed to check for latest ilspycmd version: $_"
+    }
+}
+
+# ---------------------------------------------------------------------------
 # 2. Resolve paths
 # ---------------------------------------------------------------------------
 $managedPath = if ($env:CAPTAIN_INDUSTRY_MANAGED_PATH) {

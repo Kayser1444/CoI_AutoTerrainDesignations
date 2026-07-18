@@ -48,6 +48,7 @@ Leave a :heart: if you found this mod useful.
 - Enable the mod when loading or starting a new game
 - Can be safely removed from saves
 - Works with other mods that don't conflict with mining tower inspector
+- Requires Captain of Industry `0.8.5` or newer; older versions may work but are not supported or tested.
 
 ## Build from source
 - Install the .NET SDK with .NET Framework 4.8 targeting support

@@ -275,7 +275,19 @@ namespace AutoTerrainDesignations
                     if (!isFilling && s_dumpingProto != null && clusterRampProto == s_dumpingProto)
                         AddConnectedPreparationShouldersToRampPlan(session, cluster.Designations, tileDepths, cornerHeights, attachDesignations);
 
-                    LogDebug($"[ATD Farming Access] cluster#{cluster.DebugId} planning ramp pass={pass} proto={clusterRampProto.Id.Value} width={(cluster.Count < towerSettings.RampWidth ? 1 : towerSettings.RampWidth)} attach={attachDesignations.Count} reserved={reservedRampTiles.Count} forbiddenOrigins={forbiddenApproachOrigins.Count}. {FormatFarmingAccessClusterSummary(cluster)}");
+                    int requestedRampWidth = towerSettings.RampWidth;
+                    if (GetTowerVehicleClearance(tower) == AccessVehicleClearanceMode.Auto)
+                    {
+                        VehiclePathFindingParams pathParams =
+                            GetExcavatorPathFindingParamsForTower(tower, out _);
+                        // AUTO must affect both pathability and the generated accessway
+                        // footprint. The explicit T3 setting uses two designation lanes;
+                        // mirror that when AUTO selects a T3 excavator.
+                        if (GetVehicleClearance(pathParams) >= 3)
+                            requestedRampWidth = System.Math.Max(requestedRampWidth, 2);
+                    }
+
+                    LogDebug($"[ATD Farming Access] cluster#{cluster.DebugId} planning ramp pass={pass} proto={clusterRampProto.Id.Value} width={(cluster.Count < requestedRampWidth ? 1 : requestedRampWidth)} attach={attachDesignations.Count} reserved={reservedRampTiles.Count} forbiddenOrigins={forbiddenApproachOrigins.Count}. {FormatFarmingAccessClusterSummary(cluster)}");
 
                     if (AttachSurfaceAlreadyHasOwnedRamp(attachDesignations, ownedRamps, clusterRampProto))
                     {
@@ -307,9 +319,9 @@ namespace AutoTerrainDesignations
                         prevOrigins.Clear();
                     }
 
-                    int configuredRampWidth = cluster.Count < towerSettings.RampWidth
+                    int configuredRampWidth = cluster.Count < requestedRampWidth
                         ? 1
-                        : towerSettings.RampWidth;
+                        : requestedRampWidth;
 
                     var placedRampOrigins = new List<Tile2i>();
                     // Temporarily exclude this cluster's own origins so its ramp candidates can
