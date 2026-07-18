@@ -3,7 +3,7 @@ v0.5.1 | 2026-07-19
 * Fixed: Ramps starting from mining designations now correctly reserve local space for flat landings and turns
 * Fixed: Prevented invalid ramp connections on large flat ground areas
 
-v0.5.0 | 2026-07-17
+v0.5.0 | 2026-07-18
 * Added: Experimental two-tile-wide accessways (ramps, etc.) for Mega vehicles, including turns, switchbacks, and connections between terrain work and the tower access network
 * Changed: **Accessway mode** replaces the previous ramp-width and corridor-clearance settings, with OFF, AUTO, T1, T2, T3, and legacy straight-only modes
 * Improved: Mining designations and accessways use landslide prediction to better avoid buildings and protected ocean tiles
