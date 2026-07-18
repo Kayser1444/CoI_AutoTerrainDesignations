@@ -1,3 +1,5 @@
+v0.5.1 [unreleased]
+
 v0.5.0 [released]
 * Improved: Clear debris now shows a one-shot tower notification when no debris is found or when no reachable debris can be queued; the latter suggests Ctrl-clicking to include unreachable debris.
 * Improved: Debris cleanup diagnostics now report discovery, reachability totals, enqueue and skip counts at Debug level, with per-prop origins, rejection reasons, and manager coalescing details at Trace level.
