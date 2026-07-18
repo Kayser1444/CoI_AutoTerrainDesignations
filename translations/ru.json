@@ -52,12 +52,52 @@
     "АВТО"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Ширина рампы"
+    "panel.designations.accessway_mode.label",
+    "Режим доступа"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Ширина создаваемых подъездных рамп (0 = отключить рампу)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Наследие 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Наследие 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Наследие 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Отключите сгенерированные подъезды и пандусы."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Используйте самый большой экскаватор, назначенный или заранее назначенный для этой башни, а затем самый большой экскаватор, представленный на карте. При отсутствии экскаваторов режим АВТО работает как ВЫКЛ."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Создавайте проложенные подъезды, используя проходимость экскаватора T1."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Создавайте проложенные подъезды, используя проходимость экскаватора T2."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Создавайте двухполосные подъездные пути, используя проходимость экскаватора T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Создайте только устаревший прямой пандус шириной в три ячейки обозначения, проверенный для экскаваторов T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Создайте только устаревший прямой пандус шириной в четыре ячейки обозначения, проверенный для экскаваторов T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Создайте только устаревший прямой пандус шириной в пять ячеек обозначения, проверенный для экскаваторов T3/Mega."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "Насколько строго сканирование фильтрует качество руды.\nВыкл.: включать все клетки, копать на полную глубину.\nНизк.: исключать очень бедные клетки, обрезать тонкие остатки руды внизу.\nСред.: умеренное качество — пропускать клетки с большим покрывающим слоем или малым количеством руды.\nВысок.: только богатые клетки с чистым рудным столбом.\nМакс.: только почти чистая руда — строгая проверка покрытия, глубины и плотности руды."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: минимальная мощность руды — {1:0.##} тайлов; минимальная плотность нижнего слоя — {2:P0}; минимальная чистота руды — {3:P0}; минимальный размер кластера — {4} соединённых тайла."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Отключено"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Низкий"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Средний"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Высокий"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Максимум"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -170,6 +234,46 @@
   [
     "settings.world.harvest_disrupted_trees.tooltip",
     "Отметьте деревья в завершенных подъездных путях и зонах нарушения горнодобывающих работ для вырубки. Если отключено, ATD не создает заказы на вырубку деревьев. Заказы на сбор урожая, размещенные ATD, удаляются одним из действий «Очистить»; порядок сбора несвязанных игроков сохраняется."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Пейзаж для удаления мусора"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Разрешить удаление мусора, чтобы внести минимальные возможные изменения в рельеф местности, когда опору невозможно выкопать без благоустройства территории. Если этот параметр отключен, запрос на удаление не выполняется, и запрашивающий рабочий процесс получает уведомление."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Быстрое удаление мусора"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Управляет тем, когда ATD использует игровое действие «Быстрое удаление» для проложенного мусора на подъезде. Быстрое удаление тратит Unity. Эта политика не распространяется на кнопку «Очистить мусорную башню»."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Всегда"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Используйте функцию «Быстрое удаление» для всего мусора на подъездах, за исключением подпорок, которые в запланированном месте захоронения будут достаточно засыпаны. Это ускоряет ландшафтный дизайн, но расходует Unity."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Ограничительный"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Предпочитайте обычные раскопки, но используйте функцию «Быстрое удаление», если раскопки не могут гарантировать проходимость после завершения работ."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Никогда"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Никогда не тратьте Unity на быстрое удаление мусора из подъезда. Удаление зависит от раскопок и настройки «Пейзаж для удаления мусора», и может потребоваться, чтобы игрок оказал помощь в быстром удалении."
   ],
   [
     "settings.world.safety_policy.label",
@@ -388,30 +492,6 @@
     "Минимальное число соединенных клеток обозначения, чтобы кластер прошел фильтр изоляции."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: минимальная мощность руды — {1:0.##} тайлов; минимальная плотность нижнего слоя — {2:P0}; минимальная чистота руды — {3:P0}; минимальный размер кластера — {4} соединённых тайла."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Отключено"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Низкий"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Средний"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Высокий"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Максимальный"
-  ],
-  [
     "settings.corner_mode.label",
     "Режим угловых обозначений"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} завершил сборку экскаватора"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} поставил в очередь очистку от мусора"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} не нашел мусора, который нужно было расчистить"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} не обнаружил доступных обломков, которые можно было бы расчистить. Удерживая клавишу Ctrl, щелкните, чтобы включить недоступные обломки."
   ],
   [
     "vehicle_order.confirm.singular",

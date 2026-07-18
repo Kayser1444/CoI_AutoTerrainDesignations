@@ -49,15 +49,55 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "BIL"
+    "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Rampbredd"
+    "panel.designations.accessway_mode.label",
+    "Accessway-läge"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Bredd på genererade åtkomstramper (0 = inaktivera ramp)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Legacy 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Arv 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Legacy 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Inaktivera genererade tillfarter och ramper."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Använd den största grävmaskinen som är tilldelad eller förtilldelad till detta torn, sedan den största grävmaskinen som finns på kartan. Utan grävmaskiner beter sig AUTO som AV."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Generera ruttade tillfartsvägar med hjälp av T1-grävmaskinens framkomlighet."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Generera ruttade tillfartsvägar med hjälp av T2-grävmaskinens framkomlighet."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Skapa tvåfiliga tillfartsvägar med hjälp av T3/Mega-grävmaskinens framkomlighet."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Generera endast en gammal rak ramp med tre beteckningsceller bred, validerad för T3/Mega grävmaskiner."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Generera endast en gammal rak ramp med fyra beteckningsceller bred, validerad för T3/Mega grävmaskiner."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Generera endast en gammal rak ramp med fem beteckningsceller bred, validerad för T3/Mega grävmaskiner."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "Hur strikt skanningen filtrerar efter malmhalt.\nAv: inkludera alla rutor, gräv till fullt djup.\nLåg: uteslut mycket glesa rutor, trimma tunna malmrester längst ned.\nMedel: måttlig halt — hoppa över rutor med mycket överlagring eller lite malm.\nHög: endast rika rutor med en ren malmkolumn.\nMax: nästan ren malm — strikt på överlagring, djup och malmdensitet."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minsta malmhöjd {1:0.##} terrängrutor; minsta bottendensitet {2:P0}; minsta malmrenhet {3:P0}; minsta klusterstorlek {4} sammanhängande rutor."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Av"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Låg"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medel"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Hög"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximal"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -172,6 +236,46 @@
     "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
   ],
   [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Landskap för att ta bort skräp"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Tillåt borttagning av skräp för att göra den minsta möjliga terrängförändringen när ett stöd inte kan grävas ut utan landskapsplanering. När den är inaktiverad misslyckas begäran om borttagning och det begärande arbetsflödet meddelas."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Ta snabbt bort skräp"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Styr när ATD använder spelets snabbborttagningsåtgärd för skräp från åtkomstvägar. Snabb bort spenderar Unity. Denna policy gäller inte knappen Rensa skräp i mintornet."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Alltid"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Använd Snabbborttagning för allt skräp från tillfartsvägen utom rekvisita som den planerade dumpningsbeteckningen kommer att begrava tillräckligt. Detta påskyndar landskapsarkitektur men spenderar Unity."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restriktiv"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Föredrar normal grävning men använd Quick Remove när schaktning inte kan garantera framkomlighet efter arbete."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Aldrig"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Spendera aldrig Unity på Snabbborttagning för skräp från accessway. Borttagning är beroende av utgrävning och inställningen Landscape för att ta bort skräp, och spelaren kan behöva hjälpa till med snabb borttagning."
+  ],
+  [
     "settings.world.safety_policy.label",
     "Säkerhetspolicy"
   ],
@@ -201,7 +305,7 @@
   ],
   [
     "settings.world.safety_policy.maximum",
-    "Maximum"
+    "Maximal"
   ],
   [
     "settings.pathfinder.generated_v_fixed.label",
@@ -388,30 +492,6 @@
     "Minsta antal sammanhängande markeringsrutor för att ett kluster ska överleva isoleringsfiltret."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: minsta malmhöjd {1:0.##} terrängrutor; minsta bottendensitet {2:P0}; minsta malmrenhet {3:P0}; minsta klusterstorlek {4} sammanhängande rutor."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Av"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Låg"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Medel"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Hög"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Maximum"
-  ],
-  [
     "settings.corner_mode.label",
     "Läge för hörnmarkeringar"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} har färdigställt en grävmaskin"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} har skräprensning i kö"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} hittade inget skräp att rensa"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} hittade inget nåbart skräp att rensa. Ctrl-klicka för att ta med oåtkomliga skräp"
   ],
   [
     "vehicle_order.confirm.singular",

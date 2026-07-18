@@ -52,12 +52,52 @@
     "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Rampenbreite"
+    "panel.designations.accessway_mode.label",
+    "Accessway-Modus"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Breite der erzeugten Zugangsrampen (0 = Rampe deaktivieren)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Vermächtnis 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Vermächtnis 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Vermächtnis 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Deaktivieren Sie generierte Zufahrten und Rampen."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Verwenden Sie den größten Bagger, der diesem Turm zugewiesen oder vorab zugewiesen wurde, und dann den größten Bagger auf der Karte. Ohne Bagger verhält sich AUTO wie AUS."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Generieren Sie verlegte Zufahrtswege mithilfe der T1-Bagger-Pfadbarkeit."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Generieren Sie verlegte Zufahrtswege mithilfe der T2-Bagger-Pfadbarkeit."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Generieren Sie zweispurige Zufahrtswege mithilfe der Befahrbarkeit von T3/Mega-Baggern."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Generieren Sie nur eine ältere gerade Rampe mit einer Breite von drei Bezeichnungszellen, validiert für T3-/Mega-Bagger."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Generieren Sie nur eine alte gerade Rampe mit einer Breite von vier Bezeichnungszellen, validiert für T3-/Mega-Bagger."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Generieren Sie nur eine alte gerade Rampe mit einer Breite von fünf Bezeichnungszellen, validiert für T3-/Mega-Bagger."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "Wie streng der Scan nach Erzgehalt filtert.\nAus: alle Felder einbeziehen, bis zur vollen Tiefe graben.\nNiedrig: sehr spärliche Felder ausschließen, dünne Erzreste am unteren Rand abschneiden.\nMittel: mäßiger Gehalt — Felder mit starker Deckschicht oder wenig Erz überspringen.\nHoch: nur reiche Felder mit sauberer Erzsäule.\nMax: nur nahezu reines Erz — streng bei Deckschicht, Tiefe und Erzdichte."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minimale Erzmächtigkeit {1:0.##} Geländekacheln; minimale Bodendichte {2:P0}; minimale Erzreinheit {3:P0}; minimale Clustergröße {4} verbundene Kacheln."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Aus"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Niedrig"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Mittel"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Hoch"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximal"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -172,6 +236,46 @@
     "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
   ],
   [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Landschaft zum Entfernen von Trümmern"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Ermöglichen Sie die Beseitigung von Trümmern, um die kleinste verarbeitbare Geländeveränderung vorzunehmen, wenn eine Stütze nicht ohne Landschaftsgestaltung ausgegraben werden kann. Wenn diese Option deaktiviert ist, schlägt die Entfernungsanforderung fehl und der anfordernde Workflow wird benachrichtigt."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Schmutz schnell entfernen"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Steuert, wann ATD die Schnellentfernungsaktion des Spiels für verlegte Zugangsschutt verwendet. Durch schnelles Entfernen wird Unity ausgegeben. Diese Richtlinie gilt nicht für die Schaltfläche „Trümmer entfernen“ im Minenturm."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Stets"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Verwenden Sie „Quick Removal“ für alle Zugangsreste mit Ausnahme von Stützen, die durch die geplante Deponie ausreichend vergraben werden. Dies beschleunigt die Landschaftsgestaltung, kostet aber Einheit."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restriktiv"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Bevorzugen Sie den normalen Aushub, verwenden Sie jedoch die Schnellentfernung, wenn der Aushub die Befahrbarkeit nach der Arbeit nicht gewährleisten kann."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Niemals"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Geben Sie Unity niemals für die schnelle Entfernung von Zugangsschutt aus. Die Entfernung hängt vom Aushub und der Einstellung „Landschaft zum Entfernen von Trümmern“ ab und erfordert möglicherweise die schnelle Hilfe des Spielers beim Entfernen."
+  ],
+  [
     "settings.world.safety_policy.label",
     "Sicherheitspolitik"
   ],
@@ -185,7 +289,7 @@
   ],
   [
     "settings.world.safety_policy.minimum",
-    "Minimal"
+    "Minimum"
   ],
   [
     "settings.world.safety_policy.low",
@@ -388,30 +492,6 @@
     "Minimale Anzahl verbundener Markierungskacheln, damit ein Cluster den Isolationsfilter übersteht."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: minimale Erzmächtigkeit {1:0.##} Geländekacheln; minimale Bodendichte {2:P0}; minimale Erzreinheit {3:P0}; minimale Clustergröße {4} verbundene Kacheln."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Aus"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Niedrig"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Mittel"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Hoch"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Maximum"
-  ],
-  [
     "settings.corner_mode.label",
     "Eckmarkierungsmodus"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} hat einen Bagger fertiggestellt"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} hat die Warteschlange für die Trümmerbeseitigung"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} hat keine zu beseitigenden Trümmer gefunden"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} hat keine erreichbaren Trümmer zum Entfernen gefunden. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen"
   ],
   [
     "vehicle_order.confirm.singular",

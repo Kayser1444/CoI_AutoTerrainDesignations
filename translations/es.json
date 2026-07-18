@@ -52,12 +52,52 @@
     "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Ancho de rampa"
+    "panel.designations.accessway_mode.label",
+    "Modo de acceso"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Ancho de las rampas de acceso generadas (0 = desactivar rampa)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Legado 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Legado 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Legado 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Deshabilitar accesos y rampas generadas."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Utilice la excavadora más grande asignada o preasignada a esta torre y luego la excavadora más grande presente en el mapa. Sin excavadoras, AUTO se comporta como APAGADO."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Genere accesos enrutados utilizando la transitabilidad de la excavadora T1."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Genere accesos enrutados utilizando la transitabilidad de la excavadora T2."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Genere accesos enrutados de dos carriles utilizando la transitabilidad de la excavadora T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Genere solo una rampa recta heredada de tres celdas de designación de ancho, validada para excavadoras T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Genere solo una rampa recta heredada de cuatro celdas de designación de ancho, validada para excavadoras T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Genere solo una rampa recta heredada de cinco celdas de designación de ancho, validada para excavadoras T3/Mega."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "Qué tan estrictamente filtra el escaneo la calidad del mineral.\nDesactivado: incluye todas las casillas, excava hasta la profundidad completa.\nBajo: excluye casillas muy dispersas, recorta vetas finas restantes en el fondo.\nMedio: calidad moderada — omite casillas con mucha sobrecarga o poco mineral.\nAlto: solo casillas ricas con una columna de mineral limpia.\nMáx.: mineral casi puro — estricto con la sobrecarga, la profundidad y la densidad del mineral."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altura mínima del mineral {1:0.##} casillas de terreno; densidad mínima inferior {2:P0}; pureza mínima del mineral {3:P0}; tamaño mínimo del grupo {4} casillas conectadas."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Desactivado"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Bajo"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Máximo"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -170,6 +234,46 @@
   [
     "settings.world.harvest_disrupted_trees.tooltip",
     "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Paisaje para eliminar escombros."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Permitir la remoción de escombros para realizar el cambio más pequeño en el terreno viable cuando no se pueda excavar un puntal sin paisajismo. Cuando está deshabilitado, la solicitud de eliminación falla y se notifica al flujo de trabajo solicitante."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Eliminación rápida de escombros"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Controla cuándo ATD usa la acción de eliminación rápida del juego para los desechos enrutados en las vías de acceso. La eliminación rápida gasta Unity. Esta política no se aplica al botón Limpiar escombros de la torre de la mina."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Siempre"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Utilice la eliminación rápida para todos los desechos de las vías de acceso, excepto los accesorios que la designación de vertido planificado enterrará lo suficiente. Esto acelera el paisajismo pero gasta Unity."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restrictivo"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Prefiera la excavación normal, pero utilice la extracción rápida cuando la excavación no pueda garantizar la transitabilidad posterior al trabajo."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Nunca"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Nunca gastes Unity en eliminación rápida de residuos de vías de acceso. La eliminación depende de la excavación y la configuración del paisaje para eliminar los escombros, y es posible que sea necesario que el jugador brinde asistencia para la eliminación rápida."
   ],
   [
     "settings.world.safety_policy.label",
@@ -388,30 +492,6 @@
     "Cantidad mínima de casillas de designación conectadas para que un grupo sobreviva al filtro de aislamiento."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: altura mínima del mineral {1:0.##} casillas de terreno; densidad mínima inferior {2:P0}; pureza mínima del mineral {3:P0}; tamaño mínimo del grupo {4} casillas conectadas."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Desactivado"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Bajo"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Medio"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Alto"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Máximo"
-  ],
-  [
     "settings.corner_mode.label",
     "Modo de designaciones de esquina"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} completó una excavadora"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entidad} tiene la limpieza de escombros en cola"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entidad} no encontró escombros que limpiar"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entidad} no encontró escombros accesibles para limpiar. Ctrl-clic para incluir escombros inalcanzables"
   ],
   [
     "vehicle_order.confirm.singular",

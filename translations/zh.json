@@ -49,15 +49,55 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "汽车"
+    "自动"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "坡道宽度"
+    "panel.designations.accessway_mode.label",
+    "通道方式"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "生成通行坡道的宽度。(0 = 不生成)"
+    "panel.designations.accessway_mode.legacy_3",
+    "遗产3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "遗产4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "遗产5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "禁用生成的通道和坡道。"
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "使用分配或预先分配给该塔的最大挖掘机，然后使用地图上存在的最大挖掘机。如果没有挖掘机，“自动”将表现为“关闭”。"
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "使用 T1 挖掘机路径生成路由通道。"
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "使用 T2 挖掘机路径能力生成路由通道。"
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "使用 T3/Mega 挖掘机路径生成双车道路由通道。"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "仅生成三个指定单元宽的传统直坡道，并针对 T3/Mega 挖掘机进行了验证。"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "仅生成四个指定单元宽的传统直坡道，已针对 T3/Mega 挖掘机进行验证。"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "仅生成宽度为 5 个指定单元的传统直坡道，并针对 T3/Mega 挖掘机进行了验证。"
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "扫描时过滤稀疏矿石的强度。\n关 : 包括所有格子，挖掘到最大深度。\n低 : 排除非常稀疏的地格，修剪底部零散薄矿层。\n中等:  排除矿石含量较少，或表土过多的地格。\n高 : 只包括高含量的纯矿石柱。\n最大 : 几乎纯矿 — 严格筛选矿石纯度、深度和表土厚度。"
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}：最低矿石高度 {1:0.##} 个地形格；最低底部密度 {2:P0}；最低矿石纯度 {3:P0}；最小连通矿簇大小 {4} 个地形格。"
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "关闭"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "低"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "中"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "高"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "最大限度"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -172,6 +236,46 @@
     "在最终确定的通道和采矿指定干扰区域中标记树木以供采伐。禁用后，ATD 不会创建树木采伐订单。 ATD 下的收获订单可通过清除操作删除；不相关的玩家收获订单被保留。"
   ],
   [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "景观清除杂物"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "当无法在没有景观美化的情况下挖掘支柱时，允许清除碎片以产生最小的可行地形变化。禁用后，删除请求将失败并通知请求工作流。"
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "快速清除杂物"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "控制 ATD 何时使用游戏的快速移除操作来清除通道碎片。快速去除花Unity。此政策不适用于矿塔清除碎片按钮。"
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "总是"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "使用“快速清除”清除所有通道碎片，但计划倾倒指定将充分掩埋的道具除外。这加快了美化速度，但会花费 Unity 的时间。"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "限制性的"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "首选正常挖掘，但当挖掘无法保证作业后的通行性时，请使用快速移除。"
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "绝不"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "切勿将 Unity 花费在快速移除通道碎片上。移除依赖于挖掘和景观来移除碎片设置，并且可能需要玩家提供快速移除协助。"
+  ],
+  [
     "settings.world.safety_policy.label",
     "安全政策"
   ],
@@ -185,7 +289,7 @@
   ],
   [
     "settings.world.safety_policy.minimum",
-    "最低"
+    "最低限度"
   ],
   [
     "settings.world.safety_policy.low",
@@ -201,7 +305,7 @@
   ],
   [
     "settings.world.safety_policy.maximum",
-    "最高"
+    "最大限度"
   ],
   [
     "settings.pathfinder.generated_v_fixed.label",
@@ -388,30 +492,6 @@
     "连通指定格数量达到此值的矿簇才会通过孤立过滤器。"
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}：最低矿石高度 {1:0.##} 个地形格；最低底部密度 {2:P0}；最低矿石纯度 {3:P0}；最小连通矿簇大小 {4} 个地形格。"
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "关闭"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "低"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "中"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "高"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "最高"
-  ],
-  [
     "settings.corner_mode.label",
     "角点指定模式"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity}完成了挖掘机建造"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} 已排队进行碎片清理"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} 发现没有需要清除的碎片"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} 发现没有可到达的碎片需要清除。按住 Ctrl 键单击以包含无法到达的碎片"
   ],
   [
     "vehicle_order.confirm.singular",

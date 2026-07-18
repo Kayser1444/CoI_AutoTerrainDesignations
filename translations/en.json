@@ -124,6 +124,30 @@
     "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality u2014 skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters."
   ],
   [
+    "settings.ore_quality.value_tooltip",
+    "{0}: minimum ore height {1:0.##} terrain tiles; minimum bottom density {2:P0}; minimum ore purity {3:P0}; minimum component size {4} connected tiles."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Off"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Low"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medium"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "High"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Maximum"
+  ],
+  [
     "panel.designations.corridor_clearance.label",
     "Corridor clearance"
   ],
@@ -154,10 +178,6 @@
   [
     "settings.tab.ore_quality",
     "Ore quality"
-  ],
-  [
-    "settings.tab.pathfinder",
-    "Accessways"
   ],
   [
     "settings.heading.mining_defaults",
@@ -237,7 +257,7 @@
   ],
   [
     "settings.world.quick_remove_debris.always.tooltip",
-    "Use Quick remove for all accessway debris. This speeds up landscaping but spends Unity."
+    "Use Quick remove for all accessway debris except props that the planned dumping designation will sufficiently bury. This speeds up landscaping but spends Unity."
   ],
   [
     "settings.world.quick_remove_debris.restrictive",
@@ -472,30 +492,6 @@
     "Minimum connected designation tile count for a cluster to survive the isolation filter."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: minimum ore height {1:0.##} terrain tiles; minimum bottom density {2:P0}; minimum ore purity {3:P0}; minimum component size {4} connected tiles."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Off"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Low"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Medium"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "High"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Maximum"
-  ],
-  [
     "settings.corner_mode.label",
     "Corner designations mode"
   ],
@@ -617,15 +613,15 @@
   ],
   [
     "notification.ramp_access_failed",
-    "[ATD] {entity} could not start an accessway"
+    "[ATD] {entity} could not start an access ramp"
   ],
   [
     "notification.ramp_access_truncated",
-    "[ATD] {entity} could not fit a full accessway"
+    "[ATD] {entity} could not fit a full access ramp"
   ],
   [
     "notification.ramp_access_not_accessible",
-    "[ATD] {entity} could not path to the accessway"
+    "[ATD] {entity} could not path to the ramp"
   ],
   [
     "notification.farming_complete",

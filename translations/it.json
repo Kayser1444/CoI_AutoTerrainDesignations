@@ -52,12 +52,52 @@
     "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Larghezza della rampa"
+    "panel.designations.accessway_mode.label",
+    "Modalità di accesso"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Larghezza delle rampe di accesso generate (0 = disattiva rampa)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Eredità 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Eredità 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Eredità 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Disabilitare accessi e rampe generati."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Usa l'escavatore più grande assegnato o pre-assegnato a questa torre, poi l'escavatore più grande presente sulla mappa. In assenza di escavatori, AUTO si comporta come OFF."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Genera accessi tracciati utilizzando la percorribilità dell'escavatore T1."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Genera accessi tracciati utilizzando la percorribilità dell'escavatore T2."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Genera accessi con percorso a due corsie utilizzando la percorribilità degli escavatori T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Genera solo una rampa diritta legacy larga tre celle di designazione, convalidata per escavatori T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Genera solo una rampa diritta legacy larga quattro celle di designazione, convalidata per escavatori T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Genera solo una rampa diritta legacy larga cinque celle di designazione, convalidata per escavatori T3/Mega."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "Livello di rigore dei filtri di scansione per la qualità del minerale.\nOff: include tutte le caselle, scava fino alla profondità massima.\nBasso: esclude le caselle molto rade, elimina le sottili strisce di minerale sul fondo.\nMedio: qualità moderata — salta le caselle con molto materiale di copertura o poco minerale.\nAlto: solo caselle ricche con una colonna di minerale pulita.\nMassimo: solo minerale quasi puro — rigoroso su materiale di copertura, profondità e densità del minerale."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altezza minima del minerale {1:0.##} caselle di terreno; densità minima inferiore {2:P0}; purezza minima del minerale {3:P0}; dimensione minima del gruppo {4} caselle connesse."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Disattivato"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Basso"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Medio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Massimo"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -170,6 +234,46 @@
   [
     "settings.world.harvest_disrupted_trees.tooltip",
     "Contrassegnare gli alberi negli accessi finalizzati e nelle zone di disturbo per la designazione mineraria per il raccolto. Quando disabilitato, ATD non crea ordini di raccolta alberi. Gli ordini di raccolto piazzati da ATD vengono rimossi da una delle azioni Cancella; gli ordini di raccolta dei giocatori non correlati vengono conservati."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Paesaggio per rimuovere i detriti"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Consentire la rimozione dei detriti per apportare la più piccola modifica del terreno praticabile quando non è possibile scavare un puntello senza abbellire il terreno. Se disabilitato, la richiesta di rimozione non riesce e il flusso di lavoro richiedente viene informato."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Rimuovere rapidamente i detriti"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Controlla quando ATD utilizza l'azione di rimozione rapida del gioco per i detriti dell'accesso instradati. La rimozione rapida spende Unità. Questa politica non si applica al pulsante Elimina detriti della torre mineraria."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Sempre"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Utilizzare la rimozione rapida per tutti i detriti degli accessi, ad eccezione dei sostegni che la designazione di scarico pianificata seppellirà sufficientemente. Questo accelera la creazione del paesaggio ma spende Unità."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restritivo"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Preferire lo scavo normale ma utilizzare Rimozione Rapida quando lo scavo non può garantire la pedonabilità post-opera."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Mai"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Non spendere mai Unity per la rimozione rapida dei detriti degli accessi. La rimozione si basa sullo scavo e sul paesaggio per rimuovere l'impostazione dei detriti e potrebbe essere necessario che il giocatore fornisca assistenza per la rimozione rapida."
   ],
   [
     "settings.world.safety_policy.label",
@@ -388,30 +492,6 @@
     "Numero minimo di caselle di designazione connesse perché un gruppo superi il filtro di isolamento."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: altezza minima del minerale {1:0.##} caselle di terreno; densità minima inferiore {2:P0}; purezza minima del minerale {3:P0}; dimensione minima del gruppo {4} caselle connesse."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Disattivato"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Basso"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Medio"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Alto"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Massimo"
-  ],
-  [
     "settings.corner_mode.label",
     "Modalità designazioni angolari"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} ha completato un escavatore"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entità} ha in coda la pulizia dei detriti"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entità} non ha trovato detriti da rimuovere"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entità} non ha trovato detriti raggiungibili da rimuovere. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili"
   ],
   [
     "vehicle_order.confirm.singular",

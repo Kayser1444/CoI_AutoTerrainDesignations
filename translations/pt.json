@@ -52,12 +52,52 @@
     "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Largura da rampa"
+    "panel.designations.accessway_mode.label",
+    "Modo de acesso"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Largura das rampas de acesso geradas (0 = desativar rampa)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Legado 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Legado 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Legado 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Desative os acessos e rampas gerados."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Use a maior escavadeira atribuída ou pré-atribuída a esta torre e, em seguida, a maior escavadeira presente no mapa. Sem escavadeiras, AUTO se comporta como OFF."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Gere vias de acesso roteadas usando a trajetória da escavadeira T1."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Gere vias de acesso roteadas usando a trajetória da escavadeira T2."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Gere vias de acesso roteadas de duas pistas usando a trajetória da escavadeira T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Gere apenas uma rampa reta legada com três células de designação de largura, validada para escavadeiras T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Gere apenas uma rampa reta legada com quatro células de designação de largura, validada para escavadeiras T3/Mega."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Gere apenas uma rampa reta legada com cinco células de designação de largura, validada para escavadeiras T3/Mega."
   ],
   [
     "panel.designations.max_layers.label",
@@ -82,6 +122,30 @@
   [
     "panel.designations.ore_purity.tooltip",
     "O quão rigorosamente o scan filtra a qualidade do minério.\nDesligado: incluir todos os tiles, escavar até a profundidade total.\nBaixo: excluir tiles muito esparsos, aparar minério fino no fundo.\nMédio: qualidade moderada — pular tiles com muita sobrecarga ou pouco minério.\nAlto: apenas tiles ricos com uma coluna de minério limpa.\nMáx: minério quase puro — rigoroso com sobrecarga, profundidade e densidade do minério."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: altura mínima do minério {1:0.##} células de terreno; densidade mínima inferior {2:P0}; pureza mínima do minério {3:P0}; tamanho mínimo do grupo {4} células conectadas."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "Desativado"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "Baixo"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "Médio"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "Alto"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "Máximo"
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -170,6 +234,46 @@
   [
     "settings.world.harvest_disrupted_trees.tooltip",
     "Marcar as árvores nas zonas de acesso finalizadas e nas zonas de perturbação designadas à mineração para colheita. Quando desativado, o ATD não cria ordens de colheita de árvores. Os pedidos de colheita feitos pelo ATD são removidos pela ação Clear; as ordens de colheita de jogadores não relacionados são preservadas."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Paisagem para remover detritos"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Permita que a remoção de detritos faça a menor mudança viável no terreno quando uma escora não puder ser escavada sem paisagismo. Quando desativado, a solicitação de remoção falha e o fluxo de trabalho solicitante é notificado."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Remova rapidamente os detritos"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Controla quando o ATD usa a ação de remoção rápida do jogo para detritos de vias de acesso direcionados. A remoção rápida gasta Unity. Esta política não se aplica ao botão Limpar detritos da torre da mina."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Sempre"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Use a remoção rápida para todos os detritos da via de acesso, exceto escoras que a designação de despejo planejado irá enterrar suficientemente. Isso acelera o paisagismo, mas gasta Unidade."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restritivo"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Prefira a escavação normal, mas use a remoção rápida quando a escavação não puder garantir a permeabilidade pós-obra."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Nunca"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Nunca gaste o Unity na remoção rápida de detritos de acesso. A remoção depende da escavação e da configuração da Paisagem para remover detritos e pode exigir que o jogador forneça assistência de remoção rápida."
   ],
   [
     "settings.world.safety_policy.label",
@@ -388,30 +492,6 @@
     "Número mínimo de blocos de designação conectados para que um grupo sobreviva ao filtro de isolamento."
   ],
   [
-    "settings.ore_quality.value_tooltip",
-    "{0}: altura mínima do minério {1:0.##} células de terreno; densidade mínima inferior {2:P0}; pureza mínima do minério {3:P0}; tamanho mínimo do grupo {4} células conectadas."
-  ],
-  [
-    "settings.ore_quality.value.off",
-    "Desativado"
-  ],
-  [
-    "settings.ore_quality.value.low",
-    "Baixo"
-  ],
-  [
-    "settings.ore_quality.value.medium",
-    "Médio"
-  ],
-  [
-    "settings.ore_quality.value.high",
-    "Alto"
-  ],
-  [
-    "settings.ore_quality.value.maximum",
-    "Máximo"
-  ],
-  [
     "settings.corner_mode.label",
     "Modo de designações de canto"
   ],
@@ -550,6 +630,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} concluiu uma escavadeira"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} tem limpeza de detritos na fila"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} não encontrou detritos para limpar"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} não encontrou detritos acessíveis para limpar. Ctrl-clique para incluir detritos inacessíveis"
   ],
   [
     "vehicle_order.confirm.singular",
