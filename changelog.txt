@@ -1,18 +1,23 @@
 v0.5.0 | 2026-07-17
-* Changed: Minimum supported Captain of Industry version is now 0.8.5; older versions may still work but are unsupported and untested
-* Added: Experimental two-tile-wide accessways for Mega vehicles, including turns, switchbacks, and connections between terrain work and the tower access network
+* Added: Experimental two-tile-wide accessways (ramps, etc.) for Mega vehicles, including turns, switchbacks, and connections between terrain work and the tower access network
+* Changed: **Accessway mode** replaces the previous ramp-width and corridor-clearance settings, with OFF, AUTO, T1, T2, T3, and legacy straight-only modes
+* Improved: Mining designations and accessways use landslide prediction to better avoid buildings and protected ocean tiles
 * Improved: Accessways can join usable natural terrain and reuse existing planned routes, reducing unnecessary terrain work
 * Improved: Accessway routing considers mining, dumping, and leveling endpoints, balancing landscaping work against travel distance
-* Improved: Accessways validate full vehicle clearance and use safer transitions to natural terrain and existing designations
-* Improved: Mining designations and accessways use landslide prediction to better avoid buildings and protected ocean tiles
-* Added: Trees disrupted by mining designations or accessways are automatically marked for harvesting
-* Changed: **Ramp width** and **Corridor clearance** are replaced by a unified **Vehicle clearance** setting, based on vehicle tier rather than an arbitrary number.
 * Added: A **Safety policy** setting with presets from MIN to MAX for landslide slope and buffer limits
+* Improved: Accessways validate full vehicle clearance and use safer transitions to natural terrain and existing designations
+* Added: AUTO accessways can connect to an unstarted mine control tower ghost without creating or modifying the ghost
+* Added: **Quick remove debris** accessway policy with Always, Restrictive, and Never options
+* Added: Trees disrupted by mining designations or accessways are automatically marked for harvesting
+* Added: **Clear debris** now queues safe excavator cleanup for selected props, including while paused, and reports when no reachable debris is available
+* Improved: Debris cleanup temporarily preserves existing terrain and forestry designations, then restores them after cleanup
+* Fixed: Repeated **Create Designations** clicks do nothing until relevant tower settings, terrain, or world conditions change
+* Changed: **Ore quality** now uses a five-position slider from Off through Max
 * Changed: **Ore: None** ignores debris and dirt when existing pathfinding designations are present; its previous behavior is unchanged otherwise
 * Changed: Corner designation mode is now configured in vanilla **Controls**, with existing custom bindings retained
-* Fixed: Corner designation mode bindings changed in vanilla **Controls** now persist across game restarts
 * Added: An optional bottom-left cursor-coordinate overlay, disabled by default
 * Updated: Settings labels, icons, and translations
+* Changed: Minimum supported Captain of Industry version is now 0.8.5; older versions may still work but are unsupported and untested
 
 v0.4.5a | 2026-06-21
 * Improved: Experimental turning accessways connect to uneven ground using vanilla mining and dumping workability rules, with the correct designation type on the final tile
