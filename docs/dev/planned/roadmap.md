@@ -20,6 +20,7 @@ Planned and candidate improvements for Kayser's Automatic Terrain Designations.
    and parallel post-work cardinal proofs from the future V face back to G.
 
 * Landscaping rebate when digging useful oreemaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
+* Improve wide ramps' ability to connect to mining designations with jagged or sloped faces
 
 ## Generated mining-body vehicle clearance — future refinement
 
