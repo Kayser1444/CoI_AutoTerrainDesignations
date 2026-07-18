@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Costruire {0} a {1} e preassegnarlo a {2}?"
+    "Accodare un {0} per {2} a {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Costruire {0} × {1} a {2} e preassegnarli a {3}?"
+    "Accodare {0} {1} per {3} a {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Costruire"
+    "Accodamento"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Vai a {0}"
+    "Zoom su {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

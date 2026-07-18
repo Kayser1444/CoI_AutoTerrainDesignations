@@ -1370,38 +1370,53 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
+            Tile2i startOrigin = new Tile2i(0, 16);
             Tile2i targetOrigin = new Tile2i(8, 8);
-            var targetProfiles = new Dictionary<Tile2i, AccessHeightProfile>
+            var endpointProfiles = new Dictionary<Tile2i, AccessHeightProfile>
             {
+                [startOrigin] = new AccessHeightProfile(0, 0, 0, 0),
                 [targetOrigin] = new AccessHeightProfile(0, 0, 0, 0),
             };
             AccessUsefulHeightEnvelope v1TargetEnvelope =
-                envelope.WithExtendedFixedTargets(
-                    targetProfiles, new[] { targetOrigin }, useV2: false);
+                envelope.WithExtendedFixedEndpoints(
+                    endpointProfiles, new[] { startOrigin, targetOrigin },
+                    useV2: false);
             AccessUsefulHeightEnvelope v2TargetEnvelope =
-                envelope.WithExtendedFixedTargets(
-                    targetProfiles, new[] { targetOrigin }, useV2: true);
+                envelope.WithExtendedFixedEndpoints(
+                    endpointProfiles, new[] { startOrigin, targetOrigin },
+                    useV2: true);
+            Tile2i startCenter = startOrigin + new RelTile2i(2, 2);
             Tile2i targetCenter = targetOrigin + new RelTile2i(2, 2);
-            Tile2i v2ExtensionEdge = targetCenter + new RelTile2i(5, 0);
-            Tile2i outsideV2Extension = targetCenter + new RelTile2i(6, 0);
+            Tile2i v2UpperExtensionEdge = targetCenter + new RelTile2i(5, 0);
+            Tile2i outsideV2UpperExtension = targetCenter + new RelTile2i(6, 0);
+            Tile2i v2LowerExtensionEdge = targetCenter + new RelTile2i(9, 0);
+            Tile2i outsideV2LowerExtension = targetCenter + new RelTile2i(10, 0);
             if (!v1TargetEnvelope.IsV1CenterHeightUseful(
-                    targetCenter, -16, out _)
+                    startCenter, -32, out _)
+                || !v1TargetEnvelope.IsV1CenterHeightUseful(
+                    startCenter, 16, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    startCenter, -64, out _)
+                || !v2TargetEnvelope.IsV2CenterHeightUseful(
+                    startCenter, 32, out _)
+                || !v1TargetEnvelope.IsV1CenterHeightUseful(
+                    targetCenter, -32, out _)
                 || !v1TargetEnvelope.IsV1CenterHeightUseful(
                     targetCenter, 16, out _)
                 || !v2TargetEnvelope.IsV2CenterHeightUseful(
-                    targetCenter, -32, out _)
+                    targetCenter, -64, out _)
                 || !v2TargetEnvelope.IsV2CenterHeightUseful(
                     targetCenter, 32, out _)
                 || !v2TargetEnvelope.IsV2CenterHeightUseful(
-                    v2ExtensionEdge, -1, out _)
+                    v2LowerExtensionEdge, -1, out _)
                 || !v2TargetEnvelope.IsV2CenterHeightUseful(
-                    v2ExtensionEdge, 1, out _)
+                    v2UpperExtensionEdge, 1, out _)
                 || v2TargetEnvelope.IsV2CenterHeightUseful(
-                    outsideV2Extension, -1, out _)
+                    outsideV2LowerExtension, -1, out _)
                 || v2TargetEnvelope.IsV2CenterHeightUseful(
-                    outsideV2Extension, 1, out _))
+                    outsideV2UpperExtension, 1, out _))
             {
-                failure = "Target extensions must localize V1/V2 turn-landing room to the fixed goal cone";
+                failure = "Endpoint extensions must localize V1/V2 turn-landing room to every potential fixed start and goal cone";
                 return false;
             }
 
@@ -1428,7 +1443,7 @@ namespace AutoTerrainDesignations.Access.V2
                 || customEnvelope.IsV2CenterHeightUseful(
                     allowanceSample, 1, out _))
             {
-                failure = "Useful-height hull must capture custom target extensions while retaining strict base checks: "
+                failure = "Useful-height hull must capture custom endpoint extensions while retaining strict base checks: "
                     + customEnvelopeFailure;
                 return false;
             }

@@ -138,8 +138,8 @@ public static string Tt(string text) => text;
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
         SetExperimentalAccessUsefulHeightEnvelope(true);
-        TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(0.5f);
-        TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(1f);
+        TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(1f);
+        TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(2f);
         TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(0.5f);
         TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1f);
         SetAccessAvoidOcean(true);
@@ -376,8 +376,8 @@ public static string Tt(string text) => text;
     internal static int ExperimentalAccessV2HeightEnvelopeUpperAllowance32
         => s_experimentalAccessV2HeightEnvelopeUpperAllowance32;
 
-    private static int s_experimentalAccessV1HeightEnvelopeLowerAllowance32 = 16;
-    private static int s_experimentalAccessV2HeightEnvelopeLowerAllowance32 = 32;
+    private static int s_experimentalAccessV1HeightEnvelopeLowerAllowance32 = 32;
+    private static int s_experimentalAccessV2HeightEnvelopeLowerAllowance32 = 64;
     private static int s_experimentalAccessV1HeightEnvelopeUpperAllowance32 = 16;
     private static int s_experimentalAccessV2HeightEnvelopeUpperAllowance32 = 32;
 

@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "{0} bei {1} erstellen und {2} vorab zuweisen?"
+    "{0} für {2} bei {1} in die Warteschlange stellen?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "{0} × {1} bei {2} erstellen und sie {3} vorab zuweisen?"
+    "{0} {1}s für {3} bei {2} in die Warteschlange stellen?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Bauen"
+    "In die Warteschlange stellen"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Gehen Sie zu {0}"
+    "Auf {0} zoomen"
   ],
   [
     "vehicle_order.preassigned.tooltip",

@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "在 {1} 构建 {0} 并将其预先分配给 {2}？"
+    "将 {0} 在 {1} 处为 {2} 排队？"
   ],
   [
     "vehicle_order.confirm.plural",
-    "在 {2} 构建 {0} × {1} 并将它们预先分配给 {3}？"
+    "将 {0} 个 {1} 在 {2} 处为 {3} 排队？"
   ],
   [
     "vehicle_order.confirm.button",
-    "建造"
+    "入队"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "转到{0}"
+    "缩放至 {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

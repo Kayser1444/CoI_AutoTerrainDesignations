@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Construir {0} em {1} e pré-atribuí-lo a {2}?"
+    "Enfileirar um {0} para {2} em {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Construir {0} × {1} em {2} e pré-atribuí-los a {3}?"
+    "Enfileirar {0} {1}s para {3} em {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Construir"
+    "Enfileirar"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Vá para {0}"
+    "Ampliar para {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

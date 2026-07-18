@@ -1572,7 +1572,8 @@ namespace AutoTerrainDesignations.Access
                 AccessUsefulHeightEnvelope? requestHeightEnvelope =
                     BuildRequestUsefulHeightEnvelope(
                         request.Snapshot,
-                        request.Goal.FixedProfileNodes,
+                        request.Start.FixedProfileNodes.Concat(
+                            request.Goal.FixedProfileNodes),
                         useV2: true);
                 bool useV2AStar = ShouldUseV2AStar(request);
                 AccessV2PotentialField? v2Potential = useV2AStar
@@ -1713,7 +1714,9 @@ namespace AutoTerrainDesignations.Access
             AccessUsefulHeightEnvelope? requestHeightEnvelope =
                 BuildRequestUsefulHeightEnvelope(
                     snapshot,
-                    fixedGoalOrigins ?? (IEnumerable<Tile2i>)Array.Empty<Tile2i>(),
+                    fixedGoalOrigins == null
+                        ? clusterOrigins
+                        : clusterOrigins.Concat(fixedGoalOrigins),
                     useV2: false);
 
             var goalsByHeight2 = new Dictionary<int, List<Tile2i>>();
@@ -1779,10 +1782,10 @@ namespace AutoTerrainDesignations.Access
         private static AccessUsefulHeightEnvelope?
             BuildRequestUsefulHeightEnvelope(
                 AccessSearchSnapshot snapshot,
-                IEnumerable<Tile2i> fixedGoalOrigins,
+                IEnumerable<Tile2i> fixedEndpointOrigins,
                 bool useV2)
-            => snapshot.UsefulHeightEnvelope?.WithExtendedFixedTargets(
-                snapshot.FixedProfiles, fixedGoalOrigins, useV2);
+            => snapshot.UsefulHeightEnvelope?.WithExtendedFixedEndpoints(
+                snapshot.FixedProfiles, fixedEndpointOrigins, useV2);
 
         internal static bool ShouldUseV2AStar(AccessPathRequest request)
             => request.RequiredWidth == 2

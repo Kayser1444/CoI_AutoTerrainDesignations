@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Build {0} at {1} and pre-assign it to {2}?"
+    "Enqueue a {0} for {2} at {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Build {0} × {1} at {2} and pre-assign them to {3}?"
+    "Enqueue {0} {1}s for {3} at {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Build"
+    "Enqueue"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Go to {0}"
+    "Zoom to {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

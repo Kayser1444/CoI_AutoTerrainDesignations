@@ -22,12 +22,14 @@ height to the same useful surface requires at least as much travel and strictly
 more landscaping work.
 
 The envelope is shared snapshot-and-request infrastructure used only to prune
-newly generated `V` nodes. Terrain/G and the selected start always define the
+newly generated `V` nodes. Terrain/G and every potential fixed start always define the
 useful hull. Whether every provider-eligible fixed profile or only current
 request targets also seed it remains an open reuse-versus-pruning decision.
 Sources are not pruning candidates. V1 and V2 apply strict center checks to
-their request-effective fields. Before the final transform, fixed request
-targets receive symmetric source extensions: `0.5` for V1 and `1.0` for V2.
+their request-effective fields. Before the final transform, every potential
+fixed start and fixed goal receives asymmetric source extensions. The lower
+side defaults to `1.0` for V1 and `2.0` for V2; the upper side defaults to
+`0.5` for V1 and `1.0` for V2.
 The propagated extensions preserve the flat landing that an ascending or
 descending ramp can need in order to turn toward a high or low fixed goal,
 without relaxing unrelated generated centers:
@@ -40,7 +42,7 @@ without relaxing unrelated generated centers:
   not move a center and are not tested.
 * Existing/fixed profiles and explicit `G` states are never rejected by the
   envelope. Captured terrain already includes G surfaces by definition. The
-  selected start contributes an additional source. The fixed-profile source
+  potential fixed starts contribute additional sources. The fixed-profile source
   policy is deliberately unresolved below.
 
 This is graph-domain pruning, not an A* heuristic. V1 and V2 therefore apply it
@@ -172,9 +174,10 @@ argument. A ramp cannot turn until it reaches a flat landing. When approaching
 a low or high fixed goal, the landing center can need to sit respectively below
 the scalar lower hull or above the scalar upper hull even though the route
 immediately turns back toward a represented terminal surface. Represent this
-need at its cause: extend each fixed request target source by `0.5` on both hull
-sides for V1 or `1.0` for V2, then propagate the ordinary construction-grade
-cones. The final candidate check remains strict. V2 needs the larger extension
+need at its cause: extend each potential fixed start and fixed goal source on
+the lower side by `1.0` for V1 or `2.0` for V2, and on the upper side by `0.5`
+for V1 or `1.0` for V2, then propagate the ordinary construction-grade cones.
+The final candidate check remains strict. V2 needs the larger extensions
 because its width-two band and flat turn landing introduce two lane centers
 together.
 
@@ -189,22 +192,22 @@ height-pruning boundary.
 
 ## Envelope sources
 
-Build the base envelope from captured terrain/G surfaces. The selected start
-must be part of the effective envelope. Request targets must also be represented
+Build the base envelope from captured terrain/G surfaces. Every potential fixed
+start must be part of the effective envelope. Request targets must also be represented
 unless the chosen reusable-base policy already includes them. Including extra
 fixed-profile sources weakens pruning but cannot create a false rejection.
 
 These sources define the hull; the rejection rule is applied only to newly
 generated `V` profiles. Explicit G nodes, starts, goals, and other fixed
 profiles do not need to be "inside" the envelope as candidates because they are
-never pruned by it. The selected start and any request target not already
+never pruned by it. Every potential fixed start and any request target not already
 represented by the base must be added as sources. Whether other
 provider-eligible fixed profiles seed the reusable base is left open below.
 
 | Source | Upper source | Lower source | Notes |
 |---|---:|---:|---|
 | Precise captured terrain height | Yes | Yes | Primary peak/trough source. Use precise height, not rounded G height, before conservative fixed-point rounding. |
-| Fixed start profile | Yes | Yes | The start is always an envelope source. Sample its full bilinear 5x5 target surface, even if it is not otherwise a reusable provider or goal. |
+| Potential fixed start profile | Yes | Yes | Every start origin considered by the request is an envelope source. Sample each full bilinear 5x5 target surface, even if it is not otherwise a reusable provider or goal. |
 | Tower-reachable and other captured G | Already covered | Already covered | Raw terrain supplies the elevation. Add an explicit source only if its pathing height differs from captured terrain height. |
 | Request target profile | Yes | Yes | Sample every accepted fixed/provider target's full bilinear 5x5 surface in the effective envelope: in the reusable base when already included there, otherwise in the request overlay. This also covers future synthetic target surfaces. |
 | Other provider-eligible fixed profile | Open | Open | Including all such profiles weakens pruning but allows one hull to survive later promotion of a cluster/profile to a provider or target. A hybrid can omit them initially, then update only a hull side actually exceeded by a newly required source. |
@@ -223,7 +226,7 @@ Terrain/G and any adopted global constraint sources already exist when
 consideration:
 
 * **Tight request hull:** keep the reusable base terrain/G-only, then merge the
-  selected start and accepted request targets into a request-scoped overlay.
+  potential fixed starts and accepted request targets into a request-scoped overlay.
   This gives stronger pruning but the overlay can expand when a later cluster
   gains a newly accepted fixed provider or target.
 * **Reusable area hull:** seed the base with every snapshot-known fixed profile
@@ -239,7 +242,7 @@ consideration:
   update only that side. Many later targets should already be contained and
   require no hull work at all.
 
-Both V1 and V2 must query the same effective envelope. The selected start and
+Both V1 and V2 must query the same effective envelope. Every potential fixed start and
 every request target must be represented under the chosen policy. A future
 synthetic goal surface absent from the snapshot still requires an overlay.
 
@@ -254,10 +257,10 @@ too-narrow field.
 ### Closure under finder-generated surfaces
 
 Generated centers remain inside the strict request-effective fields. If such
-work later becomes a fixed/provider target, apply the target extension once for
+work later becomes a fixed start/provider target, apply the endpoint extension once for
 that new request and run the ordinary containment/update rule for both sides.
 Do not fold a previous request's extended field back into the reusable base or
-compound target extensions across provider promotions.
+compound endpoint extensions across provider promotions.
 
 ## Numeric representation
 
@@ -398,7 +401,7 @@ next sequential cluster search.
 
 ## Center-height rejection rule
 
-After applying request-target source extensions and propagating their cones,
+After applying request-endpoint source extensions and propagating their cones,
 query the effective envelope only at each newly reached V lane/profile center
 and require:
 
@@ -407,8 +410,9 @@ LowerUsefulHeight(center) <= profile.Center <= UpperUsefulHeight(center)
 ```
 
 Reject above or below on strict center separation after conservative fixed-point
-rounding. The version-specific upper and lower target extensions are applied to
-fixed goal samples before propagation; do not add another profile-level margin.
+rounding. The version-specific upper and lower endpoint extensions are applied
+to every potential fixed start and fixed goal sample before propagation; do not
+add another profile-level margin.
 For V2, evaluate each newly reached lane center independently; do not substitute
 one band-center sample for two lane centers. V2 in-place turns inherit their
 existing centers and do not require an envelope test.
@@ -529,7 +533,7 @@ or prop-specific envelope exemptions.
 
 ### Existing and projected designations
 
-The selected start and fixed request targets are sources and remain immutable.
+All potential fixed starts and fixed request targets are sources and remain immutable.
 Other existing provider-eligible fixed profiles are sources only under the
 reusable-area policy. Existing terrain designations also project their expected
 cut or fill side slopes beyond their 4x4 target surfaces. The snapshot stores a
@@ -596,7 +600,7 @@ existing horizontal and physical bounds remain authoritative.
 Snapshot diagnostics should report:
 
 * preprocessing time;
-* the captured V1 and V2 upper/lower target extensions;
+* the captured V1 and V2 upper/lower endpoint extensions;
 * source counts by category;
 * tile count and memory;
 * minimum, maximum, and average allowed-band width;
@@ -608,7 +612,7 @@ Search result/performance logs should report above/below rejection counts next
 to visited and pending nodes.
 
 For runtime troubleshooting, expose separate session-only console parameters
-for the V1 and V2 upper and lower target extensions. Accept finite nonnegative
+for the V1 and V2 upper and lower endpoint extensions. Accept finite nonnegative
 physical-height values, quantize them to `height32`, mark mining plans dirty,
 and capture the resulting values in newly built immutable envelopes. A value of
 `0` restores the corresponding strict raw hull boundary for an A/B comparison;
@@ -634,7 +638,7 @@ Cover at least:
 * one peak: exact maximum-grade upper cone in all cardinal directions;
 * one trough: exact lower cone;
 * two peaks and two troughs: correct max/min union;
-* selected start and target profiles above and below terrain;
+* every potential fixed start and target profile above and below terrain;
 * unrelated provider-eligible fixed profiles above and below the tight request
   hull, comparing both source policies;
 * promotion of a cluster/profile to a provider without changing the reusable
@@ -658,8 +662,9 @@ Cover:
 * pointless excavation below flat terrain;
 * necessary climb toward a mountain or raised fixed target;
 * necessary descent toward a trough or lowered fixed target;
-* switchback and 90-degree flat turns near both hull sides, including the exact
-  `0.5` target-source extension and strict rejection outside its propagated cone;
+* departure ramps from every potential fixed start plus switchback and 90-degree
+  flat turns near both hull sides, including the exact V1 lower `1.0` and upper
+  `0.5` endpoint-source extensions and strict rejection outside their propagated cones;
 * G-to-V and V-to-G handoffs;
 * fixed-provider continuation;
 * projected designation, ocean, building, durability, and prop interactions;
@@ -671,8 +676,8 @@ Repeat the V1 cases for:
 
 * equal flat bands;
 * uniform ramp bands;
-* the exact `1.0` target-source extension and strict rejection outside its
-  propagated cone;
+* the exact V2 lower `2.0` and upper `1.0` endpoint-source extensions and strict
+  rejection outside their propagated cones;
 * straight and strafe center-moving transitions;
 * 2x2 flat turn transitions, verifying that turns inherit already admitted
   centers and are not independently envelope-tested;
@@ -726,7 +731,7 @@ rejecting nodes.
 ### Stage 1 — Shared base transform
 
 Build dense tile-lattice `height32` upper/lower fields and the sequential
-snapshot-scoped cache. Support selected-start and request-target sources,
+snapshot-scoped cache. Support all-potential-start and request-target sources,
 freeze the effective envelope during each search, and update it only between
 searches. Compare the tight-request, reusable-area, and monotone-hybrid
 fixed-profile policies. Add transform, closure, containment, selective-update,
@@ -769,13 +774,13 @@ regression oracle.
     and updates only the upper and/or lower field that would expand. Keep this
     open until preprocessing cost, cluster count, containment frequency, and
     lost pruning are measured. Finder-generated surfaces admitted by a boundary
-    target extension can expand either request field if later promoted to a goal.
+    endpoint extension can expand either request field if later promoted to a start or goal.
 4. **Should raw terrain use every tile or extracted extrema only?** Every tile
     gives a simple exact linear transform. Peak/trough reduction is optional
     only if it produces byte-identical fields.
 5. **Should missing envelope samples reject?** No. Fail open initially; missing
     data is a snapshot diagnostic, not a new pathfinding failure.
-6. **How should repeated field promotion be bounded?** Keep request target
+6. **How should repeated field promotion be bounded?** Keep request endpoint
    extensions out of the reusable base so repeated snapshot/provider cycles
    cannot compound them. Apply an extension once to each goal in the current
    request overlay.
@@ -789,7 +794,7 @@ The design is ready to become default behavior when:
 
 * one shared immutable effective envelope serves both V1 and V2, backed by a
   snapshot base and any overlay required by the selected source policy;
-* every current terrain/G surface, selected start, and request target is
+* every current terrain/G surface, potential fixed start, and request target is
   represented;
 * the fixed-profile source policy is selected from measured preprocessing reuse
   and pruning results rather than assumed upfront;
@@ -806,8 +811,8 @@ The design is ready to become default behavior when:
   no implementation/source defects and no unacceptable representative-route
   regressions; exact exhaustive optimal-cost equivalence is not required;
 * fixtures cover V2 per-lane centers, retained-lane and in-place-turn behavior,
-  the exact V1 `0.5` and V2 `1.0` upper/lower target extensions with strict
-  checks outside their propagated cones,
+  the exact V1 lower/upper `1.0`/`0.5` and V2 lower/upper `2.0`/`1.0`
+  endpoint extensions with strict checks outside their propagated cones,
   the confirmed ocean upper source, and the constraint-only treatment of
   projected designations, props, buildings, and durability;
 * live marker tests show the useless high/low boundary exploration removed;

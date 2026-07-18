@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Bygga {0} vid {1} och förtilldela den till {2}?"
+    "Ställ en {0} i kö för {2} vid {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Bygga {0} × {1} vid {2} och förtilldela dem till {3}?"
+    "Ställ {0} {1} i kö för {3} vid {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Bygga"
+    "Köa"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Gå till {0}"
+    "Zooma till {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

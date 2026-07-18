@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Построить {0} в {1} и предварительно назначить его {2}?"
+    "Поставить {0} в очередь для {2} в {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Построить {0} × {1} в {2} и предварительно назначить их {3}?"
+    "Поставить в очередь {0} {1} для {3} в {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Строить"
+    "очередь"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Перейти к {0}"
+    "Приблизить к {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",

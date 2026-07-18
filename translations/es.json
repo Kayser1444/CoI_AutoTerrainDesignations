@@ -645,19 +645,19 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "¿Construir {0} en {1} y asignarlo previamente a {2}?"
+    "¿Poner en cola un {0} para {2} en {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "¿Construir {0} × {1} en {2} y asignarlos previamente a {3}?"
+    "¿Poner en cola {0} {1} para {3} en {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Construir"
+    "poner en cola"
   ],
   [
     "vehicle_order.zoom.tooltip",
-    "Ir a {0}"
+    "Ampliar a {0}"
   ],
   [
     "vehicle_order.preassigned.tooltip",
