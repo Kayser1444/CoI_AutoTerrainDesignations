@@ -157,9 +157,6 @@ namespace AutoTerrainDesignations.Access
         public static bool OperationRemovesNonTreeProp(
             AccessHandoffOperation operation, int terrainHeight2, int targetHeight2)
         {
-            if (operation == AccessHandoffOperation.Mining
-                || operation == AccessHandoffOperation.Leveling)
-                return true;
             if (operation == AccessHandoffOperation.Dumping)
                 return DoesDumpingDestroyNonTreeProp(terrainHeight2, targetHeight2);
             return false;
@@ -172,17 +169,24 @@ namespace AutoTerrainDesignations.Access
             if (!TryGetDesignationTargetHeight(data, sample,
                     out float targetHeight))
                 return false;
-            const float epsilon = 0.0001f;
-            bool mines = targetHeight <= sample.PlacedHeight + epsilon;
             bool buries = DoesDumpingDestroyNonTreeProp(
                 sample.PlacedHeight, targetHeight,
                 sample.DumpBurialThreshold);
-            return operation == AccessHandoffOperation.Mining
-                ? mines
-                : operation == AccessHandoffOperation.Dumping
-                    ? buries
-                    : operation == AccessHandoffOperation.Leveling
-                        && (mines || buries);
+            return operation == AccessHandoffOperation.Dumping && buries;
+        }
+
+        public static bool TryGetNonBuriedPropRemovalStrategy(
+            QuickRemoveDebrisPolicy policy,
+            bool buriedByPlannedDumping,
+            out bool quickRemove)
+        {
+            if (buriedByPlannedDumping)
+            {
+                quickRemove = false;
+                return false;
+            }
+            quickRemove = policy != QuickRemoveDebrisPolicy.Never;
+            return true;
         }
 
         public static bool TryGetDesignationTargetHeight(

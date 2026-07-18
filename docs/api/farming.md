@@ -64,7 +64,7 @@ All setters clamp to the same valid range used by the inspector. Changing a sett
 | Method | Range | Description |
 |---|---|---|
 | `GetMaxHeightDiff` / `SetMaxHeightDiff` | 1–3 | Max height difference across a designation |
-| `GetRampWidth` / `SetRampWidth` | 0–5 | Access ramp width; 0 disables ramps |
+| `GetRampWidth` / `SetRampWidth` | 0–5 | Compatibility accessway width: `0` = OFF, `1` = AUTO, `2` = T3, and `3–5` = legacy straight-only width |
 | `GetMaxLayersToExcavate` / `SetMaxLayersToExcavate` | ≥0 | Layers from surface; 0 = no limit |
 | `GetMaxDepthToDigTo` / `SetMaxDepthToDigTo` | `int?` | Absolute minimum elevation; `null` = no limit |
 | `GetOrePurityLevel` / `SetOrePurityLevel` | 0–4 | Ore quality threshold (0 = Off, 4 = Max) |

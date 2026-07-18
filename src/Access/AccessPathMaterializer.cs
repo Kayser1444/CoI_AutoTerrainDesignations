@@ -41,18 +41,22 @@ namespace AutoTerrainDesignations.Access
                 if (node.IsGround)
                 {
                     // A mining/leveling V-to-G handoff may enter a removable
-                    // non-tree prop tile.  The selected handoff operation
-                    // clears it before this ground node is used, even though
-                    // it is not ordinary pre-work G/cleanup terrain.
+                    // non-tree prop tile. The prop-removal manager clears it
+                    // before this ground node is used; vanilla terrain work
+                    // does not remove non-tree props.
                     bool postWorkHandoffGround =
                         (node.HandoffOperation == AccessHandoffOperation.Mining
                             || node.HandoffOperation == AccessHandoffOperation.Leveling)
-                        && snapshot.HasRemovableNonTreePropAtTile(node.Position);
+                        && snapshot.TryGetRequiredGeneratedVCleanupInfoForTile(
+                            node.Position, out _);
                     if (!snapshot.IsGroundOrCleanupNode(node.Position)
                         && !postWorkHandoffGround)
                         return Invalid("PlanGroundUnavailable", result, designations, reusedNodes, groundNodes);
-                    if (snapshot.TryGetRequiredCleanupInfoForTile(
-                        node.Position, out AccessPropCleanupInfo cleanupInfo))
+                    if ((postWorkHandoffGround
+                            ? snapshot.TryGetRequiredGeneratedVCleanupInfoForTile(
+                                node.Position, out AccessPropCleanupInfo cleanupInfo)
+                            : snapshot.TryGetRequiredCleanupInfoForTile(
+                                node.Position, out cleanupInfo)))
                     {
                         bool previousGeneratedSameOrigin = !previousWasGround
                             && previousNode.Mode != AccessSearchMode.Existing
@@ -374,7 +378,7 @@ namespace AutoTerrainDesignations.Access
                 groundNodes = replayGroundCenters.Count;
                 foreach (Tile2i center in replayGroundCenters)
                 {
-                    if (!snapshot.TryGetRequiredCleanupInfoForTile(
+                    if (!snapshot.TryGetRequiredGeneratedVCleanupInfoForTile(
                             center, out AccessPropCleanupInfo cleanup))
                         continue;
                     if (terrainWorkOrigins.Contains(cleanup.Origin))

@@ -163,7 +163,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsQuickRemoveDebrisAlways =
             Loc.Str("settings.world.quick_remove_debris.always", "Always", "Quick Remove policy value.");
         public static LocStr SettingsQuickRemoveDebrisAlwaysTooltip =
-            Loc.Str("settings.world.quick_remove_debris.always.tooltip", "Use Quick remove for all accessway debris. This speeds up landscaping but spends Unity.", "Tooltip for Always Quick remove policy.");
+            Loc.Str("settings.world.quick_remove_debris.always.tooltip", "Use Quick remove for all accessway debris except props that the planned dumping designation will sufficiently bury. This speeds up landscaping but spends Unity.", "Tooltip for Always Quick remove policy.");
         public static LocStr SettingsQuickRemoveDebrisRestrictive =
             Loc.Str("settings.world.quick_remove_debris.restrictive", "Restrictive", "Quick Remove policy value.");
         public static LocStr SettingsQuickRemoveDebrisRestrictiveTooltip =

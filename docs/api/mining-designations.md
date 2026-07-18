@@ -52,7 +52,7 @@ All setters clamp to the same range used by the in-game inspector. Changing a se
 | Method | Range | Meaning |
 |---|---|---|
 | `GetMaxHeightDiff` / `SetMaxHeightDiff` | 1–3 | Maximum height difference between adjacent designation cells |
-| `GetRampWidth` / `SetRampWidth` | 0–5 | Generated ramp width; `0` disables ramps |
+| `GetRampWidth` / `SetRampWidth` | 0–5 | Compatibility accessway width: `0` = OFF, `1` = AUTO, `2` = T3, and `3–5` = legacy straight-only width |
 | `GetMaxLayersToExcavate` / `SetMaxLayersToExcavate` | `0+` | Maximum layers from the current surface; `0` means no limit |
 | `GetMaxDepthToDigTo` / `SetMaxDepthToDigTo` | `int?` | Absolute minimum elevation; `null` means no limit |
 | `GetOrePurityLevel` / `SetOrePurityLevel` | 0–4 | Purity preset from `Off` through `Max` |

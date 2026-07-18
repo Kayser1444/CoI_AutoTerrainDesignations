@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Mafi;
+using Mafi.Core.Terrain.Designation;
 using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations.Access
@@ -243,6 +244,80 @@ namespace AutoTerrainDesignations.Access
                 || AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
                     new[] { -1, -1, 0, 1, 1 }, out _))
             { failure = "handoff operation must come only from a single-operation ground-facing edge"; return false; }
+            if (!AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                    new[] { -1, -1 }, new[] { 0, 0 },
+                    smoothLevelingAvailable: true,
+                    out AccessHandoffOperation smoothLeveling)
+                || smoothLeveling != AccessHandoffOperation.Leveling
+                || !AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                    new[] { -1, -1 }, new[] { 0, 0 },
+                    smoothLevelingAvailable: false,
+                    out AccessHandoffOperation roughMining)
+                || roughMining != AccessHandoffOperation.Mining
+                || !AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                    new[] { 1, 1 }, new[] { 0, 0 },
+                    smoothLevelingAvailable: false,
+                    out AccessHandoffOperation roughDumping)
+                || roughDumping != AccessHandoffOperation.Dumping
+                || AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                    new[] { -1, 1 }, new[] { 0, 0 },
+                    smoothLevelingAvailable: false, out _))
+            { failure = "V2 corner crests must level only a smooth face and otherwise select coherent mining or dumping"; return false; }
+            var postWorkTerrain = new Dictionary<Tile2i, float>();
+            var postWorkGround2 = new Dictionary<Tile2i, int>();
+            for (int y = 0; y <= 20; y++)
+                for (int x = 0; x <= 20; x++)
+                {
+                    var tile = new Tile2i(x, y);
+                    postWorkTerrain[tile] = 0f;
+                    postWorkGround2[tile] = 0;
+                }
+            postWorkTerrain[new Tile2i(11, 10)] = 1f;
+            postWorkGround2[new Tile2i(11, 10)] = 2;
+            // This sample is immediately outside the five-wide mask centered
+            // at (10,10). It must not become an accidental sixth fringe tile.
+            postWorkTerrain[new Tile2i(13, 10)] = 4f;
+            postWorkGround2[new Tile2i(13, 10)] = 8;
+            var postWorkSnapshot = new AccessSearchSnapshot(
+                new Tile2i(0, 0), new Tile2i(20, 20),
+                new Tile2i(18, 18), -4, 4,
+                true, false, false, 1f, 1f,
+                postWorkGround2,
+                new Dictionary<Tile2i, int>(),
+                new Dictionary<Tile2i, AccessHeightProfile>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                Array.Empty<AccessDurabilityCorner>(),
+                preciseTerrainHeights: postWorkTerrain,
+                vehicleWidth: 5,
+                propCleanupByTile:
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [new Tile2i(10, 10)] =
+                            AccessPropCleanupInfo.HardBlocked(
+                                new Tile2i(8, 8),
+                                AccessPropBlockerKind.UnderlyingTerrain),
+                    });
+            var postWorkOrigin = new Tile2i(8, 8);
+            AccessV2History postWorkHistory = AccessV2History.Empty.ApplyValidated(
+                new[] { new AccessV2OriginProfile(postWorkOrigin, flat) },
+                Array.Empty<AccessRayHeightConstraint>(),
+                Array.Empty<string>());
+            if (postWorkSnapshot.IsV2HandoffCenterPathable(
+                    postWorkOrigin, AccessHandoffOperation.Mining,
+                    new Tile2i(10, 10), postWorkHistory)
+                || !postWorkSnapshot.IsV2HandoffCorridorCenterPathable(
+                    postWorkOrigin, AccessHandoffOperation.Mining,
+                    new Tile2i(10, 10), postWorkHistory,
+                    new[] { postWorkOrigin })
+                || !postWorkSnapshot.IsV2HandoffCorridorCenterPathable(
+                    postWorkOrigin, AccessHandoffOperation.Mining,
+                    new Tile2i(7, 10), postWorkHistory,
+                    new[] { postWorkOrigin }))
+            { failure = "V2 mining handoff must validate the complete post-work Mega mask instead of requiring work at its center point"; return false; }
             if (!AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
                     new[] { -1, 0, -1, 0 }, AccessHandoffOperation.Mining)
                 || AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
@@ -482,8 +557,8 @@ namespace AutoTerrainDesignations.Access
                 new[] { new AccessPropSample(new Tile2i(0, 0), false, true, false) });
             if (hardCleanup.IsEligible || hardCleanup.BlockerKind != AccessPropBlockerKind.HardBlocker)
             { failure = "non-removable prop sample must classify as a hard blocker"; return false; }
-            if (!AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Mining, 4, 4)
-                || !AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Leveling, 4, 4)
+            if (AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Mining, 4, 4)
+                || AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Leveling, 4, 4)
                 || !AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Dumping, 2, 4)
                 || AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Dumping, 2, 3)
                 || AccessPropCleanupPolicy.DoesDumpingDestroyNonTreeProp(
@@ -493,6 +568,54 @@ namespace AutoTerrainDesignations.Access
                 || !AccessPropCleanupPolicy.DoesTerrainDeltaDestroyTree(AccessHandoffOperation.Mining, 4, 3)
                 || AccessPropCleanupPolicy.DoesTerrainDeltaDestroyTree(AccessHandoffOperation.Dumping, 2, 3))
             { failure = "prop terrain-removal policy helper failed"; return false; }
+            var exactPropSample = new AccessPropSample(
+                new Tile2i(1, 1), false, true, true,
+                dumpBurialProbeTile: new Tile2i(1, 1),
+                dumpBurialProbeOffsetX: 0.5f,
+                dumpBurialProbeOffsetY: 0.5f,
+                placedHeight: 2f,
+                dumpBurialThreshold: 0.5f);
+            var flatAtProp = new DesignationData(Tile2i.Zero,
+                new HeightTilesI(2));
+            var buriedProp = new DesignationData(Tile2i.Zero,
+                new HeightTilesI(3));
+            if (AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Mining, flatAtProp,
+                    exactPropSample)
+                || AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Leveling, buriedProp,
+                    exactPropSample)
+                || AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Dumping, flatAtProp,
+                    exactPropSample)
+                || !AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Dumping, buriedProp,
+                    exactPropSample))
+            { failure = "exact-position accessway prop classifier failed"; return false; }
+            if (AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Always,
+                    buriedByPlannedDumping: true,
+                    out _)
+                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Always,
+                    buriedByPlannedDumping: false,
+                    out bool alwaysQuick)
+                || !alwaysQuick
+                || AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Restrictive,
+                    buriedByPlannedDumping: true,
+                    out _)
+                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Restrictive,
+                    buriedByPlannedDumping: false,
+                    out bool restrictiveQuick)
+                || !restrictiveQuick
+                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Never,
+                    buriedByPlannedDumping: false,
+                    out bool neverQuick)
+                || neverQuick)
+            { failure = "non-buried prop-removal strategy policy failed"; return false; }
             for (int fixedCoordinate = -5; fixedCoordinate <= 5; fixedCoordinate++)
             {
                 for (int start = -5; start <= 5; start++)
@@ -1481,6 +1604,25 @@ namespace AutoTerrainDesignations.Access
                                         request.Snapshot, state, groundEntry,
                                         operation, history, diagnostics)
                                 : (AccessV2GroundToVHandoffEvaluator?)null,
+                    terminalExtensionOperationEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            && request.Snapshot.HasV2WorkableHandoffEvaluator
+                                ? recent => AccessV2Handoffs
+                                    .GetSameTypeExtensionRequest(
+                                        recent,
+                                        request.Snapshot.GetV2WorkableHandoffs)
+                                : (AccessV2TerminalExtensionOperationEvaluator?)null,
+                    terminalTransitionEvaluator:
+                        (current, transition, history, connectedFixedOrigin,
+                            operation) => EvaluateV2Transition(
+                                request.Snapshot, current, transition,
+                                history, connectedFixedOrigin, operation),
+                    staggeredHandoffEvaluator:
+                        (terminalStates, extensionLane, operation, history) =>
+                            EvaluateV2StaggeredHandoffs(
+                                request.Snapshot, terminalStates,
+                                extensionLane, operation, history,
+                                diagnostics),
                     heuristicEvaluator: null,
                     groundGraph: request.Snapshot.V2GroundGraph,
                     groundValidator: request.Snapshot.IsProjectedV2CenterPathable,
@@ -4512,7 +4654,9 @@ namespace AutoTerrainDesignations.Access
             AccessV2BandState? current,
             AccessV2Transition transition,
             AccessV2History history,
-            Tile2i? connectedFixedOrigin)
+            Tile2i? connectedFixedOrigin,
+            AccessHandoffOperation operation =
+                AccessHandoffOperation.Leveling)
         {
             float traversalCost = current.HasValue
                 ? Manhattan(
@@ -4587,12 +4731,12 @@ namespace AutoTerrainDesignations.Access
                     * DirectWorkWeight
                     * EstimateDirectWorkCost(
                         snapshot, item.Origin, item.Profile,
-                        AccessHandoffOperation.Leveling);
+                        operation);
                 fixedCost += GeneratedVFixedOverhead;
 
                 CalculateGeneratedPropCleanupCost(
                     snapshot, item.Origin, item.Profile,
-                    AccessHandoffOperation.Leveling,
+                    operation,
                     out string cleanupReason, out _, out _);
                 if (!string.IsNullOrEmpty(cleanupReason))
                     return AccessV2TransitionEvaluation.Reject(cleanupReason);
@@ -4623,7 +4767,7 @@ namespace AutoTerrainDesignations.Access
 
             if (!TryAddV2ExteriorRays(
                     snapshot, current, transition,
-                    connectedFixedOrigin,
+                    connectedFixedOrigin, operation,
                     rayConstraints, ref rayCost,
                     out string rayReason))
                 return AccessV2TransitionEvaluation.Reject(rayReason);
@@ -4701,12 +4845,60 @@ namespace AutoTerrainDesignations.Access
                 snapshot.LandscapingCostDistanceScale,
                 snapshot.IsProjectedV2CenterPathable,
                 snapshot.DoesProjectedV2CenterOverlapWork,
-                snapshot.IsV2HandoffCenterPathable,
+                snapshot.IsV2HandoffCorridorCenterPathable,
                 snapshot.IsV2HandoffGroundEntryPathable,
                 snapshot.VehicleWidth,
                 AccessV2CostModel.GetCenterSpokeCost(
                     GeneratedVFixedOverhead),
                 requiredGroundEntry,
+                diagnostics);
+        }
+
+        internal static IReadOnlyList<AccessV2HandoffCandidate>
+            EvaluateV2StaggeredHandoffs(
+                AccessSearchSnapshot snapshot,
+                IReadOnlyList<AccessV2BandState> terminalOldestFirst,
+                int extensionLane,
+                AccessHandoffOperation operation,
+                AccessV2History history,
+                AccessSearchDiagnostics? diagnostics = null)
+        {
+            if (snapshot.V2GroundGraph == null
+                || !snapshot.HasV2WorkableHandoffEvaluator)
+                return Array.Empty<AccessV2HandoffCandidate>();
+            int diagnosticBudget = 24;
+            bool PostWorkCenter(
+                Tile2i origin,
+                AccessHandoffOperation candidateOperation,
+                Tile2i center,
+                AccessV2History candidateHistory,
+                IReadOnlyCollection<Tile2i> handoffOrigins)
+            {
+                bool valid = snapshot.IsV2HandoffCorridorCenterPathable(
+                    origin, candidateOperation, center,
+                    candidateHistory, handoffOrigins);
+                if (!valid && diagnostics != null
+                    && diagnosticBudget-- > 0
+                    && AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    diagnostics.RecordFirstGeneratedHandoff(
+                        $"v2-postwork center={center} owner={origin} " +
+                        $"op={candidateOperation} reject=" +
+                        snapshot.DescribeV2HandoffCorridorCenterRejection(
+                            origin, candidateOperation, center,
+                            candidateHistory, handoffOrigins));
+                return valid;
+            }
+            return AccessV2Handoffs.EvaluateStaggeredExtension(
+                terminalOldestFirst, extensionLane, operation,
+                history, snapshot.V2GroundGraph,
+                snapshot.GetV2WorkableHandoffs,
+                snapshot.GetV2WorkableHandoffSpans,
+                snapshot.LandscapingCostDistanceScale,
+                snapshot.IsProjectedV2CenterPathable,
+                PostWorkCenter,
+                snapshot.IsV2HandoffGroundEntryPathable,
+                AccessV2CostModel.GetCenterSpokeCost(
+                    GeneratedVFixedOverhead),
                 diagnostics);
         }
 
@@ -4738,6 +4930,7 @@ namespace AutoTerrainDesignations.Access
             AccessV2BandState? current,
             AccessV2Transition transition,
             Tile2i? connectedFixedOrigin,
+            AccessHandoffOperation operation,
             ICollection<AccessRayHeightConstraint> constraints,
             ref float rayCost,
             out string reason)
@@ -4747,7 +4940,7 @@ namespace AutoTerrainDesignations.Access
                 && current.HasValue)
                 return TryAddV2StrafeExteriorRays(
                     snapshot, transition, connectedFixedOrigin,
-                    constraints, ref rayCost, out reason);
+                    operation, constraints, ref rayCost, out reason);
 
             bool scoreLane0 = transition.Delta.Any(
                 item => item.Origin == next.GetLaneOrigin(0));
@@ -4764,6 +4957,19 @@ namespace AutoTerrainDesignations.Access
                 // route to begin inside a cluster beside an impassable wall.
                 scoreLane0 = true;
                 scoreLane1 = true;
+            }
+
+            Tile2i? lane0Exemption = connectedFixedOrigin;
+            Tile2i? lane1Exemption = connectedFixedOrigin;
+            if (current.HasValue
+                && transition.Kind == AccessV2TransitionKind.Straight)
+            {
+                Tile2i lane0Source = current.Value.GetLaneOrigin(0);
+                Tile2i lane1Source = current.Value.GetLaneOrigin(1);
+                if (snapshot.TryGetFixedProfile(lane0Source, out _))
+                    lane0Exemption = lane0Source;
+                if (snapshot.TryGetFixedProfile(lane1Source, out _))
+                    lane1Exemption = lane1Source;
             }
 
             if (!TryGetExitRayGeometry(
@@ -4789,14 +4995,14 @@ namespace AutoTerrainDesignations.Access
                     snapshot, constraints, ref rayCost,
                     next.GetLaneOrigin(0),
                     lane0OuterCorner, lane0OuterHeight,
-                    lane0OuterDirection, connectedFixedOrigin,
+                    lane0OuterDirection, lane0Exemption, operation,
                     out reason))
                 return false;
             if (scoreLane1 && !TryAddV2Ray(
                     snapshot, constraints, ref rayCost,
                     next.GetLaneOrigin(1),
                     lane1OuterCorner, lane1OuterHeight,
-                    lane1OuterDirection, connectedFixedOrigin,
+                    lane1OuterDirection, lane1Exemption, operation,
                     out reason))
                 return false;
 
@@ -4813,7 +5019,7 @@ namespace AutoTerrainDesignations.Access
                             snapshot, constraints, ref rayCost,
                             null,
                             turnRay.Source, landingHeight,
-                            UnitDirection(turnRay.Direction), null,
+                            UnitDirection(turnRay.Direction), null, operation,
                             out reason))
                         return false;
                 }
@@ -4827,6 +5033,7 @@ namespace AutoTerrainDesignations.Access
             AccessSearchSnapshot snapshot,
             AccessV2Transition transition,
             Tile2i? connectedFixedOrigin,
+            AccessHandoffOperation operation,
             ICollection<AccessRayHeightConstraint> constraints,
             ref float rayCost,
             out string reason)
@@ -4864,7 +5071,7 @@ namespace AutoTerrainDesignations.Access
                         transverseSign < 0 ? lowCorner : highCorner,
                         transverseSign < 0 ? lowHeight : highHeight,
                         transverseSign < 0 ? lowDirection : highDirection,
-                        connectedFixedOrigin, out reason))
+                        connectedFixedOrigin, operation, out reason))
                     return false;
             }
             reason = string.Empty;
@@ -4880,11 +5087,12 @@ namespace AutoTerrainDesignations.Access
             float height,
             Tile2i direction,
             Tile2i? exemption,
+            AccessHandoffOperation operation,
             out string reason)
         {
             AccessSideRayResult ray = ScoreExitCorner(
                 snapshot, corner, height, direction,
-                AccessHandoffOperation.Leveling,
+                operation,
                 exemptDesignationOrigin: exemption);
             if (ray.IsFatal)
             {
@@ -4896,7 +5104,7 @@ namespace AutoTerrainDesignations.Access
             IReadOnlyList<AccessRayHeightConstraint> added =
                 BuildRayHeightConstraints(
                     snapshot, corner, height, direction,
-                    ray, AccessHandoffOperation.Leveling,
+                    ray, operation,
                     snapshot.VehicleClearanceRadius);
             for (int index = 0; index < added.Count; index++)
             {

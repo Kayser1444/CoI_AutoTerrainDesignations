@@ -644,8 +644,13 @@ namespace AutoTerrainDesignations.Access
                 return false;
             }
             return m_propCleanupByTile.TryGetValue(tile, out info)
-                && info.IsEligible;
-        }
+                  && info.IsEligible;
+          }
+        public bool TryGetRequiredGeneratedVCleanupInfoForTile(
+            Tile2i tile,
+            out AccessPropCleanupInfo info)
+            => m_propCleanupByTile.TryGetValue(tile, out info)
+                && info.IsEligibleWithinGeneratedV;
         public bool CanTraverseToCleanupGround(Tile2i fromTile, Tile2i toTile)
             => CanTraverseToCleanupGround(fromTile, toTile,
                 fromCountsAsPostWorkGround: false);
@@ -890,6 +895,165 @@ namespace AutoTerrainDesignations.Access
             return true;
         }
 
+        /// <summary>
+        /// Validates the complete vehicle mask after terminal work. The
+        /// captured G graph can reject a center because high samples elsewhere
+        /// in its mask are about to be mined; a center-point-only test then
+        /// incorrectly erases every rank of a valid Mega mining mouth.
+        /// </summary>
+        public bool IsV2HandoffCorridorCenterPathable(
+            Tile2i origin,
+            AccessHandoffOperation operation,
+            Tile2i center,
+            V2.AccessV2History history,
+            IReadOnlyCollection<Tile2i> handoffOrigins)
+        {
+            if (operation != AccessHandoffOperation.Mining
+                && operation != AccessHandoffOperation.Dumping
+                && operation != AccessHandoffOperation.Leveling)
+                return false;
+
+            int clearance = Math.Max(1, VehicleWidth);
+            Tile2i corner = center + new RelTile2i(
+                -(clearance / 2), -(clearance / 2));
+            var rayTiles = new HashSet<Tile2i>(
+                history.CollectHandoffRayTiles());
+            const float epsilon = 0.0001f;
+            for (int y = 0; y < clearance; y++)
+                for (int x = 0; x < clearance; x++)
+                {
+                    Tile2i tile = corner + new RelTile2i(x, y);
+                    if (AvoidOcean && m_oceanTiles.Contains(tile)
+                        || AvoidBuildings && m_occupiedTiles.Contains(tile)
+                        || rayTiles.Contains(tile)
+                            && !history.ContainsGeneratedTile(tile))
+                        return false;
+                    if (!TryGetPostWorkHeight(tile, out float height))
+                        return false;
+                    if (x + 1 < clearance
+                        && (!TryGetPostWorkHeight(
+                                tile + new RelTile2i(1, 0), out float plusX)
+                            || Math.Abs(height - plusX)
+                                > VehicleMaxSteepnessDelta + epsilon))
+                        return false;
+                    if (y + 1 < clearance
+                        && (!TryGetPostWorkHeight(
+                                tile + new RelTile2i(0, 1), out float plusY)
+                            || Math.Abs(height - plusY)
+                                > VehicleMaxSteepnessDelta + epsilon))
+                        return false;
+                }
+
+            bool hasOwnerProfile = TryGetV2HandoffProfile(
+                origin, history, out AccessHeightProfile ownerProfile);
+            bool operationWorks = hasOwnerProfile
+                && DoesV2HandoffOperationWorkCenter(
+                    origin, ownerProfile, operation, center);
+            if (operationWorks
+                && operation == AccessHandoffOperation.Mining)
+                return true;
+            if (!m_propCleanupByTile.TryGetValue(
+                    center, out AccessPropCleanupInfo cleanup))
+                return true;
+            bool blockerResolvedByPostWork =
+                cleanup.BlockerKind == AccessPropBlockerKind.UnderlyingTerrain
+                || cleanup.BlockerKind == AccessPropBlockerKind.Durability
+                || cleanup.BlockerKind == AccessPropBlockerKind.SourceWorkOrigin
+                    && (handoffOrigins.Contains(cleanup.Origin)
+                        || handoffOrigins.Any(handoffOrigin =>
+                            center.X >= handoffOrigin.X
+                            && center.X < handoffOrigin.X + 4
+                            && center.Y >= handoffOrigin.Y
+                            && center.Y < handoffOrigin.Y + 4));
+            if (cleanup.BlockerKind != AccessPropBlockerKind.None
+                && !operationWorks
+                && !blockerResolvedByPostWork)
+                return false;
+            if (operation == AccessHandoffOperation.Mining
+                || operation == AccessHandoffOperation.Leveling)
+                return cleanup.Samples.Count == 0
+                    ? blockerResolvedByPostWork
+                        || cleanup.BlockerKind == AccessPropBlockerKind.None
+                    : cleanup.IsEligibleWithinGeneratedV;
+
+            var checkedProps = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < cleanup.Samples.Count; index++)
+            {
+                AccessPropSample sample = cleanup.Samples[index];
+                if (!sample.IsDenseDebris
+                    || !checkedProps.Add(sample.CleanupObjectKey)
+                    || hasOwnerProfile
+                    && DoesDumpingBuryProp(origin, ownerProfile, sample))
+                    continue;
+                if (!sample.IsRemovable
+                    || !history.ContainsCleanupKey(sample.CleanupObjectKey)
+                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
+                        cleanupOrigin != origin
+                        && !history.ContainsOrigin(cleanupOrigin)
+                        && !m_fixedProfiles.ContainsKey(cleanupOrigin)))
+                    return false;
+            }
+            return true;
+
+            bool TryGetPostWorkHeight(Tile2i tile, out float height)
+            {
+                foreach (Tile2i handoffOrigin in handoffOrigins)
+                {
+                    if (!TryGetV2HandoffProfile(
+                            handoffOrigin, history,
+                            out AccessHeightProfile handoffProfile))
+                        continue;
+                    int localX = tile.X - handoffOrigin.X;
+                    int localY = tile.Y - handoffOrigin.Y;
+                    if (localX < 0 || localX > 4
+                        || localY < 0 || localY > 4)
+                        continue;
+                    if (!m_preciseTerrainHeights.TryGetValue(
+                            tile, out float natural))
+                    {
+                        height = 0f;
+                        return false;
+                    }
+                    float target = handoffProfile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    height = operation == AccessHandoffOperation.Mining
+                        ? Math.Min(natural, target)
+                        : operation == AccessHandoffOperation.Dumping
+                            ? Math.Max(natural, target)
+                            : target;
+                    return true;
+                }
+
+                EnsureProjectedV2ProfileCache(history);
+                Tile2i canonical = TerrainOriginForTile(tile);
+                Tile2i[] profileCandidates =
+                {
+                    canonical,
+                    canonical + new RelTile2i(-4, 0),
+                    canonical + new RelTile2i(0, -4),
+                    canonical + new RelTile2i(-4, -4),
+                };
+                for (int index = 0; index < profileCandidates.Length; index++)
+                {
+                    Tile2i profileOrigin = profileCandidates[index];
+                    if (!m_projectedV2CachedProfiles.TryGetValue(
+                            profileOrigin, out AccessHeightProfile profile)
+                        && !m_fixedProfiles.TryGetValue(
+                            profileOrigin, out profile))
+                        continue;
+                    int localX = tile.X - profileOrigin.X;
+                    int localY = tile.Y - profileOrigin.Y;
+                    if (localX < 0 || localX > 4
+                        || localY < 0 || localY > 4)
+                        continue;
+                    height = profile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    return true;
+                }
+                return m_preciseTerrainHeights.TryGetValue(tile, out height);
+            }
+        }
+
         public bool DoesV2HandoffOperationWorkCenter(
             Tile2i origin,
             AccessHeightProfile profile,
@@ -910,6 +1074,120 @@ namespace AutoTerrainDesignations.Access
                 ? targetHeight < groundHeight - epsilon
                 : operation == AccessHandoffOperation.Dumping
                     && targetHeight > groundHeight + epsilon;
+        }
+
+        public string DescribeV2HandoffCorridorCenterRejection(
+            Tile2i origin,
+            AccessHandoffOperation operation,
+            Tile2i center,
+            V2.AccessV2History history,
+            IReadOnlyCollection<Tile2i> handoffOrigins)
+        {
+            if (IsV2HandoffCorridorCenterPathable(
+                    origin, operation, center, history, handoffOrigins))
+                return "accepted";
+            int clearance = Math.Max(1, VehicleWidth);
+            Tile2i corner = center + new RelTile2i(
+                -(clearance / 2), -(clearance / 2));
+            var rayTiles = new HashSet<Tile2i>(
+                history.CollectHandoffRayTiles());
+            const float epsilon = 0.0001f;
+            for (int y = 0; y < clearance; y++)
+                for (int x = 0; x < clearance; x++)
+                {
+                    Tile2i tile = corner + new RelTile2i(x, y);
+                    if (AvoidOcean && m_oceanTiles.Contains(tile))
+                        return $"ocean@{tile}";
+                    if (AvoidBuildings && m_occupiedTiles.Contains(tile))
+                        return $"building@{tile}";
+                    if (rayTiles.Contains(tile)
+                        && !history.ContainsGeneratedTile(tile))
+                        return $"ray@{tile}";
+                    if (!TryHeight(tile, out float height))
+                        return $"missing-height@{tile}";
+                    if (x + 1 < clearance)
+                    {
+                        Tile2i plusTile = tile + new RelTile2i(1, 0);
+                        if (!TryHeight(plusTile, out float plusX))
+                            return $"missing-height@{plusTile}";
+                        if (Math.Abs(height - plusX)
+                            > VehicleMaxSteepnessDelta + epsilon)
+                            return $"slope@{tile}->{plusTile}:" +
+                                $"{height:0.###}/{plusX:0.###}";
+                    }
+                    if (y + 1 < clearance)
+                    {
+                        Tile2i plusTile = tile + new RelTile2i(0, 1);
+                        if (!TryHeight(plusTile, out float plusY))
+                            return $"missing-height@{plusTile}";
+                        if (Math.Abs(height - plusY)
+                            > VehicleMaxSteepnessDelta + epsilon)
+                            return $"slope@{tile}->{plusTile}:" +
+                                $"{height:0.###}/{plusY:0.###}";
+                    }
+                }
+            if (m_propCleanupByTile.TryGetValue(
+                    center, out AccessPropCleanupInfo cleanup))
+                return $"cleanup-or-operation@{center}:" +
+                    $"blocker={cleanup.BlockerKind}:origin={cleanup.Origin}";
+            return $"operation@{center}";
+
+            bool TryHeight(Tile2i tile, out float height)
+            {
+                foreach (Tile2i handoffOrigin in handoffOrigins)
+                {
+                    if (!TryGetV2HandoffProfile(
+                            handoffOrigin, history,
+                            out AccessHeightProfile handoffProfile))
+                        continue;
+                    int localX = tile.X - handoffOrigin.X;
+                    int localY = tile.Y - handoffOrigin.Y;
+                    if (localX < 0 || localX > 4
+                        || localY < 0 || localY > 4)
+                        continue;
+                    if (!m_preciseTerrainHeights.TryGetValue(
+                            tile, out float natural))
+                    {
+                        height = 0f;
+                        return false;
+                    }
+                    float target = handoffProfile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    height = operation == AccessHandoffOperation.Mining
+                        ? Math.Min(natural, target)
+                        : operation == AccessHandoffOperation.Dumping
+                            ? Math.Max(natural, target)
+                            : target;
+                    return true;
+                }
+                EnsureProjectedV2ProfileCache(history);
+                Tile2i canonical = TerrainOriginForTile(tile);
+                Tile2i[] candidates =
+                {
+                    canonical,
+                    canonical + new RelTile2i(-4, 0),
+                    canonical + new RelTile2i(0, -4),
+                    canonical + new RelTile2i(-4, -4),
+                };
+                for (int index = 0; index < candidates.Length; index++)
+                {
+                    Tile2i profileOrigin = candidates[index];
+                    if (!m_projectedV2CachedProfiles.TryGetValue(
+                            profileOrigin, out AccessHeightProfile profile)
+                        && !m_fixedProfiles.TryGetValue(
+                            profileOrigin, out profile))
+                        continue;
+                    int localX = tile.X - profileOrigin.X;
+                    int localY = tile.Y - profileOrigin.Y;
+                    if (localX < 0 || localX > 4
+                        || localY < 0 || localY > 4)
+                        continue;
+                    height = profile.GetHeight2NumeratorAt(
+                        localX, localY) / 32f;
+                    return true;
+                }
+                return m_preciseTerrainHeights.TryGetValue(tile, out height);
+            }
         }
 
         public bool IsV2HandoffGroundEntryPathable(

@@ -1986,7 +1986,7 @@ namespace AutoTerrainDesignations
                 }
 
                 bool perimeterGround = IsPostWorkHandoffGroundCenter(
-                    groundNodes, propCleanupByTile, propCleanupByOrigin,
+                    groundNodes, propCleanupByTile,
                     perimeterTile, operation);
                 if (perimeterGround)
                     groundCandidateCount++;
@@ -2157,7 +2157,7 @@ namespace AutoTerrainDesignations
                 }
                 TryAdd(perimeter,
                     fulfilled && IsPostWorkHandoffGroundCenter(
-                        groundNodes, propCleanupByTile, propCleanupByOrigin,
+                        groundNodes, propCleanupByTile,
                         perimeter, operation)
                         ? new[] { perimeter }
                         : null);
@@ -2549,9 +2549,9 @@ namespace AutoTerrainDesignations
                 out operation, out fulfilledBitmap, out diagnostic);
         }
 
-        // V2 does not use vanilla's operation-specific fulfilled bitmap. One
-        // mask-pathable G-facing tile level with the target surface is enough
-        // to bridge into a leveling designation. Mining and dumping retain
+        // V2 does not use vanilla's operation-specific fulfilled bitmap. A
+        // leveling handoff requires a smooth, target-compatible G-facing edge
+        // with at least one mask-pathable bridge tile. Mining and dumping use
         // the corner-crest crossing rule. The G graph and width-two pairing
         // subsequently prove the usable exit for non-leveling operations.
         private static bool TrySelectV2CornerCrestHandoff(
@@ -2588,11 +2588,12 @@ namespace AutoTerrainDesignations
                 + "] outgoing=["
                 + string.Join(",", outgoingCorners) + "]";
 
-            if (IsLevelingHandoffFaceCompatible(
-                    outgoingOrigin, outgoingProfile,
-                    handoffEdge, terrMgr))
+            uint smoothFaceMask = 0;
+            bool smoothLeveling = IsLevelingHandoffFaceCompatible(
+                outgoingOrigin, outgoingProfile,
+                handoffEdge, terrMgr);
+            if (smoothLeveling)
             {
-                uint smoothFaceMask = 0;
                 for (int offset = 0;
                     offset < outgoingEdgeSigns.Length;
                     offset++)
@@ -2604,35 +2605,42 @@ namespace AutoTerrainDesignations
                     if (bridgeTilePathable(bridge))
                         smoothFaceMask |= GetDesignationMask(x, y);
                 }
-                if (smoothFaceMask != 0)
-                {
-                    operation = AccessHandoffOperation.Leveling;
-                    fulfilledBitmap = smoothFaceMask;
-                    diagnostic += " smoothLeveling=true";
-                    return true;
-                }
             }
 
-            uint levelBridgeMask = 0;
-            for (int offset = 0; offset < outgoingEdgeSigns.Length; offset++)
+            if (!TrySelectV2CornerCrestOperation(
+                    incomingCorners, outgoingCorners,
+                    smoothFaceMask != 0, out operation))
             {
-                if (outgoingEdgeSigns[offset] != 0)
-                    continue;
-                GetHandoffLaneCoordinates(
-                    handoffEdge, offset,
-                    out int x, out int y, out _, out _);
-                Tile2i bridge = outgoingOrigin + new RelTile2i(x, y);
-                if (bridgeTilePathable(bridge))
-                    levelBridgeMask |= GetDesignationMask(x, y);
+                fulfilledBitmap = 0;
+                return false;
             }
-            if (levelBridgeMask != 0)
+
+            if (operation == AccessHandoffOperation.Leveling)
+            {
+                fulfilledBitmap = smoothFaceMask;
+                diagnostic += " smoothLeveling=true";
+            }
+            else
+                fulfilledBitmap = BuildHandoffEdgeMask(handoffEdge);
+            return true;
+        }
+
+        // Leveling is preferred only when the complete G-facing terrain edge
+        // is smooth, target-compatible, and contains a pathable bridge sample.
+        // An isolated level sample on rough ground is merely the crossing
+        // point of a mining or dumping crest; it must not turn the entire
+        // terminal into a leveling handoff.
+        internal static bool TrySelectV2CornerCrestOperation(
+            IReadOnlyList<int> incomingCorners,
+            IReadOnlyList<int> outgoingCorners,
+            bool smoothLevelingAvailable,
+            out AccessHandoffOperation operation)
+        {
+            if (smoothLevelingAvailable)
             {
                 operation = AccessHandoffOperation.Leveling;
-                fulfilledBitmap = levelBridgeMask;
                 return true;
             }
-
-            fulfilledBitmap = BuildHandoffEdgeMask(handoffEdge);
 
             bool mining = incomingCorners.All(sign => sign <= 0)
                 && incomingCorners.Any(sign => sign < 0)
@@ -2653,7 +2661,6 @@ namespace AutoTerrainDesignations
             }
 
             operation = AccessHandoffOperation.None;
-            fulfilledBitmap = 0;
             return false;
         }
 
@@ -2986,15 +2993,13 @@ namespace AutoTerrainDesignations
                 && info.IsEligible;
         }
 
-        // A mining or leveling handoff removes a removable non-tree prop in
-        // its contact tile.  Accept that tile as post-work ground even when
-        // its pre-work cleanup classification is not traversable G terrain.
-        // Dumping deliberately does not get this exception: it can leave such
-        // a prop intact unless its fill height is sufficient to bury it.
+        // A mining or leveling handoff may provisionally enter a removable
+        // non-tree prop tile when generated-V cleanup can service it. Vanilla
+        // terrain work does not remove that prop; materialization must submit
+        // it to the prop-removal manager before the route is considered live.
         private static bool IsPostWorkHandoffGroundCenter(
             HashSet<Tile2i> groundNodes,
             IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> propCleanupByTile,
-            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin,
             Tile2i center,
             AccessHandoffOperation operation)
         {
@@ -3004,19 +3009,9 @@ namespace AutoTerrainDesignations
             if (operation != AccessHandoffOperation.Mining
                 && operation != AccessHandoffOperation.Leveling)
                 return false;
-            return HasRemovableNonTreePropAtTile(propCleanupByOrigin, center);
-        }
-
-        private static bool HasRemovableNonTreePropAtTile(
-            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin,
-            Tile2i tile)
-        {
-            return propCleanupByOrigin != null
-                && propCleanupByOrigin.TryGetValue(
-                    TerrainDesignation.GetOrigin(tile), out AccessPropCleanupInfo info)
-                && info.Samples.Any(sample => sample.Tile == tile
-                    && sample.IsDenseDebris && !sample.IsTree
-                    && sample.IsRemovable);
+            return propCleanupByTile.TryGetValue(
+                    center, out AccessPropCleanupInfo info)
+                && info.IsEligibleWithinGeneratedV;
         }
 
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
@@ -3346,6 +3341,7 @@ namespace AutoTerrainDesignations
                         handoff.GroundEntryCenters,
                         liveExitDirection,
                         lane: 0,
+                        requiresCrest: handoff.Lane0RequiresCrest,
                         out string laneReason)
                     || !ValidateLiveLane(
                         handoff.Lane1TerminalOrigins,
@@ -3354,6 +3350,7 @@ namespace AutoTerrainDesignations
                         handoff.GroundEntryCenters,
                         liveExitDirection,
                         lane: 1,
+                        requiresCrest: handoff.Lane1RequiresCrest,
                         out laneReason))
                 {
                     reason = laneReason;
@@ -3371,6 +3368,7 @@ namespace AutoTerrainDesignations
                 IReadOnlyList<Tile2i> groundEntries,
                 Tile2i exitDirection,
                 int lane,
+                bool requiresCrest,
                 out string laneReason)
             {
                 laneReason = string.Empty;
@@ -3404,7 +3402,7 @@ namespace AutoTerrainDesignations
                 bool levelingCompanion =
                     operation == AccessHandoffOperation.Leveling
                     && !groundEntries.Contains(contact);
-                if (!levelingCompanion
+                if (requiresCrest && !levelingCompanion
                     && (!TrySelectV2CornerCrestHandoff(
                         incomingOrigin, incomingProfile,
                         terminalOrigin, terminalProfile,
@@ -3610,13 +3608,14 @@ namespace AutoTerrainDesignations
 
                 QuickRemoveDebrisPolicy policy =
                     AccessQuickRemoveDebrisPolicy;
-                if (policy != QuickRemoveDebrisPolicy.Always
-                    && defaultOperationRemoves)
+                if (!AccessPropCleanupPolicy
+                    .TryGetNonBuriedPropRemovalStrategy(
+                        policy, defaultOperationRemoves,
+                        out bool quickRemove))
                 {
                     handledByDefaultOperation++;
                     continue;
                 }
-                bool quickRemove = policy != QuickRemoveDebrisPolicy.Never;
                 if (!quickRemove && origin != propOrigin)
                 {
                     if (!pair.Value.Contains(propOrigin)
@@ -3662,8 +3661,14 @@ namespace AutoTerrainDesignations
                     && request.Result.Outcome != ATDPropRemovalOutcome.Removed
                     && request.Result.Outcome != ATDPropRemovalOutcome.AlreadyAbsent)
                 {
-                    failureReason = "PropRemoval" + request.Result.Outcome;
-                    return false;
+                    // Prop cleanup is assistance, not a placement prerequisite.
+                    // If the manager cannot perform the requested quick removal
+                    // or landscaping, retain the accessway so the player can
+                    // remove the prop manually.
+                    LogExperimentalAccessDebug(
+                        $"[ATD Experimental Access Cleanup] request={request.RequestId} " +
+                        $"origin={request.Origin} outcome={request.Result.Outcome} " +
+                        "accesswayRetained=true manualRemovalRequired=true");
                 }
                 if (request.IsCompleted
                     && request.Result.Outcome == ATDPropRemovalOutcome.AlreadyAbsent)
@@ -3674,11 +3679,16 @@ namespace AutoTerrainDesignations
                     if (result.Outcome == ATDPropRemovalOutcome.Removed
                         && !result.OriginalDesignationRestored)
                         return;
-                    if (plannedPlacements.ContainsKey(request.Origin)
-                        && result.Outcome == ATDPropRemovalOutcome.Removed)
-                        return;
                     if (plannedPlacements.ContainsKey(request.Origin))
-                        UnregisterGeneratedDesignationOrigin(tower, request.Origin);
+                    {
+                        if (result.Outcome != ATDPropRemovalOutcome.Removed
+                            && result.Outcome != ATDPropRemovalOutcome.AlreadyAbsent)
+                            LogExperimentalAccessDebug(
+                                $"[ATD Experimental Access Cleanup] request={result.RequestId} " +
+                                $"origin={result.Origin} outcome={result.Outcome} " +
+                                "accesswayRetained=true manualRemovalRequired=true");
+                        return;
+                    }
                     s_designationOriginsInArea.Remove(request.Origin);
                     reservedRampTiles?.Remove(request.Origin);
                 });

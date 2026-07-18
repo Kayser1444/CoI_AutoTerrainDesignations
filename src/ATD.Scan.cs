@@ -155,9 +155,36 @@ namespace AutoTerrainDesignations
             if (autoScan && HasTerrainDesignationsInTowerArea(tower))
             {
                 LogDebug("AUTO scanning found existing terrain designations; treating them as access-pathfinding goals.");
-                yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps,
-                    usePlannedTowerGhostGoals: true);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+
+                if (repairResult.InitialReachabilityEvaluated
+                    && repairResult.AllClustersInitiallyConnected)
+                {
+                    LogExperimentalAccessDebug(
+                        "[ATD Planned Tower Access] all existing terrain-work " +
+                        "clusters were connected when the scan was requested; " +
+                        "ghost goals are eligible");
+                    var plannedTowerAccess = new PlannedTowerAccessResult();
+                    IEnumerator plannedTowerRoutine =
+                        TryConnectToPlannedMiningTowerGhostCoroutine(
+                            tower, terrMgr, towerSettings, generateRamps,
+                            plannedTowerAccess);
+                    while (plannedTowerRoutine.MoveNext())
+                        yield return plannedTowerRoutine.Current;
+                }
+                else
+                {
+                    LogExperimentalAccessDebug(
+                        "[ATD Planned Tower Access] ghost goals skipped because " +
+                        "existing terrain work was not fully connected to the " +
+                        "active tower when the scan was requested");
+                }
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 if (inspectorInstance != null)
                 {
@@ -835,6 +862,7 @@ namespace AutoTerrainDesignations
                 towerSettings.MaxLayersToExcavate,
                 towerSettings.MaxDepthToDigTo?.ToString() ?? "<none>",
                 towerSettings.OrePurityLevel,
+                towerSettings.VehicleClearance,
                 towerSettings.CorridorClearance,
                 selectedOreId,
                 AutoTerrainDesignationsMod.BottomFlatteningEnabled,
@@ -907,13 +935,24 @@ namespace AutoTerrainDesignations
             ClearRegisteredGeneratedAccessways(tower);
         }
 
+        private sealed class ExistingTerrainWorkAccessResult
+        {
+            public bool InitialReachabilityEvaluated;
+            public bool AllClustersInitiallyConnected;
+        }
+
         private static IEnumerator RepairExistingTerrainWorkAccessCoroutine(
             IAreaManagingTower tower,
             TerrainManager terrMgr,
             ATDTowerSettings towerSettings,
             bool generateRamps,
-            bool usePlannedTowerGhostGoals = false)
+            ExistingTerrainWorkAccessResult? repairResult = null)
         {
+            if (repairResult != null)
+            {
+                repairResult.InitialReachabilityEvaluated = false;
+                repairResult.AllClustersInitiallyConnected = false;
+            }
             string? skipReason = !generateRamps
                 ? "accessway generation disabled"
                 : !AutoTerrainDesignationsMod.TurningRampsExperimental
@@ -943,10 +982,6 @@ namespace AutoTerrainDesignations
             var endpointCornerHeights = new Dict<Tile2i, int>();
             var placedAccesswayOrigins = new List<Tile2i>();
             var rampResult = new RampGenerationResult();
-            IReadOnlyList<Tile2i>? ghostGroundGoals =
-                usePlannedTowerGhostGoals
-                    ? BuildPlannedTowerGhostGroundGoals(tower)
-                    : null;
             yield return CreateAccessRampCoroutine(
                 tower,
                 emptyGeneratedPlan,
@@ -958,10 +993,14 @@ namespace AutoTerrainDesignations
                 null,
                 useLocalSurfaceReference: false,
                 allowExistingPlannedRampShortcut: true,
-                result: rampResult,
-                groundGoalOverride: ghostGroundGoals?.Count > 0
-                    ? ghostGroundGoals
-                    : null);
+                result: rampResult);
+            if (repairResult != null)
+            {
+                repairResult.InitialReachabilityEvaluated =
+                    rampResult.InitialReachabilityEvaluated;
+                repairResult.AllClustersInitiallyConnected =
+                    rampResult.AllClustersInitiallyConnected;
+            }
             SetTowerLastRampOutcome(tower, rampResult.Outcome);
         }
 

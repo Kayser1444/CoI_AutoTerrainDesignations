@@ -129,6 +129,8 @@ namespace AutoTerrainDesignations
         {
             public RampPlacementOutcome Outcome = RampPlacementOutcome.Failed;
             public Tile2i TopRowTile = default;
+            public bool InitialReachabilityEvaluated;
+            public bool AllClustersInitiallyConnected;
         }
 
         private struct RampVertexEdge
@@ -558,11 +560,14 @@ namespace AutoTerrainDesignations
             bool experimentalWidthSupported = configuredRampWidth > 0;
             bool experimentalSearchEnabled = AutoTerrainDesignationsMod.TurningRampsExperimental
                 && experimentalWidthSupported
-                && experimentalOperationSupported;
+                && experimentalOperationSupported
+                && !IsLegacyRampMode(GetTowerVehicleClearance(tower));
             if (AutoTerrainDesignationsMod.TurningRampsExperimental && !experimentalSearchEnabled)
             {
                 string reason = !experimentalWidthSupported
                     ? "tower accessway generation is disabled"
+                    : IsLegacyRampMode(GetTowerVehicleClearance(tower))
+                        ? "tower is configured for a legacy straight-only ramp width"
                     : $"designation proto {sourceWorkProto.Id.Value} is neither mining nor dumping";
                 LogExperimentalAccessDebug($"[ATD Experimental Access] skipped because {reason}.");
             }
@@ -603,6 +608,10 @@ namespace AutoTerrainDesignations
                     Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                     return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                 });
+            result.InitialReachabilityEvaluated = true;
+            result.AllClustersInitiallyConnected = originClusters.All(c =>
+                states[c] == AccessClusterState.AccessibleDirect
+                || states[c] == AccessClusterState.AccessibleViaProvider);
             bool usesGroundGoalOverride =
                 groundGoalOverride != null && groundGoalOverride.Count > 0;
             if (usesGroundGoalOverride)
@@ -921,13 +930,17 @@ namespace AutoTerrainDesignations
                                 return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                             });
                         string v2ValidationReason = "NotV2";
-                        bool v2ProviderValid = source.SearchResult.V2Route != null
+                        bool pendingPropRemoval = HasPendingExperimentalPropRemovalRequests();
+                        if (pendingPropRemoval)
+                            v2ValidationReason = "AcceptedPendingPropRemoval";
+                        bool v2ProviderValid = pendingPropRemoval
+                            || (source.SearchResult.V2Route != null
                             && ValidatePlacedV2Provider(
                                  source.SearchResult,
                                  source.Plan,
                                  accesswayProto,
                                  terrMgr,
-                                 out v2ValidationReason);
+                                 out v2ValidationReason));
                         bool overrideProviderValid = usesGroundGoalOverride
                             && source.SearchResult.Success
                             && (source.SearchResult.V2Route == null

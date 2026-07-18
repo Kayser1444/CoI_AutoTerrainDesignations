@@ -207,7 +207,8 @@ namespace AutoTerrainDesignations
             // accessible cluster's reserved tiles — NotAccessible is returned. As the accessible
             // cluster advances (reserved count shrinks), the bucket changes, allowing a retry every
             // ~50 tile completions instead of waiting for the inaccessible cluster itself to change.
-            string requestKey = BuildFarmingAccessRampRequestKey(inaccessibleClusters, isFilling)
+            string requestKey = BuildFarmingAccessRampRequestKey(
+                    inaccessibleClusters, isFilling, towerSettings.VehicleClearance)
                 + "|r=" + (reservedRampTiles.Count / 50);
             if (session.LastAccessRampRequestKey == requestKey)
             {
@@ -490,10 +491,12 @@ namespace AutoTerrainDesignations
 
         private static string BuildFarmingAccessRampRequestKey(
             List<FarmingAccessCluster> inaccessibleClusters,
-            bool isFilling)
+            bool isFilling,
+            AccessVehicleClearanceMode accesswayMode)
         {
             var sb = new StringBuilder();
-            sb.Append(isFilling ? "fill" : "prep");
+            sb.Append(isFilling ? "fill" : "prep")
+                .Append("|mode=").Append((int)accesswayMode);
             foreach (TerrainDesignation designation in inaccessibleClusters
                 .SelectMany(cluster => cluster.Designations)
                 .OrderBy(designation => designation.OriginTileCoord.Y)

@@ -304,7 +304,11 @@ namespace AutoTerrainDesignations
             AccessDesignationPlan placedPlan = LastExperimentalAccessPlan
                 ?? best.Plan;
             string validationReason = "NotV2";
-            bool valid = best.SearchResult.V2Route == null
+            bool pendingPropRemoval = HasPendingExperimentalPropRemovalRequests();
+            if (pendingPropRemoval)
+                validationReason = "AcceptedPendingPropRemoval";
+            bool valid = pendingPropRemoval
+                || best.SearchResult.V2Route == null
                 || ValidatePlacedV2Provider(
                     best.SearchResult, placedPlan, s_levelingProto, terrMgr,
                     out validationReason);

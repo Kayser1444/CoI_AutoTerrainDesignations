@@ -103,13 +103,16 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyList<AccessV2OriginProfile> Delta { get; }
         public IReadOnlyCollection<Tile2i> LocalContextOrigins { get; }
         public IReadOnlyList<AccessV2TurnRay> OldDirectionTurnRays { get; }
+        public AccessHandoffOperation WorkOperation { get; }
 
         public AccessV2Transition(
             AccessV2TransitionKind kind,
             AccessV2BandState next,
             IReadOnlyList<AccessV2OriginProfile> delta,
             IReadOnlyCollection<Tile2i> localContextOrigins,
-            IReadOnlyList<AccessV2TurnRay>? oldDirectionTurnRays = null)
+            IReadOnlyList<AccessV2TurnRay>? oldDirectionTurnRays = null,
+            AccessHandoffOperation workOperation =
+                AccessHandoffOperation.Leveling)
         {
             Kind = kind;
             Next = next;
@@ -117,6 +120,7 @@ namespace AutoTerrainDesignations.Access.V2
             LocalContextOrigins = localContextOrigins;
             OldDirectionTurnRays = oldDirectionTurnRays
                 ?? Array.Empty<AccessV2TurnRay>();
+            WorkOperation = workOperation;
         }
     }
 

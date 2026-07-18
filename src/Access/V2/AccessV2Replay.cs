@@ -264,8 +264,23 @@ namespace AutoTerrainDesignations.Access.V2
                         recent.Add(recentStep.State);
                         }
                     AccessV2History historyAtHandoff = history;
-                    replayedHandoff = AccessPathSearch.EvaluateV2Handoffs(
-                            snapshot, recent, historyAtHandoff)
+                    IReadOnlyList<AccessV2HandoffCandidate> replayCandidates;
+                    if (step.Handoff.IsStaggeredExtension)
+                    {
+                        int extensionLane = step.Handoff.NonCrestLane;
+                        replayCandidates =
+                            AccessPathSearch.EvaluateV2StaggeredHandoffs(
+                                snapshot,
+                                recent.Take(step.Handoff.SpanLength)
+                                    .Reverse().ToArray(),
+                                extensionLane,
+                                step.Handoff.Lane0Operation,
+                                historyAtHandoff);
+                    }
+                    else
+                        replayCandidates = AccessPathSearch.EvaluateV2Handoffs(
+                            snapshot, recent, historyAtHandoff);
+                    replayedHandoff = replayCandidates
                         .FirstOrDefault(candidate =>
                             HandoffsEqual(candidate, step.Handoff)
                             && candidate.GroundEntryCenters.Contains(center));
@@ -395,7 +410,8 @@ namespace AutoTerrainDesignations.Access.V2
             AccessV2TransitionEvaluation evaluation =
                 AccessPathSearch.EvaluateV2Transition(
                     snapshot, current, transition,
-                    history, connectedFixed);
+                    history, connectedFixed,
+                    transition.WorkOperation);
             if (!evaluation.IsValid)
             {
                 reason = evaluation.RejectionReason;
@@ -461,7 +477,10 @@ namespace AutoTerrainDesignations.Access.V2
             => left.ExitDirection == right.ExitDirection
                 && left.SpanLength == right.SpanLength
                 && left.Lane0Operation == right.Lane0Operation
-                && left.Lane1Operation == right.Lane1Operation
+                    && left.Lane1Operation == right.Lane1Operation
+                    && left.IsStaggeredExtension
+                        == right.IsStaggeredExtension
+                    && left.NonCrestLane == right.NonCrestLane
                 && left.Lane0Contact == right.Lane0Contact
                 && left.Lane1Contact == right.Lane1Contact
                 && left.Lane0TerminalOrigins.SequenceEqual(

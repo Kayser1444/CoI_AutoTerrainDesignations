@@ -59,6 +59,25 @@ namespace AutoTerrainDesignations.Access.V2
         AccessV2History history,
         Tile2i? connectedFixedOrigin);
 
+    internal delegate AccessV2TransitionEvaluation
+        AccessV2TerminalTransitionEvaluator(
+            AccessV2BandState? current,
+            AccessV2Transition transition,
+            AccessV2History history,
+            Tile2i? connectedFixedOrigin,
+            AccessHandoffOperation operation);
+
+    internal delegate AccessV2TerminalExtensionRequest
+        AccessV2TerminalExtensionOperationEvaluator(
+            IReadOnlyList<AccessV2BandState> recentNewestFirst);
+
+    internal delegate IReadOnlyList<AccessV2HandoffCandidate>
+        AccessV2StaggeredHandoffEvaluator(
+            IReadOnlyList<AccessV2BandState> terminalOldestFirst,
+            int extensionLane,
+            AccessHandoffOperation operation,
+            AccessV2History history);
+
     internal delegate IReadOnlyList<AccessV2HandoffCandidate>
         AccessV2HandoffEvaluator(
             IReadOnlyList<AccessV2BandState> recentNewestFirst,
@@ -214,7 +233,13 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly Tile2i m_boundsMax;
         private readonly IReadOnlyList<AccessV2FixedFrontage> m_goals;
         private readonly AccessV2TransitionEvaluator m_evaluator;
+        private readonly AccessV2TerminalTransitionEvaluator?
+            m_terminalTransitionEvaluator;
+        private readonly AccessV2StaggeredHandoffEvaluator?
+            m_staggeredHandoffEvaluator;
         private readonly AccessV2HandoffEvaluator? m_handoffEvaluator;
+        private readonly AccessV2TerminalExtensionOperationEvaluator?
+            m_terminalExtensionOperationEvaluator;
         private readonly AccessV2GroundToVHandoffEvaluator?
             m_groundToVHandoffEvaluator;
         private readonly AccessV2HeuristicEvaluator? m_heuristicEvaluator;
@@ -279,13 +304,23 @@ namespace AutoTerrainDesignations.Access.V2
             AccessSearchDiagnostics? diagnostics = null,
             Func<Tile2i, float?>? preciseTerrainHeightProvider = null,
             float groundToVCenterSpokeCost = 2f,
-            AccessV2GroundToVHandoffEvaluator? groundToVHandoffEvaluator = null)
+            AccessV2GroundToVHandoffEvaluator? groundToVHandoffEvaluator = null,
+            AccessV2TerminalExtensionOperationEvaluator?
+                terminalExtensionOperationEvaluator = null,
+            AccessV2TerminalTransitionEvaluator?
+                terminalTransitionEvaluator = null,
+            AccessV2StaggeredHandoffEvaluator?
+                staggeredHandoffEvaluator = null)
         {
             m_boundsMin = boundsMin;
             m_boundsMax = boundsMax;
             m_goals = endpoints.FixedGoals;
             m_evaluator = evaluator;
+            m_terminalTransitionEvaluator = terminalTransitionEvaluator;
+            m_staggeredHandoffEvaluator = staggeredHandoffEvaluator;
             m_handoffEvaluator = handoffEvaluator;
+            m_terminalExtensionOperationEvaluator =
+                terminalExtensionOperationEvaluator;
             m_groundToVHandoffEvaluator = groundToVHandoffEvaluator;
             m_heuristicEvaluator = heuristicEvaluator;
             m_potentialField = potentialField;
@@ -807,6 +842,228 @@ namespace AutoTerrainDesignations.Access.V2
                         current.CleanupCost + handoff.CleanupCost,
                         current, null, handoff, entry));
                 }
+            }
+
+            if (candidates.Count == 0)
+                EnqueueSameTypeTerminalExtensions(current, recent);
+        }
+
+        private void EnqueueSameTypeTerminalExtensions(
+            SearchNode current,
+            IReadOnlyList<AccessV2BandState> recentNewestFirst)
+        {
+            if (m_terminalExtensionOperationEvaluator == null
+                || m_terminalTransitionEvaluator == null
+                || m_staggeredHandoffEvaluator == null
+                || m_handoffEvaluator == null
+                || current.Parent == null
+                || current.Parent.GroundCenter.HasValue
+                || current.Transition == null
+                || current.Transition.Kind != AccessV2TransitionKind.Straight)
+                return;
+            AccessV2TerminalExtensionRequest request =
+                m_terminalExtensionOperationEvaluator(recentNewestFirst);
+            if (!request.IsValid)
+                return;
+            TraceTerminal($"request anchor={current.State.Anchor} " +
+                $"op={request.Operation} extensionLane={request.ExtensionLane}");
+            AccessHandoffOperation operation = request.Operation;
+
+            SearchNode baseNode = current.Parent;
+            if (!TryApplyTerminalTransition(
+                    baseNode, current.Transition, operation,
+                    out SearchNode correctedCurrent))
+                return;
+            EnqueueSpecialHandoffs(
+                correctedCurrent,
+                m_staggeredHandoffEvaluator(
+                    new[] { correctedCurrent.State },
+                    request.ExtensionLane, operation,
+                    correctedCurrent.History));
+            Extend(correctedCurrent,
+                new List<AccessV2BandState> { correctedCurrent.State });
+
+            void Extend(
+                SearchNode cursor,
+                List<AccessV2BandState> terminalStates)
+            {
+                if (terminalStates.Count >= AccessV2Handoffs.MaxSpanLength)
+                    return;
+                foreach (AccessV2Transition fullTransition in
+                    AccessV2Geometry.EnumerateStraight(cursor.State))
+                {
+                    if (!IsTerminalExtensionMode(fullTransition.Next))
+                        continue;
+                    var transition = new AccessV2Transition(
+                        AccessV2TransitionKind.Straight,
+                        fullTransition.Next,
+                        new[]
+                        {
+                            fullTransition.Next.GetLane(
+                                request.ExtensionLane),
+                        },
+                        fullTransition.LocalContextOrigins,
+                        workOperation: operation);
+                    if (!TryApplyTerminalTransition(
+                            cursor, transition, operation,
+                            out SearchNode extension))
+                        continue;
+
+                    terminalStates.Add(extension.State);
+                    IReadOnlyList<AccessV2HandoffCandidate> extensionHandoffs =
+                        m_staggeredHandoffEvaluator(
+                            terminalStates, request.ExtensionLane,
+                            operation, extension.History);
+                    bool accepted = EnqueueSpecialHandoffs(
+                        extension, extensionHandoffs);
+                    if (!accepted && !extension.RequiresGroundTransition)
+                        Extend(extension, terminalStates);
+                    terminalStates.RemoveAt(terminalStates.Count - 1);
+                }
+            }
+
+            bool EnqueueSpecialHandoffs(
+                SearchNode parent,
+                IReadOnlyList<AccessV2HandoffCandidate> handoffs)
+            {
+                bool accepted = false;
+                for (int index = 0; index < handoffs.Count; index++)
+                {
+                    AccessV2HandoffCandidate handoff = handoffs[index];
+                    if (handoff.Lane0Operation != operation
+                        || handoff.Lane1Operation != operation)
+                        continue;
+                    accepted = true;
+                    EnqueueTerminalGround(parent, handoff);
+                }
+                TraceTerminal($"handoffs anchor={parent.State.Anchor} " +
+                    $"count={handoffs.Count} accepted={accepted}");
+                return accepted;
+            }
+
+            bool TryApplyTerminalTransition(
+                SearchNode parent,
+                AccessV2Transition transition,
+                AccessHandoffOperation terminalOperation,
+                out SearchNode node)
+            {
+                node = null!;
+                if (!AccessV2Geometry.IsInsideBounds(
+                        transition, m_boundsMin, m_boundsMax))
+                {
+                    TraceTerminal($"transition anchor={transition.Next.Anchor} reject=bounds");
+                    return false;
+                }
+                if (!IsTransitionWithinUsefulHeightEnvelope(
+                        m_usefulHeightEnvelope, transition,
+                        out string envelopeReason))
+                {
+                    TraceTerminal($"transition anchor={transition.Next.Anchor} " +
+                        $"reject={envelopeReason}");
+                    return false;
+                }
+                if (!parent.History.TryValidateApply(
+                        transition.Delta,
+                        transition.LocalContextOrigins,
+                        out string historyReason))
+                {
+                    TraceTerminal($"transition anchor={transition.Next.Anchor} " +
+                        $"reject={historyReason}");
+                    return false;
+                }
+                var terminalTransition = transition.WorkOperation ==
+                        terminalOperation
+                    ? transition
+                    : new AccessV2Transition(
+                        transition.Kind, transition.Next,
+                        transition.Delta,
+                        transition.LocalContextOrigins,
+                        transition.OldDirectionTurnRays,
+                        terminalOperation);
+                AccessV2TransitionEvaluation evaluation =
+                    m_terminalTransitionEvaluator(
+                    parent.State, terminalTransition,
+                    parent.History, null,
+                    terminalOperation);
+                if (!evaluation.IsValid)
+                {
+                    TraceTerminal($"transition anchor={transition.Next.Anchor} " +
+                        $"op={terminalOperation} reject={evaluation.RejectionReason}");
+                    return false;
+                }
+                float cost = parent.Cost + evaluation.TotalCost;
+                if (cost > m_maxCost)
+                {
+                    TraceTerminal($"transition anchor={transition.Next.Anchor} reject=max-cost");
+                    return false;
+                }
+                AccessV2History history = parent.History.ApplyValidated(
+                    terminalTransition.Delta,
+                    evaluation.RayConstraints,
+                    evaluation.CleanupKeys);
+                node = new SearchNode(
+                    terminalTransition.Next, history, cost,
+                    parent.TraversalCost + evaluation.TraversalCost,
+                    parent.GeneratedWorkCost + evaluation.GeneratedWorkCost,
+                    parent.DirectWorkCost + evaluation.DirectWorkCost,
+                    parent.GeneratedFixedCost + evaluation.GeneratedFixedCost,
+                    parent.ExteriorRayCost + evaluation.ExteriorRayCost,
+                    parent.CleanupCost + evaluation.CleanupCost,
+                    parent, terminalTransition, null,
+                    requiresGroundTransition:
+                        evaluation.RequiresGroundTransition);
+                return true;
+            }
+
+            void TraceTerminal(string message)
+            {
+                if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    m_diagnostics.RecordFirstGeneratedHandoff(
+                        "v2-terminal " + message);
+            }
+
+            void EnqueueTerminalGround(
+                SearchNode parent,
+                AccessV2HandoffCandidate handoff)
+            {
+                float cost = parent.Cost + handoff.TotalCost;
+                if (cost > m_maxCost)
+                    return;
+                AccessV2History history =
+                    parent.History.ApplyCleanupKeys(handoff.CleanupKeys);
+                for (int index = 0;
+                    index < handoff.GroundEntryCenters.Count;
+                    index++)
+                {
+                    Tile2i entry = handoff.GroundEntryCenters[index];
+                    Enqueue(new SearchNode(
+                        parent.State, history, cost,
+                        parent.TraversalCost + handoff.CenterSpokeCost,
+                        parent.GeneratedWorkCost,
+                        parent.DirectWorkCost,
+                        parent.GeneratedFixedCost,
+                        parent.ExteriorRayCost,
+                        parent.CleanupCost + handoff.CleanupCost,
+                        parent, null, handoff, entry));
+                }
+            }
+
+            bool IsTerminalExtensionMode(AccessV2BandState state)
+            {
+                if (!AccessV2BandProfile.TryGetProfileMode(
+                        state.Band.Lane0, out AccessSearchMode mode))
+                    return false;
+                if (mode == AccessSearchMode.Flat)
+                    return true;
+                AccessSearchMode rising = state.Axis
+                    == AccessV2TravelAxis.X
+                        ? state.EntryDirection.X > 0
+                            ? AccessSearchMode.XPositive
+                            : AccessSearchMode.XNegative
+                        : state.EntryDirection.Y > 0
+                            ? AccessSearchMode.YPositive
+                            : AccessSearchMode.YNegative;
+                return mode == rising;
             }
         }
 
@@ -1609,6 +1866,7 @@ namespace AutoTerrainDesignations.Access.V2
                     && left.SpanLength == right.SpanLength
                     && left.Lane0Operation == right.Lane0Operation
                     && left.Lane1Operation == right.Lane1Operation
+                    && left.NonCrestLane == right.NonCrestLane
                     && left.Lane0Contact == right.Lane0Contact
                     && left.Lane1Contact == right.Lane1Contact
                     && left.Lane0TerminalOrigins.SequenceEqual(
