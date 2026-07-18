@@ -1,4 +1,4 @@
-v0.5.1 [packaged]
+v0.5.1 [released]
 * Changed: Vehicle construction confirmations now use the same enqueue-for-tower wording, button text, and depot zoom tooltip as AFD.
 * Fixed: useful-height hull pruning now extends every potential fixed start and fixed goal cone in the request before building the effective hull. Lower endpoint extensions default to `1.0` for V1 and `2.0` for V2; upper extensions remain `0.5` and `1.0`. Ramps can leave any eligible mining-designation start and retain local room for a flat landing and turn toward a high or low goal, while generated-center checks remain strict elsewhere. Large flat ground components no longer admit rising and falling G-to-V handoff candidates merely because of a global hull allowance. The existing session-only upper/lower commands tune these endpoint extensions independently, with captured values reported in settings and hull-build diagnostics.
 
