@@ -68,6 +68,7 @@ namespace AutoTerrainDesignations
 
         internal static void ClearDesignationsForTower(IAreaManagingTower tower)
         {
+            CancelManualDebrisRemovalRequestsForTower(tower);
             CaptureClearedAccesswayOrigins(tower);
             ClearDesignationsInArea(tower);
             ClearGeneratedHarvestTreesForTower(tower);
@@ -77,6 +78,10 @@ namespace AutoTerrainDesignations
         }
         internal static bool HasGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
+            if (s_manualDebrisRemovalRequestsByTower.TryGetValue(tower.Id,
+                    out List<ATDPropRemovalRequestHandle> debrisRequests)
+                && debrisRequests.Count > 0)
+                return true;
             if (GetRegisteredGeneratedHarvestTreePositions(tower).Count > 0)
                 return true;
             if (s_desigManager == null) return false;
@@ -92,6 +97,7 @@ namespace AutoTerrainDesignations
 
         internal static void ClearGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
+            CancelManualDebrisRemovalRequestsForTower(tower);
             CaptureClearedAccesswayOrigins(tower);
             ClearGeneratedHarvestTreesForTower(tower);
             if (s_desigManager == null)

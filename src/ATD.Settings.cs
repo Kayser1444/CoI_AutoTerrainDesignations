@@ -530,6 +530,16 @@ namespace AutoTerrainDesignations
                 if (accessHarvestDisruptedTrees.HasValue && ShouldPreserveBool(accessHarvestDisruptedTrees.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(accessHarvestDisruptedTrees.Value);
 
+                bool? accessAllowDigToRemoveDebris = ParseBool(json, "accessAllowDigToRemoveDebris");
+                if (accessAllowDigToRemoveDebris.HasValue && ShouldPreserveBool(accessAllowDigToRemoveDebris.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetAccessAllowDigToRemoveDebris(accessAllowDigToRemoveDebris.Value);
+
+                int? accessQuickRemoveDebrisPolicy = ParseInt(json,
+                    "accessQuickRemoveDebrisPolicy");
+                if (accessQuickRemoveDebrisPolicy.HasValue)
+                    AutoTerrainDesignationsMod.SetAccessQuickRemoveDebrisPolicy(
+                        (QuickRemoveDebrisPolicy)accessQuickRemoveDebrisPolicy.Value);
+
                 float? accessLandscapingCostDistanceScale = ParseFloat(json, "accessLandscapingCostDistanceScale")
                     ?? ParseFloat(json, "accessWorkDistanceScale");
                 if (accessLandscapingCostDistanceScale.HasValue && ShouldPreserveFloat(accessLandscapingCostDistanceScale.Value, migrateGeneratedDefaults, 1f))
@@ -908,8 +918,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_maxSlopeHeightDiff\": \"Default starting value for the Max Slope setting on each mine tower. Controls the maximum allowed height difference between adjacent designation corners during slope smoothing. Lower values produce flatter designations; higher values allow steeper steps. Can be adjusted per tower in-game. Min 1, max 3. Default: 1.\",");
             sb.AppendLine($"  \"maxSlopeHeightDiff\": {AutoTerrainDesignationsMod.MaxHeightDiff},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_rampWidth\": \"Default starting value for the Ramp Width setting on each mine tower. Width of access ramps generated at the edge of designations, in tiles. 0 disables ramp generation entirely. Can be adjusted per tower in-game. Allowed range: 0-5. Default: 1.\",");
+            sb.AppendLine("  \"_comment_rampWidth\": \"Legacy/API-compatible numeric access ramp width. Values map to accessway modes when loaded: 0=OFF, 1=AUTO, 2=T3, and 3-5=legacy straight-only widths.\",");
             sb.AppendLine($"  \"rampWidth\": {AutoTerrainDesignationsMod.RampWidth},");
+            sb.AppendLine("  \"_comment_vehicleClearance\": \"Default accessway mode: 0=OFF, 1=AUTO, 2=T1, 3=T2, 4=T3, 5=Legacy 3, 6=Legacy 4, 7=Legacy 5. Legacy modes generate straight ramps only.\",");
             sb.AppendLine($"  \"vehicleClearance\": {(int)AutoTerrainDesignationsMod.VehicleClearance},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_maxLayersToExcavate\": \"Default starting value for the Max Layers setting on each mine tower. Maximum number of terrain layers to excavate from the surface downward. 0 = no limit. Can be adjusted per tower in-game. Default: 30.\",");
@@ -951,7 +962,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_autoReleaseTrucksWhenIdle\": \"Default starting value for the Auto-release trucks when idle toggle on each mine tower. When enabled, ATD automatically unassigns trucks from the tower once no managed designation has pending excavation work, or while the tower is paused. Vehicles are tracked and re-assigned when excavation work returns. Can be toggled per tower in-game. Default: false.\",");
             sb.AppendLine($"  \"autoReleaseTrucksWhenIdle\": {BoolToJsonStr(AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires ramp width 1; corridor clearance is independent. Default: true.\",");
+            sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, AUTO and T1-T3 may use routed turning or switchback accessways. Legacy 3-5 remain straight-only. Default: true.\",");
             sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsExperimental)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
@@ -974,6 +985,12 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways and Mining Designations mark trees in their disturbance zones for harvest; when disabled, ATD creates no tree harvest orders. Default: true.\",");
             sb.AppendLine($"  \"accessHarvestDisruptedTrees\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessAllowDigToRemoveDebris\": \"New-game default for the per-world Landscape to remove debris option. When disabled, prop-removal requests fail instead of changing terrain when a no-landscaping cleanup profile is unavailable. Default: true.\",");
+            sb.AppendLine($"  \"accessAllowDigToRemoveDebris\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessQuickRemoveDebrisPolicy\": \"New-game default for Quick Remove accessway debris. 0 = Always, 1 = Restrictive, 2 = Never. Quick Remove spends Unity. Default: 1.\",");
+            sb.AppendLine($"  \"accessQuickRemoveDebrisPolicy\": {(int)AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
             sb.AppendLine($"  \"accessLandscapingCostDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale)},");

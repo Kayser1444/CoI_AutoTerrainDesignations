@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Mafi;
+using Mafi.Core.Terrain.Designation;
+using Mafi.Core.Terrain.Props;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -41,6 +43,7 @@ namespace AutoTerrainDesignations.Access
         public bool IsDenseDebris { get; }
         public bool IsRemovable { get; }
         public string CleanupObjectKey { get; }
+        public TerrainPropId? DenseDebrisPropId { get; }
         public IReadOnlyList<Tile2i> EligibleCleanupOrigins { get; }
         public bool HasDumpBurialProbe { get; }
         public Tile2i DumpBurialProbeTile { get; }
@@ -56,13 +59,15 @@ namespace AutoTerrainDesignations.Access
             float dumpBurialProbeOffsetX = 0f,
             float dumpBurialProbeOffsetY = 0f,
             float placedHeight = 0f,
-            float dumpBurialThreshold = 0.5f)
+            float dumpBurialThreshold = 0.5f,
+            TerrainPropId? denseDebrisPropId = null)
         {
             Tile = tile;
             IsTree = isTree;
             IsDenseDebris = isDenseDebris;
             IsRemovable = isRemovable;
             CleanupObjectKey = cleanupObjectKey ?? $"{(isTree ? "tree" : isDenseDebris ? "debris" : "prop")}:{tile.X},{tile.Y}";
+            DenseDebrisPropId = denseDebrisPropId;
             EligibleCleanupOrigins = eligibleCleanupOrigins
                 ?? Array.Empty<Tile2i>();
             HasDumpBurialProbe = dumpBurialProbeTile.HasValue;
@@ -158,6 +163,57 @@ namespace AutoTerrainDesignations.Access
             if (operation == AccessHandoffOperation.Dumping)
                 return DoesDumpingDestroyNonTreeProp(terrainHeight2, targetHeight2);
             return false;
+        }
+
+        public static bool PlannedOperationRemovesNonTreeProp(
+            AccessHandoffOperation operation, DesignationData data,
+            AccessPropSample sample)
+        {
+            if (!TryGetDesignationTargetHeight(data, sample,
+                    out float targetHeight))
+                return false;
+            const float epsilon = 0.0001f;
+            bool mines = targetHeight <= sample.PlacedHeight + epsilon;
+            bool buries = DoesDumpingDestroyNonTreeProp(
+                sample.PlacedHeight, targetHeight,
+                sample.DumpBurialThreshold);
+            return operation == AccessHandoffOperation.Mining
+                ? mines
+                : operation == AccessHandoffOperation.Dumping
+                    ? buries
+                    : operation == AccessHandoffOperation.Leveling
+                        && (mines || buries);
+        }
+
+        public static bool TryGetDesignationTargetHeight(
+            DesignationData data, AccessPropSample sample,
+            out float targetHeight)
+        {
+            if (!sample.HasDumpBurialProbe)
+            {
+                targetHeight = 0f;
+                return false;
+            }
+            float worldX = sample.DumpBurialProbeTile.X
+                + sample.DumpBurialProbeOffsetX;
+            float worldY = sample.DumpBurialProbeTile.Y
+                + sample.DumpBurialProbeOffsetY;
+            float localX = worldX - data.OriginTile.X;
+            float localY = worldY - data.OriginTile.Y;
+            if (localX < 0f || localX > 4f
+                || localY < 0f || localY > 4f)
+            {
+                targetHeight = 0f;
+                return false;
+            }
+            float north = data.OriginTargetHeight.Value
+                + (data.PlusXTargetHeight.Value
+                    - data.OriginTargetHeight.Value) * localX / 4f;
+            float south = data.PlusYTargetHeight.Value
+                + (data.PlusXyTargetHeight.Value
+                    - data.PlusYTargetHeight.Value) * localX / 4f;
+            targetHeight = north + (south - north) * localY / 4f;
+            return true;
         }
 
         public static AccessPropCleanupInfo BuildOriginInfo(Tile2i origin,

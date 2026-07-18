@@ -17,6 +17,7 @@ using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
 using UnityEngine;
 using Display = Mafi.Unity.Ui.Library.Display;
+using SliderWithIncrements = Mafi.Unity.Ui.Library.SliderWithIncrements;
 using Row = Mafi.Unity.UiToolkit.Library.Row;
 
 namespace AutoTerrainDesignations
@@ -69,7 +70,7 @@ namespace AutoTerrainDesignations
             return new ModSettingsTab(
                 MOD_ID,
                 AtdLocalization.SettingsModName.AsFormatted,
-                Loc.Str("settings.tab.pathfinder", "Pathfinder", "Settings tab title for ATD pathfinding.").AsFormatted,
+                Loc.Str("settings.tab.pathfinder", "Accessways", "Settings tab title for ATD accessway settings.").AsFormatted,
                 130,
                 BuildPathfinderContent,
                 PATHFINDER_ICON);
@@ -175,13 +176,7 @@ namespace AutoTerrainDesignations
         {
             content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingMiningDefaults.AsFormatted));
 
-            content.Add(BuildIntStepRow(
-                new LocStrFormatted("Vehicle clearance"),
-                new LocStrFormatted("AUTO uses the largest excavator assigned or pre-assigned to the tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF. OFF disables accessways; T1/T2/T3 select explicit pathability."),
-                () => (int)AutoTerrainDesignationsMod.VehicleClearance,
-                value => AutoTerrainDesignationsMod.SetVehicleClearance((AccessVehicleClearanceMode)Math.Max(0, Math.Min(4, value))),
-                value => value == 0 ? "OFF" : ((AccessVehicleClearanceMode)value).ToString(),
-                refreshers));
+            content.Add(BuildAccesswayModeRow(refreshers));
             content.Add(BuildIntStepRow(
                 AtdLocalization.DesigMaxLayersLabel.AsFormatted,
                 AtdLocalization.DesigMaxLayersTip.AsFormatted,
@@ -190,13 +185,63 @@ namespace AutoTerrainDesignations
                 FormatNoLimitZero,
                 refreshers));
             content.Add(BuildNullableDepthRow(refreshers));
-            content.Add(BuildIntStepRow(
-                AtdLocalization.DesigOrePurityLabel.AsFormatted,
-                AtdLocalization.DesigOrePurityTip.AsFormatted,
-                () => AutoTerrainDesignationsMod.OrePurityLevel,
-                value => AutoTerrainDesignationsMod.SetOrePurityLevel(value),
-                FormatOrePurityLevel,
-                refreshers));
+            content.Add(BuildOreQualitySliderRow(refreshers));
+        }
+
+        private static Row BuildAccesswayModeRow(List<Action> refreshers)
+        {
+            var dropdown = new Dropdown<AccessVehicleClearanceMode>(DesignationPanel.AccesswayModeOption)
+                .SetOptions(
+                    AccessVehicleClearanceMode.Off,
+                    AccessVehicleClearanceMode.Auto,
+                    AccessVehicleClearanceMode.T1,
+                    AccessVehicleClearanceMode.T2,
+                    AccessVehicleClearanceMode.T3,
+                    AccessVehicleClearanceMode.LegacyWidth3,
+                    AccessVehicleClearanceMode.LegacyWidth4,
+                    AccessVehicleClearanceMode.LegacyWidth5)
+                .SetValue(AutoTerrainDesignationsMod.VehicleClearance)
+                .OnValueChanged((mode, _) => AutoTerrainDesignationsMod.SetVehicleClearance(mode));
+            dropdown.Width(130.px());
+            refreshers.Add(() => dropdown.SetValue(AutoTerrainDesignationsMod.VehicleClearance));
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
+            row.Add(new Label(AtdLocalization.DesigAccesswayModeLabel.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(dropdown);
+            return row;
+        }
+
+        private static Row BuildOreQualitySliderRow(List<Action> refreshers)
+        {
+            var display = new Display(L(FormatOrePurityLevel(
+                AutoTerrainDesignationsMod.OrePurityLevel)))
+                .MinDigits(6).AlignSelfStretch().MarginTopBottom(2.px());
+            var slider = new SliderWithIncrements()
+                .Range(0, 4)
+                .Value(AutoTerrainDesignationsMod.OrePurityLevel)
+                .OnValueChangedForPreview(value =>
+                    display.SetValue(L(FormatOrePurityLevel(value))))
+                .OnValueChanged(value =>
+                {
+                    AutoTerrainDesignationsMod.SetOrePurityLevel(value);
+                    display.SetValue(L(FormatOrePurityLevel(value)));
+                });
+            slider.FlexGrow(0f).Width(150.px());
+            refreshers.Add(() =>
+            {
+                int value = AutoTerrainDesignationsMod.OrePurityLevel;
+                slider.Value(value);
+                display.SetValue(L(FormatOrePurityLevel(value)));
+            });
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter().Gap(1.pt());
+            row.Add(new Label(AtdLocalization.DesigOrePurityLabel.AsFormatted)
+                .Tooltip(AtdLocalization.DesigOrePurityTip.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(slider);
+            row.Add(display);
+            return row;
         }
 
         private static void AddScanBehaviorSection(Column content, List<Action> refreshers)
@@ -241,6 +286,7 @@ namespace AutoTerrainDesignations
                 () => AutoTerrainDesignationsMod.ExperimentalAccessUseAStar,
                 AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar,
                 refreshers));
+            content.Add(BuildQuickRemoveDebrisPolicyRow(refreshers));
             content.Add(BuildFloatStepRow(
                 AtdLocalization.SettingsAccessLandscapingCostScaleLabel.AsFormatted,
                 AtdLocalization.SettingsAccessLandscapingCostScaleTooltip.AsFormatted,
@@ -319,6 +365,51 @@ namespace AutoTerrainDesignations
                 () => AutoDepthDesignation.AccessHarvestDisruptedTrees,
                 AutoDepthDesignation.SetAccessHarvestDisruptedTrees,
                 refreshers));
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsAllowDigToRemoveDebrisLabel.AsFormatted,
+                AtdLocalization.SettingsAllowDigToRemoveDebrisTooltip.AsFormatted,
+                () => AutoDepthDesignation.AccessAllowDigToRemoveDebris,
+                AutoDepthDesignation.SetAccessAllowDigToRemoveDebris,
+                refreshers));
+        }
+
+        private static Row BuildQuickRemoveDebrisPolicyRow(List<Action> refreshers)
+        {
+            var dropdown = new Dropdown<QuickRemoveDebrisPolicy>(QuickRemoveDebrisOption)
+                .SetOptions(
+                    QuickRemoveDebrisPolicy.Always,
+                    QuickRemoveDebrisPolicy.Restrictive,
+                    QuickRemoveDebrisPolicy.Never)
+                .SetValue(AutoDepthDesignation.AccessQuickRemoveDebrisPolicy)
+                .OnValueChanged((policy, _) =>
+                    AutoDepthDesignation.SetAccessQuickRemoveDebrisPolicy(policy));
+            dropdown.Width(110.px());
+            refreshers.Add(() => dropdown.SetValue(
+                AutoDepthDesignation.AccessQuickRemoveDebrisPolicy));
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
+            row.Add(new Label(AtdLocalization.SettingsQuickRemoveDebrisLabel.AsFormatted)
+                .Tooltip(AtdLocalization.SettingsQuickRemoveDebrisTooltip.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(dropdown);
+            return row;
+        }
+
+        private static UiComponent QuickRemoveDebrisOption(
+            QuickRemoveDebrisPolicy policy, int index, bool isInDropdown)
+        {
+            switch (policy)
+            {
+                case QuickRemoveDebrisPolicy.Always:
+                    return new Label(AtdLocalization.SettingsQuickRemoveDebrisAlways.AsFormatted)
+                        .Tooltip(AtdLocalization.SettingsQuickRemoveDebrisAlwaysTooltip.AsFormatted);
+                case QuickRemoveDebrisPolicy.Never:
+                    return new Label(AtdLocalization.SettingsQuickRemoveDebrisNever.AsFormatted)
+                        .Tooltip(AtdLocalization.SettingsQuickRemoveDebrisNeverTooltip.AsFormatted);
+                default:
+                    return new Label(AtdLocalization.SettingsQuickRemoveDebrisRestrictive.AsFormatted)
+                        .Tooltip(AtdLocalization.SettingsQuickRemoveDebrisRestrictiveTooltip.AsFormatted);
+            }
         }
 
         private static void AddPathfinderFloat(Column content, List<Action> refreshers,

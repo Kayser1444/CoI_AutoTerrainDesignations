@@ -39,8 +39,8 @@ namespace AutoTerrainDesignations
             => AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace);
         private static UiRoot? s_uiRoot;
         private static bool s_cancelExperimentalAccessSearch;
-        private static readonly List<PlacedExperimentalDesignation> s_lastExperimentalCleanupDesignations =
-            new List<PlacedExperimentalDesignation>();
+        private static readonly List<ATDPropRemovalRequestHandle> s_lastExperimentalPropRemovalRequests =
+            new List<ATDPropRemovalRequestHandle>();
         private static readonly List<TreeId> s_lastExperimentalCleanupTreeSelections = new List<TreeId>();
 
         private readonly struct PlacedExperimentalDesignation
@@ -51,6 +51,19 @@ namespace AutoTerrainDesignations
             public PlacedExperimentalDesignation(Tile2i origin, TerrainDesignationProto proto)
             {
                 Origin = origin;
+                Proto = proto;
+            }
+        }
+
+        private readonly struct PlannedExperimentalDesignation
+        {
+            public DesignationData Data { get; }
+            public TerrainDesignationProto Proto { get; }
+
+            public PlannedExperimentalDesignation(DesignationData data,
+                TerrainDesignationProto proto)
+            {
+                Data = data;
                 Proto = proto;
             }
         }
@@ -966,7 +979,8 @@ namespace AutoTerrainDesignations
                                     prop.PlacedAtHeight.Value.ToFloat(),
                                 dumpBurialThreshold:
                                     prop.Proto.DespawnBuriedThreshold
-                                        .ScaledBy(prop.Scale).Value.ToFloat());
+                                        .ScaledBy(prop.Scale).Value.ToFloat(),
+                                denseDebrisPropId: prop.Id);
                             AccessPropBlockerKind blocker = AddCleanupSample(
                                 tower,
                                 origin,
@@ -3078,23 +3092,69 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            var placedCleanupDesignations = new List<PlacedExperimentalDesignation>();
-            var plannedTerrainWorkOrigins = new HashSet<Tile2i>(
-                placementPlan.Designations.Select(item => item.Origin));
-            var dumpingHandoffOrigins = new HashSet<Tile2i>(
-                placementPlan.HandoffOperationsByOrigin
-                    .Where(pair => pair.Value == AccessHandoffOperation.Dumping)
-                    .Select(pair => pair.Key));
+            Tile2i terminalOrigin = default;
+            bool hasGeneratedTerminal = TryGetGeneratedTerminal(
+                candidate.SearchResult, out terminalOrigin);
+            Dictionary<Tile2i, AccessHandoffOperation> generatedHandoffOperations =
+                placementPlan.HandoffOperationsByOrigin.ToDictionary(
+                    pair => pair.Key, pair => pair.Value);
+            var plannedPlacements = new Dictionary<Tile2i, PlannedExperimentalDesignation>();
+            foreach (AccessPlannedDesignation item in placementPlan.Designations)
+            {
+                if (((item.Profile.Nw2 | item.Profile.Ne2 | item.Profile.Se2
+                        | item.Profile.Sw2) & 1) != 0)
+                {
+                    failureReason = "HalfLevelCorner";
+                    return false;
+                }
+                TerrainDesignationProto itemProto = rampProto;
+                AccessHandoffOperation operation = AccessHandoffOperation.None;
+                if (generatedHandoffOperations.TryGetValue(item.Origin,
+                        out AccessHandoffOperation mappedOperation))
+                    operation = mappedOperation;
+                else if (hasGeneratedTerminal && item.Origin == terminalOrigin)
+                    operation = placementPlan.HandoffOperation;
+                if (operation != AccessHandoffOperation.None)
+                {
+                    TerrainDesignationProto? terminalProto = operation == AccessHandoffOperation.Mining
+                        ? s_miningProto
+                        : operation == AccessHandoffOperation.Dumping
+                            ? s_dumpingProto
+                            : operation == AccessHandoffOperation.Leveling
+                                ? s_levelingProto
+                                : null;
+                    if (terminalProto == null)
+                    {
+                        failureReason = "MissingHandoffOperationProto";
+                        return false;
+                    }
+                    itemProto = terminalProto;
+                }
+                var data = new DesignationData(item.Origin,
+                    new HeightTilesI(item.Profile.Nw2 / 2),
+                    new HeightTilesI(item.Profile.Ne2 / 2),
+                    new HeightTilesI(item.Profile.Se2 / 2),
+                    new HeightTilesI(item.Profile.Sw2 / 2));
+                plannedPlacements[item.Origin] =
+                    new PlannedExperimentalDesignation(data, itemProto);
+            }
+
+            var placedCleanupRequests = new List<ATDPropRemovalRequestHandle>();
+            var placedNow = new List<PlacedExperimentalDesignation>(
+                placementPlan.Designations.Count);
+            var preplacedCleanupOrigins = new HashSet<Tile2i>();
             if (!TryPlaceDenseDebrisCleanupDesignations(
                     placementPlan.CleanupOrigins,
-                    plannedTerrainWorkOrigins,
-                    dumpingHandoffOrigins,
+                    plannedPlacements,
                     tower,
                     reservedRampTiles,
-                    placedCleanupDesignations,
+                    placedCleanupRequests,
+                    placedNow,
+                    preplacedCleanupOrigins,
                     out failureReason))
             {
-                RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                RollBackPropRemovalRequests(placedCleanupRequests, reservedRampTiles);
+                RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                 return false;
             }
 
@@ -3102,7 +3162,8 @@ namespace AutoTerrainDesignations
             if (!TryMaterializeTreeCleanup(placementPlan.CleanupOrigins, selectedCleanupTrees, out failureReason))
             {
                 RollBackTreeCleanupSelections(selectedCleanupTrees);
-                RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                RollBackPropRemovalRequests(placedCleanupRequests, reservedRampTiles);
+                RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                 return false;
             }
             if (AccessHarvestDisruptedTrees
@@ -3110,29 +3171,16 @@ namespace AutoTerrainDesignations
                     snapshot, candidate.SearchResult, selectedCleanupTrees, out failureReason))
             {
                 RollBackTreeCleanupSelections(selectedCleanupTrees);
-                RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                RollBackPropRemovalRequests(placedCleanupRequests, reservedRampTiles);
+                RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                 return false;
             }
-
-            Tile2i terminalOrigin = default;
-            bool hasGeneratedTerminal = TryGetGeneratedTerminal(
-                candidate.SearchResult, out terminalOrigin);
-            Dictionary<Tile2i, AccessHandoffOperation> generatedHandoffOperations =
-                placementPlan.HandoffOperationsByOrigin.ToDictionary(
-                    pair => pair.Key, pair => pair.Value);
-            var placedNow = new List<PlacedExperimentalDesignation>(placementPlan.Designations.Count);
             int placementIndex = -1;
             foreach (AccessPlannedDesignation item in placementPlan.Designations)
             {
                 placementIndex++;
-                if (((item.Profile.Nw2 | item.Profile.Ne2 | item.Profile.Se2 | item.Profile.Sw2) & 1) != 0)
-                {
-                    failureReason = "HalfLevelCorner";
-                    RollBackTreeCleanupSelections(selectedCleanupTrees);
-                    RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
-                    RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
-                    return false;
-                }
+                if (preplacedCleanupOrigins.Contains(item.Origin))
+                    continue;
                 Option<TerrainDesignation> existingDesignation =
                     s_desigManager.GetDesignationAt(item.Origin);
                 if (existingDesignation.HasValue)
@@ -3150,58 +3198,28 @@ namespace AutoTerrainDesignations
                         $"reserved={reservedRampTiles?.Contains(item.Origin) == true} " +
                         $"cleanupOrigin={placementPlan.CleanupOrigins.Any(cleanup => cleanup.Origin == item.Origin)}");
                     RollBackTreeCleanupSelections(selectedCleanupTrees);
-                    RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                    RollBackPropRemovalRequests(placedCleanupRequests, reservedRampTiles);
                     RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                     return false;
                 }
 
-                var data = new DesignationData(item.Origin,
-                    new HeightTilesI(item.Profile.Nw2 / 2),
-                    new HeightTilesI(item.Profile.Ne2 / 2),
-                    new HeightTilesI(item.Profile.Se2 / 2),
-                    new HeightTilesI(item.Profile.Sw2 / 2));
-                TerrainDesignationProto itemProto = rampProto;
-                AccessHandoffOperation itemHandoffOperation = AccessHandoffOperation.None;
-                if (generatedHandoffOperations.TryGetValue(item.Origin, out AccessHandoffOperation mappedOperation))
-                    itemHandoffOperation = mappedOperation;
-                else if (hasGeneratedTerminal
-                    && item.Origin == terminalOrigin)
-                    itemHandoffOperation = placementPlan.HandoffOperation;
-                if (itemHandoffOperation != AccessHandoffOperation.None)
-                {
-                    TerrainDesignationProto? terminalProto = itemHandoffOperation == AccessHandoffOperation.Mining
-                        ? s_miningProto
-                        : itemHandoffOperation == AccessHandoffOperation.Dumping
-                            ? s_dumpingProto
-                            : itemHandoffOperation == AccessHandoffOperation.Leveling
-                                ? s_levelingProto
-                                : null;
-                    if (terminalProto == null)
-                    {
-                        failureReason = "MissingHandoffOperationProto";
-                        RollBackTreeCleanupSelections(selectedCleanupTrees);
-                        RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
-                        RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
-                        return false;
-                    }
-                    itemProto = terminalProto;
-                }
-                if (!s_desigManager.AddOrReplaceDesignation(itemProto, data))
+                PlannedExperimentalDesignation planned = plannedPlacements[item.Origin];
+                if (!s_desigManager.AddOrReplaceDesignation(planned.Proto, planned.Data))
                 {
                     failureReason = "PlacementFailed";
                     RollBackTreeCleanupSelections(selectedCleanupTrees);
-                    RollBackExperimentalDesignations(placedCleanupDesignations, tower, reservedRampTiles);
+                    RollBackPropRemovalRequests(placedCleanupRequests, reservedRampTiles);
                     RollBackExperimentalDesignations(placedNow, tower, reservedRampTiles);
                     return false;
                 }
 
                 RegisterGeneratedDesignationOrigin(tower, item.Origin);
-                placedNow.Add(new PlacedExperimentalDesignation(item.Origin, itemProto));
+                placedNow.Add(new PlacedExperimentalDesignation(item.Origin, planned.Proto));
                 s_designationOriginsInArea.Add(item.Origin);
                 reservedRampTiles?.Add(item.Origin);
-                if (itemProto != rampProto)
+                if (planned.Proto != rampProto)
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Terminal] origin={item.Origin} proto={itemProto.Id.Value}");
+                        $"[ATD Experimental Access Terminal] origin={item.Origin} proto={planned.Proto.Id.Value}");
             }
 
             placedRampOrigins?.AddRange(placedNow.Select(item => item.Origin));
@@ -3209,7 +3227,7 @@ namespace AutoTerrainDesignations
                 ? placementPlan.Designations[placementPlan.Designations.Count - 1].Origin
                 : placementPlan.HandoffGround;
             LastExperimentalAccessPlan = placementPlan;
-            s_lastExperimentalCleanupDesignations.AddRange(placedCleanupDesignations);
+            s_lastExperimentalPropRemovalRequests.AddRange(placedCleanupRequests);
             s_lastExperimentalCleanupTreeSelections.AddRange(selectedCleanupTrees);
             RegisterGeneratedHarvestTreePositions(tower, selectedCleanupTrees);
             return true;
@@ -3480,11 +3498,12 @@ namespace AutoTerrainDesignations
 
         private static bool TryPlaceDenseDebrisCleanupDesignations(
             IReadOnlyList<AccessPropCleanupInfo> cleanupOrigins,
-            ISet<Tile2i> plannedTerrainWorkOrigins,
-            ISet<Tile2i> dumpingHandoffOrigins,
+            IReadOnlyDictionary<Tile2i, PlannedExperimentalDesignation> plannedPlacements,
             IAreaManagingTower tower,
             HashSet<Tile2i>? reservedRampTiles,
-            List<PlacedExperimentalDesignation> placedCleanupDesignations,
+            List<ATDPropRemovalRequestHandle> placedCleanupRequests,
+            List<PlacedExperimentalDesignation> placedTerrainDesignations,
+            ISet<Tile2i> preplacedCleanupOrigins,
             out string failureReason)
         {
             failureReason = string.Empty;
@@ -3494,20 +3513,15 @@ namespace AutoTerrainDesignations
             int denseCleanupOrigins = cleanupOrigins.Count(info => info.HasDenseDebrisCleanup);
             if (denseCleanupOrigins == 0)
                 return true;
-            if (s_desigManager == null)
+            if (s_desigManager == null || PropRemovalManager == null)
             {
                 failureReason = "DesignationManagerUnavailable";
                 return false;
             }
-            if (s_miningProto == null)
-            {
-                failureReason = "MiningProtoUnavailable";
-                return false;
-            }
-
-            var cleanupOriginsByObjectKey =
-                new Dictionary<string, HashSet<Tile2i>>(StringComparer.Ordinal);
-            var dumpingCleanupKeys = new HashSet<string>(StringComparer.Ordinal);
+            var cleanupOriginsByProp =
+                new Dictionary<TerrainPropId, HashSet<Tile2i>>();
+            var cleanupSampleByProp =
+                new Dictionary<TerrainPropId, AccessPropSample>();
             foreach (AccessPropCleanupInfo cleanup in cleanupOrigins)
             {
                 if (!cleanup.HasDenseDebrisCleanup)
@@ -3516,72 +3530,169 @@ namespace AutoTerrainDesignations
                 {
                     if (!sample.IsDenseDebris)
                         continue;
-                    if (!cleanupOriginsByObjectKey.TryGetValue(
-                            sample.CleanupObjectKey,
+                    if (!sample.DenseDebrisPropId.HasValue)
+                    {
+                        failureReason = "DenseDebrisPropIdUnavailable";
+                        return false;
+                    }
+                    TerrainPropId propId = sample.DenseDebrisPropId.Value;
+                    cleanupSampleByProp[propId] = sample;
+                    if (!cleanupOriginsByProp.TryGetValue(
+                            propId,
                             out HashSet<Tile2i> approvedOrigins))
                     {
                         approvedOrigins = new HashSet<Tile2i>();
-                        cleanupOriginsByObjectKey.Add(
-                            sample.CleanupObjectKey, approvedOrigins);
+                        cleanupOriginsByProp.Add(propId, approvedOrigins);
                     }
                     approvedOrigins.UnionWith(
                         sample.EligibleCleanupOrigins);
-                    if (dumpingHandoffOrigins.Contains(cleanup.Origin))
-                        dumpingCleanupKeys.Add(sample.CleanupObjectKey);
                 }
             }
 
-            TerrainManager terrMgr = s_desigManager.TerrainManager;
             var placedCleanupOrigins = new HashSet<Tile2i>();
-            int coveredByTerrainWork = 0;
-            foreach (KeyValuePair<string, HashSet<Tile2i>> pair
-                in cleanupOriginsByObjectKey)
+            var plannedTerrainWorkOrigins = new HashSet<Tile2i>(
+                plannedPlacements.Keys);
+            int preplacedTerrainWork = 0;
+            int buriedProps = 0;
+            int handledByDefaultOperation = 0;
+            foreach (KeyValuePair<TerrainPropId, HashSet<Tile2i>> pair
+                in cleanupOriginsByProp)
             {
+                if (!cleanupSampleByProp.TryGetValue(
+                        pair.Key, out AccessPropSample sample)
+                    || s_terrainPropsManager == null
+                    || !s_terrainPropsManager.TerrainProps.TryGetValue(
+                        pair.Key, out TerrainPropData liveProp))
+                    continue;
+                float currentCover = s_desigManager.TerrainManager
+                    .GetHeight(liveProp.Position).Value.ToFloat()
+                    - liveProp.PlacedAtHeight.Value.ToFloat();
+                float burialThreshold = liveProp.Proto.DespawnBuriedThreshold
+                    .ScaledBy(liveProp.Scale).Value.ToFloat();
+                if (currentCover > burialThreshold + 0.0001f)
+                {
+                    buriedProps++;
+                    continue;
+                }
+                Tile2i propOrigin = TerrainDesignation.GetOrigin(
+                    liveProp.Position.Tile2i);
                 if (!TrySelectDenseDebrisCleanupOrigin(
                         tower,
                         pair.Value,
                         plannedTerrainWorkOrigins,
-                        dumpingHandoffOrigins,
                         placedCleanupOrigins,
                         reservedRampTiles,
-                        dumpingCleanupKeys.Contains(pair.Key),
-                        out Tile2i origin,
-                        out bool coveredByWork))
+                        propOrigin,
+                        out Tile2i origin))
                 {
                     failureReason = "DenseDebrisCleanupOriginUnavailable";
                     return false;
                 }
-                if (coveredByWork)
+
+                bool defaultOperationRemoves = false;
+                if (plannedPlacements.TryGetValue(origin,
+                        out PlannedExperimentalDesignation defaultPlanned))
                 {
-                    coveredByTerrainWork++;
-                    continue;
-                }
-                if (!placedCleanupOrigins.Add(origin))
-                    continue;
-                if (s_desigManager.GetDesignationAt(origin).HasValue)
-                {
-                    failureReason = "CleanupDesignationAppeared";
-                    return false;
+                    AccessHandoffOperation defaultOperation =
+                        defaultPlanned.Proto == s_miningProto
+                            ? AccessHandoffOperation.Mining
+                            : defaultPlanned.Proto == s_dumpingProto
+                                ? AccessHandoffOperation.Dumping
+                                : defaultPlanned.Proto == s_levelingProto
+                                    ? AccessHandoffOperation.Leveling
+                                    : AccessHandoffOperation.None;
+                    defaultOperationRemoves =
+                        AccessPropCleanupPolicy
+                            .PlannedOperationRemovesNonTreeProp(
+                                defaultOperation, defaultPlanned.Data,
+                                sample);
                 }
 
-                DesignationData data = BuildDenseDebrisCleanupDesignationData(terrMgr, origin);
-                if (!s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
+                QuickRemoveDebrisPolicy policy =
+                    AccessQuickRemoveDebrisPolicy;
+                if (policy != QuickRemoveDebrisPolicy.Always
+                    && defaultOperationRemoves)
                 {
-                    failureReason = "CleanupPlacementFailed";
+                    handledByDefaultOperation++;
+                    continue;
+                }
+                bool quickRemove = policy != QuickRemoveDebrisPolicy.Never;
+                if (!quickRemove && origin != propOrigin)
+                {
+                    if (!pair.Value.Contains(propOrigin)
+                        || !TrySelectDenseDebrisCleanupOrigin(
+                            tower,
+                            new[] { propOrigin },
+                            plannedTerrainWorkOrigins,
+                            placedCleanupOrigins,
+                            reservedRampTiles,
+                            propOrigin,
+                            out origin))
+                    {
+                        failureReason =
+                            "DenseDebrisTerrainOriginUnavailable";
+                        return false;
+                    }
+                }
+                bool firstRequestAtOrigin = placedCleanupOrigins.Add(origin);
+                if (firstRequestAtOrigin
+                    && plannedPlacements.TryGetValue(origin,
+                        out PlannedExperimentalDesignation planned))
+                {
+                    if (s_desigManager.GetDesignationAt(origin).HasValue
+                        || !s_desigManager.AddOrReplaceDesignation(
+                            planned.Proto, planned.Data))
+                    {
+                        failureReason = "CleanupOriginalPlacementFailed";
+                        return false;
+                    }
+                    RegisterGeneratedDesignationOrigin(tower, origin);
+                    placedTerrainDesignations.Add(
+                        new PlacedExperimentalDesignation(origin, planned.Proto));
+                    preplacedCleanupOrigins.Add(origin);
+                    s_designationOriginsInArea.Add(origin);
+                    reservedRampTiles?.Add(origin);
+                    preplacedTerrainWork++;
+                }
+                ATDPropRemovalRequestHandle request = PropRemovalManager.RequestRemoval(
+                    pair.Key, origin,
+                    $"accessway:{origin.X},{origin.Y}",
+                    quickRemove);
+                if (request.IsCompleted
+                    && request.Result.Outcome != ATDPropRemovalOutcome.Removed
+                    && request.Result.Outcome != ATDPropRemovalOutcome.AlreadyAbsent)
+                {
+                    failureReason = "PropRemoval" + request.Result.Outcome;
                     return false;
                 }
+                if (request.IsCompleted
+                    && request.Result.Outcome == ATDPropRemovalOutcome.AlreadyAbsent)
+                    continue;
 
-                RegisterGeneratedDesignationOrigin(tower, origin);
-                placedCleanupDesignations.Add(new PlacedExperimentalDesignation(origin, s_miningProto));
+                request.OnCompleted(result =>
+                {
+                    if (result.Outcome == ATDPropRemovalOutcome.Removed
+                        && !result.OriginalDesignationRestored)
+                        return;
+                    if (plannedPlacements.ContainsKey(request.Origin)
+                        && result.Outcome == ATDPropRemovalOutcome.Removed)
+                        return;
+                    if (plannedPlacements.ContainsKey(request.Origin))
+                        UnregisterGeneratedDesignationOrigin(tower, request.Origin);
+                    s_designationOriginsInArea.Remove(request.Origin);
+                    reservedRampTiles?.Remove(request.Origin);
+                });
+                placedCleanupRequests.Add(request);
                 s_designationOriginsInArea.Add(origin);
                 reservedRampTiles?.Add(origin);
             }
 
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Cleanup] dense debris materialization origins={denseCleanupOrigins} " +
-                $"props={cleanupOriginsByObjectKey.Count} " +
-                $"designations={placedCleanupDesignations.Count} " +
-                $"coveredByTerrainWork={coveredByTerrainWork}");
+                $"props={cleanupOriginsByProp.Count} " +
+                $"requests={placedCleanupRequests.Count} " +
+                $"buried={buriedProps} defaultHandled={handledByDefaultOperation} " +
+                $"preplacedTerrainWork={preplacedTerrainWork}");
             return true;
         }
 
@@ -3589,17 +3700,18 @@ namespace AutoTerrainDesignations
             IAreaManagingTower tower,
             IEnumerable<Tile2i> approvedOrigins,
             ISet<Tile2i> plannedTerrainWorkOrigins,
-            ISet<Tile2i> dumpingHandoffOrigins,
             ISet<Tile2i> placedCleanupOrigins,
             ISet<Tile2i>? reservedRampTiles,
-            bool requiresFreeNeighbor,
-            out Tile2i origin,
-            out bool coveredByTerrainWork)
+            Tile2i preferredPropOrigin,
+            out Tile2i origin)
         {
             origin = default;
-            coveredByTerrainWork = false;
             foreach (Tile2i candidate in approvedOrigins
-                .OrderBy(item => item.X)
+                .OrderBy(item => plannedTerrainWorkOrigins.Contains(item)
+                    && item == preferredPropOrigin ? 0
+                    : plannedTerrainWorkOrigins.Contains(item) ? 1
+                    : item == preferredPropOrigin ? 2 : 3)
+                .ThenBy(item => item.X)
                 .ThenBy(item => item.Y))
             {
                 if (!IsOriginInsideTower(tower, candidate)
@@ -3613,38 +3725,16 @@ namespace AutoTerrainDesignations
                 }
                 if (plannedTerrainWorkOrigins.Contains(candidate))
                 {
-                    if (!requiresFreeNeighbor
-                        && !dumpingHandoffOrigins.Contains(candidate))
-                    {
-                        origin = candidate;
-                        coveredByTerrainWork = true;
-                        return true;
-                    }
-                    continue;
+                    origin = candidate;
+                    return true;
                 }
-                if (dumpingHandoffOrigins.Contains(candidate)
-                    || reservedRampTiles?.Contains(candidate) == true
+                if (reservedRampTiles?.Contains(candidate) == true
                     || s_desigManager?.GetDesignationAt(candidate).HasValue == true)
                     continue;
                 origin = candidate;
                 return true;
             }
             return false;
-        }
-
-        private static DesignationData BuildDenseDebrisCleanupDesignationData(
-            TerrainManager terrMgr,
-            Tile2i origin)
-        {
-            int hNW = GetSurfaceHeight(terrMgr, origin) + 1;
-            int hNE = GetSurfaceHeight(terrMgr, origin.AddX(4)) + 1;
-            int hSE = GetSurfaceHeight(terrMgr, origin.AddXy(4)) + 1;
-            int hSW = GetSurfaceHeight(terrMgr, origin.AddY(4)) + 1;
-            return new DesignationData(origin,
-                new HeightTilesI(hNW),
-                new HeightTilesI(hNE),
-                new HeightTilesI(hSE),
-                new HeightTilesI(hSW));
         }
 
         private static bool TryMaterializeTreeCleanup(
@@ -3752,14 +3842,31 @@ namespace AutoTerrainDesignations
             HashSet<Tile2i>? reservedRampTiles)
         {
             RollBackTreeCleanupSelections(s_lastExperimentalCleanupTreeSelections);
-            RollBackExperimentalDesignations(s_lastExperimentalCleanupDesignations, tower, reservedRampTiles);
+            RollBackPropRemovalRequests(s_lastExperimentalPropRemovalRequests, reservedRampTiles);
             ClearLastExperimentalCleanupMaterialization();
         }
 
         private static void ClearLastExperimentalCleanupMaterialization()
         {
             s_lastExperimentalCleanupTreeSelections.Clear();
-            s_lastExperimentalCleanupDesignations.Clear();
+            s_lastExperimentalPropRemovalRequests.Clear();
+        }
+
+        private static bool HasPendingExperimentalPropRemovalRequests()
+            => s_lastExperimentalPropRemovalRequests.Any(request => !request.IsCompleted);
+
+        private static void RollBackPropRemovalRequests(
+            IReadOnlyList<ATDPropRemovalRequestHandle> requests,
+            HashSet<Tile2i>? reservedRampTiles)
+        {
+            if (PropRemovalManager == null)
+                return;
+            foreach (ATDPropRemovalRequestHandle request in requests)
+            {
+                PropRemovalManager.Cancel(request);
+                s_designationOriginsInArea.Remove(request.Origin);
+                reservedRampTiles?.Remove(request.Origin);
+            }
         }
 
         private static void RollBackExperimentalDesignations(

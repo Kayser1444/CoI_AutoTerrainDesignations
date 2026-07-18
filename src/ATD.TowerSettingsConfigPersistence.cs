@@ -85,6 +85,11 @@ namespace AutoTerrainDesignations
             AppendJsonBool(sb, AccessAvoidBuildings);
             sb.Append(",\"harvestDisruptedTrees\":");
             AppendJsonBool(sb, AccessHarvestDisruptedTrees);
+            sb.Append(",\"allowDigToRemoveDebris\":");
+            AppendJsonBool(sb, AccessAllowDigToRemoveDebris);
+            sb.Append(",\"quickRemoveDebrisPolicy\":")
+                .Append(((int)AccessQuickRemoveDebrisPolicy)
+                    .ToString(CultureInfo.InvariantCulture));
             sb.Append('}');
             sb.Append(",\"towerSettings\":[");
 
@@ -209,6 +214,7 @@ namespace AutoTerrainDesignations
 
             sb.Append(']');
             AppendPendingFarmPlacementBatchesJson(sb);
+            s_propRemovalManager?.AppendPendingRequestsJson(sb);
             sb.Append('}');
             return sb.ToString();
         }
@@ -240,7 +246,21 @@ namespace AutoTerrainDesignations
                     SetAccessAvoidBuildings(avoidBuildings);
                 if (TryGetBool(worldSettings, "harvestDisruptedTrees", out bool harvestDisruptedTrees))
                     SetAccessHarvestDisruptedTrees(harvestDisruptedTrees);
+                if (TryGetBool(worldSettings, "allowDigToRemoveDebris", out bool allowDigToRemoveDebris))
+                    SetAccessAllowDigToRemoveDebris(allowDigToRemoveDebris);
+                if (TryGetInt(worldSettings, "quickRemoveDebrisPolicy", out int quickRemovePolicy))
+                    SetAccessQuickRemoveDebrisPolicy(
+                        (QuickRemoveDebrisPolicy)Math.Max(
+                            (int)QuickRemoveDebrisPolicy.Always,
+                            Math.Min((int)QuickRemoveDebrisPolicy.Never,
+                                quickRemovePolicy)));
             }
+
+            if (root.TryGetValue("pendingPropRemovals", out object rawPropRemovals)
+                && rawPropRemovals is object[] propRemovalEntries)
+                s_propRemovalManager?.RestorePendingRequestsFromJsonEntries(propRemovalEntries);
+            else
+                s_propRemovalManager?.RestorePendingRequestsFromJsonEntries(Array.Empty<object>());
 
             if (!root.TryGetValue("towerSettings", out object rawEntries)
                 || !(rawEntries is object[] entries))

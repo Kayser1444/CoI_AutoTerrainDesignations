@@ -26,6 +26,7 @@ using Mafi.Core.Terrain.Resources;
 using Mafi.Core.Terrain.Trees;
 using UnityEngine;
 using AutoTerrainDesignations.Access;
+using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {
@@ -33,6 +34,9 @@ namespace AutoTerrainDesignations
     {
         private static int s_latestCreateDesignationsRequestId;
         private static bool s_createDesignationsOperationActive;
+        private static readonly Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>
+            s_manualDebrisRemovalRequestsByTower =
+                new Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>();
 
         private static IEnumerator RunCreateDesignationsWithDebugGate(
             IEnumerator routine,
@@ -838,6 +842,8 @@ namespace AutoTerrainDesignations
                 AccessAvoidOcean,
                 AccessAvoidBuildings,
                 AccessHarvestDisruptedTrees,
+                AccessAllowDigToRemoveDebris,
+                AccessQuickRemoveDebrisPolicy,
                 AutoTerrainDesignationsMod.AccessRaySlopeConservatism,
                 AutoTerrainDesignationsMod.AccessRayEndBuffer,
                 AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance,
@@ -1400,7 +1406,7 @@ namespace AutoTerrainDesignations
 
         private static IEnumerator MarkDebrisForRemovalCoroutine(IAreaManagingTower tower, bool overrideExisting, bool markUnreachable)
         {
-            if (s_desigManager == null || s_miningProto == null)
+            if (s_desigManager == null || PropRemovalManager == null)
                 yield break;
 
             var area = tower.Area;
@@ -1408,13 +1414,23 @@ namespace AutoTerrainDesignations
                 yield break;
 
             TerrainManager terrMgr = s_desigManager.TerrainManager;
-            HashSet<Tile2i> debrisOrigins = CollectDebrisDesignationOrigins(tower, area, terrMgr);
+            Dictionary<TerrainPropId, HashSet<Tile2i>> debrisOriginsByProp =
+                CollectDebrisDesignationOriginsByProp(area, terrMgr);
+            var debrisOrigins = new HashSet<Tile2i>(
+                debrisOriginsByProp.Values.SelectMany(origins => origins));
+            int collectedOriginCount = debrisOrigins.Count;
             if (!markUnreachable)
             {
                 FilterReachableDebrisOrigins(tower, debrisOrigins);
             }
-            yield return CreateDebrisRemovalDesignationsCoroutine(
-                tower, area, terrMgr, debrisOrigins, new HashSet<Tile2i>(), overrideExisting);
+            LogRuntimeDebug(
+                $"[ATD Debris Button] tower={tower.Id.Value} " +
+                $"props={debrisOriginsByProp.Count} origins={collectedOriginCount} " +
+                $"eligibleOrigins={debrisOrigins.Count} " +
+                $"includeUnreachable={markUnreachable} " +
+                $"overrideExisting={overrideExisting}");
+            yield return CreateDebrisRemovalRequestsCoroutine(
+                tower, area, debrisOriginsByProp, debrisOrigins, overrideExisting);
         }
 
         private static void FilterReachableDebrisOrigins(IAreaManagingTower tower, HashSet<Tile2i> debrisOrigins)
@@ -1425,7 +1441,10 @@ namespace AutoTerrainDesignations
             }
 
             IPathabilityProvider pathabilityProvider = s_vehiclePathFindingManager.PathabilityProvider;
-            VehiclePathFindingParams pfParams = GetExcavatorPathFindingParamsForTower(tower, out _);
+            VehiclePathFindingParams pfParams =
+                GetExcavatorPathFindingParamsForTower(tower,
+                    out string pathParamsSource,
+                    out int miningApproachRadius);
 
             Tile2i bbMin = tower.Area.BoundingBoxMin;
             Tile2i bbMax = tower.Area.BoundingBoxMax;
@@ -1433,6 +1452,10 @@ namespace AutoTerrainDesignations
 
             if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
             {
+                LogRuntimeDebug(
+                    $"[ATD Debris Reachability] tower={tower.Id.Value} " +
+                    $"no pathable start near towerPosition={towerPosition}; " +
+                    $"rejectedOrigins={debrisOrigins.Count}");
                 debrisOrigins.Clear();
                 return;
             }
@@ -1469,12 +1492,25 @@ namespace AutoTerrainDesignations
             foreach (Tile2i origin in debrisOrigins)
             {
                 bool isReachable = false;
-                for (int y = 0; y < 4; y++)
+                // Match vanilla's prop-containing mining navigation tolerance:
+                // (MinMiningDistance + MaxMiningDistance) / 2 for the selected
+                // excavator proto. A blocking prop can make the designation
+                // interior and its immediate perimeter unpathable even though
+                // the excavator can work it from farther away.
+                for (int y = -miningApproachRadius;
+                    y <= 4 + miningApproachRadius; y++)
                 {
-                    for (int x = 0; x < 4; x++)
+                    for (int x = -miningApproachRadius;
+                        x <= 4 + miningApproachRadius; x++)
                     {
                         Tile2i cell = origin + new RelTile2i(x, y);
-                        if (visited.Contains(cell))
+                        // Vanilla considers all 5x5 terrain-designation sample
+                        // points (offsets 0..4), then expands them by tolerance.
+                        int dx = x < 0 ? -x : x > 4 ? x - 4 : 0;
+                        int dy = y < 0 ? -y : y > 4 ? y - 4 : 0;
+                        if (dx * dx + dy * dy
+                                <= miningApproachRadius * miningApproachRadius
+                            && visited.Contains(cell))
                         {
                             isReachable = true;
                             break;
@@ -1486,6 +1522,10 @@ namespace AutoTerrainDesignations
                 if (!isReachable)
                 {
                     unreachable.Add(origin);
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        LogExperimentalAccessTrace(
+                            $"[ATD Debris Reachability] rejected origin={origin} " +
+                            $"reason=no connected interior-or-perimeter approach");
                 }
             }
 
@@ -1493,6 +1533,13 @@ namespace AutoTerrainDesignations
             {
                 debrisOrigins.Remove(origin);
             }
+            LogRuntimeDebug(
+                $"[ATD Debris Reachability] tower={tower.Id.Value} " +
+                $"start={start} pathParams={pathParamsSource} " +
+                $"miningApproachRadius={miningApproachRadius} visited={visited.Count} " +
+                $"eligibleOrigins={debrisOrigins.Count} " +
+                $"rejectedOrigins={unreachable.Count} " +
+                $"searchLimitReached={visited.Count >= MAX_RAMP_ACCESS_SEARCH_TILES}");
         }
 
         private static List<LooseProductProto> GetCandidateScanProducts(IAreaManagingTower tower)
@@ -1621,15 +1668,16 @@ namespace AutoTerrainDesignations
             return true;
         }
 
-        private static HashSet<Tile2i> CollectDebrisDesignationOrigins(
-            IAreaManagingTower tower,
+        private static Dictionary<TerrainPropId, HashSet<Tile2i>>
+            CollectDebrisDesignationOriginsByProp(
             PolygonTerrainArea2i area,
             TerrainManager terrMgr)
         {
-            var origins = new HashSet<Tile2i>();
+            var originsByProp =
+                new Dictionary<TerrainPropId, HashSet<Tile2i>>();
             if (s_terrainPropsManager == null)
             {
-                return origins;
+                return originsByProp;
             }
 
             try
@@ -1646,6 +1694,7 @@ namespace AutoTerrainDesignations
 
                     occupiedTiles.Clear();
                     prop.CalculateOccupiedTiles(terrMgr, occupiedTiles);
+                    var origins = new HashSet<Tile2i>();
                     for (int i = 0; i < occupiedTiles.Count; i++)
                     {
                         Tile2i occupiedTile = occupiedTiles[i];
@@ -1660,6 +1709,18 @@ namespace AutoTerrainDesignations
                             origins.Add(origin);
                         }
                     }
+                    if (origins.Count > 0)
+                    {
+                        originsByProp[prop.Id] = origins;
+                        if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        {
+                            LogExperimentalAccessTrace(
+                                $"[ATD Debris Discovery] prop={prop.Id} " +
+                                $"proto={prop.Proto.Id.Value} position={prop.Position} " +
+                                $"placedHeight={prop.PlacedAtHeight.Value.ToFloat():0.###} " +
+                                $"origins=[{string.Join(",", origins.OrderBy(item => item.X).ThenBy(item => item.Y))}]");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -1667,61 +1728,161 @@ namespace AutoTerrainDesignations
                 s_log.Warning("Failed to collect debris props: " + ex.Message);
             }
 
-            if (origins.Count > 0)
+            if (originsByProp.Count > 0)
             {
-                LogDebug(string.Format("Found {0} debris designation tile(s)", origins.Count));
+                LogDebug(string.Format("Found {0} debris prop(s) for removal",
+                    originsByProp.Count));
             }
 
-            return origins;
+            return originsByProp;
         }
 
-        private static IEnumerator CreateDebrisRemovalDesignationsCoroutine(
+        private static HashSet<Tile2i> CollectDebrisDesignationOrigins(
+            IAreaManagingTower tower, PolygonTerrainArea2i area,
+            TerrainManager terrMgr) => new HashSet<Tile2i>(
+                CollectDebrisDesignationOriginsByProp(area, terrMgr)
+                    .Values.SelectMany(origins => origins));
+
+        private static IEnumerator CreateDebrisRemovalRequestsCoroutine(
             IAreaManagingTower tower,
             PolygonTerrainArea2i area,
-            TerrainManager terrMgr,
-            HashSet<Tile2i> debrisOrigins,
-            HashSet<Tile2i> oreOrigins,
+            IReadOnlyDictionary<TerrainPropId, HashSet<Tile2i>> debrisOriginsByProp,
+            ISet<Tile2i> eligibleOrigins,
             bool overrideExisting = false)
         {
-            if (s_desigManager == null || s_miningProto == null)
+            if (s_desigManager == null || PropRemovalManager == null)
             {
                 yield break;
             }
 
-            int created = 0;
-            foreach (Tile2i origin in debrisOrigins)
+            int requested = 0;
+            int skippedUnreachable = 0;
+            int skippedExisting = 0;
+            int skippedOutsideArea = 0;
+            var initiallyDesignatedOrigins = new HashSet<Tile2i>(
+                eligibleOrigins.Where(origin =>
+                    s_desigManager.GetDesignationAt(origin).HasValue));
+            foreach (KeyValuePair<TerrainPropId, HashSet<Tile2i>> pair
+                in debrisOriginsByProp)
             {
-                if (oreOrigins.Contains(origin) ||
-                    (!overrideExisting && s_desigManager.GetDesignationAt(origin).HasValue) ||
-                    !IsDesignatableTileFullyInsideArea(area, origin))
+                List<Tile2i> reachableOrigins = pair.Value
+                    .Where(eligibleOrigins.Contains)
+                    .Where(origin => IsDesignatableTileFullyInsideArea(area, origin))
+                    .ToList();
+                if (reachableOrigins.Count == 0)
                 {
+                    bool hasEligibleOutsideArea = pair.Value
+                        .Any(eligibleOrigins.Contains);
+                    if (hasEligibleOutsideArea)
+                        skippedOutsideArea++;
+                    else
+                        skippedUnreachable++;
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        LogExperimentalAccessTrace(
+                            $"[ATD Debris Request] skipped prop={pair.Key} " +
+                            $"reason={(hasEligibleOutsideArea ? "origin-not-fully-inside-area" : "no-reachable-origin")} " +
+                            $"discoveredOrigins=[{string.Join(",", pair.Value.OrderBy(item => item.X).ThenBy(item => item.Y))}]");
                     continue;
                 }
 
-                int hNW = GetSurfaceHeight(terrMgr, origin) + 1;
-                int hNE = GetSurfaceHeight(terrMgr, origin.AddX(4)) + 1;
-                int hSE = GetSurfaceHeight(terrMgr, origin.AddXy(4)) + 1;
-                int hSW = GetSurfaceHeight(terrMgr, origin.AddY(4)) + 1;
-
-                var data = new DesignationData(origin,
-                    new HeightTilesI(hNW), new HeightTilesI(hNE),
-                    new HeightTilesI(hSE), new HeightTilesI(hSW));
-
-                if (s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
+                List<Tile2i> availableOrigins = reachableOrigins
+                    .Where(origin => overrideExisting
+                        || !initiallyDesignatedOrigins.Contains(origin))
+                    .ToList();
+                if (availableOrigins.Count == 0)
                 {
-                    RegisterGeneratedDesignationOrigin(tower, origin);
-                    created++;
+                    skippedExisting++;
+                    if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                        LogExperimentalAccessTrace(
+                            $"[ATD Debris Request] skipped prop={pair.Key} " +
+                            $"reason=existing-designation overrideExisting={overrideExisting} " +
+                            $"reachableOrigins=[{string.Join(",", reachableOrigins.OrderBy(item => item.X).ThenBy(item => item.Y))}]");
+                    continue;
                 }
 
+                Tile2i selectedOrigin = availableOrigins
+                    // Shift-click explicitly opts into designation suspension. For
+                    // props spanning more than one 4x4 cell, prefer the occupied
+                    // cell containing the existing designation so the manager
+                    // actually exercises its suspend/restore handoff instead of
+                    // silently choosing an adjacent empty cell.
+                    .OrderByDescending(origin => origin
+                        == TerrainDesignation.GetOrigin(
+                            pair.Key.Position.AsFull))
+                    .ThenByDescending(origin => overrideExisting
+                        && initiallyDesignatedOrigins.Contains(origin))
+                    .ThenBy(origin => origin.X)
+                    .ThenBy(origin => origin.Y)
+                    .FirstOrDefault();
+
+                ATDPropRemovalRequestHandle request = PropRemovalManager.RequestRemoval(
+                    pair.Key, selectedOrigin,
+                    $"debris-button:{tower.Id.Value}",
+                    quickRemove: false);
+                TrackManualDebrisRemovalRequest(tower, request);
+                requested++;
+                if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                    LogExperimentalAccessTrace(
+                        $"[ATD Debris Request] queued prop={pair.Key} " +
+                        $"origin={selectedOrigin} request={request.RequestId} " +
+                        $"coalescedOrigin={request.Origin} overrideExisting={overrideExisting}");
+
                 int effectiveBatchSize = GetEffectiveBatchSize();
-                if (created > 0 && created % effectiveBatchSize == 0)
+                if (requested % effectiveBatchSize == 0)
                     yield return null;
             }
 
-            if (created > 0)
+            LogRuntimeDebug(
+                $"[ATD Debris Request] tower={tower.Id.Value} " +
+                $"requested={requested}/{debrisOriginsByProp.Count} " +
+                $"skippedUnreachable={skippedUnreachable} " +
+                $"skippedExisting={skippedExisting} " +
+                $"skippedOutsideArea={skippedOutsideArea}");
+            if (requested == 0)
+                AddTowerDebrisCleanupEmptyNotification(tower,
+                    debrisWasFound: debrisOriginsByProp.Count > 0);
+        }
+
+        private static void TrackManualDebrisRemovalRequest(
+            IAreaManagingTower tower, ATDPropRemovalRequestHandle request)
+        {
+            if (request.IsCompleted)
+                return;
+            EntityId towerId = tower.Id;
+            if (!s_manualDebrisRemovalRequestsByTower.TryGetValue(towerId,
+                    out List<ATDPropRemovalRequestHandle> requests))
             {
-                LogDebug(string.Format("Created {0} debris removal designation(s)", created));
+                requests = new List<ATDPropRemovalRequestHandle>();
+                s_manualDebrisRemovalRequestsByTower.Add(towerId, requests);
             }
+            requests.Add(request);
+            SetTowerDebrisCleanupQueuedNotification(tower, isQueued: true);
+            request.OnCompleted(_ =>
+            {
+                if (!s_manualDebrisRemovalRequestsByTower.TryGetValue(towerId,
+                        out List<ATDPropRemovalRequestHandle> liveRequests))
+                    return;
+                liveRequests.Remove(request);
+                if (liveRequests.Count == 0)
+                {
+                    s_manualDebrisRemovalRequestsByTower.Remove(towerId);
+                    SetTowerDebrisCleanupQueuedNotification(tower,
+                        isQueued: false);
+                }
+            });
+        }
+
+        private static void CancelManualDebrisRemovalRequestsForTower(
+            IAreaManagingTower tower)
+        {
+            if (PropRemovalManager == null
+                || !s_manualDebrisRemovalRequestsByTower.TryGetValue(tower.Id,
+                    out List<ATDPropRemovalRequestHandle> requests))
+                return;
+            foreach (ATDPropRemovalRequestHandle request in requests.ToArray())
+                PropRemovalManager.Cancel(request);
+            s_manualDebrisRemovalRequestsByTower.Remove(tower.Id);
+            SetTowerDebrisCleanupQueuedNotification(tower, isQueued: false);
         }
 
         private static float GetMinSurfaceHeightInDesignatableTile(Tile2i tileOrigin, TerrainManager terrMgr)

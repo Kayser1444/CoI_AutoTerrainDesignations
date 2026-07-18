@@ -36,7 +36,17 @@ using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {
-    internal enum AccessVehicleClearanceMode { Off = 0, Auto = 1, T1 = 2, T2 = 3, T3 = 4 }
+    internal enum AccessVehicleClearanceMode
+    {
+        Off = 0,
+        Auto = 1,
+        T1 = 2,
+        T2 = 3,
+        T3 = 4,
+        LegacyWidth3 = 5,
+        LegacyWidth4 = 6,
+        LegacyWidth5 = 7,
+    }
 
     public static partial class AutoDepthDesignation
     {
@@ -75,13 +85,11 @@ namespace AutoTerrainDesignations
         {
             public int MaxHeightDiff { get; private set; }
             public AccessVehicleClearanceMode VehicleClearance { get; private set; }
-            public int RampWidth => VehicleClearance == AccessVehicleClearanceMode.Off
-                ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
+            public int RampWidth => RampWidthForMode(VehicleClearance);
             public int MaxLayersToExcavate { get; private set; }
             public int? MaxDepthToDigTo { get; private set; }
             public int OrePurityLevel { get; private set; }
-            public int CorridorClearance => VehicleClearance == AccessVehicleClearanceMode.Off
-                ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
+            public int CorridorClearance => CorridorClearanceForMode(VehicleClearance);
             public bool AutoReleaseExcavatorsWhenIdle { get; private set; }
             public bool AutoReleaseTrucksWhenIdle { get; private set; }
             public bool MiningPlanDirty { get; private set; } = true;
@@ -124,13 +132,12 @@ namespace AutoTerrainDesignations
                 MaxHeightDiff = clamped;
             }
 
-            public void SetRampWidth(int value) => SetVehicleClearance(
-                value == 0 ? AccessVehicleClearanceMode.Off : AccessVehicleClearanceMode.Auto);
+            public void SetRampWidth(int value) => SetVehicleClearance(ModeForRampWidth(value));
 
             public void SetVehicleClearance(AccessVehicleClearanceMode value)
             {
                 AccessVehicleClearanceMode clamped = value < AccessVehicleClearanceMode.Off
-                    || value > AccessVehicleClearanceMode.T3
+                    || value > AccessVehicleClearanceMode.LegacyWidth5
                         ? AccessVehicleClearanceMode.Auto : value;
                 if (VehicleClearance != clamped) MiningPlanDirty = true;
                 VehicleClearance = clamped;
@@ -185,7 +192,7 @@ namespace AutoTerrainDesignations
             public bool MatchesGlobalDefaults()
             {
                 return MaxHeightDiff == AutoTerrainDesignationsMod.MaxHeightDiff
-                    && RampWidth == AutoTerrainDesignationsMod.RampWidth
+                    && VehicleClearance == AutoTerrainDesignationsMod.VehicleClearance
                     && MaxLayersToExcavate == AutoTerrainDesignationsMod.MaxLayersToExcavate
                     && MaxDepthToDigTo == AutoTerrainDesignationsMod.MaxDepthToDigTo
                     && OrePurityLevel == AutoTerrainDesignationsMod.OrePurityLevel
@@ -228,20 +235,69 @@ namespace AutoTerrainDesignations
         private static bool s_accessAvoidOcean = true;
         private static bool s_accessAvoidBuildings = true;
         private static bool s_accessHarvestDisruptedTrees = true;
+        private static bool s_accessAllowDigToRemoveDebris = true;
+        private static QuickRemoveDebrisPolicy s_accessQuickRemoveDebrisPolicy =
+            QuickRemoveDebrisPolicy.Restrictive;
+        private static ATDPropRemovalManager? s_propRemovalManager;
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
         internal static bool AccessHarvestDisruptedTrees => s_accessHarvestDisruptedTrees;
+        internal static bool AccessAllowDigToRemoveDebris => s_accessAllowDigToRemoveDebris;
+        internal static QuickRemoveDebrisPolicy AccessQuickRemoveDebrisPolicy =>
+            s_accessQuickRemoveDebrisPolicy;
+        internal static ATDPropRemovalManager? PropRemovalManager => s_propRemovalManager;
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
         internal static void SetAccessHarvestDisruptedTrees(bool value) => s_accessHarvestDisruptedTrees = value;
+        internal static void SetAccessAllowDigToRemoveDebris(bool value) => s_accessAllowDigToRemoveDebris = value;
+        internal static void SetAccessQuickRemoveDebrisPolicy(
+            QuickRemoveDebrisPolicy value) => s_accessQuickRemoveDebrisPolicy = value;
 
         internal static void ResetWorldPathfinderSettingsToDefaults()
         {
             s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
             s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
             s_accessHarvestDisruptedTrees = AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees;
+            s_accessAllowDigToRemoveDebris = AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris;
+            s_accessQuickRemoveDebrisPolicy =
+                AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy;
+        }
+
+        internal static bool IsLegacyRampMode(AccessVehicleClearanceMode mode) =>
+            mode >= AccessVehicleClearanceMode.LegacyWidth3
+            && mode <= AccessVehicleClearanceMode.LegacyWidth5;
+
+        internal static int RampWidthForMode(AccessVehicleClearanceMode mode)
+        {
+            switch (mode)
+            {
+                case AccessVehicleClearanceMode.Off: return 0;
+                case AccessVehicleClearanceMode.T3: return 2;
+                case AccessVehicleClearanceMode.LegacyWidth3: return 3;
+                case AccessVehicleClearanceMode.LegacyWidth4: return 4;
+                case AccessVehicleClearanceMode.LegacyWidth5: return 5;
+                default: return 1;
+            }
+        }
+
+        internal static int CorridorClearanceForMode(AccessVehicleClearanceMode mode) =>
+            mode == AccessVehicleClearanceMode.Off ? 0
+                : mode == AccessVehicleClearanceMode.T3 || IsLegacyRampMode(mode) ? 2
+                : 1;
+
+        internal static AccessVehicleClearanceMode ModeForRampWidth(int value)
+        {
+            switch (Math.Max(0, Math.Min(5, value)))
+            {
+                case 0: return AccessVehicleClearanceMode.Off;
+                case 2: return AccessVehicleClearanceMode.T3;
+                case 3: return AccessVehicleClearanceMode.LegacyWidth3;
+                case 4: return AccessVehicleClearanceMode.LegacyWidth4;
+                case 5: return AccessVehicleClearanceMode.LegacyWidth5;
+                default: return AccessVehicleClearanceMode.Auto;
+            }
         }
 
         internal static void SaveWorldPathfinderSettingsAsGlobalDefaults()
@@ -249,6 +305,9 @@ namespace AutoTerrainDesignations
             AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
             AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
             AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
+            AutoTerrainDesignationsMod.SetAccessAllowDigToRemoveDebris(s_accessAllowDigToRemoveDebris);
+            AutoTerrainDesignationsMod.SetAccessQuickRemoveDebrisPolicy(
+                s_accessQuickRemoveDebrisPolicy);
         }
 
         // Keep the broad create-designations trace quiet unless explicitly
@@ -285,13 +344,13 @@ namespace AutoTerrainDesignations
                 s_log.Info(message);
         }
 
-        private static void LogExperimentalAccessDebug(string message)
+        internal static void LogExperimentalAccessDebug(string message)
         {
             if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
                 s_log.Info(message);
         }
 
-        private static void LogExperimentalAccessTrace(string message)
+        internal static void LogExperimentalAccessTrace(string message)
         {
             if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
                 s_log.Info(message);
@@ -630,6 +689,8 @@ namespace AutoTerrainDesignations
 
         internal static void ResetWorldRuntimeState()
         {
+            s_propRemovalManager?.Dispose(restoreOriginals: true);
+            s_propRemovalManager = null;
             s_worldGeneration++;
             s_latestCreateDesignationsRequestId++;
             s_cancelExperimentalAccessSearch = true;
@@ -665,6 +726,7 @@ namespace AutoTerrainDesignations
             s_generatedDesignationOriginsByTowerEntityId.Clear();
             s_generatedAccesswayOriginsByTowerEntityId.Clear();
             s_generatedHarvestTreePositionsByTowerEntityId.Clear();
+            s_manualDebrisRemovalRequestsByTower.Clear();
             s_startupTowerPrioritySyncCompleted = false;
             s_startupTowerPrioritySyncAttempts = 0;
 
@@ -682,6 +744,7 @@ namespace AutoTerrainDesignations
             MonoBehaviour coroutineHost,
             IEntitiesManager entitiesManager,
             TerrainPropsManager terrainPropsManager,
+            PropsRemovalProcessor propsRemovalProcessor,
             TreesManager treesManager,
             IVehiclePathFindingManager? vehiclePathFindingManager = null,
             ParkAndWaitJobFactory? parkAndWaitJobFactory = null,
@@ -711,8 +774,12 @@ namespace AutoTerrainDesignations
             s_excavatorPathFindingParams = FindExcavatorPathFindingParams(protosDb);
             s_standardVehiclePathFindingParams = s_excavatorPathFindingParams;
 
+            TerrainDesignationProto? miningForPropRemoval = null;
             if (protosDb.TryGetProto(new Proto.ID("MiningDesignator"), out TerrainDesignationProto proto))
+            {
                 s_miningProto = proto;
+                miningForPropRemoval = proto;
+            }
             else
                 s_log.Warning("MiningDesignator proto not found");
 
@@ -720,6 +787,14 @@ namespace AutoTerrainDesignations
                 s_dumpingProto = dumpProto;
             else
                 s_log.Warning("DumpingDesignator proto not found");
+
+            if (s_desigManager != null
+                && miningForPropRemoval != null
+                && s_dumpingProto != null)
+                s_propRemovalManager = new ATDPropRemovalManager(
+                    s_desigManager, terrainPropsManager, protosDb,
+                    miningForPropRemoval, s_dumpingProto,
+                    propsRemovalProcessor);
 
             if (protosDb.TryGetProto(new Proto.ID("LevelDesignator"), out TerrainDesignationProto levelProto))
                 s_levelingProto = levelProto;
@@ -755,13 +830,23 @@ namespace AutoTerrainDesignations
         private static VehiclePathFindingParams GetExcavatorPathFindingParamsForTower(
             IAreaManagingTower tower,
             out string source)
+            => GetExcavatorPathFindingParamsForTower(tower, out source,
+                out _);
+
+        private static VehiclePathFindingParams GetExcavatorPathFindingParamsForTower(
+            IAreaManagingTower tower,
+            out string source,
+            out int miningApproachRadius)
         {
             AccessVehicleClearanceMode requestedMode = GetTowerVehicleClearance(tower);
             if (requestedMode == AccessVehicleClearanceMode.T1
                 || requestedMode == AccessVehicleClearanceMode.T2
-                || requestedMode == AccessVehicleClearanceMode.T3)
+                || requestedMode == AccessVehicleClearanceMode.T3
+                || IsLegacyRampMode(requestedMode))
             {
-                string tierToken = requestedMode.ToString();
+                string tierToken = IsLegacyRampMode(requestedMode)
+                    ? AccessVehicleClearanceMode.T3.ToString()
+                    : requestedMode.ToString();
                 if (s_protosDb != null)
                 {
                     foreach (ExcavatorProto proto in s_protosDb.All<ExcavatorProto>()
@@ -771,6 +856,7 @@ namespace AutoTerrainDesignations
                         {
                             int explicitClearance = GetVehicleClearance(proto.PathFindingParams);
                             source = $"explicit{tierToken}:{proto.Id}:clearance={explicitClearance}";
+                            miningApproachRadius = GetPropMiningApproachRadius(proto);
                             return proto.PathFindingParams;
                         }
                     }
@@ -788,7 +874,8 @@ namespace AutoTerrainDesignations
                                 excavator.PathFindingParams,
                                 $"assignedExcavator:{excavator.Prototype.Id}",
                                 GetVehicleClearance(excavator.PathFindingParams),
-                                excavator.Prototype.Id.ToString()));
+                                excavator.Prototype.Id.ToString(),
+                                GetPropMiningApproachRadius(excavator.Prototype)));
                 }
 
                 if (TryGetTowerEntityId(tower, out EntityId towerId))
@@ -800,7 +887,8 @@ namespace AutoTerrainDesignations
                                     excavator.PathFindingParams,
                                     $"releasedExcavator:{excavator.Prototype.Id}",
                                     GetVehicleClearance(excavator.PathFindingParams),
-                                    excavator.Prototype.Id.ToString()));
+                                    excavator.Prototype.Id.ToString(),
+                                    GetPropMiningApproachRadius(excavator.Prototype)));
 
                     if (s_protosDb != null)
                         foreach (DynamicEntityProto.ID protoId in PendingVehicleAllocations.GetQueuedProtoIdsForTower(towerId))
@@ -809,13 +897,15 @@ namespace AutoTerrainDesignations
                                     proto.PathFindingParams,
                                     $"preAssignedExcavator:{proto.Id}",
                                     GetVehicleClearance(proto.PathFindingParams),
-                                    proto.Id.ToString()));
+                                    proto.Id.ToString(),
+                                    GetPropMiningApproachRadius(proto)));
                 }
             }
 
             if (TrySelectPathabilityCandidate(towerCandidates, int.MaxValue, out VehiclePathabilityCandidate towerSelected))
             {
                 source = $"{towerSelected.Source}:clearance={towerSelected.Clearance}";
+                miningApproachRadius = towerSelected.MiningApproachRadius;
                 return towerSelected.Params;
             }
 
@@ -828,18 +918,28 @@ namespace AutoTerrainDesignations
                             excavator.PathFindingParams,
                             $"fleetExcavator:{excavator.Prototype.Id}",
                             GetVehicleClearance(excavator.PathFindingParams),
-                            excavator.Prototype.Id.ToString()));
+                            excavator.Prototype.Id.ToString(),
+                            GetPropMiningApproachRadius(excavator.Prototype)));
 
                 if (TrySelectPathabilityCandidate(fleetCandidates, int.MaxValue, out VehiclePathabilityCandidate selected))
                 {
                     source = $"{selected.Source}:clearance={selected.Clearance}";
+                    miningApproachRadius = selected.MiningApproachRadius;
                     return selected.Params;
                 }
             }
 
             source = "autoOff:noExcavatorsOnMap";
+            miningApproachRadius = s_protosDb?.All<ExcavatorProto>()
+                .OrderBy(proto => proto.Id.Value, StringComparer.Ordinal)
+                .Select(GetPropMiningApproachRadius)
+                .FirstOrDefault() ?? 1;
             return s_excavatorPathFindingParams ?? VehiclePathFindingParams.DEFAULT;
         }
+
+        private static int GetPropMiningApproachRadius(ExcavatorProto proto)
+            => Math.Max(1, (proto.MinMiningDistance.Value
+                + proto.MaxMiningDistance.Value) / 2);
 
         internal static bool ShouldGenerateAccessways(IAreaManagingTower tower)
         {
@@ -857,18 +957,21 @@ namespace AutoTerrainDesignations
             public int Clearance { get; }
             public int HeightClearance { get; }
             public string SortKey { get; }
+            public int MiningApproachRadius { get; }
 
             public VehiclePathabilityCandidate(
                 VehiclePathFindingParams pathFindingParams,
                 string source,
                 int clearance,
-                string sortKey)
+                string sortKey,
+                int miningApproachRadius)
             {
                 Params = pathFindingParams;
                 Source = source;
                 Clearance = clearance;
                 HeightClearance = pathFindingParams.MinHeightClearance.Value;
                 SortKey = sortKey;
+                MiningApproachRadius = miningApproachRadius;
             }
         }
 

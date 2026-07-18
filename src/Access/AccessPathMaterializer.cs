@@ -60,13 +60,11 @@ namespace AutoTerrainDesignations.Access
                         if (previousGeneratedSameOrigin)
                         {
                             cleanupOriginsCoveredByGeneratedV.Add(cleanupInfo.Origin);
-                            if (TryBuildTreeOnlyCleanupInfo(cleanupInfo, out AccessPropCleanupInfo treeCleanup))
-                                MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                            MergeCleanupInfo(cleanupByOrigin, cleanupInfo);
                         }
                         else if (cleanupOriginsCoveredByGeneratedV.Contains(cleanupInfo.Origin))
                         {
-                            if (TryBuildTreeOnlyCleanupInfo(cleanupInfo, out AccessPropCleanupInfo treeCleanup))
-                                MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                            MergeCleanupInfo(cleanupByOrigin, cleanupInfo);
                         }
                         else
                         {
@@ -210,16 +208,8 @@ namespace AutoTerrainDesignations.Access
                                     usesTerrainRemovalPolicy:
                                         generatedCleanup.UsesTerrainRemovalPolicy)
                                 : generatedCleanup;
-                        if (!hasTerrainDelta)
-                            MergeCleanupInfo(cleanupByOrigin, approvedGeneratedCleanup);
-                        else if (terminalOperation == AccessHandoffOperation.Dumping
-                            && TryBuildDumpingCleanupInfo(
-                                approvedGeneratedCleanup, node.Position,
-                                profile, out AccessPropCleanupInfo dumpingCleanup))
-                            MergeCleanupInfo(cleanupByOrigin, dumpingCleanup);
-                        else if (TryBuildTreeOnlyCleanupInfo(
-                            approvedGeneratedCleanup, out AccessPropCleanupInfo treeCleanup))
-                            MergeCleanupInfo(cleanupByOrigin, treeCleanup);
+                        MergeCleanupInfo(cleanupByOrigin,
+                            approvedGeneratedCleanup);
                     }
 
                     // V-space is needed for accurate elevation-aware
@@ -329,11 +319,7 @@ namespace AutoTerrainDesignations.Access
                                 usesTerrainRemovalPolicy:
                                     generatedCleanup.UsesTerrainRemovalPolicy)
                             : generatedCleanup;
-                    if (!hasTerrainDelta)
-                        MergeCleanupInfo(cleanupByOrigin, approved);
-                    else if (TryBuildTreeOnlyCleanupInfo(
-                        approved, out AccessPropCleanupInfo trees))
-                        MergeCleanupInfo(cleanupByOrigin, trees);
+                    MergeCleanupInfo(cleanupByOrigin, approved);
                 }
                 if (!hasTerrainDelta) continue;
                 if (!AccessV2BandProfile.TryGetProfileMode(
@@ -393,23 +379,7 @@ namespace AutoTerrainDesignations.Access
                         continue;
                     if (terrainWorkOrigins.Contains(cleanup.Origin))
                     {
-                        AccessHeightProfile profile = default;
-                        bool isDumping = operations.TryGetValue(
-                                cleanup.Origin,
-                                out AccessHandoffOperation operation)
-                            && operation == AccessHandoffOperation.Dumping
-                            && route.GeneratedProfiles.TryGetValue(
-                                cleanup.Origin,
-                                out profile);
-                        if (isDumping
-                            && TryBuildDumpingCleanupInfo(
-                                cleanup, cleanup.Origin, profile,
-                                out AccessPropCleanupInfo dumpingCleanup))
-                            MergeCleanupInfo(cleanupByOrigin, dumpingCleanup);
-                        else if (TryBuildTreeOnlyCleanupInfo(
-                                     cleanup,
-                                     out AccessPropCleanupInfo trees))
-                            MergeCleanupInfo(cleanupByOrigin, trees);
+                        MergeCleanupInfo(cleanupByOrigin, cleanup);
                     }
                     else
                     {

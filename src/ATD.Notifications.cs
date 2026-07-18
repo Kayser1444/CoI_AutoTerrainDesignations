@@ -30,6 +30,12 @@ namespace AutoTerrainDesignations
             new EntityNotificationProto.ID("ATD_FarmingComplete");
         internal static readonly EntityNotificationProto.ID ExcavatorCompletedId =
             new EntityNotificationProto.ID("ATD_ExcavatorCompleted");
+        internal static readonly EntityNotificationProto.ID DebrisCleanupQueuedId =
+            new EntityNotificationProto.ID("ATD_DebrisCleanupQueued");
+        internal static readonly EntityNotificationProto.ID DebrisCleanupNoneFoundId =
+            new EntityNotificationProto.ID("ATD_DebrisCleanupNoneFound");
+        internal static readonly EntityNotificationProto.ID DebrisCleanupNoneReachableId =
+            new EntityNotificationProto.ID("ATD_DebrisCleanupNoneReachable");
 
         private static readonly HashSet<string> s_protoIds = new HashSet<string>
         {
@@ -39,6 +45,9 @@ namespace AutoTerrainDesignations
             RampAccessNotAccessibleId.Value,
             FarmingCompleteId.Value,
             ExcavatorCompletedId.Value,
+            DebrisCleanupQueuedId.Value,
+            DebrisCleanupNoneFoundId.Value,
+            DebrisCleanupNoneReachableId.Value,
         };
 
         internal static void RegisterPrototypes(ProtoRegistrator registrator)
@@ -64,6 +73,46 @@ namespace AutoTerrainDesignations
                 AtdLocalization.NotifExcavatorCompleted.TranslatedString,
                 ExcavatorCompletedId,
                 "Assets/Unity/UserInterface/Toolbar/Mining.svg");
+            RegisterQueued(
+                registrator,
+                AtdLocalization.NotifDebrisCleanupQueued.TranslatedString,
+                DebrisCleanupQueuedId);
+            RegisterDebrisOutcome(
+                registrator,
+                AtdLocalization.NotifDebrisCleanupNoneFound.TranslatedString,
+                DebrisCleanupNoneFoundId,
+                NotificationStyle.Success);
+            RegisterDebrisOutcome(
+                registrator,
+                AtdLocalization.NotifDebrisCleanupNoneReachable.TranslatedString,
+                DebrisCleanupNoneReachableId,
+                NotificationStyle.Warning);
+        }
+
+        private static void RegisterDebrisOutcome(ProtoRegistrator registrator,
+            string message, EntityNotificationProto.ID id,
+            NotificationStyle style)
+        {
+            registrator.NotificationProtoBuilder
+                .Start(message, id)
+                .SetType(NotificationType.OneTimeOnly)
+                .SetStyle(style)
+                .SetTimeToLive(Duration.FromSec(20))
+                .MuteAudio()
+                .AddIcon("Assets/Unity/UserInterface/Toolbar/Sweep.svg")
+                .BuildAndAdd(doNotRequireEntityIcon: true);
+        }
+
+        private static void RegisterQueued(ProtoRegistrator registrator,
+            string message, EntityNotificationProto.ID id)
+        {
+            registrator.NotificationProtoBuilder
+                .Start(message, id)
+                .SetType(NotificationType.Continuous)
+                .SetStyle(NotificationStyle.Success)
+                .MuteAudio()
+                .AddIcon("Assets/Unity/UserInterface/Toolbar/Sweep.svg")
+                .BuildAndAdd(doNotRequireEntityIcon: true);
         }
 
         private static void RegisterWarning(ProtoRegistrator registrator, string message, EntityNotificationProto.ID id)
@@ -107,6 +156,7 @@ namespace AutoTerrainDesignations
             RampAccessFailed,
             RampAccessTruncated,
             RampAccessNotAccessible,
+            DebrisCleanupQueued,
         }
 
         private readonly struct TransientNotificationKey
@@ -142,6 +192,9 @@ namespace AutoTerrainDesignations
         private static EntityNotificationProto? s_rampAccessNotAccessibleNotificationProto;
         private static EntityNotificationProto? s_farmingCompleteNotificationProto;
         private static EntityNotificationProto? s_excavatorCompletedNotificationProto;
+        private static EntityNotificationProto? s_debrisCleanupQueuedNotificationProto;
+        private static EntityNotificationProto? s_debrisCleanupNoneFoundNotificationProto;
+        private static EntityNotificationProto? s_debrisCleanupNoneReachableNotificationProto;
         private static readonly Dictionary<TransientNotificationKey, NotificationId> s_transientNotificationsByKey =
             new Dictionary<TransientNotificationKey, NotificationId>();
 
@@ -154,6 +207,9 @@ namespace AutoTerrainDesignations
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.RampAccessNotAccessibleId, ref s_rampAccessNotAccessibleNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.FarmingCompleteId, ref s_farmingCompleteNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.ExcavatorCompletedId, ref s_excavatorCompletedNotificationProto);
+            TryInitializeTransientNotificationProto(protosDb, AtdNotifications.DebrisCleanupQueuedId, ref s_debrisCleanupQueuedNotificationProto);
+            TryInitializeTransientNotificationProto(protosDb, AtdNotifications.DebrisCleanupNoneFoundId, ref s_debrisCleanupNoneFoundNotificationProto);
+            TryInitializeTransientNotificationProto(protosDb, AtdNotifications.DebrisCleanupNoneReachableId, ref s_debrisCleanupNoneReachableNotificationProto);
         }
 
         private static void TryInitializeTransientNotificationProto(
@@ -175,6 +231,9 @@ namespace AutoTerrainDesignations
             s_rampAccessNotAccessibleNotificationProto = null;
             s_farmingCompleteNotificationProto = null;
             s_excavatorCompletedNotificationProto = null;
+            s_debrisCleanupQueuedNotificationProto = null;
+            s_debrisCleanupNoneFoundNotificationProto = null;
+            s_debrisCleanupNoneReachableNotificationProto = null;
             s_transientNotificationsByKey.Clear();
         }
 
@@ -259,6 +318,44 @@ namespace AutoTerrainDesignations
                 if (s_entitiesManager.TryGetEntity<IEntity>(kvp.Key, out IEntity entity) && entity is IAreaManagingTower tower)
                     UpdateTowerRampWarningNotification(tower, kvp.Value.LastRampOutcome.Value);
             }
+
+            foreach (EntityId towerId in
+                s_manualDebrisRemovalRequestsByTower.Keys.ToList())
+            {
+                if (s_entitiesManager.TryGetEntity<IEntity>(towerId,
+                        out IEntity entity)
+                    && entity is IAreaManagingTower tower)
+                    SetTowerDebrisCleanupQueuedNotification(tower,
+                        isQueued: true);
+            }
+        }
+
+        private static void SetTowerDebrisCleanupQueuedNotification(
+            IAreaManagingTower tower, bool isQueued)
+        {
+            if (isQueued)
+                AddTransientTowerNotification(tower,
+                    TransientNotificationKind.DebrisCleanupQueued,
+                    s_debrisCleanupQueuedNotificationProto);
+            else
+                ClearTransientTowerNotification(tower,
+                    TransientNotificationKind.DebrisCleanupQueued);
+        }
+
+        private static void AddTowerDebrisCleanupEmptyNotification(
+            IAreaManagingTower tower, bool debrisWasFound)
+        {
+            if (s_notificationsManager == null)
+                return;
+            EntityNotificationProto? proto = debrisWasFound
+                ? s_debrisCleanupNoneReachableNotificationProto
+                : s_debrisCleanupNoneFoundNotificationProto;
+            if (proto == null || !(tower is IObjectWithTitle objectWithTitle))
+                return;
+            s_notificationsManager.AddNotification(
+                proto,
+                Option<IObjectWithTitle>.Create(objectWithTitle),
+                Option.None);
         }
 
         private static void ClearTowerRampWarningNotification(IAreaManagingTower tower)

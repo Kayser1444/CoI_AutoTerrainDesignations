@@ -49,17 +49,37 @@ namespace AutoTerrainDesignations
         public static LocStr DesigCreateTip =
             Loc.Str("panel.designations.create_tooltip", "Scan and place mining designations in this tower's area.", "Tooltip on the Create Designations button.");
         public static LocStr DesigDebrisTip =
-            Loc.Str("panel.designations.debris_tooltip", "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations.", "Tooltip on the Debris button.");
+            Loc.Str("panel.designations.debris_tooltip", "Request excavator removal of reachable debris through ATD's prop-removal manager. Existing designations are temporarily suspended and restored after removal. This button never spends Unity on Quick remove and follows Landscape to remove debris. Ctrl-click includes unreachable debris.", "Tooltip on the Debris button.");
         public static LocStr DesigClearTip =
             Loc.Str("panel.designations.clear_tooltip", "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations.", "Tooltip on the Clear button.");
         public static LocStr DesigClearTipWithShiftClick =
             Loc.Str("panel.designations.clear_tooltip.shift_click", "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations.", "Tooltip on the Clear button when generated designations exist.");
         public static LocStr DesigOreFilterAuto =
             Loc.Str("panel.designations.ore_filter.auto", "AUTO", "Label for automatic scanning behavior in the ore picker.");
-        public static LocStr DesigRampWidthLabel =
-            Loc.Str("panel.designations.ramp_width.label", "Ramp width", "Label for the ramp width setting row.");
-        public static LocStr DesigRampWidthTip =
-            Loc.Str("panel.designations.ramp_width.tooltip", "Width of generated access ramps (0 = disable ramp).", "Tooltip for the ramp width setting.");
+        public static LocStr DesigAccesswayModeLabel =
+            Loc.Str("panel.designations.accessway_mode.label", "Accessway mode", "Label for the accessway mode selector.");
+        public static LocStr AccesswayModeLegacy3 =
+            Loc.Str("panel.designations.accessway_mode.legacy_3", "Legacy 3", "Accessway mode option for a legacy straight ramp three designation cells wide.");
+        public static LocStr AccesswayModeLegacy4 =
+            Loc.Str("panel.designations.accessway_mode.legacy_4", "Legacy 4", "Accessway mode option for a legacy straight ramp four designation cells wide.");
+        public static LocStr AccesswayModeLegacy5 =
+            Loc.Str("panel.designations.accessway_mode.legacy_5", "Legacy 5", "Accessway mode option for a legacy straight ramp five designation cells wide.");
+        public static LocStr AccesswayModeOffTip =
+            Loc.Str("panel.designations.accessway_mode.off.tooltip", "Disable generated accessways and ramps.", "Tooltip for the OFF accessway mode.");
+        public static LocStr AccesswayModeAutoTip =
+            Loc.Str("panel.designations.accessway_mode.auto.tooltip", "Use the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF.", "Tooltip for the AUTO accessway mode.");
+        public static LocStr AccesswayModeT1Tip =
+            Loc.Str("panel.designations.accessway_mode.t1.tooltip", "Generate routed accessways using T1 excavator pathability.", "Tooltip for the T1 accessway mode.");
+        public static LocStr AccesswayModeT2Tip =
+            Loc.Str("panel.designations.accessway_mode.t2.tooltip", "Generate routed accessways using T2 excavator pathability.", "Tooltip for the T2 accessway mode.");
+        public static LocStr AccesswayModeT3Tip =
+            Loc.Str("panel.designations.accessway_mode.t3.tooltip", "Generate two-lane routed accessways using T3/Mega excavator pathability.", "Tooltip for the T3 accessway mode.");
+        public static LocStr AccesswayModeLegacy3Tip =
+            Loc.Str("panel.designations.accessway_mode.legacy_3.tooltip", "Generate only a legacy straight ramp three designation cells wide, validated for T3/Mega excavators.", "Tooltip for legacy ramp width 3.");
+        public static LocStr AccesswayModeLegacy4Tip =
+            Loc.Str("panel.designations.accessway_mode.legacy_4.tooltip", "Generate only a legacy straight ramp four designation cells wide, validated for T3/Mega excavators.", "Tooltip for legacy ramp width 4.");
+        public static LocStr AccesswayModeLegacy5Tip =
+            Loc.Str("panel.designations.accessway_mode.legacy_5.tooltip", "Generate only a legacy straight ramp five designation cells wide, validated for T3/Mega excavators.", "Tooltip for legacy ramp width 5.");
         public static LocStr DesigMaxLayersLabel =
             Loc.Str("panel.designations.max_layers.label", "Max layers to excavate", "Label for the max layers setting row.");
         public static LocStr DesigMaxLayersTip =
@@ -72,12 +92,12 @@ namespace AutoTerrainDesignations
             Loc.Str("panel.designations.ore_purity.label", "Ore quality", "Label for the ore quality setting row.");
         public static LocStr DesigOrePurityTip =
             Loc.Str("panel.designations.ore_purity.tooltip",
-                "How strictly the scan filters for ore quality.\n" +
+                "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\n" +
                 "Off: include all tiles, dig to full depth.\n" +
                 "Low: exclude very sparse tiles, trim thin trailing ore at the bottom.\n" +
                 "Med: moderate quality \u2014 skip tiles with heavy overburden or little ore.\n" +
                 "High: only rich tiles with a clean ore column.\n" +
-                "Max: near-pure ore only \u2014 strict on overburden, depth and ore density.",
+                "Max: apply the strictest overburden, depth, and ore-density filters.",
                 "Tooltip for the ore purity setting.");
         public static LocStr DesigCorridorClearanceLabel =
             Loc.Str("panel.designations.corridor_clearance.label", "Corridor clearance", "Label for the corridor clearance setting row.");
@@ -132,6 +152,26 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.harvest_disrupted_trees.label", "Harvest disrupted trees", "World safety setting label for disrupted-tree harvesting.");
         public static LocStr SettingsHarvestDisruptedTreesTooltip =
             Loc.Str("settings.world.harvest_disrupted_trees.tooltip", "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved.", "World safety setting tooltip for disrupted-tree harvesting.");
+        public static LocStr SettingsAllowDigToRemoveDebrisLabel =
+            Loc.Str("settings.world.allow_dig_to_remove_debris.label", "Landscape to remove debris", "World safety setting label for terrain-altering debris removal.");
+        public static LocStr SettingsAllowDigToRemoveDebrisTooltip =
+            Loc.Str("settings.world.allow_dig_to_remove_debris.tooltip", "Allow debris removal to make the smallest workable terrain change when a prop cannot be excavated without landscaping. When disabled, the removal request fails and the requesting workflow is notified.", "World safety setting tooltip for terrain-altering debris removal.");
+        public static LocStr SettingsQuickRemoveDebrisLabel =
+            Loc.Str("settings.world.quick_remove_debris.label", "Quick remove debris", "Accessway setting label for Quick Remove policy.");
+        public static LocStr SettingsQuickRemoveDebrisTooltip =
+            Loc.Str("settings.world.quick_remove_debris.tooltip", "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity. This policy does not apply to the mine-tower Clear debris button.", "Accessway setting tooltip explaining that Quick remove costs Unity.");
+        public static LocStr SettingsQuickRemoveDebrisAlways =
+            Loc.Str("settings.world.quick_remove_debris.always", "Always", "Quick Remove policy value.");
+        public static LocStr SettingsQuickRemoveDebrisAlwaysTooltip =
+            Loc.Str("settings.world.quick_remove_debris.always.tooltip", "Use Quick remove for all accessway debris. This speeds up landscaping but spends Unity.", "Tooltip for Always Quick remove policy.");
+        public static LocStr SettingsQuickRemoveDebrisRestrictive =
+            Loc.Str("settings.world.quick_remove_debris.restrictive", "Restrictive", "Quick Remove policy value.");
+        public static LocStr SettingsQuickRemoveDebrisRestrictiveTooltip =
+            Loc.Str("settings.world.quick_remove_debris.restrictive.tooltip", "Prefer normal excavation but use Quick remove when excavation cannot guarantee post-work pathability.", "Tooltip for Restrictive Quick Remove policy.");
+        public static LocStr SettingsQuickRemoveDebrisNever =
+            Loc.Str("settings.world.quick_remove_debris.never", "Never", "Quick Remove policy value.");
+        public static LocStr SettingsQuickRemoveDebrisNeverTooltip =
+            Loc.Str("settings.world.quick_remove_debris.never.tooltip", "Never spend Unity on Quick remove for accessway debris. Removal relies on excavation and the Landscape to remove debris setting, and may need the player to provide Quick remove assistance.", "Tooltip for Never Quick Remove policy.");
         public static LocStr SettingsSafetyPolicyLabel =
             Loc.Str("settings.world.safety_policy.label", "Safety policy", "World safety policy setting label.");
         public static LocStr SettingsSafetyPolicyTooltip =
@@ -159,7 +199,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsTurningRampsLabel =
             Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps (experimental)", "Settings toggle label for experimental turning ramps.");
         public static LocStr SettingsTurningRampsTooltip =
-            Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires the tower's ramp width to be set to 1. Corridor clearance is independent. Wider ramps and corner or saddle designations are not included.", "Tooltip for experimental turning ramps.");
+            Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included.", "Tooltip for experimental turning ramps.");
         public static LocStr SettingsSuppressLegacyRampsLabel =
             Loc.Str("settings.experimental_access.suppress_legacy_ramps.label", "Suppress legacy ramps", "Settings toggle label for suppressing legacy access ramps.");
         public static LocStr SettingsSuppressLegacyRampsTooltip =
@@ -319,6 +359,12 @@ namespace AutoTerrainDesignations
             Loc.Str("notification.farming_complete", "[ATD] {entity} farming preparation and filling complete", "Notification: farming complete. {entity} is substituted by the game.");
         public static LocStr NotifExcavatorCompleted =
             Loc.Str("notification.excavator_completed", "[ATD] {entity} completed an excavator", "Notification: excavator built. {entity} is substituted by the game.");
+        public static LocStr NotifDebrisCleanupQueued =
+            Loc.Str("notification.debris_cleanup_queued", "[ATD] {entity} has debris cleanup queued", "Notification: Clear debris requests are queued or active. {entity} is substituted by the game.");
+        public static LocStr NotifDebrisCleanupNoneFound =
+            Loc.Str("notification.debris_cleanup_none_found", "[ATD] {entity} found no debris to clear", "Notification: Clear debris found no blocking props. {entity} is substituted by the game.");
+        public static LocStr NotifDebrisCleanupNoneReachable =
+            Loc.Str("notification.debris_cleanup_none_reachable", "[ATD] {entity} found no reachable debris to clear. Ctrl-click to include unreachable debris", "Notification: Clear debris found blocking props but none passed reachability filtering. {entity} is substituted by the game.");
 
         public static LocStr EnqueueConfirmPromptSingular =
             Loc.Str("vehicle_order.confirm.singular", "Build {0} at {1} and pre-assign it to {2}?", "Vehicle construction confirmation. Vehicle, depot, tower.");

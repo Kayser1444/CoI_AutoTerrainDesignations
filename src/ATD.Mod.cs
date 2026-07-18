@@ -47,6 +47,7 @@ using Mafi.Unity.UiToolkit;
 namespace AutoTerrainDesignations;
 
 internal enum SafetyPolicy { Min = 0, Low = 1, Med = 2, High = 3, Max = 4 }
+internal enum QuickRemoveDebrisPolicy { Always = 0, Restrictive = 1, Never = 2 }
 
 public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
 {
@@ -120,7 +121,7 @@ public static string Tt(string text) => text;
     public static void ResetGlobalDefaults()
     {
         SetMaxHeightDiff(1);
-        SetRampWidth(2);
+        SetVehicleClearance(AccessVehicleClearanceMode.Auto);
         SetMaxLayersToExcavate(30);
         SetMaxDepthToDigTo(null);
         SetOrePurityLevel(0);
@@ -144,6 +145,8 @@ public static string Tt(string text) => text;
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetAccessHarvestDisruptedTrees(true);
+        SetAccessAllowDigToRemoveDebris(true);
+        SetAccessQuickRemoveDebrisPolicy(QuickRemoveDebrisPolicy.Restrictive);
         SetAccessLandscapingCostDistanceScale(1f);
         SetAccessPropCleanupLandscapingCost(8f);
         SetAccessLandslideRunPerHeight(1f);
@@ -171,14 +174,16 @@ public static string Tt(string text) => text;
     internal static AccessVehicleClearanceMode VehicleClearance { get; private set; } = AccessVehicleClearanceMode.Auto;
     internal static void SetVehicleClearance(AccessVehicleClearanceMode value)
     {
-        VehicleClearance = value < AccessVehicleClearanceMode.Off || value > AccessVehicleClearanceMode.T3 ? AccessVehicleClearanceMode.Auto : value;
-        RampWidth = VehicleClearance == AccessVehicleClearanceMode.Off ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
-        MinCorridorClearance = VehicleClearance == AccessVehicleClearanceMode.Off ? 0 : VehicleClearance == AccessVehicleClearanceMode.T3 ? 2 : 1;
+        VehicleClearance = value < AccessVehicleClearanceMode.Off || value > AccessVehicleClearanceMode.LegacyWidth5
+            ? AccessVehicleClearanceMode.Auto
+            : value;
+        RampWidth = AutoDepthDesignation.RampWidthForMode(VehicleClearance);
+        MinCorridorClearance = AutoDepthDesignation.CorridorClearanceForMode(VehicleClearance);
     }
 
     public static void SetRampWidth(int value)
     {
-        SetVehicleClearance(value == 0 ? AccessVehicleClearanceMode.Off : AccessVehicleClearanceMode.Auto);
+        SetVehicleClearance(AutoDepthDesignation.ModeForRampWidth(value));
     }
 
     /// <summary>Maximum number of layers to excavate from the surface. 0 = no limit.</summary>
@@ -444,6 +449,25 @@ public static string Tt(string text) => text;
         AccessHarvestDisruptedTrees = value;
     }
 
+    public static bool AccessAllowDigToRemoveDebris { get; private set; } = true;
+
+    public static void SetAccessAllowDigToRemoveDebris(bool value)
+    {
+        AccessAllowDigToRemoveDebris = value;
+    }
+
+    internal static QuickRemoveDebrisPolicy AccessQuickRemoveDebrisPolicy { get; private set; }
+        = QuickRemoveDebrisPolicy.Restrictive;
+
+    internal static void SetAccessQuickRemoveDebrisPolicy(QuickRemoveDebrisPolicy value)
+    {
+        AccessQuickRemoveDebrisPolicy = value < QuickRemoveDebrisPolicy.Always
+            ? QuickRemoveDebrisPolicy.Always
+            : value > QuickRemoveDebrisPolicy.Never
+                ? QuickRemoveDebrisPolicy.Never
+                : value;
+    }
+
     /// <summary>Tile-distance cost assigned to one unit of landscaping cost.</summary>
     public static float AccessLandscapingCostDistanceScale { get; private set; } = 1f;
 
@@ -616,6 +640,7 @@ public static string Tt(string text) => text;
             IEntitiesManager entitiesManager = resolver.Resolve<IEntitiesManager>();
             Mafi.Core.Vehicles.IVehiclesManager vehiclesManager = resolver.Resolve<Mafi.Core.Vehicles.IVehiclesManager>();
             TerrainPropsManager terrainPropsManager = resolver.Resolve<TerrainPropsManager>();
+            PropsRemovalProcessor propsRemovalProcessor = resolver.Resolve<PropsRemovalProcessor>();
             TreesManager treesManager = resolver.Resolve<TreesManager>();
             IVehiclePathFindingManager vehiclePathFindingManager = resolver.Resolve<IVehiclePathFindingManager>();
             ParkAndWaitJobFactory parkAndWaitJobFactory = resolver.Resolve<ParkAndWaitJobFactory>();
@@ -626,9 +651,10 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.SetModRootDirectoryPath(Manifest.RootDirectoryPath);
             m_entitiesManager = entitiesManager;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
-            AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
+            AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
+            AutoDepthDesignation.PropRemovalManager?.ResumeLoadedRequests();
             m_preAllocationsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, "atdPendingVehicleAllocations");
             PendingVehicleAllocations.LoadFromJsonStore(m_preAllocationsStateStore);
             PendingVehicleAllocations.ReconcileQueues(entitiesManager);
@@ -671,10 +697,13 @@ public static string Tt(string text) => text;
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickFarmingPreparationSessions"); }
         try { AutoDepthDesignation.TickIdleVehicleRelease(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickIdleVehicleRelease"); }
+        try { AutoDepthDesignation.PropRemovalManager?.Tick(); }
+        catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "ATDPropRemovalManager.Tick"); }
     }
 
     private void beforeSave()
     {
+        AutoDepthDesignation.PropRemovalManager?.PrepareForSave();
         IModStateJsonStore store = m_towerSettingsStateStore
             ?? ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
         m_towerSettingsStateStore = store;
@@ -692,6 +721,7 @@ public static string Tt(string text) => text;
 
     private void onSaveDone(SaveResult result)
     {
+        AutoDepthDesignation.PropRemovalManager?.ResumeAfterSave();
         AutoDepthDesignation.ResumeFarmingRuntimeAfterSave();
         AutoDepthDesignation.RestoreTransientNotificationsAfterSave();
         AutoDepthDesignation.ReReleaseIdleVehiclesAfterSave();

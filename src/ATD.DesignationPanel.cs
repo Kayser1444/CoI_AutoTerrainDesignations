@@ -38,26 +38,29 @@ namespace AutoTerrainDesignations
         {
             public Func<IAreaManagingTower?> GetTower { get; }
             public PanelWithHeader Panel { get; }
-            public Mafi.Unity.Ui.Library.Display RampWidthDisplay { get; }
+            public Dropdown<AccessVehicleClearanceMode> AccesswayModeDropdown { get; }
             public Mafi.Unity.Ui.Library.Display MaxLayersDisplay { get; }
             public Mafi.Unity.Ui.Library.Display MinElevDisplay { get; }
+            public SliderWithIncrements OrePuritySlider { get; }
             public Mafi.Unity.Ui.Library.Display OrePurityDisplay { get; }
             public ButtonIcon ClearBtn { get; }
 
             public Bindings(
                 Func<IAreaManagingTower?> getTower,
                 PanelWithHeader panel,
-                Mafi.Unity.Ui.Library.Display rampWidthDisplay,
+                Dropdown<AccessVehicleClearanceMode> accesswayModeDropdown,
                 Mafi.Unity.Ui.Library.Display maxLayersDisplay,
                 Mafi.Unity.Ui.Library.Display minElevDisplay,
+                SliderWithIncrements orePuritySlider,
                 Mafi.Unity.Ui.Library.Display orePurityDisplay,
                 ButtonIcon clearBtn)
             {
                 GetTower = getTower;
                 Panel = panel;
-                RampWidthDisplay = rampWidthDisplay;
+                AccesswayModeDropdown = accesswayModeDropdown;
                 MaxLayersDisplay = maxLayersDisplay;
                 MinElevDisplay = minElevDisplay;
+                OrePuritySlider = orePuritySlider;
                 OrePurityDisplay = orePurityDisplay;
                 ClearBtn = clearBtn;
             }
@@ -83,10 +86,12 @@ namespace AutoTerrainDesignations
             var tower = b.GetTower();
             if (tower == null) return;
             b.Panel.Collapsed(AutoDepthDesignation.GetTowerTerrainPanelCollapsed(tower));
-            b.RampWidthDisplay.SetValue(new LocStrFormatted(VehicleClearanceText(AutoDepthDesignation.GetTowerVehicleClearance(tower))));
+            b.AccesswayModeDropdown.SetValue(AutoDepthDesignation.GetTowerVehicleClearance(tower));
             b.MaxLayersDisplay.SetValue(new LocStrFormatted(MaxLayersText(AutoDepthDesignation.GetTowerMaxLayersToExcavate(tower))));
             b.MinElevDisplay.SetValue(new LocStrFormatted(MinElevText(AutoDepthDesignation.GetTowerMaxDepthToDigTo(tower))));
-            b.OrePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(AutoDepthDesignation.GetTowerOrePurityLevel(tower))));
+            int orePurity = AutoDepthDesignation.GetTowerOrePurityLevel(tower);
+            b.OrePuritySlider.Value(orePurity);
+            b.OrePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(orePurity)));
             bool hasGen = AutoDepthDesignation.HasGeneratedDesignationsForTower(tower);
             b.ClearBtn.Tooltip(AtdLocalization.Tip(hasGen ? AtdLocalization.DesigClearTipWithShiftClick : AtdLocalization.DesigClearTip));
         }
@@ -186,9 +191,12 @@ namespace AutoTerrainDesignations
                         var tower = getTower();
                         if (tower == null) return;
                         AutoDepthDesignation.ClearTowerLastRampOutcome(tower);
-                        bool overrideExisting = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                         bool markUnreachable = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-                        AutoDepthDesignation.MarkDebrisForRemovalForTower(tower, overrideExisting, markUnreachable);
+                        // The prop-removal manager now suspends and restores any
+                        // existing designation, so cleanup no longer needs an
+                        // override modifier to work in an already-designated cell.
+                        AutoDepthDesignation.MarkDebrisForRemovalForTower(tower,
+                            overrideExisting: true, markUnreachable);
                     }
                     catch (Exception ex) { Debug.Log($"[ATD] Debris button click EXCEPTION: {ex}"); }
                 }, allowKeyPresses: true)
@@ -239,30 +247,32 @@ namespace AutoTerrainDesignations
             });
             panel.BodyAdd(contentRow);
 
-            // --- Ramp width ---
+            // --- Accessway mode ---
             AccessVehicleClearanceMode initVehicleClearance = initialTower != null
                 ? AutoDepthDesignation.GetTowerVehicleClearance(initialTower)
                 : AccessVehicleClearanceMode.Auto;
-            var rampWidthDisplay = new Mafi.Unity.Ui.Library.Display(new LocStrFormatted(VehicleClearanceText(initVehicleClearance)))
-                .MinDigits(3).AlignSelfStretch().MarginTopBottom(2.px());
-            panel.BodyAdd(BuildStepRow(
-                new LocStrFormatted("Vehicle clearance"),
-                new LocStrFormatted("Selects vehicle pathability and accessway width. AUTO uses the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF. OFF disables generated accessways."),
-                rampWidthDisplay,
-                (Action)delegate
+            var accesswayModeDropdown = new Dropdown<AccessVehicleClearanceMode>(AccesswayModeOption)
+                .SetOptions(
+                    AccessVehicleClearanceMode.Off,
+                    AccessVehicleClearanceMode.Auto,
+                    AccessVehicleClearanceMode.T1,
+                    AccessVehicleClearanceMode.T2,
+                    AccessVehicleClearanceMode.T3,
+                    AccessVehicleClearanceMode.LegacyWidth3,
+                    AccessVehicleClearanceMode.LegacyWidth4,
+                    AccessVehicleClearanceMode.LegacyWidth5)
+                .SetValue(initVehicleClearance)
+                .OnValueChanged((mode, _) =>
                 {
                     var tower = getTower(); if (tower == null) return;
-                    AccessVehicleClearanceMode next = (AccessVehicleClearanceMode)Math.Min(4, (int)AutoDepthDesignation.GetTowerVehicleClearance(tower) + 1);
-                    AutoDepthDesignation.SetTowerVehicleClearance(tower, next);
-                    rampWidthDisplay.SetValue(new LocStrFormatted(VehicleClearanceText(next)));
-                },
-                (Action)delegate
-                {
-                    var tower = getTower(); if (tower == null) return;
-                    AccessVehicleClearanceMode next = (AccessVehicleClearanceMode)Math.Max(0, (int)AutoDepthDesignation.GetTowerVehicleClearance(tower) - 1);
-                    AutoDepthDesignation.SetTowerVehicleClearance(tower, next);
-                    rampWidthDisplay.SetValue(new LocStrFormatted(VehicleClearanceText(next)));
-                }));
+                    AutoDepthDesignation.SetTowerVehicleClearance(tower, mode);
+                });
+            accesswayModeDropdown.Width(130.px());
+            var accesswayModeRow = new Row().MarginTop(1.pt());
+            accesswayModeRow.Add(new Label(AtdLocalization.DesigAccesswayModeLabel));
+            accesswayModeRow.Add(new UiComponent().FlexGrow(1f));
+            accesswayModeRow.Add(accesswayModeDropdown);
+            panel.BodyAdd(accesswayModeRow);
 
             // --- Max layers ---
             int initLayers = initialTower != null
@@ -325,23 +335,26 @@ namespace AutoTerrainDesignations
                 ? AutoDepthDesignation.GetTowerOrePurityLevel(initialTower)
                 : AutoTerrainDesignationsMod.OrePurityLevel;
             var orePurityDisplay = new Mafi.Unity.Ui.Library.Display(new LocStrFormatted(OrePurityLevelText(initPurity)))
-                .MinDigits(3).AlignSelfStretch().MarginTopBottom(2.px());
-            panel.BodyAdd(BuildStepRow(
-                AtdLocalization.DesigOrePurityLabel,
-                AtdLocalization.DesigOrePurityTip,
-                orePurityDisplay,
-                (Action)delegate
+                .MinDigits(6).AlignSelfStretch().MarginTopBottom(2.px());
+            var orePuritySlider = new SliderWithIncrements()
+                .Range(0, 4)
+                .Value(initPurity)
+                .OnValueChangedForPreview(value =>
+                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(value))))
+                .OnValueChanged(value =>
                 {
                     var tower = getTower(); if (tower == null) return;
-                    AutoDepthDesignation.SetTowerOrePurityLevel(tower, AutoDepthDesignation.GetTowerOrePurityLevel(tower) + 1);
-                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(AutoDepthDesignation.GetTowerOrePurityLevel(tower))));
-                },
-                (Action)delegate
-                {
-                    var tower = getTower(); if (tower == null) return;
-                    AutoDepthDesignation.SetTowerOrePurityLevel(tower, AutoDepthDesignation.GetTowerOrePurityLevel(tower) - 1);
-                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(AutoDepthDesignation.GetTowerOrePurityLevel(tower))));
-                }));
+                    AutoDepthDesignation.SetTowerOrePurityLevel(tower, value);
+                    orePurityDisplay.SetValue(new LocStrFormatted(OrePurityLevelText(value)));
+                });
+            orePuritySlider.FlexGrow(0f).Width(140.px());
+            var orePurityRow = new Row().MarginTop(1.pt()).AlignItemsCenter().Gap(1.pt());
+            orePurityRow.Add(new Label(AtdLocalization.DesigOrePurityLabel)
+                .Tooltip(AtdLocalization.DesigOrePurityTip));
+            orePurityRow.Add(new UiComponent().FlexGrow(1f));
+            orePurityRow.Add(orePuritySlider);
+            orePurityRow.Add(orePurityDisplay);
+            panel.BodyAdd(orePurityRow);
 
             // --- Ore picker row ---
             if (orePicker != null)
@@ -354,7 +367,8 @@ namespace AutoTerrainDesignations
                 panel.BodyAdd(oreRow);
             }
 
-            s_bindings[key] = new Bindings(getTower, panel, rampWidthDisplay, maxLayersDisplay, minElevDisplay, orePurityDisplay, clearBtn);
+            s_bindings[key] = new Bindings(getTower, panel, accesswayModeDropdown,
+                maxLayersDisplay, minElevDisplay, orePuritySlider, orePurityDisplay, clearBtn);
             return panel;
         }
 
@@ -385,7 +399,43 @@ namespace AutoTerrainDesignations
             return 1;
         }
 
-        private static string VehicleClearanceText(AccessVehicleClearanceMode value) => value == AccessVehicleClearanceMode.Off ? "OFF" : value.ToString();
+        internal static UiComponent AccesswayModeOption(
+            AccessVehicleClearanceMode mode,
+            int index,
+            bool isInDropdown) => new Label(AccesswayModeText(mode))
+                .Tooltip(AccesswayModeTooltip(mode));
+
+        internal static LocStrFormatted AccesswayModeText(AccessVehicleClearanceMode mode)
+        {
+            switch (mode)
+            {
+                case AccessVehicleClearanceMode.Off: return new LocStrFormatted("OFF");
+                case AccessVehicleClearanceMode.Auto: return new LocStrFormatted("AUTO");
+                case AccessVehicleClearanceMode.T1: return new LocStrFormatted("T1");
+                case AccessVehicleClearanceMode.T2: return new LocStrFormatted("T2");
+                case AccessVehicleClearanceMode.T3: return new LocStrFormatted("T3");
+                case AccessVehicleClearanceMode.LegacyWidth3: return AtdLocalization.AccesswayModeLegacy3.AsFormatted;
+                case AccessVehicleClearanceMode.LegacyWidth4: return AtdLocalization.AccesswayModeLegacy4.AsFormatted;
+                case AccessVehicleClearanceMode.LegacyWidth5: return AtdLocalization.AccesswayModeLegacy5.AsFormatted;
+                default: return new LocStrFormatted(mode.ToString());
+            }
+        }
+
+        internal static LocStrFormatted AccesswayModeTooltip(AccessVehicleClearanceMode mode)
+        {
+            switch (mode)
+            {
+                case AccessVehicleClearanceMode.Off: return AtdLocalization.AccesswayModeOffTip.AsFormatted;
+                case AccessVehicleClearanceMode.Auto: return AtdLocalization.AccesswayModeAutoTip.AsFormatted;
+                case AccessVehicleClearanceMode.T1: return AtdLocalization.AccesswayModeT1Tip.AsFormatted;
+                case AccessVehicleClearanceMode.T2: return AtdLocalization.AccesswayModeT2Tip.AsFormatted;
+                case AccessVehicleClearanceMode.T3: return AtdLocalization.AccesswayModeT3Tip.AsFormatted;
+                case AccessVehicleClearanceMode.LegacyWidth3: return AtdLocalization.AccesswayModeLegacy3Tip.AsFormatted;
+                case AccessVehicleClearanceMode.LegacyWidth4: return AtdLocalization.AccesswayModeLegacy4Tip.AsFormatted;
+                case AccessVehicleClearanceMode.LegacyWidth5: return AtdLocalization.AccesswayModeLegacy5Tip.AsFormatted;
+                default: return LocStrFormatted.Empty;
+            }
+        }
 
         private static string MaxLayersText(int value) => value == 0 ? "\u221e" : value.ToString();
 

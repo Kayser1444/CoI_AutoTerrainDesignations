@@ -37,7 +37,7 @@
   ],
   [
     "panel.designations.debris_tooltip",
-    "Place debris-removal designations on reachable unoccupied cells. Ctrl-click to include unreachable debris. Shift-click to also replace existing terrain and forestry designations."
+    "Request excavator removal of reachable debris through ATD's prop-removal manager. Existing designations are temporarily suspended and restored after removal. This button never spends Unity on Quick remove and follows Landscape to remove debris. Ctrl-click includes unreachable debris."
   ],
   [
     "panel.designations.clear_tooltip",
@@ -52,12 +52,52 @@
     "AUTO"
   ],
   [
-    "panel.designations.ramp_width.label",
-    "Ramp width"
+    "panel.designations.accessway_mode.label",
+    "Accessway mode"
   ],
   [
-    "panel.designations.ramp_width.tooltip",
-    "Width of generated access ramps (0 = disable ramp)."
+    "panel.designations.accessway_mode.legacy_3",
+    "Legacy 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "Legacy 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "Legacy 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "Disable generated accessways and ramps."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "Use the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "Generate routed accessways using T1 excavator pathability."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "Generate routed accessways using T2 excavator pathability."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "Generate two-lane routed accessways using T3/Mega excavator pathability."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "Generate only a legacy straight ramp three designation cells wide, validated for T3/Mega excavators."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "Generate only a legacy straight ramp four designation cells wide, validated for T3/Mega excavators."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "Generate only a legacy straight ramp five designation cells wide, validated for T3/Mega excavators."
   ],
   [
     "panel.designations.max_layers.label",
@@ -81,7 +121,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "How strictly the scan filters for ore quality.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality u2014 skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: near-pure ore only u2014 strict on overburden, depth and ore density."
+    "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality u2014 skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters."
   ],
   [
     "panel.designations.corridor_clearance.label",
@@ -114,6 +154,10 @@
   [
     "settings.tab.ore_quality",
     "Ore quality"
+  ],
+  [
+    "settings.tab.pathfinder",
+    "Accessways"
   ],
   [
     "settings.heading.mining_defaults",
@@ -172,6 +216,46 @@
     "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
   ],
   [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "Landscape to remove debris"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "Allow debris removal to make the smallest workable terrain change when a prop cannot be excavated without landscaping. When disabled, the removal request fails and the requesting workflow is notified."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "Quick remove debris"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity. This policy does not apply to the mine-tower Clear debris button."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "Always"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "Use Quick remove for all accessway debris. This speeds up landscaping but spends Unity."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "Restrictive"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "Prefer normal excavation but use Quick remove when excavation cannot guarantee post-work pathability."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "Never"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "Never spend Unity on Quick remove for accessway debris. Removal relies on excavation and the Landscape to remove debris setting, and may need the player to provide Quick remove assistance."
+  ],
+  [
     "settings.world.safety_policy.label",
     "Safety policy"
   ],
@@ -225,7 +309,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires the tower's ramp width to be set to 1. Corridor clearance is independent. Wider ramps and corner or saddle designations are not included."
+    "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included."
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -502,6 +586,18 @@
   [
     "notification.excavator_completed",
     "[ATD] {entity} completed an excavator"
+  ],
+  [
+    "notification.debris_cleanup_queued",
+    "[ATD] {entity} has debris cleanup queued"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity} found no debris to clear"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity} found no reachable debris to clear. Ctrl-click to include unreachable debris"
   ],
   [
     "vehicle_order.confirm.singular",
