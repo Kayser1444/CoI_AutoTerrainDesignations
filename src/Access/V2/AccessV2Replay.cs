@@ -70,7 +70,7 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessV2BandState previous = route.States[index - 1];
                 AccessV2BandState next = route.States[index];
                 if (!TryInferTransition(
-                        route.States, index, previous, next,
+                        route.States, index, previous, next, history,
                         out AccessV2Transition transition))
                 {
                     reason = "V2ReplayTransitionMissing";
@@ -418,8 +418,7 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
             if (!history.TryApply(
-                    transition.Delta,
-                    transition.LocalContextOrigins,
+                    transition,
                     evaluation.RayConstraints,
                     evaluation.CleanupKeys,
                     out AccessV2History next,
@@ -436,6 +435,7 @@ namespace AutoTerrainDesignations.Access.V2
             int index,
             AccessV2BandState previous,
             AccessV2BandState next,
+            AccessV2History history,
             out AccessV2Transition transition)
         {
             foreach (AccessV2Transition candidate in
@@ -457,10 +457,34 @@ namespace AutoTerrainDesignations.Access.V2
                     transition = strafe;
                     return true;
                 }
-                if (index >= 2
+                AccessV2Transition? turn = null;
+                for (int predecessorIndex = index - 2;
+                    predecessorIndex >= 0;
+                    predecessorIndex--)
+                {
+                    AccessV2BandState candidatePredecessor =
+                        states[predecessorIndex];
+                    if (candidatePredecessor.Axis != previous.Axis
+                        || candidatePredecessor.EntryDirection
+                            != previous.EntryDirection
+                        || candidatePredecessor.Anchor !=
+                            AccessV2Geometry.Subtract(
+                                previous.Anchor, previous.EntryDirection))
+                        continue;
+                    if (AccessV2Geometry.TryTurn(
+                            candidatePredecessor, previous, sign,
+                            out AccessV2Transition candidateTurn, out _))
+                    {
+                        turn = candidateTurn;
+                        break;
+                    }
+                }
+                if (turn == null
                     && AccessV2Geometry.TryTurn(
-                        states[index - 2], previous, sign,
-                        out AccessV2Transition turn, out _)
+                        previous, history, sign,
+                        out AccessV2Transition historyTurn, out _))
+                    turn = historyTurn;
+                if (turn != null
                     && turn.Next.Equals(next))
                 {
                     transition = turn;

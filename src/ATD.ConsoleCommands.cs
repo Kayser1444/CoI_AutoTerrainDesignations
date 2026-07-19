@@ -417,36 +417,36 @@ public sealed class AtdConsoleCommands
         return $"[ATD] V1 fixed-endpoint lower hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint lower hull extension. Nonnegative; rounded to 1/32 height. Default 2.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint lower hull extension. Nonnegative; rounded to 1/32 height. Default 1.5. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
     private string atdAccessHeightEnvelopeV2LowerAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
-            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 2.0.";
+            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(parsed))
-            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 2.0.";
+            return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         return $"[ATD] V2 fixed-endpoint lower hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V1 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 0.5. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V1 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
     private string atdAccessHeightEnvelopeV1UpperAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
-            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(parsed))
-            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 0.5.";
+            return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
         return $"[ATD] V1 fixed-endpoint upper hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
     }
 
-    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
+    [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.5. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
     private string atdAccessHeightEnvelopeV2UpperAllowance(string value)
     {
         if (!TryParseConsoleFloat(value, out float parsed))
-            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         if (!AutoTerrainDesignationsMod
                 .TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(parsed))
-            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
+            return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         return $"[ATD] V2 fixed-endpoint upper hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
     }
 

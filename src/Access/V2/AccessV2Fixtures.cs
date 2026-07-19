@@ -193,6 +193,35 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             if (!TryCreateUniformState(
+                    new Tile2i(24, 24), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState strafeStart, out failure)
+                || !AccessV2Geometry.TryStraight(
+                    strafeStart, out AccessV2Transition strafeAdvance,
+                    out failure)
+                || !CreateHistoryForState(
+                    strafeStart, out AccessV2History strafeHistory,
+                    out failure)
+                || !strafeHistory.TryApply(
+                    strafeAdvance, out strafeHistory, out failure)
+                || !AccessV2Geometry.TryStrafe(
+                    strafeAdvance.Next, 1,
+                    out AccessV2Transition strafeTurnAdvance,
+                    out failure)
+                || !strafeHistory.TryApply(
+                    strafeTurnAdvance, out strafeHistory, out failure)
+                || !AccessV2Geometry.TryTurn(
+                    strafeTurnAdvance.Next, strafeHistory, 1,
+                    out AccessV2Transition strafeTurn, out failure)
+                || !strafeTurn.Next.IsTurnPending
+                || strafeTurn.Delta.Count != 0)
+            {
+                failure = "Turn after a lateral flat strafe was not admitted: "
+                    + failure;
+                return false;
+            }
+
+            if (!TryCreateUniformState(
                     new Tile2i(20, 20), AccessV2TravelAxis.X,
                     new Tile2i(4, 0), AccessSearchMode.Flat, 0,
                     out AccessV2BandState flatState, out failure))
@@ -325,11 +354,43 @@ namespace AutoTerrainDesignations.Access.V2
                         + ": " + failure;
                     return false;
                 }
-                if (turn.Delta.Count != 2
+                if (turn.Delta.Count != 0
                     || turn.OldDirectionTurnRays.Count != 3
-                    || turn.Next.Axis == axis)
+                    || turn.Next.Axis == axis
+                    || !turn.Next.IsTurnPending
+                    || AccessV2Geometry.EnumerateStraight(turn.Next)
+                        .Any(item => item.Next.Band.Kind
+                            != AccessV2BandProfileKind.UniformRamp))
                 {
-                    failure = "Turn footprint/ray count failed for " + direction;
+                    failure = "Turn orientation/ray successor contract failed for "
+                        + direction;
+                    return false;
+                }
+                AccessSearchMode expectedRampUpMode = turn.Next.Axis
+                    == AccessV2TravelAxis.X
+                    ? AccessSearchMode.XPositive
+                    : AccessSearchMode.YPositive;
+                if (!AccessV2Geometry.EnumerateStraight(turn.Next).Any(
+                        item => AccessV2BandProfile.TryGetProfileMode(
+                            item.Next.Band.Lane0,
+                            out AccessSearchMode mode)
+                            && mode == expectedRampUpMode))
+                {
+                    failure = "Ramp-up successor after turn missing for "
+                        + direction;
+                    return false;
+                }
+                AccessV2Transition? rampUp =
+                    AccessV2Geometry.EnumerateStraight(turn.Next)
+                        .FirstOrDefault(item =>
+                            AccessV2BandProfile.TryGetProfileMode(
+                                item.Next.Band.Lane0,
+                                out AccessSearchMode mode)
+                                && mode == expectedRampUpMode);
+                if (rampUp == null)
+                {
+                    failure = "Ramp-up successor after turn missing for "
+                        + direction;
                     return false;
                 }
                 Tile2i laneDirection =
@@ -356,6 +417,8 @@ namespace AutoTerrainDesignations.Access.V2
                         predecessor, out AccessV2History history, out failure)
                     || !history.TryApply(straight, out history, out failure)
                     || !history.TryApply(turn, out history, out failure)
+                    || !history.TryApply(
+                        rampUp, out history, out failure)
                     || history.OriginCount != 6)
                 {
                     failure = "Turn landing history failed for " + direction

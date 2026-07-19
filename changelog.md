@@ -1,4 +1,5 @@
 v0.5.2 [unreleased]
+* Changed: Set default access height envelope allowances so both V1 are 1.0 (previously 1.0 lower and 0.5 upper) and both V2 are 1.5 (previously 2.0 lower and 1.0 upper).
 
 v0.5.1 [released]
 * Changed: Vehicle construction confirmations now use the same enqueue-for-tower wording, button text, and depot zoom tooltip as AFD.

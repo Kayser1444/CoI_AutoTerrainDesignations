@@ -518,28 +518,44 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessV2Geometry.EnumerateStraight(current.State))
                 TryRelax(current, transition);
 
+            // A turn is an orientation-only transition. Its next state may
+            // either terminate here or take exactly one ramp step; flat and
+            // strafe successors would recreate the paths the turn policy is
+            // intended to eliminate.
+            if (current.State.IsTurnPending)
+                return;
+
             for (int sign = -1; sign <= 1; sign += 2)
             {
                 AccessV2Transition? turn = null;
                 string turnReason = string.Empty;
-                SearchNode? predecessor = current.Parent;
-                bool hasVPredecessor = predecessor != null
-                    && !predecessor.GroundCenter.HasValue;
-                if (hasVPredecessor
-                    && AccessV2Geometry.TryTurn(
-                        predecessor!.State, current.State, sign,
-                        out AccessV2Transition candidateTurn,
+                if (TryFindTurnPredecessor(
+                        current, out AccessV2BandState predecessor))
+                {
+                    if (AccessV2Geometry.TryTurn(
+                            predecessor, current.State, sign,
+                            out AccessV2Transition candidateTurn,
+                            out turnReason))
+                        turn = candidateTurn;
+                    else
+                        Reject(turnReason);
+                }
+                else if (AccessV2Geometry.TryTurn(
+                        current.State, current.History, sign,
+                        out AccessV2Transition historyTurn,
                         out turnReason))
-                    turn = candidateTurn;
-                else if (hasVPredecessor)
+                {
+                    turn = historyTurn;
+                }
+                else
+                {
                     Reject(turnReason);
+                }
 
                 // A flat strafe and the corresponding turn path can emit the
                 // same terrain plan. Keep one canonical representation so
                 // incremental ray cost and blockage cannot differ by graph path.
-                if (!hasVPredecessor)
-                    Reject("StrafeRequiresPredecessorSlice");
-                else if (turn != null && current.State.Band.IsCompletelyFlat)
+                if (turn != null && current.State.Band.IsCompletelyFlat)
                     Reject("FlatStrafeDominatedByTurn");
                 else if (!TryGetStrafePredecessorProfile(
                     current, sign,
@@ -557,6 +573,28 @@ namespace AutoTerrainDesignations.Access.V2
                     TryRelax(current, turn);
                 }
             }
+        }
+
+        private static bool TryFindTurnPredecessor(
+            SearchNode current,
+            out AccessV2BandState predecessor)
+        {
+            Tile2i expectedAnchor = AccessV2Geometry.Subtract(
+                current.State.Anchor, current.State.EntryDirection);
+            for (SearchNode? node = current.Parent;
+                node != null && !node.GroundCenter.HasValue;
+                node = node.Parent)
+            {
+                if (node.State.Axis == current.State.Axis
+                    && node.State.EntryDirection == current.State.EntryDirection
+                    && node.State.Anchor == expectedAnchor)
+                {
+                    predecessor = node.State;
+                    return true;
+                }
+            }
+            predecessor = default;
+            return false;
         }
 
         private static bool TryGetStrafePredecessorProfile(
@@ -637,9 +675,7 @@ namespace AutoTerrainDesignations.Access.V2
                 return;
             }
             if (!current.History.TryValidateApply(
-                    transition.Delta,
-                    transition.LocalContextOrigins,
-                    out string historyReason))
+                    transition, out string historyReason))
             {
                 Reject(historyReason);
                 Trace("reject:" + historyReason);

@@ -139,9 +139,9 @@ public static string Tt(string text) => text;
         SetExperimentalAccessUseAStar(true);
         SetExperimentalAccessUsefulHeightEnvelope(true);
         TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(1f);
-        TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(2f);
-        TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(0.5f);
-        TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1f);
+        TrySetExperimentalAccessV2HeightEnvelopeLowerAllowance(1.5f);
+        TrySetExperimentalAccessV1HeightEnvelopeUpperAllowance(1f);
+        TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1.5f);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -377,9 +377,9 @@ public static string Tt(string text) => text;
         => s_experimentalAccessV2HeightEnvelopeUpperAllowance32;
 
     private static int s_experimentalAccessV1HeightEnvelopeLowerAllowance32 = 32;
-    private static int s_experimentalAccessV2HeightEnvelopeLowerAllowance32 = 64;
-    private static int s_experimentalAccessV1HeightEnvelopeUpperAllowance32 = 16;
-    private static int s_experimentalAccessV2HeightEnvelopeUpperAllowance32 = 32;
+    private static int s_experimentalAccessV2HeightEnvelopeLowerAllowance32 = 48;
+    private static int s_experimentalAccessV1HeightEnvelopeUpperAllowance32 = 32;
+    private static int s_experimentalAccessV2HeightEnvelopeUpperAllowance32 = 48;
 
     public static bool TrySetExperimentalAccessV1HeightEnvelopeLowerAllowance(
         float value)

@@ -40,13 +40,15 @@ namespace AutoTerrainDesignations.Access.V2
         public Tile2i Anchor { get; }
         public AccessV2BandProfile Band { get; }
         public Tile2i EntryDirection { get; }
+        public bool IsTurnPending { get; }
 
         public AccessV2TravelAxis Axis => Band.Axis;
 
         public AccessV2BandState(
             Tile2i anchor,
             AccessV2BandProfile band,
-            Tile2i entryDirection)
+            Tile2i entryDirection,
+            bool isTurnPending = false)
         {
             if (!AccessV2Geometry.IsOriginAligned(anchor))
                 throw new ArgumentException("V2 anchor must be aligned to the four-tile origin grid.", nameof(anchor));
@@ -55,6 +57,7 @@ namespace AutoTerrainDesignations.Access.V2
             Anchor = anchor;
             Band = band;
             EntryDirection = entryDirection;
+            IsTurnPending = isTurnPending;
         }
 
         public Tile2i GetLaneOrigin(int lane)
@@ -76,7 +79,8 @@ namespace AutoTerrainDesignations.Access.V2
         public bool Equals(AccessV2BandState other)
             => Anchor == other.Anchor
                 && Band.Equals(other.Band)
-                && EntryDirection == other.EntryDirection;
+                && EntryDirection == other.EntryDirection
+                && IsTurnPending == other.IsTurnPending;
 
         public override bool Equals(object? obj)
             => obj is AccessV2BandState other && Equals(other);
@@ -88,12 +92,14 @@ namespace AutoTerrainDesignations.Access.V2
                 int hash = Anchor.GetHashCode();
                 hash = (hash * 397) ^ Band.GetHashCode();
                 hash = (hash * 397) ^ EntryDirection.GetHashCode();
+                hash = (hash * 397) ^ IsTurnPending.GetHashCode();
                 return hash;
             }
         }
 
         public override string ToString()
-            => $"{Axis}@{Anchor}/entry={EntryDirection}/kind={Band.Kind}";
+            => $"{Axis}@{Anchor}/entry={EntryDirection}/kind={Band.Kind}" +
+                (IsTurnPending ? "/turn-pending" : string.Empty);
     }
 
     internal sealed class AccessV2Transition
@@ -149,6 +155,12 @@ namespace AutoTerrainDesignations.Access.V2
             out AccessV2Transition transition,
             out string reason)
         {
+            if (current.IsTurnPending)
+            {
+                transition = null!;
+                reason = "TurnRequiresRampOrTerminate";
+                return false;
+            }
             if (!current.Band.TryAdvance(
                     current.EntryDirection,
                     out AccessV2BandProfile nextBand,
@@ -179,7 +191,9 @@ namespace AutoTerrainDesignations.Access.V2
             AccessSearchMode negative = current.Axis == AccessV2TravelAxis.X
                 ? AccessSearchMode.XNegative
                 : AccessSearchMode.YNegative;
-            var modes = new[] { AccessSearchMode.Flat, positive, negative };
+            var modes = current.IsTurnPending
+                ? new[] { positive, negative }
+                : new[] { AccessSearchMode.Flat, positive, negative };
             var result = new List<AccessV2Transition>(modes.Length);
             for (int index = 0; index < modes.Length; index++)
             {
@@ -329,13 +343,13 @@ namespace AutoTerrainDesignations.Access.V2
 
             Tile2i laneDirection = GetCanonicalLaneDirection(current.Axis);
             Tile2i newDirection = Scale(laneDirection, transverseSign);
-            Tile2i exitOffset = transverseSign > 0
-                ? Scale(laneDirection, 2)
-                : Scale(laneDirection, -1);
-            Tile2i exit0 = Add(predecessor.Anchor, exitOffset);
-            Tile2i exit1 = Add(current.Anchor, exitOffset);
+            Tile2i boundaryOffset = transverseSign > 0
+                ? laneDirection
+                : Tile2i.Zero;
+            Tile2i boundary0 = Add(predecessor.Anchor, boundaryOffset);
+            Tile2i boundary1 = Add(current.Anchor, boundaryOffset);
             Tile2i nextAnchor = CanonicalAnchor(
-                OtherAxis(current.Axis), exit0, exit1);
+                OtherAxis(current.Axis), boundary0, boundary1);
 
             if (!AccessHeightProfile.TryForMode(
                     AccessSearchMode.Flat, landingHeight2,
@@ -350,12 +364,8 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
 
             var next = new AccessV2BandState(
-                nextAnchor, nextBand, newDirection);
-            Tile2i boundaryOffset = transverseSign > 0
-                ? laneDirection
-                : Tile2i.Zero;
-            Tile2i boundary0 = Add(predecessor.Anchor, boundaryOffset);
-            Tile2i boundary1 = Add(current.Anchor, boundaryOffset);
+                nextAnchor, nextBand, newDirection,
+                isTurnPending: true);
 
             Tile2i forwardFaceBase = IsPositive(current.EntryDirection)
                 ? Add(current.Anchor, current.EntryDirection)
@@ -369,7 +379,7 @@ namespace AutoTerrainDesignations.Access.V2
             transition = new AccessV2Transition(
                 AccessV2TransitionKind.Turn,
                 next,
-                new[] { next.GetLane(0), next.GetLane(1) },
+                Array.Empty<AccessV2OriginProfile>(),
                 new[]
                 {
                     predecessor.GetLaneOrigin(0),
@@ -382,6 +392,44 @@ namespace AutoTerrainDesignations.Access.V2
                 rays);
             reason = string.Empty;
             return true;
+        }
+
+        public static bool TryTurn(
+            AccessV2BandState current,
+            AccessV2History history,
+            int transverseSign,
+            out AccessV2Transition transition,
+            out string reason)
+        {
+            Tile2i predecessorAnchor = Subtract(
+                current.Anchor, current.EntryDirection);
+            Tile2i predecessorLane0 = predecessorAnchor;
+            Tile2i predecessorLane1 = Add(
+                predecessorAnchor,
+                GetCanonicalLaneDirection(current.Axis));
+            if (!history.TryGetProfile(
+                    predecessorLane0, out AccessHeightProfile lane0)
+                || !history.TryGetProfile(
+                    predecessorLane1, out AccessHeightProfile lane1))
+            {
+                transition = null!;
+                reason = "TurnPredecessorProfileMissing";
+                return false;
+            }
+            if (!AccessV2BandProfile.TryCreateEnabled(
+                    current.Axis, lane0, lane1,
+                    out AccessV2BandProfile predecessorBand, out reason))
+            {
+                transition = null!;
+                return false;
+            }
+
+            var predecessor = new AccessV2BandState(
+                predecessorAnchor, predecessorBand,
+                current.EntryDirection);
+            return TryTurn(
+                predecessor, current, transverseSign,
+                out transition, out reason);
         }
 
         public static bool IsInsideBounds(

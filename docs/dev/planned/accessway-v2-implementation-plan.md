@@ -111,12 +111,12 @@ This state is the current two-origin **frontier slice**, not the complete access
 
 * A straight transition advances one origin step and introduces one new two-origin slice.
 * A strafe shifts the slice laterally by one origin while preserving travel axis and profile family. The overlapping lane is retained as immutable frontier context; only the newly exposed lane belongs to the transition delta.
-* A turn is a special transition available only when the current and immediately preceding slices are both completely flat. Those two slices form the required 2x2-origin landing. The turn validates the appropriate perpendicular edge of that landing and advances directly to the first new outgoing slice; it does not enqueue an orientation-only frontier made from already introduced landing origins.
+* A turn is an orientation-only transition available only when the current and immediately preceding slices are both completely flat. Those two slices form the required 2x2-origin landing. The turn validates the appropriate perpendicular edge, reorients the frontier onto the landing's outer edge, and introduces no terrain origins. Its pending state may terminate at a matching goal or advance exactly once through a uniform ramp; flat and strafe successors are suppressed.
 * Search history owns a unique origin/profile map. Every transition delta adds previously unused origins; costs and materialization are computed only for that addition. A strafe may retain one already-owned lane as frontier context without re-adding, re-costing, or rematerializing it.
 
-Worked clockwise example, using `+X = east` and `+Y = south`: let the current eastbound frontier anchor be `A`, with the preceding anchor at `A + (-4, 0)`. Their four flat origins form the 2x2 landing. The landing's implicit south-facing frontier is anchored at `A + (-4, 4)`, but both of its origins already belong to the landing and are therefore not enqueued. The first new `Y`, `entryDirection = (0, +4)` frontier is anchored at `A + (-4, 8)`, with origins `A + (-4, 8)` and `A + (0, 8)`. Therefore `A + (4, 4)` is not the successor anchor under this convention; it would attach an outgoing slice to only the landing's east side rather than continue from its full south edge.
+Worked clockwise example, using `+X = east` and `+Y = south`: let the current eastbound frontier anchor be `A`, with the preceding anchor at `A + (-4, 0)`. Their four flat origins form the 2x2 landing. The turn-pending `+Y` frontier is anchored at `A + (-4, 4)` and reuses the landing's two south-edge origins as orientation context. The following ramp step advances to `A + (-4, 8)`, with new origins `A + (-4, 8)` and `A + (0, 8)`. Therefore `A + (4, 4)` is not the successor anchor under this convention; it would attach an outgoing slice to only the landing's east side rather than continue from its full south edge.
 
-The turn must also retain the incoming frontier's forward disturbance. Cast three material-aware durability rays in the **old** travel direction from the three vertices across the predecessor frontier's two-origin forward face: both endpoints and the shared-lane midpoint. In the eastbound example these start at `A + (4, 0)`, `A + (4, 4)`, and `A + (4, 8)` and all travel in `+X`. This is the V1 turn-forward/outer-corner ray extended with the other full-width endpoint (the true outer corner for the second lane) and the predecessor-frontier midpoint. All three participate in feasibility, cost, elevation-aware generated history, finalized disturbance, and disrupted-tree harvesting; vehicle-clearance thickening does not replace any of the three source rays.
+The turn must also retain the incoming frontier's forward disturbance. Cast three material-aware durability rays in the **old** travel direction from the three vertices across the predecessor frontier's two-origin forward face: both endpoints and the shared-lane midpoint. In the eastbound example these start at `A + (4, 0)`, `A + (4, 4)`, and `A + (4, 8)` and all travel in `+X`. This is the V1 turn-forward/outer-corner ray extended with the other full-width endpoint (the true outer corner for the second lane) and the predecessor-frontier midpoint. The turn evaluates these rays only; the subsequent ramp evaluates the new outgoing perimeter. All three participate in feasibility, cost, elevation-aware generated history, finalized disturbance, and disrupted-tree harvesting; vehicle-clearance thickening does not replace any of the three source rays.
 
 A geometric center anchor was considered and rejected for the band-slice model. The center of a two-origin slice has different lattice offsets for `X` and `Y` orientation, while the convenient grid-aligned center exists only for the temporary 2x2 turn landing. It would make some coordinate traces more symmetric but would not prevent loops or replace concrete-origin history checks. The accepted lane-0 anchor keeps origin derivation and materialization direct.
 
@@ -136,7 +136,7 @@ Enumerate pairs of concrete V1 profiles within the construction-reachable relati
 
 An `FF` slice is geometrically axis-neutral, but route state retains orientation to define lane order and the next footprint.
 
-Keep orientation in the state key and permit an axis change only through the explicit flat-turn transition above. It validates the already charged 2x2 landing, then costs only the first new outgoing slice and newly exposed exterior rays. Do not add free in-place orientation edges or enqueue a frontier composed of already introduced landing origins.
+Keep orientation in the state key and permit an axis change only through the explicit flat-turn transition above. It validates the already charged 2x2 landing, adds only the old-direction turn rays, and marks the reoriented state as ramp-or-terminate. The following ramp costs the first new outgoing slice and its newly exposed exterior rays. Do not permit flat/strafe successors or treat the orientation transition as a normal terrain delta.
 
 ### 3. Start frontage and narrow mining bodies
 
@@ -171,7 +171,7 @@ Any origin reintroduced by a transition delta rejects the transition before prof
 
 Calling the V1 scorer independently for both lanes would cast rays from the internal seam and exaggerate cost/blocking. Turns also have an inside corner, outside corner, and potentially newly exposed flat landing edges.
 
-Build a band perimeter first, classify each perimeter edge by work operation and exposure, and score only exterior rays. Keep direct work per newly introduced origin. A turn transition reuses the already scored flat landing only as validation context, then scores the first new outgoing slice, the exterior corners newly exposed by the changed direction, and the three old-direction forward rays across the incoming frontier described above. Safety-buffer tiles count as disrupted for harvesting, preserving V1 `DisturbedRayTiles` behavior.
+Build a band perimeter first, classify each perimeter edge by work operation and exposure, and score only exterior rays. Keep direct work per newly introduced origin. A turn transition reuses the already scored flat landing only as validation context and scores the three old-direction forward rays across the incoming frontier described above. The following ramp scores the first new outgoing slice and the exterior corners newly exposed by the changed direction. Safety-buffer tiles count as disrupted for harvesting, preserving V1 `DisturbedRayTiles` behavior.
 
 ### 7. Fixed providers and provider goals
 
@@ -232,8 +232,8 @@ All reviewed recommendations have been accepted and folded in. No semantic desig
 | Generated history | Every transition delta introduces unused origins; any origin reintroduced by a delta is rejected before costing | Accepted |
 | Generated self-contact | Reject nonlocal cardinal edge contact; allow only explicit transition context and diagonal corner contact | Accepted |
 | Lateral strafe | Shift by one origin; retain the overlapping lane as immutable, uncharged frontier context and generate only the newly exposed lane | Accepted |
-| Turns | Current and predecessor flat slices form the 2x2 landing; jump to the first new outgoing slice | Accepted |
-| Turn disturbance | Three old-direction forward rays across the complete incoming frontage plus newly exposed perimeter rays | Accepted |
+| Turns | Current and predecessor flat slices form the 2x2 landing; reorient on its outer edge, then require ramp or termination | Accepted |
+| Turn disturbance | Three old-direction forward rays on the orientation transition; outgoing perimeter rays belong to the following ramp | Accepted |
 | G graph | Concrete Mega/T3 mask, cleanup footprint, tower component, and sparse goals | Accepted |
 | V2/G seam | Workable contact per lane and one continuous five-tile Mega corridor | Accepted |
 | Terminal operation | Per-lane mining/dumping allowed | Accepted |
@@ -293,7 +293,7 @@ Exit gate: four worked examples (flat straight, uniform ramp, direct strafe, and
 * Add fixtures for direction symmetry, relative lane heights, illegal fights, opposed pairs, turn landing size, all three old-direction turn rays under four rotational symmetries, identical-origin revisit, and conflicting-origin revisit.
 * Put the full V2 matrix behind an explicit development/test entry point; any retained startup V2 gate disables V2 only.
 
-Exit gate: pure fixtures prove every emitted origin profile has integer corners, all shared corners agree, every transition introduces a deterministic origin/profile delta, no transition double-owns an origin, nonlocal edge contact is rejected, and straight, strafe, turn-landing, and handoff-span local contacts remain legal.
+Exit gate: pure fixtures prove every emitted origin profile has integer corners, all shared corners agree, every terrain transition introduces a deterministic origin/profile delta, the orientation-only turn is the sole empty-delta transition, no transition double-owns an origin, nonlocal edge contact is rejected, and straight, strafe, turn-landing, and handoff-span local contacts remain legal.
 
 ### Stage 2 — Clearance-two G graph and cleanup overlay (implemented and live-verified)
 

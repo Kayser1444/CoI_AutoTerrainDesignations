@@ -107,6 +107,22 @@ namespace AutoTerrainDesignations.Access.V2
                 transition.LocalContextOrigins,
                 Array.Empty<AccessRayHeightConstraint>(),
                 Array.Empty<string>(),
+                transition.Kind == AccessV2TransitionKind.Turn,
+                out next,
+                out reason);
+
+        public bool TryApply(
+            AccessV2Transition transition,
+            IReadOnlyList<AccessRayHeightConstraint> rayDelta,
+            IReadOnlyCollection<string> cleanupKeyDelta,
+            out AccessV2History next,
+            out string reason)
+            => TryApply(
+                transition.Delta,
+                transition.LocalContextOrigins,
+                rayDelta,
+                cleanupKeyDelta,
+                transition.Kind == AccessV2TransitionKind.Turn,
                 out next,
                 out reason);
 
@@ -119,6 +135,7 @@ namespace AutoTerrainDesignations.Access.V2
                 delta, localContextOrigins,
                 Array.Empty<AccessRayHeightConstraint>(),
                 Array.Empty<string>(),
+                false,
                 out next, out reason);
 
         public bool TryApply(
@@ -128,9 +145,22 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<string> cleanupKeyDelta,
             out AccessV2History next,
             out string reason)
+            => TryApply(
+                delta, localContextOrigins, rayDelta, cleanupKeyDelta,
+                false, out next, out reason);
+
+        private bool TryApply(
+            IReadOnlyList<AccessV2OriginProfile> delta,
+            IReadOnlyCollection<Tile2i> localContextOrigins,
+            IReadOnlyList<AccessRayHeightConstraint> rayDelta,
+            IReadOnlyCollection<string> cleanupKeyDelta,
+            bool allowEmptyDelta,
+            out AccessV2History next,
+            out string reason)
         {
             next = this;
-            if (!TryValidateApply(delta, localContextOrigins, out reason))
+            if (!TryValidateApply(
+                    delta, localContextOrigins, allowEmptyDelta, out reason))
                 return false;
 
             next = ApplyValidated(delta, rayDelta, cleanupKeyDelta);
@@ -147,8 +177,23 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2OriginProfile> delta,
             IReadOnlyCollection<Tile2i> localContextOrigins,
             out string reason)
+            => TryValidateApply(
+                delta, localContextOrigins, false, out reason);
+
+        public bool TryValidateApply(
+            AccessV2Transition transition,
+            out string reason)
+            => TryValidateApply(
+                transition.Delta, transition.LocalContextOrigins,
+                transition.Kind == AccessV2TransitionKind.Turn, out reason);
+
+        private bool TryValidateApply(
+            IReadOnlyList<AccessV2OriginProfile> delta,
+            IReadOnlyCollection<Tile2i> localContextOrigins,
+            bool allowEmptyDelta,
+            out string reason)
         {
-            if (delta.Count == 0)
+            if (delta.Count == 0 && !allowEmptyDelta)
             {
                 reason = "EmptyTransitionDelta";
                 return false;

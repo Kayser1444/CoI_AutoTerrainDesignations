@@ -4704,14 +4704,17 @@ namespace AutoTerrainDesignations.Access
 
             bool exactTerrainBand = !V2BandHasTerrainDelta(
                 snapshot, transition.Next);
-            // Exact straight/turn successors are real zero-work G seams. Keep
-            // one terminal V state so the ordinary handoff evaluator can prove
-            // the width-two boundary, but prohibit any further V expansion.
+            // Exact straight successors are real zero-work G seams. Keep one
+            // terminal V state so the ordinary handoff evaluator can prove the
+            // width-two boundary, but prohibit any further V expansion. An
+            // orientation-only turn must still evaluate its old-direction
+            // clearance rays, so it deliberately falls through below.
             // Ground-originated exact bands are similarly dominated by staying
             // in G. Synthetic fixed-source companions remain the sole exception.
             if (!connectedFixedOrigin.HasValue
                 && exactTerrainBand
-                && transition.Kind != AccessV2TransitionKind.Strafe)
+                && transition.Kind != AccessV2TransitionKind.Strafe
+                && transition.Kind != AccessV2TransitionKind.Turn)
                 return new AccessV2TransitionEvaluation(
                     true, string.Empty,
                     traversalCost, 0f, 0f,
@@ -4980,6 +4983,27 @@ namespace AutoTerrainDesignations.Access
                     snapshot, transition, connectedFixedOrigin,
                     operation, constraints, ref rayCost, out reason);
 
+            if (transition.Kind == AccessV2TransitionKind.Turn
+                && current.HasValue)
+            {
+                float landingHeight = current.Value.Band.Lane0.Center2 / 2f;
+                for (int index = 0;
+                    index < transition.OldDirectionTurnRays.Count;
+                    index++)
+                {
+                    AccessV2TurnRay turnRay = transition.OldDirectionTurnRays[index];
+                    if (!TryAddV2Ray(
+                            snapshot, constraints, ref rayCost,
+                            null,
+                            turnRay.Source, landingHeight,
+                            UnitDirection(turnRay.Direction), null, operation,
+                            out reason))
+                        return false;
+                }
+                reason = string.Empty;
+                return true;
+            }
+
             bool scoreLane0 = transition.Delta.Any(
                 item => item.Origin == next.GetLaneOrigin(0));
             bool scoreLane1 = transition.Delta.Any(
@@ -5043,25 +5067,6 @@ namespace AutoTerrainDesignations.Access
                     lane1OuterDirection, lane1Exemption, operation,
                     out reason))
                 return false;
-
-            if (transition.Kind == AccessV2TransitionKind.Turn
-                && current.HasValue)
-            {
-                float landingHeight = current.Value.Band.Lane0.Center2 / 2f;
-                for (int index = 0;
-                    index < transition.OldDirectionTurnRays.Count;
-                    index++)
-                {
-                    AccessV2TurnRay turnRay = transition.OldDirectionTurnRays[index];
-                    if (!TryAddV2Ray(
-                            snapshot, constraints, ref rayCost,
-                            null,
-                            turnRay.Source, landingHeight,
-                            UnitDirection(turnRay.Direction), null, operation,
-                            out reason))
-                        return false;
-                }
-            }
 
             reason = string.Empty;
             return true;
