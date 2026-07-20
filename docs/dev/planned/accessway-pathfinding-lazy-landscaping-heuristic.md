@@ -62,10 +62,11 @@ positive work that the real transition cost would charge.
 Use the four precise terrain corners and the candidate's four profile corners,
 not only its center. This directly matches the existing direct-work scorer:
 each corner represents one quarter of a 4x4 origin footprint. Omit fixed origin
-overhead, traversal, cleanup, side-ray cost, unresolved penalties, durability,
-history, and other feasibility costs from this component. The existing
+overhead, traversal, cleanup, unresolved penalties, durability, history, and
+other feasibility costs from this direct-footprint component. The existing
 potential and real `g` already account for the appropriate non-landscaping
 terms, while omitting additional nonnegative costs preserves a lower bound.
+(See below for an analytical side-ray extension.)
 
 ## Guaranteed horizon
 
@@ -93,7 +94,17 @@ terminal.
 If a rigorous mandatory V-step horizon is not yet available, fail open with a
 zero landscaping heuristic. Do not infer one from total potential cost.
 
+## Analytical side-ray lower bound
+
+The core four-corner calculation omits side-ray spreading costs to remain a simple lower bound. However, it is possible to calculate an analytical lower bound on the future side-ray work as well.
+
+Given that a point `P` needs at least a distance `D` tiles to get down to the ground, there must be an upper bound on the actual ground height within that distance `D`. Using that upper bound for the ground height gives a lower bound on the height difference `dh(d)` for any distance `d` within `D` along the steepest legal ramp cone (e.g., at a 0.25 incline) from `P` to `D`.
+
+Since all loose materials are runnier than any legal accessway slope, dumped material within `D` cannot run outside `D`. Thus, a lower bound can be calculated from `h_P` and `D` alone by assuming the best case: a straight slope down from `P`, `D` long, touching the ground at `D`. Assuming flat ground (which minimizes the required fill volume), the flat footprint, fixed origin, and ray costs can all be mathematically estimated and added to the unpaid work in `h`.
+
 ## Lazy evaluation
+
+### Potentially
 
 Calculate the bound only when an A* `V` state is enqueued and its current
 operation-specific gap is positive. Expand a small relaxed successor frontier

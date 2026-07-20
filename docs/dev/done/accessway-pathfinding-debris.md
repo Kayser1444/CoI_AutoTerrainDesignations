@@ -1,6 +1,6 @@
 # Accessway Pathfinding Debris Amendment
 
-Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note narrows the existing open debris question into a route-search and materialization contract for the new accessway pathfinder. See [Accessway Implementation Sequence](accessway-implementation-sequence.md) for the proposed branch stack and rollout order.
+Status: implemented and integrated with the accessway pathfinder.
 
 ## Problem
 

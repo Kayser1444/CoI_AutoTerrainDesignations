@@ -1,6 +1,6 @@
 # Accessway Pathfinding Side-Ray Landscaping Cost Amendment
 
-Status: planned amendment to [Accessway Pathfinding](accessway-pathfinding.md). This note refines the landscaping-cost part of the path cost for mountain and cliff approaches where a center-height or corner-height delta is too weak to rank good routes.
+Status: implemented and integrated with the accessway pathfinder.
 
 ## Motivation
 

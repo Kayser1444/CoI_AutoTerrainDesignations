@@ -1,6 +1,6 @@
 # Accessway Implementation Sequence
 
-Status: planning stack for the next experimental accessway work.
+Status: completed.
 
 This plan keeps the original order: props/debris behavior first, merged search
 second, A* heuristic third, and clearance 2+ after the single-width behavior is

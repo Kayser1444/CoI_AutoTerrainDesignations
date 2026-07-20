@@ -1,6 +1,8 @@
-v0.5.2 [unreleased]
+v0.5.2 [packaged]
+* Fixed: Restricted vehicle pre-allocation UI patches to MineTower entities only, resolving the truck assignment issue on Tree Harvesters.
 * Changed: V2 turns are now orientation-only transitions over an existing flat 2x2 landing. Flat and strafe successors are suppressed after a turn; the pending orientation may terminate or continue through either positive or negative uniform ramp, including ramp-up. Turn discovery also works after lateral flat strafes, with old-direction clearance rays retained and no duplicate landing terrain delta.
 * Changed: Set default access height envelope allowances so both V1 are 1.0 (previously 1.0 lower and 0.5 upper) and both V2 are 1.5 (previously 2.0 lower and 1.0 upper).
+
 
 v0.5.1 [released]
 * Changed: Vehicle construction confirmations now use the same enqueue-for-tower wording, button text, and depot zoom tooltip as AFD.

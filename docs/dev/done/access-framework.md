@@ -1,6 +1,6 @@
 # Access Provision Framework
 
-Status: in-progress architecture note.
+Status: implemented.
 
 This document defines the shared language for ATD access provision. The goal is to make mining designation and farmland preparation bugs diagnosable in terms of specific states and decisions, especially reports like "ramps are not being created" or "work is not being completed."
 
