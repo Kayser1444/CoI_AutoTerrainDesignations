@@ -1576,9 +1576,6 @@ namespace AutoTerrainDesignations.Access
                             request.Goal.FixedProfileNodes),
                         useV2: true);
                 bool useV2AStar = ShouldUseV2AStar(request);
-                
-                // [Reverse BFS Prototype Hook]
-                AccessV2ReverseBfsHeuristic.Compute(request.Snapshot);
 
                 AccessV2PotentialField? v2Potential = useV2AStar
                     ? new AccessV2PotentialField(
