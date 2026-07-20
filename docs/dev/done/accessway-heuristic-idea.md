@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned design revision. This supersedes the earlier tower-gravity/hourglass-penalty idea. See [Accessway Implementation Sequence](accessway-implementation-sequence.md) for the proposed branch stack; merged-goal Dijkstra should land before the A* heuristic branch.
+**Implemented.** Merged fixed-network and tower-grounded searches, and added the height-aware A* heuristic.
 
 ## Context
 
@@ -18,6 +18,8 @@ The pathfinder should instead treat both target classes as one set of acceptable
 ## Proposed Direction
 
 ### 1. Merge fixed-network and tower-grounded searches
+
+Status: Done
 
 Build one access search snapshot that contains the union of all goal nodes:
 
@@ -35,6 +37,8 @@ Expected benefits:
 - Future goal types can be added by extending the goal-node collection instead of adding another search mode.
 
 ### 2. Replace tower gravity / hourglass penalties with an admissible heuristic
+
+Status: Abandoned - Inadmissible. Ramps and slopes "cost" the same to traverse.
 
 Do not add heuristic-like penalties to edge costs. Those penalties change the optimization target and can make the selected route worse even when a cheaper valid route exists.
 

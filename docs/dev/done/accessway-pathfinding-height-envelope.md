@@ -1,6 +1,6 @@
 # Accessway Pathfinding Useful-Height Envelope
 
-Status: experimental shared V1/V2 optimization
+Status: implemented and enabled by default.
 
 Drafted: 2026-07-15
 

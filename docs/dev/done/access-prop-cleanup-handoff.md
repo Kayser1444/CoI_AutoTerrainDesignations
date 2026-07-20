@@ -1,6 +1,6 @@
 # Access prop cleanup steps 1-5 handoff
 
-Status: draft patch implementing the planned props/debris scaffolding from `docs/dev/planned/accessway-implementation-sequence.md` steps 1-5. Follow-up runtime work has now completed the local build/API check and wired live prop/tree cleanup metadata into snapshot construction with diagnostics. Cleanup-dependent placement remains deliberately guarded until cleanup actions are emitted.
+Status: implemented.
 
 ## What changed
 

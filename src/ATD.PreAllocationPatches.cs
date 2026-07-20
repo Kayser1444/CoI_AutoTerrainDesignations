@@ -139,6 +139,10 @@ namespace AutoTerrainDesignations
             try
             {
                 if (!(proto is ExcavatorProto) && !(proto is TruckProto)) return;
+
+                var entity = entityProvider();
+                if (!(entity is MineTower)) return;
+
                 // Find the column inside row
                 var col = __instance.AllChildren.OfType<Column>().FirstOrDefault();
                 if (col == null) return;

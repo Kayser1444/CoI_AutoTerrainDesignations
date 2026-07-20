@@ -1,6 +1,6 @@
 # Accessway Pathfinding (least-work corridor search)
 
-Status: planned design note. Candidate replacement for the straight-corridor generator described under *Accessway Routing* in [../in-progress/access-framework.md](../in-progress/access-framework.md).
+Status: implemented. Integrated as the new pathfinder for experimental turning accessways.
 
 This document describes an alternative accessway **generation** strategy: instead of enumerating straight corridors and ranking them, treat "connect this origin cluster to tower-reachable ground" as a **least-work corridor search over the terrain heightfield**. The work of digging or dumping terrain becomes graph cost, and the slope rule becomes graph structure. The rest of the access framework - clustering, the grounded-reachability flood, completion, phase gating, diagnostics - is unchanged; only the *routing* step is swapped.
 

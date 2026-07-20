@@ -1,6 +1,6 @@
 # Accessway V2 review and staged implementation plan
 
-Status: Stages 0–6 implemented; Stage 7 A* is implemented and awaiting live verification alongside the remaining Stage 6 Mega-pathability cases
+Status: fully implemented (Stages 0–7 completed).
 
 Reviewed: 2026-07-13
 

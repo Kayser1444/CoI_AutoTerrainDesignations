@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented; live rough-terrain measurement pending**
+**Implemented**
 
 This document supersedes the earlier canonical-face prefilter, two-anchor
 enumeration, singleton floor/ceiling profile placement, monotonic seam reuse,

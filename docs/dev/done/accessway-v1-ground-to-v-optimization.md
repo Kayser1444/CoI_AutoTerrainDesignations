@@ -2,7 +2,7 @@
 
 ## Status
 
-**Implemented; live measurement pending**
+**Implemented**
 
 ## Shared-edge leveling rule
 
