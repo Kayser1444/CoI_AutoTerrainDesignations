@@ -1,4 +1,4 @@
-v0.5.2 [unreleased]
+v0.5.2 [packaged]
 * Removed: Unwired the reverse BFS prototype and deleted AccessV2ReverseBfsHeuristic.cs.
 * Fixed: Restricted vehicle pre-allocation UI patches to MineTower entities only, resolving the truck assignment issue on Tree Harvesters.
 * Changed: V2 turns are now orientation-only transitions over an existing flat 2x2 landing. Flat and strafe successors are suppressed after a turn; the pending orientation may terminate or continue through either positive or negative uniform ramp, including ramp-up. Turn discovery also works after lateral flat strafes, with old-direction clearance rays retained and no duplicate landing terrain delta.
