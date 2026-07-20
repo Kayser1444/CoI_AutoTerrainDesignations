@@ -1,3 +1,6 @@
+v0.5.2a [unreleased]
+
+
 v0.5.2 [released]
 * Removed: Unwired the reverse BFS prototype and deleted AccessV2ReverseBfsHeuristic.cs.
 * Fixed: Restricted vehicle pre-allocation UI patches to MineTower entities only, resolving the truck assignment issue on Tree Harvesters.
