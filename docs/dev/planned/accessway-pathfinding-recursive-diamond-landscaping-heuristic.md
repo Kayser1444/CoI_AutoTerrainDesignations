@@ -30,18 +30,28 @@ diamond around the state. Full diamonds are required because a legal U-turn can
 occasionally be the cheapest route; travel direction therefore cannot safely
 remove the rear half of the relaxation.
 
-Diamond maxima have an exact recurrence:
+Diamond maxima have an exact four-child recurrence. Radius zero is read directly
+from the immutable terrain field and is not cached. Radius one reads its five
+terrain samples directly. Every larger diamond is the union of the four
+radius-one-smaller diamonds centered at its cardinal neighbours:
 
 ```text
-M(center, radius) = max of M(childCenter, radius - 1)
-                    for childCenter in
-                    { center, north, south, east, west }
+M(c, 0) = terrain(c)
+
+M(c, 1) = max terrain at { c, north, south, east, west }
+
+M(c, r) = max(
+    M(c + north, r - 1),
+    M(c + south, r - 1),
+    M(c + east,  r - 1),
+    M(c + west,  r - 1))                 for r >= 2
 ```
 
-Memoize those values on demand. The expected A* evaluation order should request
-many contained diamonds before their supersets. When the order is reversed, a
-recursive superset evaluation precomputes values that its likely descendants
-can reuse. Measure that hypothesis rather than assuming it.
+Memoize positive-radius values on demand. The expected A* evaluation order
+should request many recursively produced subset diamonds before their
+supersets. When the order is reversed, a recursive superset evaluation
+prefetches parity-compatible subset values that its likely descendants can
+reuse. Measure that hypothesis rather than assuming it.
 
 The work conversion is a small lookup generated from an idealized straight
 maximum-grade V2 landing over flat terrain at elevation `F`. It uses the same
@@ -89,7 +99,7 @@ It deliberately does not initially include:
 * mining or mixed leveling;
 * directionally cropped diamonds;
 * generated-history exclusions;
-* visited-origin or neighbor removal;
+* visited-origin or neighbour removal;
 * candidate feasibility, buildings, durability, cleanup, or projected-work
   checks inside the ceiling query;
 * turn-owned frontal rays;
@@ -100,15 +110,14 @@ It deliberately does not initially include:
 
 ## Coordinates and units
 
-Use a relaxed tile-centered V coordinate system for the proof and ceiling
-query:
+Use a relaxed tile-centred V coordinate system for the proof and ceiling query:
 
 ```text
-one cardinal relaxed step = one terrain tile
+one cardinal relaxed step  = one terrain tile
 maximum relaxed grade      = 0.25 physical height per step
 height32 per physical level = 32
-height32 per relaxed step   = 8
-one V2 origin stride        = 4 relaxed steps
+height32 per relaxed step  = 8
+one V2 origin stride       = 4 relaxed steps
 ```
 
 Let:
@@ -117,7 +126,7 @@ Let:
 p       current relaxed representative position
 H32     conservative scalar current path height in height32
 G032    conservative local terrain/support height below p
-A32     8, the maximum favorable height reduction per relaxed step
+A32     8, the maximum favourable height reduction per relaxed step
 R0      ceil((H32 - G032) / A32)
 ```
 
@@ -171,7 +180,7 @@ heuristic.
 ### Ground-distance proof
 
 Every relaxed continuation can lower its scalar height by at most `A32` per
-cardinal step. Before step `dGround`, even its most favorable possible height is
+cardinal step. Before step `dGround`, even its most favourable possible height is
 strictly above `F32`:
 
 ```text
@@ -206,7 +215,7 @@ Tfixed = minimum conservative relaxed V distance to any compatible fixed target
 ```
 
 Do not derive `Tfixed` by dividing the scalar potential cost. The potential
-mixes travel, generated fixed overhead, exact G suffix distance, center spokes,
+mixes travel, generated fixed overhead, exact G suffix distance, centre spokes,
 and fixed-provider terminal fees.
 
 The earliest compatible terminal horizon is:
@@ -221,7 +230,7 @@ When no compatible fixed target exists, use `Tfixed = infinity`.
 
 For a direct-work-only bound, it can be safe to crop the terrain diamond to the
 fixed-target horizon. The initial specification includes side rays, whose
-support can extend laterally beyond a nearby terminal's center distance.
+support can extend laterally beyond a nearby terminal's centre distance.
 Therefore:
 
 * build `F32` from the full local fallback radius `R0`; and
@@ -258,24 +267,24 @@ For each residual height gap and each unpaid-slice prefix, precompute the work
 of an idealized two-lane straight V2 descent over flat terrain at elevation
 zero.
 
-The synthetic continuation is more favorable than real V2:
+The synthetic continuation is more favourable than real V2:
 
 * it begins in the cheapest descending profile phase, as though the band were
   already on a uniform maximum-grade descent;
-* each four-tile slice may lower its center by one full physical level;
+* each four-tile slice may lower its centre by one full physical level;
 * it never turns or strafes;
-* all terrain beneath and beside it is flat at the favorable ceiling;
+* all terrain beneath and beside it is flat at the favourable ceiling;
 * it has no buildings, ocean failures, durability, history, cleanup, or
   projected-work conflicts;
 * it pays no traversal or generated fixed overhead; and
 * it terminates without an additional landscaping charge.
 
 Use the actual descending V2 profile geometry in the table generator, including
-its outgoing edge/corner heights. Do not score a flat band at its center height
+its outgoing edge/corner heights. Do not score a flat band at its centre height
 when a descending ramp exposes a lower outgoing edge; that would overstate the
 minimum side-ray work.
 
-For future slice `k`, the relaxed center gap may be no greater than:
+For future slice `k`, the relaxed centre gap may be no greater than:
 
 ```text
 centerGap32(k) = max(0, delta32 - k * 32)
@@ -334,7 +343,7 @@ m >= a
 ```
 
 At relaxed longitudinal distance `i`, a maximum-grade descent has residual gap
-above the favorable ceiling:
+above the favourable ceiling:
 
 ```text
 z(i) = max(0, delta - a * i)
@@ -420,27 +429,48 @@ polynomial less reliable than the generated lookup.
 
 ## Exact recursive diamond maximum
 
-### Recurrence
+### Base cases and recurrence
 
-For `r = 0`:
+Radius zero is not cached:
 
 ```text
 M32(c, 0) = roundedPreciseTerrainHeight32(c)
 ```
 
-For `r > 0`:
+The value is already available in the immutable rounded terrain field. Caching
+it would duplicate terrain storage while replacing a direct array read with a
+cache lookup.
+
+Radius one is calculated directly and may be cached as the first reusable
+level:
+
+```text
+M32(c, 1) = max(
+    terrain32(c),
+    terrain32(c + north),
+    terrain32(c + south),
+    terrain32(c + east),
+    terrain32(c + west))
+```
+
+For `r >= 2`:
 
 ```text
 M32(c, r) = max(
-    M32(c,                 r - 1),
-    M32(c + north,         r - 1),
-    M32(c + south,         r - 1),
-    M32(c + east,          r - 1),
-    M32(c + west,          r - 1))
+    M32(c + north, r - 1),
+    M32(c + south, r - 1),
+    M32(c + east,  r - 1),
+    M32(c + west,  r - 1))
 ```
 
-The five child diamonds exactly cover `D(c, r)`. The recurrence therefore
-returns the same value as a direct scan.
+The centre subdiamond `M32(c, r - 1)` is unnecessary. Every non-centre point in
+`D(c, r)` is one step closer to at least one cardinal neighbour. For `r >= 2`,
+the centre itself is also inside every cardinal child diamond. The four child
+diamonds therefore exactly cover `D(c, r)`.
+
+A parent assembled from cached children costs four reads and three comparisons.
+The omitted centre child may be tested only as an optional prefetch strategy if
+measurements later show that its extra subset family is frequently consumed.
 
 ### Subset relation
 
@@ -458,42 +488,68 @@ A radius-`r` diamond contains:
 2r^2 + 2r + 1
 ```
 
-terrain positions. One immediate radius-`r - 1` child differs from it by only
-`4r` positions, which also permits a cheaper opportunistic crescent mode when
-full recursive prefetch is disabled.
+terrain positions. One immediate radius-`r - 1` directional child differs from
+it by only `4r` positions, which also permits a cheaper opportunistic crescent
+mode when full recursive prefetch is disabled.
 
-### Recursive evaluation cone
+### Recursive evaluation cone and parity
 
-A cold recursive query for `(c, R)` creates every cache state `(q, k)` satisfying:
-
-```text
-ManhattanDistance(c, q) + k <= R
-```
-
-The number of such states is cubic in `R`:
+A cold recursive query for `(c, R)` does not create every geometrically
+contained `(tile, radius)` key. Each recursive edge moves the centre by one
+cardinal tile while reducing the radius by one. It therefore creates exactly
+the positive-radius states `(q, k)` satisfying:
 
 ```text
-sum from j = 0 to R of (2j^2 + 2j + 1)
-= (R + 1) * (2R^2 + 4R + 3) / 3
+ManhattanDistance(c, q) <= R - k
+and
+ManhattanDistance(c, q) has the same parity as R - k
+and
+1 <= k <= R
 ```
 
-This is more expensive than one direct `O(R^2)` diamond scan. It becomes
-attractive only when the search later requests a meaningful fraction of those
-contained subdiamonds.
+The opposite-parity contained subsets are not needed to calculate the parent.
+They remain available for later on-demand evaluation if A* requests them.
+
+At recursive depth `t = R - k`, the number of reachable centres is:
+
+```text
+(t + 1)^2
+```
+
+Therefore a cold radius-`R` query creates:
+
+```text
+sum from i = 1 to R of i^2
+= R * (R + 1) * (2R + 1) / 6
+```
+
+cached positive-radius entries.
+
+This remains `O(R^3)`, but is approximately half the leading-order cache work
+of the earlier five-child full-cone recurrence. Radius-zero terrain samples are
+read as leaves and are not stored as cache entries.
+
+A single direct scan is still only `O(R^2)`. Recursive evaluation becomes
+attractive when the search later requests a meaningful fraction of the
+prefetched parity-compatible subset family.
 
 ### Expected A* access pattern
 
-The heuristic itself is expected to favor lower-gap descendants and postpone
+The heuristic itself is expected to favour lower-gap descendants and postpone
 larger-gap supersets. Consequently:
 
-* many subset queries should already be cached when a superset is evaluated;
-* a superset assembled from five cached children costs only five reads and four
+* many required child queries should already be cached when a superset is
+  evaluated;
+* a superset assembled from four cached children costs only four reads and three
   comparisons; and
-* when a superset is evaluated first, its recursively generated subsets are
-  likely to become top-level heuristic queries before the request finishes.
+* when a superset is evaluated first, its recursively generated
+  parity-compatible subsets are likely to become top-level heuristic queries
+  before the request finishes.
 
 This is a performance hypothesis, not an admissibility assumption. Instrument
-prefetch utilization and compare it with direct scanning.
+prefetch utilization and compare it with direct scanning. Also record misses
+caused specifically by a requested subset belonging to the opposite-parity
+family.
 
 ### Cache ownership and key
 
@@ -501,11 +557,11 @@ The atomic favorable-ground cache depends only on immutable precise terrain and
 snapshot coverage:
 
 ```text
-key   = (tile, radius)
+key   = (tile, positiveRadius)
 value = (maximumHeight32, optionalArgmaxTile, coverageStatus)
 ```
 
-It does not depend on:
+Radius zero is never inserted. The cache does not depend on:
 
 * current path height;
 * travel axis or direction;
@@ -526,12 +582,12 @@ recurrence.
 
 ### Data structure
 
-Start with a packed-key dictionary or a sparse per-center radius vector. Avoid
+Start with a packed-key dictionary or a sparse per-centre radius vector. Avoid
 allocating a dense `(x, y, radius)` volume over the complete snapshot.
 
 If profiling shows dictionary overhead dominates, replace it with:
 
-* one sparse radius array per touched center; or
+* one sparse radius array per touched centre; or
 * radius layers over the locally warmed search region.
 
 The logical recurrence must remain identical.
@@ -560,7 +616,7 @@ coverage, fail open for that query by returning a ceiling at least `H32`, which
 makes `delta32` and `H_land` zero.
 
 Physical map exterior is not usable terrain and need not seed the maximum.
-Generated-center bounds remain authoritative. Ocean support must use the same
+Generated-centre bounds remain authoritative. Ocean support must use the same
 precise terrain/floor interpretation as the real dumping side-ray scorer; do
 not use water-surface height as solid ground unless the real scorer does.
 
@@ -604,7 +660,7 @@ h = existingPotential + H_land
 
 The components cover disjoint cost portions:
 
-* the existing potential lower-bounds travel, generated fixed overhead, center
+* the existing potential lower-bounds travel, generated fixed overhead, centre
   spokes, exact G suffix distance, and fixed-terminal fees; and
 * `H_land` lower-bounds only unpaid future direct and exterior-side landscaping
   work.
@@ -612,7 +668,7 @@ The components cover disjoint cost portions:
 Dijkstra continues to enqueue `h = 0` and remains the optimality reference for
 the same useful-height-envelope and graph-pruning configuration.
 
-Initially calculate `H_land` when a state is enqueued. If favorable-ground
+Initially calculate `H_land` when a state is enqueued. If favourable-ground
 queries remain expensive for states that never pop, separately test deferred
 calculation on first pop with priority reinsertion. Do not combine both changes
 in the first experiment.
@@ -645,13 +701,15 @@ Record:
 
 * top-level queries;
 * exact cache hits and misses;
-* recursive entries created;
+* radius-one direct evaluations;
+* recursive positive-radius entries created;
 * entries later requested as top-level queries;
 * prefetch utilization ratio;
-* queries assembled entirely from cached immediate children;
+* opposite-parity top-level misses;
+* queries assembled entirely from four cached immediate children;
 * direct-scan fallbacks;
 * crescent-reuse queries, if enabled;
-* terrain samples scanned directly;
+* terrain samples read directly;
 * maximum radius;
 * maximum and final cache entries;
 * missing-coverage fail-open count; and
@@ -672,8 +730,9 @@ Compare at least:
 2. direct diamond scan without cache;
 3. exact-key cache with direct scans;
 4. opportunistic one-child/crescent reuse;
-5. full recursive memoization; and
-6. the older lazy successor-frontier heuristic.
+5. four-child recursive memoization;
+6. optional five-child recursive prefetch; and
+7. the older lazy successor-frontier heuristic.
 
 ## Validation
 
@@ -692,12 +751,17 @@ Compare at least:
 
 ### Recurrence and cache fixtures
 
-* every parent equals the maximum of its five children;
-* arbitrary contained `(center, radius)` queries are already present after a
-  cold recursive superset build;
+* radius zero reads terrain directly and creates no cache entry;
+* radius one equals the maximum of the centre and four cardinal terrain samples;
+* every radius-at-least-two parent equals the maximum of its four directional
+  children;
+* four directional child diamonds exactly cover every tested parent diamond;
+* a cold superset build contains every parity-compatible subset predicted by the
+  recurrence and need not contain opposite-parity subsets;
 * child-first evaluation makes a parent constant-work;
 * parent-first evaluation records later top-level consumption of prefetched
   children;
+* the recursive entry count matches `R * (R + 1) * (2R + 1) / 6`;
 * cache saturation falls back to an exact direct result; and
 * cache ownership is invalidated with the snapshot.
 
@@ -705,7 +769,7 @@ Compare at least:
 
 * zero gap and zero-slice prefixes return zero;
 * the current state is never charged;
-* synthetic successor center and corner heights use the favorable descending
+* synthetic successor centre and corner heights use the favourable descending
   phase;
 * direct work matches the shared real scorer on equivalent flat fixtures;
 * exterior side-ray work matches the shared scorer using the selected dumping
@@ -720,7 +784,7 @@ Compare at least:
 ### Search validation
 
 * deep/high dumping fixtures with known unavoidable future work;
-* terrain rising as favorably as construction grade permits;
+* terrain rising as favourably as construction grade permits;
 * high support terrain encountered by lateral rays;
 * immediate ground and fixed-frontage terminals;
 * combined requests in which each goal class wins;
@@ -741,19 +805,20 @@ Compare at least:
    diagnostics only.
 5. Enable the direct-scan heuristic behind an experimental flag and compare A*
    with Dijkstra.
-6. Add exact `(tile, radius)` memoization without recursive prefetch and measure
-   natural query reuse.
+6. Add exact positive-radius `(tile, radius)` memoization without recursive
+   prefetch and measure natural query reuse.
 7. Add opportunistic child/crescent reuse.
-8. Add full recursive memoization with budgets and measure prefetch utilization
-   and total runtime.
-9. Select the cheapest query strategy from live measurements; do not retain
-   recursive prefetch merely because it has a high cache-hit rate.
-10. Compare the selected scalar-diamond formulation with the older lazy
+8. Add four-child recursive memoization with budgets and measure prefetch
+   utilization, opposite-parity misses, and total runtime.
+9. Test the omitted centre child only as an optional additional prefetch mode.
+10. Select the cheapest query strategy from live measurements; do not retain
+    recursive prefetch merely because it has a high cache-hit rate.
+11. Compare the selected scalar-diamond formulation with the older lazy
     profile-aware successor frontier.
-11. Add mining as the sign-symmetric minimum-terrain/inverted-work extension.
-12. Consider only proven static eligibility or history refinements that improve
+12. Add mining as the sign-symmetric minimum-terrain/inverted-work extension.
+13. Consider only proven static eligibility or history refinements that improve
     end-to-end time without weakening cache reuse.
 
-Keep this heuristic only if its measured pruning benefit survives favorable-
+Keep this heuristic only if its measured pruning benefit survives favourable-
 ground lookup, work-table, cache, and queue overhead after useful-height pruning
 is already enabled.
