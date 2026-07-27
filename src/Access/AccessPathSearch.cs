@@ -1151,8 +1151,8 @@ namespace AutoTerrainDesignations.Access
                     [0] = new List<Tile2i> { new Tile2i(20, 0) },
                     [10] = new List<Tile2i> { new Tile2i(0, 0) },
                 });
-            if (Math.Abs(pairedGoalIndex.GetLowerBound(new Tile2i(0, 0), 0) - 0f) > 0.0001f)
-            { failure = "heuristic must find minimum distance over goal bands"; return false; }
+            if (Math.Abs(pairedGoalIndex.GetLowerBound(new Tile2i(0, 0), 0) - 10f) > 0.0001f)
+            { failure = "height-aware heuristic must pair distance and height from the same goal"; return false; }
             var tieBreakQueue = new MinQueue();
             var highHeuristicNode = new AccessSearchNode(
                 new Tile2i(4, 4), 0, AccessSearchMode.Ground);
@@ -1576,7 +1576,6 @@ namespace AutoTerrainDesignations.Access
                             request.Goal.FixedProfileNodes),
                         useV2: true);
                 bool useV2AStar = ShouldUseV2AStar(request);
-
                 AccessV2PotentialField? v2Potential = useV2AStar
                     ? new AccessV2PotentialField(
                         request.Snapshot.GoalDistanceMin,
@@ -4195,7 +4194,9 @@ namespace AutoTerrainDesignations.Access
                 {
                     float horizontalDistance = m_bands[i].Distances[index];
                     if (horizontalDistance < 0) continue;
-                    float lowerBound = horizontalDistance;
+                    float lowerBound = Math.Max(
+                        horizontalDistance,
+                        Math.Abs(height2 - m_bands[i].Height2));
                     if (lowerBound < best) best = lowerBound;
                 }
                 return float.IsPositiveInfinity(best) ? 0f : best;

@@ -17,7 +17,7 @@
   ],
   [
     "common.level.max",
-    "Max"
+    "Maximum"
   ],
   [
     "panel.designations.title",
@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "AUTO"
+    "AUTOMATISCH"
   ],
   [
     "panel.designations.accessway_mode.label",
@@ -57,7 +57,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_3",
-    "Vermächtnis 3"
+    "Altmodus 3"
   ],
   [
     "panel.designations.accessway_mode.legacy_4",
@@ -65,7 +65,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_5",
-    "Vermächtnis 5"
+    "Altmodus 5"
   ],
   [
     "panel.designations.accessway_mode.off.tooltip",
@@ -289,7 +289,7 @@
   ],
   [
     "settings.world.safety_policy.minimum",
-    "Minimum"
+    "Mindestwert"
   ],
   [
     "settings.world.safety_policy.low",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "{0} für {2} bei {1} in die Warteschlange stellen?"
+    "Ein neues {0} für {2} bei {1} bestellen?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "{0} {1}s für {3} bei {2} in die Warteschlange stellen?"
+    "{0} neue Fahrzeuge vom Typ {1} für {3} bei {2} bestellen?"
   ],
   [
     "vehicle_order.confirm.button",
-    "In die Warteschlange stellen"
+    "Bestellen"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Vorab zugewiesen an {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
   ]
 ]

@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "AUTO"
+    "AUTOMÁTICO"
   ],
   [
     "panel.designations.accessway_mode.label",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Enfileirar um {0} para {2} em {1}?"
+    "Encomendar um novo {0} para {2} em {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Enfileirar {0} {1}s para {3} em {2}?"
+    "Encomendar {0} novas unidades de {1} para {3} em {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Enfileirar"
+    "Encomendar"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Pré-atribuído a {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Shift-Alt-clique para solicitar um novo {0} para {2} em {1}"
   ]
 ]

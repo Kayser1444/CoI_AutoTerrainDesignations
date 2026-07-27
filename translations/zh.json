@@ -57,7 +57,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_3",
-    "遗产3"
+    "旧版 3"
   ],
   [
     "panel.designations.accessway_mode.legacy_4",
@@ -65,7 +65,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_5",
-    "遗产5"
+    "旧版 5"
   ],
   [
     "panel.designations.accessway_mode.off.tooltip",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "将 {0} 在 {1} 处为 {2} 排队？"
+    "在 {1} 为 {2} 订购新的 {0}？"
   ],
   [
     "vehicle_order.confirm.plural",
-    "将 {0} 个 {1} 在 {2} 处为 {3} 排队？"
+    "在 {2} 为 {3} 订购 {0} 个新的 {1}？"
   ],
   [
     "vehicle_order.confirm.button",
-    "入队"
+    "订购"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "预先分配给{0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "按住 Shift-Alt 键并单击即可在 {1} 为 {2} 订购新的 {0}"
   ]
 ]

@@ -391,15 +391,17 @@ namespace AutoTerrainDesignations
             Loc.Str("notification.debris_cleanup_none_reachable", "[ATD] {entity} found no reachable debris to clear. Ctrl-click to include unreachable debris", "Notification: Clear debris found blocking props but none passed reachability filtering. {entity} is substituted by the game.");
 
         public static LocStr EnqueueConfirmPromptSingular =
-            Loc.Str("vehicle_order.confirm.singular", "Enqueue a {0} for {2} at {1}?", "Vehicle construction confirmation. Vehicle, depot, tower.");
+            Loc.Str("vehicle_order.confirm.singular", "Order a new {0} for {2} at {1}?", "Vehicle construction confirmation. Vehicle, depot, tower.");
         public static LocStr EnqueueConfirmPromptPlural =
-            Loc.Str("vehicle_order.confirm.plural", "Enqueue {0} {1}s for {3} at {2}?", "Vehicle construction confirmation. Count, vehicle, depot, tower.");
+            Loc.Str("vehicle_order.confirm.plural", "Order {0} new {1}s for {3} at {2}?", "Vehicle construction confirmation. Count, vehicle, depot, tower.");
         public static LocStr EnqueueConfirmBtnText =
-            Loc.Str("vehicle_order.confirm.button", "Enqueue", "Vehicle construction confirmation button.");
+            Loc.Str("vehicle_order.confirm.button", "Order", "Vehicle construction confirmation button.");
         public static LocStr ZoomToDepotTooltip =
             Loc.Str("vehicle_order.zoom.tooltip", "Zoom to {0}", "Tooltip for zooming to the selected vehicle depot.");
         public static LocStr PreAssignedTooltipFmt =
             Loc.Str("vehicle_order.preassigned.tooltip", "Pre-assigned to {0}", "Tooltip for a queued vehicle pre-assigned to a tower.");
+        public static LocStr OrderConstructionShortcutHint =
+            Loc.Str("vehicle_order.shortcut.tooltip", "Shift-Alt-click to order a new {0} for {2} at {1}", "Hint appended to the vanilla assign-vehicle floater. Vehicle, depot, target.");
 
     }
 }

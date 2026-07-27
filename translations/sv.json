@@ -17,7 +17,7 @@
   ],
   [
     "common.level.max",
-    "Max"
+    "Maxvärde"
   ],
   [
     "panel.designations.title",
@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "AUTO"
+    "AUTOMATISK"
   ],
   [
     "panel.designations.accessway_mode.label",
@@ -57,7 +57,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_3",
-    "Legacy 3"
+    "Äldre 3"
   ],
   [
     "panel.designations.accessway_mode.legacy_4",
@@ -65,7 +65,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_5",
-    "Legacy 5"
+    "Äldre 5"
   ],
   [
     "panel.designations.accessway_mode.off.tooltip",
@@ -289,7 +289,7 @@
   ],
   [
     "settings.world.safety_policy.minimum",
-    "Minimum"
+    "Minsta"
   ],
   [
     "settings.world.safety_policy.low",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Ställ en {0} i kö för {2} vid {1}?"
+    "Beställa en ny {0} för {2} vid {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Ställ {0} {1} i kö för {3} vid {2}?"
+    "Beställa {0} nya fordon av typen {1} för {3} vid {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Köa"
+    "Beställ"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Förtilldelad till {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
   ]
 ]

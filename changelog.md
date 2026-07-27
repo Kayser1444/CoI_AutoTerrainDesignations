@@ -1,5 +1,9 @@
 v0.5.2a [unreleased]
-
+* Fixed: Completed removal of the abandoned reverse BFS prototype by restoring the height-aware paired-goal lower bound and its regression fixture.
+* Restored vehicle-prototype-based pre-allocation UI patching for excavators and trucks, including compatible modded subclasses and non-tower assignment panels.
+* Fixed the pre-allocation visibility observer to use the stable inspector parent, matching vanilla and avoiding a hidden-row update cycle.
+* Added a full Shift-Alt-click vehicle-order hint to the vanilla assign tooltip and aligned the confirmation wording and action button on "Order".
+* Fixed the full vehicle-order tooltip to resolve its target and depot on hover, after the inspector entity provider is initialized, while always preserving the vanilla floater.
 
 v0.5.2 [released]
 * Removed: Unwired the reverse BFS prototype and deleted AccessV2ReverseBfsHeuristic.cs.

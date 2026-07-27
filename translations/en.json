@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Enqueue a {0} for {2} at {1}?"
+    "Order a new {0} for {2} at {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Enqueue {0} {1}s for {3} at {2}?"
+    "Order {0} new {1}s for {3} at {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Enqueue"
+    "Order"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Pre-assigned to {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Shift-Alt-click to order a new {0} for {2} at {1}"
   ]
 ]

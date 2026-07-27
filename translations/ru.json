@@ -57,7 +57,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_3",
-    "Наследие 3"
+    "Старый режим 3"
   ],
   [
     "panel.designations.accessway_mode.legacy_4",
@@ -65,7 +65,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_5",
-    "Наследие 5"
+    "Старый режим 5"
   ],
   [
     "panel.designations.accessway_mode.off.tooltip",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Поставить {0} в очередь для {2} в {1}?"
+    "Заказать новый {0} для {2} в {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Поставить в очередь {0} {1} для {3} в {2}?"
+    "Заказать {0} новых машин типа {1} для {3} в {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "очередь"
+    "Заказать"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Предварительно назначено {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Нажмите, удерживая клавишу Shift-Alt, чтобы заказать новый {0} для {2} в {1}."
   ]
 ]

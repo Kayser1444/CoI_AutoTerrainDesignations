@@ -49,7 +49,7 @@
   ],
   [
     "panel.designations.ore_filter.auto",
-    "AUTO"
+    "AUTOMATICO"
   ],
   [
     "panel.designations.accessway_mode.label",
@@ -57,7 +57,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_3",
-    "Eredità 3"
+    "Modalità precedente 3"
   ],
   [
     "panel.designations.accessway_mode.legacy_4",
@@ -65,7 +65,7 @@
   ],
   [
     "panel.designations.accessway_mode.legacy_5",
-    "Eredità 5"
+    "Modalità precedente 5"
   ],
   [
     "panel.designations.accessway_mode.off.tooltip",
@@ -645,15 +645,15 @@
   ],
   [
     "vehicle_order.confirm.singular",
-    "Accodare un {0} per {2} a {1}?"
+    "Ordinare un nuovo {0} per {2} presso {1}?"
   ],
   [
     "vehicle_order.confirm.plural",
-    "Accodare {0} {1} per {3} a {2}?"
+    "Ordinare {0} nuove unità di {1} per {3} presso {2}?"
   ],
   [
     "vehicle_order.confirm.button",
-    "Accodamento"
+    "Ordina"
   ],
   [
     "vehicle_order.zoom.tooltip",
@@ -662,5 +662,9 @@
   [
     "vehicle_order.preassigned.tooltip",
     "Preassegnato a {0}"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Fai clic tenendo premuto Maiusc-Alt per ordinare un nuovo {0} per {2} presso {1}"
   ]
 ]
