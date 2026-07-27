@@ -1,4 +1,5 @@
 v0.5.4 [packaged]
+* Fixed: Deleted mine control towers now properly reset farmland work in progress.
 * Changed: Retuned World safety policy slope and buffer presets (`Min`: [0.8, 0], `Low`: [0.85, 1], `Med`: [0.9, 2], `High`: [1.0, 3], `Max`: [1.1, 4]).
 * Changed: Set default landslide slope factor (`accessRaySlopeConservatism`) to `0.9` and default ray end buffer (`accessRayEndBuffer`) to `2` tiles.
 * Improved: Added `_comment_*` string keys for all expert access pathfinding tuning parameters in `ATD.Settings.cs` and `ATDsettings.json`.

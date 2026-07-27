@@ -1,4 +1,5 @@
 v0.5.4 | 2026-07-27
+* Fixed: Deleted mine control towers now properly reset farmland work in progress
 * Changed: Adjusted Safety policy slope and buffer presets for improved terrain clearance, with default slope factor 0.9 and buffer 2 tiles
 * Improved: Added documentation comments for all expert access search settings in ATDsettings.json
 
