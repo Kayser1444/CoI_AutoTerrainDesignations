@@ -26,6 +26,7 @@ using Mafi.Unity.UiStatic;
 using Mafi.Unity.UiStatic.Cursors;
 using Mafi.Localization;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace AutoTerrainDesignations
 {
@@ -919,7 +920,7 @@ namespace AutoTerrainDesignations
 
                     // Rotate the inner icon 180° so the arrow points inward.
                     if (innerItem.m_btn is ButtonIcon innerBtnIcon)
-                        innerBtnIcon.Icon.Element.transform.rotation = Quaternion.Euler(0f, 0f, 180f);
+                        innerBtnIcon.Icon.Element.style.rotate = new Rotate(180f);
 
                     outerItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerOuterTip));
                     innerItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerInnerTip));
