@@ -1,3 +1,7 @@
+v0.5.3 | 2026-07-27
+* Fixed: Restored vehicle pre-allocation UI controls for excavators and trucks, including custom vehicle subclasses and non-tower assignment panels
+* Fixed: Mine tower vehicle ordering hint tooltip now shows full Shift-Alt-click shortcut details when hovered
+
 v0.5.2 | 2026-07-20
 * Changed: V2 turns are now orientation-only transitions over flat 2x2 landings, suppressing flat and strafe successors.
 * Changed: Adjusted default access height envelope allowances for V1 and V2 accessways.
