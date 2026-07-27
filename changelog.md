@@ -1,4 +1,4 @@
-v0.5.4a [unreleased]
+v0.5.4 [unreleased]
 
 
 v0.5.3 [released]
