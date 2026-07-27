@@ -769,6 +769,8 @@ public static string Tt(string text) => text;
 
     private void onEntityRemoved(IEntity entity)
     {
+        AutoDepthDesignation.OnFarmingTowerRemoved(entity.Id);
+
         if (entity is IEntityAssignedWithVehicles)
             PendingVehicleAllocations.OnTowerDestroyed(entity.Id);
         else if (entity is VehicleDepotBase)

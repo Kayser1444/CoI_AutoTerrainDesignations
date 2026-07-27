@@ -1,4 +1,4 @@
-v0.5.3 [packaged]
+v0.5.3 [released]
 * Fixed: Completed removal of the abandoned reverse BFS prototype by restoring the height-aware paired-goal lower bound and its regression fixture.
 * Restored vehicle-prototype-based pre-allocation UI patching for excavators and trucks, including compatible modded subclasses and non-tower assignment panels.
 * Fixed the pre-allocation visibility observer to use the stable inspector parent, matching vanilla and avoiding a hidden-row update cycle.

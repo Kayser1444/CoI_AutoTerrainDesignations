@@ -517,6 +517,68 @@ namespace AutoTerrainDesignations
             return session;
         }
 
+        internal static void OnFarmingTowerRemoved(EntityId towerId)
+        {
+            s_farmingAutomationDisabledTowerIds.Remove(towerId);
+            TryCleanupRemovedFarmingTower(towerId);
+        }
+
+        private static bool TryCleanupRemovedFarmingTower(EntityId towerId)
+        {
+            if (!s_farmingPreparationSessions.TryGetValue(towerId, out FarmingPreparationSession session))
+                return true;
+
+            session.Enabled = false;
+            session.Active = false;
+            session.Tower = null;
+            session.LastAccessRampRequestKey = string.Empty;
+            session.FillingAllDoneSinceRealtime = null;
+            ClearPendingFillingAreaCache(session);
+            ClearFarmingFillingVehicleClearOut(session);
+            ClearFarmingFillingActivation(session);
+            RemoveOwnedFarmingPreparationShoulders(session);
+            RemoveOwnedFarmingFutureRimDebrisCleanup(session);
+            RemoveOwnedFarmingAccessRamps(session, isFilling: false);
+            RemoveOwnedFarmingAccessRamps(session, isFilling: true);
+
+            // The tower is already destroyed, so its dump rules and vehicle assignments
+            // must not be touched. Clear only our runtime ownership bookkeeping.
+            session.TowerDumpRulesOwned = false;
+            session.TowerDumpRulesSnapshot = null;
+            session.ReleasedFillingTrucks.Clear();
+            session.FillingTruckAssignmentsReleased = false;
+
+            if (s_desigManager == null || s_levelingProto == null)
+                return false;
+
+            int restored = 0;
+            int failed = 0;
+            foreach (FarmingOriginSession originState in session.Origins.Values)
+            {
+                if (s_desigManager.AddOrReplaceDesignation(s_levelingProto, originState.OriginalData))
+                {
+                    restored++;
+                    s_farmingDebugStoredDesignations.Remove(originState.Origin);
+                }
+                else
+                {
+                    failed++;
+                }
+            }
+
+            if (failed > 0)
+            {
+                session.LastReport =
+                    $"[ATD Farming] Removed tower cleanup restored {restored} original designation(s), failed={failed}; retry pending.";
+                Log.Warning(session.LastReport);
+                return false;
+            }
+
+            s_farmingPreparationSessions.Remove(towerId);
+            LogDebug($"[ATD Farming] Removed tower cleanup restored {restored} original designation(s) and cleared the session.");
+            return true;
+        }
+
         internal static void TickFarmingPreparationSessions()
         {
             if (s_desigManager == null)
@@ -531,6 +593,12 @@ namespace AutoTerrainDesignations
                 EntityId towerId = entry.Key;
                 FarmingPreparationSession session = entry.Value;
                 IAreaManagingTower? tower = session.Tower;
+                if (tower == null || (tower is IEntity towerEntity && towerEntity.IsDestroyed))
+                {
+                    TryCleanupRemovedFarmingTower(towerId);
+                    continue;
+                }
+
                 if (!session.Enabled || tower == null)
                     continue;
 
