@@ -564,6 +564,7 @@ namespace AutoTerrainDesignations
                     && ShouldPreserveFloat(
                         accessRaySlopeConservatism.Value,
                         migrateGeneratedDefaults,
+                        0.9f,
                         1f,
                         0.8f,
                         0.85f))
@@ -1001,17 +1002,35 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the experimental landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
             sb.AppendLine($"  \"accessLandslideRunPerHeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandslideRunPerHeight)},");
             sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessGeneratedVFixedCost\": \"Fixed cost penalty added for generated V-turn or switchback vertices in experimental access search. Default: 1.\",");
             sb.AppendLine($"  \"accessGeneratedVFixedCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessGeneratedVFixedCost)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessDirectWorkWeight\": \"Cost weight factor applied to direct terrain work (dig/fill volume) in experimental access search. Default: 1.\",");
             sb.AppendLine($"  \"accessDirectWorkWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessDirectWorkWeight)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessSideRayWeight\": \"Cost weight factor applied to side-ray clearance checking in experimental access search. Default: 1.\",");
             sb.AppendLine($"  \"accessSideRayWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessSideRayWeight)},");
-            sb.AppendLine("  \"_comment_safetyPolicyExpertValues\": \"Expert values behind the World settings Safety policy. Defaults by policy: MAX=[1.5,5], HIGH=[1.25,4], MED=[1.0,3], LOW=[0.9,2], MIN=[0.8,1]. Custom values are allowed and the UI displays the nearest policy.\",");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_safetyPolicyExpertValues\": \"Expert values behind the World settings Safety policy. Defaults by policy: MAX=[1.1,4], HIGH=[1.0,3], MED=[0.9,2], LOW=[0.85,1], MIN=[0.8,0]. Custom values are allowed and the UI displays the nearest policy.\",");
             sb.AppendLine($"  \"accessRaySlopeConservatism\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRaySlopeConservatism)},");
             sb.AppendLine($"  \"accessRayEndBuffer\": {AutoTerrainDesignationsMod.AccessRayEndBuffer},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessCandidateRayMaxDistance\": \"Maximum search distance in tiles for clearance rays during accessway pathfinding. Default: 16.\",");
             sb.AppendLine($"  \"accessCandidateRayMaxDistance\": {AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessRayMaxCost\": \"Maximum path cost budget allowed for an accessway route candidate before aborting search. Default: 500.\",");
             sb.AppendLine($"  \"accessRayMaxCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayMaxCost)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessRayUnresolvedPenalty\": \"Cost penalty added when an accessway clearance ray cannot fully resolve terrain contact. Default: 200.\",");
             sb.AppendLine($"  \"accessRayUnresolvedPenalty\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessMaxVisitedNodes\": \"Maximum node exploration limit for experimental access pathfinding search. Default: 250000.\",");
             sb.AppendLine($"  \"accessMaxVisitedNodes\": {AutoTerrainDesignationsMod.AccessMaxVisitedNodes},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessSearchTimeoutSeconds\": \"Maximum elapsed search timeout in seconds for background accessway pathfinding. Default: 60.\",");
             sb.AppendLine($"  \"accessSearchTimeoutSeconds\": {AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessSearchFrameBudgetMs\": \"Time budget in milliseconds per frame allocated to sliced background access search. Default: 30.\",");
             sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");
             sb.AppendLine();
             sb.AppendLine("  \"purityLevels\": {");

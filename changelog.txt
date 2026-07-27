@@ -1,3 +1,7 @@
+v0.5.4 | 2026-07-27
+* Changed: Adjusted Safety policy slope and buffer presets for improved terrain clearance, with default slope factor 0.9 and buffer 2 tiles
+* Improved: Added documentation comments for all expert access search settings in ATDsettings.json
+
 v0.5.3 | 2026-07-27
 * Fixed: Restored vehicle pre-allocation UI controls for excavators and trucks, including custom vehicle subclasses and non-tower assignment panels
 * Fixed: Mine tower vehicle ordering hint tooltip now shows full Shift-Alt-click shortcut details when hovered

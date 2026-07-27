@@ -394,6 +394,20 @@ public sealed class AtdConsoleCommands
             : "[ATD] Experimental access search overlay OFF.";
     }
 
+    [ConsoleCommand(false, false, "Toggles a persistent V2 Mega-handoff overlay for the latest access search: red = locally pathable but disconnected from the tower, green = tower-reachable, cyan = selected route. Session-only.", null)]
+    private string atdV2PathabilityOverlay(string value = "")
+    {
+        bool current = AutoDepthDesignation.ShowV2PathabilityOverlay;
+        if (!TryParseConsoleBool(value, out bool parsed))
+            parsed = !current;
+        AutoDepthDesignation.ShowV2PathabilityOverlay = parsed;
+        if (!parsed)
+            AutoDepthDesignation.ClearV2PathabilityOverlay();
+        return parsed
+            ? "[ATD] V2 Mega pathability overlay ON. Re-run accessway generation to populate it."
+            : "[ATD] V2 Mega pathability overlay OFF.";
+    }
+
     [ConsoleCommand(false, false, "Builds the experimental access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
     private string atdAccessHeightEnvelope(string value = "")
     {

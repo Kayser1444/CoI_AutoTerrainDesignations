@@ -1584,6 +1584,7 @@ namespace AutoTerrainDesignations
             TimeSpan maxSlice)
         {
             LastExperimentalAccessSearch = result;
+            RecordV2PathabilityOverlay(snapshot, result);
             AccessSearchDiagnostics diag = result.Diagnostics;
             if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Info)
                 && !AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
@@ -1682,6 +1683,14 @@ namespace AutoTerrainDesignations
                 LogExperimentalAccessTrace(
                     $"[ATD Experimental Access First Handoffs] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.FirstGeneratedHandoffDetails));
+            if (diag.V2RouteHandoffDetails.Count > 0)
+                LogExperimentalAccessTrace(
+                    $"[ATD V2 Route Handoffs] cluster={cluster.ClusterId} " +
+                    string.Join("; ", diag.V2RouteHandoffDetails));
+            if (diag.V2GroundSuffixDetails.Count > 0)
+                LogExperimentalAccessTrace(
+                    $"[ATD V2 Ground Suffix] cluster={cluster.ClusterId} " +
+                    string.Join("; ", diag.V2GroundSuffixDetails));
             if (!string.IsNullOrEmpty(diag.V2DryRunSummary))
                 LogExperimentalAccessDebug(
                     $"[ATD V2 Search] cluster={cluster.ClusterId} " +

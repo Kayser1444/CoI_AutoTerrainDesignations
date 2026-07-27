@@ -819,6 +819,20 @@ namespace AutoTerrainDesignations.Access.V2
                 m_handoffEvaluator(recent, current.History, null);
             m_diagnostics.V2HandoffEvaluationTicks +=
                 AtdDiagnostics.ElapsedSince(handoffStart);
+            m_diagnostics.RecordV2RouteHandoff(
+                $"anchor={current.State.Anchor} entry={current.State.EntryDirection} " +
+                $"band={current.State.Band.Kind} pathCost={FormatCost(current.Cost)} " +
+                $"candidates={candidates.Count}" +
+                (candidates.Count == 0
+                    ? " outcome=no-compatible-ground-seam"
+                    : " options=[" + string.Join(", ", candidates.Select(
+                        candidate => candidate +
+                            $" entryCenters=[{string.Join(",", candidate.GroundEntryCenters)}] " +
+                            $"totalCost={FormatCost(candidate.TotalCost)}")) + "]"));
+            if (candidates.Count > 0)
+                m_diagnostics.RecordV2HandoffTrace(
+                    current.State.Anchor,
+                    candidates.SelectMany(candidate => candidate.GroundEntryCenters));
             if (current.Parent != null
                 && current.Parent.Parent == null
                 && current.Transition != null
@@ -1174,13 +1188,22 @@ namespace AutoTerrainDesignations.Access.V2
             out SearchNode? terminal)
         {
             terminal = null;
+            string prefix = $"entry={current.GroundCenter.GetValueOrDefault()} " +
+                $"fromAnchor={current.State.Anchor} pathCost={FormatCost(current.Cost)}";
             if (m_groundGraph == null
                 || (m_potentialField == null && m_heuristicEvaluator == null)
-                || !current.GroundCenter.HasValue
-                || !m_groundGraph.TryGetGoalDistance(
+                || !current.GroundCenter.HasValue)
+            {
+                m_diagnostics.RecordV2GroundSuffix(prefix + " outcome=unavailable");
+                return false;
+            }
+            if (!m_groundGraph.TryGetGoalDistance(
                     current.GroundCenter.Value, out float distance)
                 || distance <= 0f)
+            {
+                m_diagnostics.RecordV2GroundSuffix(prefix + " outcome=no-goal-distance");
                 return false;
+            }
 
             m_diagnostics.V2GroundSuffixAttempts++;
             SearchNode cursor = current;
@@ -1202,6 +1225,9 @@ namespace AutoTerrainDesignations.Access.V2
                     m_diagnostics.V2GroundSuffixSuccesses++;
                     m_diagnostics.V2GroundSuffixSteps += stepIndex;
                     terminal = cursor;
+                    m_diagnostics.RecordV2GroundSuffix(
+                        prefix + $" outcome=success distance={FormatCost(distance)} " +
+                        $"steps={stepIndex}");
                     return true;
                 }
                 if (!m_groundGraph.TryGetGoalDistance(from, out distance))
@@ -1261,6 +1287,8 @@ namespace AutoTerrainDesignations.Access.V2
             }
 
             m_diagnostics.V2GroundSuffixFallbacks++;
+            m_diagnostics.RecordV2GroundSuffix(
+                prefix + $" outcome=fallback remainingDistance={FormatCost(distance)}");
             return false;
         }
 

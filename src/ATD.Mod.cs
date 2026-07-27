@@ -153,8 +153,8 @@ public static string Tt(string text) => text;
         SetAccessGeneratedVFixedCost(1f);
         SetAccessDirectWorkWeight(1f);
         SetAccessSideRayWeight(1f);
-        SetAccessRaySlopeConservatism(1f);
-        SetAccessRayEndBuffer(3);
+        SetAccessRaySlopeConservatism(0.9f);
+        SetAccessRayEndBuffer(2);
         SetAccessCandidateRayMaxDistance(16);
         SetAccessRayMaxCost(500f);
         SetAccessRayUnresolvedPenalty(200f);
@@ -498,7 +498,7 @@ public static string Tt(string text) => text;
     public static void SetAccessDirectWorkWeight(float value) => AccessDirectWorkWeight = Math.Max(0f, Math.Min(100f, value));
     public static float AccessSideRayWeight { get; private set; } = 1f;
     public static void SetAccessSideRayWeight(float value) => AccessSideRayWeight = Math.Max(0f, Math.Min(100f, value));
-    public static float AccessRaySlopeConservatism { get; private set; } = 1f;
+    public static float AccessRaySlopeConservatism { get; private set; } = 0.9f;
     public static void SetAccessRaySlopeConservatism(float value)
     {
         float clamped = Math.Max(0f, Math.Min(1.5f, value));
@@ -506,7 +506,7 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.MarkAllMiningPlansDirty();
         AccessRaySlopeConservatism = clamped;
     }
-    public static int AccessRayEndBuffer { get; private set; } = 3;
+    public static int AccessRayEndBuffer { get; private set; } = 2;
     public static void SetAccessRayEndBuffer(int value)
     {
         int clamped = Math.Max(0, Math.Min(16, value));
@@ -546,11 +546,11 @@ public static string Tt(string text) => text;
     {
         switch (policy)
         {
-            case SafetyPolicy.Max: slope = 1.5f; buffer = 5; break;
-            case SafetyPolicy.High: slope = 1.25f; buffer = 4; break;
-            case SafetyPolicy.Low: slope = 0.9f; buffer = 2; break;
-            case SafetyPolicy.Min: slope = 0.8f; buffer = 1; break;
-            default: slope = 1f; buffer = 3; break;
+            case SafetyPolicy.Max: slope = 1.1f; buffer = 4; break;
+            case SafetyPolicy.High: slope = 1.0f; buffer = 3; break;
+            case SafetyPolicy.Low: slope = 0.85f; buffer = 1; break;
+            case SafetyPolicy.Min: slope = 0.8f; buffer = 0; break;
+            default: slope = 0.9f; buffer = 2; break;
         }
     }
     public static int AccessCandidateRayMaxDistance { get; private set; } = 16;

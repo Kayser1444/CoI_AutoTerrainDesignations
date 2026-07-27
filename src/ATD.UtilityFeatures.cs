@@ -10,6 +10,7 @@
 using System.Collections.Generic;
 using Mafi;
 using UnityEngine;
+using AutoTerrainDesignations.Access;
 
 namespace AutoTerrainDesignations;
 
@@ -19,6 +20,9 @@ partial class AutoDepthDesignation
     internal static bool ShowCursorOverlay;
     // Whether the experimental access search shows recently explored nodes.
     internal static bool ShowExperimentalAccessSearchOverlay;
+    // Whether the latest V2 handoff candidates show their captured Mega-ground
+    // connectivity. This is a session-only diagnostic overlay.
+    internal static bool ShowV2PathabilityOverlay;
 
     private const int MAX_ACCESS_SEARCH_OVERLAY_POINTS = 3000;
     private const float ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS = 3f;
@@ -26,6 +30,25 @@ partial class AutoDepthDesignation
     private static readonly List<AccessSearchOverlayPoint> s_accessSearchOverlayPoints =
         new List<AccessSearchOverlayPoint>();
     private static Texture2D? s_accessSearchOverlayCircleTexture;
+    private static readonly List<V2PathabilityOverlayPoint> s_v2PathabilityOverlayPoints =
+        new List<V2PathabilityOverlayPoint>();
+
+    private readonly struct V2PathabilityOverlayPoint
+    {
+        public Tile2i Position { get; }
+        public int Height2 { get; }
+        public bool IsTowerReachable { get; }
+        public bool IsSelectedRoute { get; }
+
+        public V2PathabilityOverlayPoint(
+            Tile2i position, int height2, bool isTowerReachable, bool isSelectedRoute)
+        {
+            Position = position;
+            Height2 = height2;
+            IsTowerReachable = isTowerReachable;
+            IsSelectedRoute = isSelectedRoute;
+        }
+    }
 
     private readonly struct AccessSearchOverlayPoint
     {
@@ -61,6 +84,7 @@ partial class AutoDepthDesignation
         if (!tickerActive || !IsWorldGenerationActive(worldGeneration)) return;
 
         DrawExperimentalAccessSearchOverlay();
+        DrawV2PathabilityOverlay();
         if (!ShowCursorOverlay || !TryGetCursorTile(out Tile3f pos)) return;
 
         s_tileOverlayStyle ??= new GUIStyle(GUI.skin.box)
@@ -96,6 +120,39 @@ partial class AutoDepthDesignation
         s_accessSearchOverlayPoints.Clear();
     }
 
+    internal static void RecordV2PathabilityOverlay(
+        AccessSearchSnapshot snapshot, AccessSearchResult result)
+    {
+        if (!ShowV2PathabilityOverlay) return;
+        s_v2PathabilityOverlayPoints.Clear();
+        if (snapshot.V2GroundGraph == null) return;
+
+        var selected = new HashSet<Tile2i>();
+        if (result.V2Route != null)
+            foreach (Access.V2.AccessV2RouteStep step in result.V2Route.RouteSteps)
+                if (step.IsGround)
+                    selected.Add(step.GroundCenter!.Value);
+
+        var entries = new HashSet<Tile2i>();
+        foreach (V2HandoffTrace trace in result.Diagnostics.V2HandoffTraces)
+            foreach (Tile2i entry in trace.Entries)
+                entries.Add(entry);
+        foreach (Tile2i entry in entries)
+        {
+            int height2 = snapshot.TryGetGroundHeight2(entry, out int captured)
+                ? captured : 0;
+            s_v2PathabilityOverlayPoints.Add(new V2PathabilityOverlayPoint(
+                entry, height2,
+                snapshot.V2GroundGraph.TryGetGoalDistance(entry, out _),
+                selected.Contains(entry)));
+        }
+    }
+
+    internal static void ClearV2PathabilityOverlay()
+    {
+        s_v2PathabilityOverlayPoints.Clear();
+    }
+
     private static void DrawExperimentalAccessSearchOverlay()
     {
         if (!ShowExperimentalAccessSearchOverlay || s_accessSearchOverlayPoints.Count == 0)
@@ -125,6 +182,28 @@ partial class AutoDepthDesignation
                 ? GetAccessSearchOverlayCircleTexture()
                 : Texture2D.whiteTexture;
             GUI.DrawTexture(new Rect(screen.x - 3f, Screen.height - screen.y - 3f, 6f, 6f), texture);
+            GUI.color = previousColor;
+        }
+    }
+
+    private static void DrawV2PathabilityOverlay()
+    {
+        if (!ShowV2PathabilityOverlay || s_v2PathabilityOverlayPoints.Count == 0)
+            return;
+
+        Camera? camera = Camera.main;
+        if (camera == null) return;
+        foreach (V2PathabilityOverlayPoint point in s_v2PathabilityOverlayPoints)
+        {
+            Vector3 screen = camera.WorldToScreenPoint(new Vector3(
+                (point.Position.X + 0.5f) * 2f, point.Height2 + 0.5f,
+                (point.Position.Y + 0.5f) * 2f));
+            if (screen.z <= 0f) continue;
+            Color previousColor = GUI.color;
+            GUI.color = point.IsSelectedRoute ? Color.cyan
+                : point.IsTowerReachable ? Color.green : Color.red;
+            GUI.DrawTexture(new Rect(screen.x - 6f, Screen.height - screen.y - 6f, 12f, 12f),
+                GetAccessSearchOverlayCircleTexture());
             GUI.color = previousColor;
         }
     }

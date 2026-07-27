@@ -2006,6 +2006,7 @@ namespace AutoTerrainDesignations.Access
     internal sealed class AccessSearchDiagnostics
     {
         private const int MaxStartDiagnosticDetails = 64;
+        private const int MaxV2RouteDiagnosticDetails = 128;
 
         public int GroundExpansions;
         public int OriginExpansions;
@@ -2103,6 +2104,9 @@ namespace AutoTerrainDesignations.Access
         public long V2LocalEscapeTicks;
         public List<string> StartSuccessorDetails { get; } = new List<string>();
         public List<string> FirstGeneratedHandoffDetails { get; } = new List<string>();
+        public List<string> V2RouteHandoffDetails { get; } = new List<string>();
+        public List<string> V2GroundSuffixDetails { get; } = new List<string>();
+        public List<V2HandoffTrace> V2HandoffTraces { get; } = new List<V2HandoffTrace>();
         public string V2DryRunSummary = string.Empty;
         public string V2DryRunPath = string.Empty;
 
@@ -2120,9 +2124,42 @@ namespace AutoTerrainDesignations.Access
                 FirstGeneratedHandoffDetails.Add(detail);
         }
 
+        public void RecordV2RouteHandoff(string detail)
+        {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
+            if (V2RouteHandoffDetails.Count < MaxV2RouteDiagnosticDetails)
+                V2RouteHandoffDetails.Add(detail);
+        }
+
+        public void RecordV2GroundSuffix(string detail)
+        {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
+            if (V2GroundSuffixDetails.Count < MaxV2RouteDiagnosticDetails)
+                V2GroundSuffixDetails.Add(detail);
+        }
+
+        public void RecordV2HandoffTrace(Tile2i anchor, IEnumerable<Tile2i> entries)
+        {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
+            if (V2HandoffTraces.Count < MaxV2RouteDiagnosticDetails)
+                V2HandoffTraces.Add(new V2HandoffTrace(anchor, entries));
+        }
+
         public AccessSearchDiagnostics Clone()
         {
             return (AccessSearchDiagnostics)MemberwiseClone();
+        }
+    }
+
+    internal readonly struct V2HandoffTrace
+    {
+        public Tile2i Anchor { get; }
+        public IReadOnlyList<Tile2i> Entries { get; }
+
+        public V2HandoffTrace(Tile2i anchor, IEnumerable<Tile2i> entries)
+        {
+            Anchor = anchor;
+            Entries = entries.Distinct().ToArray();
         }
     }
 }
