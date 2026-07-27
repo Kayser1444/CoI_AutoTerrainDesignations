@@ -1,4 +1,4 @@
-# Recursive-Diamond Favorable-Ground Landscaping Heuristic
+# Recursive-Diamond Terrain-Extrema Landscaping Heuristic
 
 Status: proposed alternative to the lazy unavoidable-landscaping heuristic
 
@@ -14,36 +14,32 @@ Related designs:
 
 ## Summary
 
-Replace the profile-aware lazy successor relaxation with a cheaper scalar lower
-bound for unavoidable future landscaping work.
+Add a conservative lower bound for unpaid future landscaping work to the V2 A*
+heuristic.
 
-For an above-ground V2 state, split the estimate into two independent problems:
+For a generated V2 state, split the estimate into two independent problems:
 
-1. find a favorable terrain ceiling `F` and a proven minimum relaxed distance
-   before terrain or another compatible terminal can be reached; and
-2. convert the residual height gap `delta = H - F` and the proven unpaid
-   generated-origin horizon into a lower bound `W` for direct work plus exterior
-   side-ray work.
+1. find favorable terrain extrema and prove a minimum relaxed distance before
+   terrain or another compatible terminal can be reached; and
+2. convert the residual height gap and proven horizon into a lower bound for
+   direct landscaping work plus ordinary exterior side-ray work.
 
-The terrain ceiling is the maximum precise terrain height in a full Manhattan
-diamond around the state. Full diamonds are required because a legal U-turn can
-occasionally be the cheapest route; travel direction therefore cannot safely
-remove the rear half of the relaxation.
+Use a full Manhattan diamond around the state. A legal U-turn can occasionally
+be the cheapest route, so travel direction cannot safely remove the rear half of
+the relaxation.
 
-The same spatial query is useful for the later below-ground mining extension.
-A state above terrain needs the diamond maximum, while its approximate mirror
-state below terrain needs the diamond minimum. Calculate and cache both extrema
-whenever a diamond is evaluated:
+Calculate and cache both terrain extrema for every diamond:
 
 ```text
-E(c, r) = (minimum terrain height, maximum terrain height) in D(c, r)
+E(c, r) = (
+    minimum precise terrain height in D(c, r),
+    maximum precise terrain height in D(c, r))
 ```
 
-The extra minimum costs only one stored value and three additional comparisons
-per recursive parent. It requires no additional recursive calls or terrain
-reads. This is expected to be especially useful because above- and below-ground
-states at similar positions can have similar total path costs and may both be
-explored during the same request.
+An above-ground dumping state uses the maximum. Its approximate below-ground
+mining mirror uses the minimum. Calculating both requires no extra recursive
+calls or terrain reads and only one additional cached height plus three
+additional comparisons per recursive parent.
 
 Diamond extrema have an exact four-child recurrence. Radius zero is read
 directly from the immutable precise-terrain field and is not cached. Radius one
@@ -68,14 +64,28 @@ supersets. When the order is reversed, a recursive superset evaluation
 prefetches parity-compatible subset values that its likely descendants can
 reuse. Measure that hypothesis rather than assuming it.
 
-For dumping, convert the remaining gap to landscaping work using an idealized
-straight maximum-grade V2 landing over flat terrain at elevation `F`. The work
-model uses the same direct-work normalization, effective dumping-material
-slope, exterior-ray integration, weights, and caps as the real scorer, while
-removing every constraint or cost that is not needed for the lower bound.
+The initial dumping-work conversion is deliberately simple and fixed:
 
-Implement dumping first. Mining later reuses the same extrema cache but requires
-its own operation-specific conversion from the minimum terrain floor to work.
+```text
+integer delta grid: 0..8 physical levels, step 1
+relaxed horizon N:  0..32 cardinal tile steps
+lookup:             lower delta endpoint, capped at delta 8 and N 32
+interpolation:      none
+```
+
+Generate the table from the same synthetic straight maximum-grade V2 landing and
+shared landscaping scorers used by the proof. Select the dumping material in the
+same way as the real scorer, derive one conservative effective dumping slope,
+and freeze it for the table. Cache or precompute the table by its immutable
+configuration.
+
+The corresponding mining table later uses a fixed slope from the least runny
+normal in-ground material present in the tower area. This is the steepest
+available cut slope and therefore gives the smallest synthetic cut wedge.
+
+More precise gap grids, interpolation, exact large-gap evaluation, filtered
+landing extrema, and alternate heuristic-only material slopes are later
+refinements rather than first-pass requirements.
 
 ## Priority and purpose
 
@@ -87,14 +97,39 @@ This heuristic is a later A*-only ordering refinement for the V2 states that
 remain inside the frozen request-effective envelope. It succeeds only if the
 reduction in visited states, pending high-water, and total search time exceeds:
 
-* favorable-ground query time;
+* terrain-extrema query time;
 * recursive-cache construction and lookup time;
-* work-function lookup or evaluation time;
-* additional cache memory for both terrain extrema; and
+* work-table construction or cache lookup time;
+* additional cache memory for paired extrema; and
 * any extra queue work caused by inconsistency.
 
-Keep the existing lazy-frontier proposal as a comparison mode until live
+Keep the older lazy-frontier proposal as a comparison mode until live
 measurements select one formulation.
+
+## Initial implementation decisions
+
+The first implementation settles the following choices:
+
+1. Use full, unfiltered Manhattan diamonds.
+2. Include every authoritative precise terrain sample in the diamond, including
+   samples outside the tower area and samples on ocean tiles.
+3. Do not run V-origin eligibility, tower-bound, ocean, building, history, or
+   candidate-feasibility checks inside the extrema query.
+4. Cache both exact minimum and exact maximum terrain heights.
+5. Do not cache radius-zero queries.
+6. Use the exact four-child recurrence without the redundant center child.
+7. Implement dumping work first.
+8. Use a fixed `Wdump` table over integer gaps `0..8` and relaxed horizons
+   `0..32`.
+9. Use lower-endpoint lookup without interpolation.
+10. Select the dumping material as the real scorer does and freeze one fixed
+    conservative effective slope for the table.
+11. Define the later mining counterpart with the least runny normal in-ground
+    material found in the tower area.
+
+These choices favor a small, verifiable implementation. Strengthening the
+heuristic is deferred until the baseline has been validated against Dijkstra
+and measured on live requests.
 
 ## Scope
 
@@ -106,14 +141,16 @@ The first implementation covers:
 * direct generated-origin work;
 * the two ordinary exterior side rays owned by a straight V2 slice;
 * immutable precise terrain captured in the access snapshot;
-* full Manhattan-diamond minimum-and-maximum queries;
-* exact request- or snapshot-scoped memoization; and
+* full unfiltered Manhattan-diamond minimum-and-maximum queries;
+* exact request- or snapshot-scoped extrema memoization;
+* a fixed `9 x 33` dumping-work table per configuration; and
 * A* queue ordering only.
 
 It deliberately does not initially include:
 
-* mining or mixed leveling work conversion;
+* mining or mixed-leveling work conversion;
 * directionally cropped diamonds;
+* tower-area or ocean filtering in extrema queries;
 * generated-history exclusions;
 * visited-origin or neighbour removal;
 * candidate feasibility, buildings, durability, cleanup, or projected-work
@@ -121,13 +158,16 @@ It deliberately does not initially include:
 * turn-owned frontal rays;
 * fixed generated overhead or traversal cost already represented by the
   existing potential;
-* a final decision on work-table discretization, interpolation, or analytical
-  evaluation; or
+* interpolation or adaptive delta intervals;
+* exact work evaluation above `delta = 8`;
+* a heuristic-only dumping material or slope different from the real scorer;
+  or
 * changes to real edge cost in `g`.
 
 ## Coordinates and units
 
-Use a relaxed tile-centred V coordinate system for the proof and extrema query:
+Use a relaxed tile-centred coordinate system for the extrema proof and terminal
+horizon:
 
 ```text
 one cardinal relaxed step = one terrain tile
@@ -139,7 +179,7 @@ Path profiles remain represented by the authoritative V2 height type. Convert
 the relevant scalar profile height to the same physical-height unit used by the
 snapshot's precise terrain samples before calculating a gap.
 
-For the above-ground case, let:
+For an above-ground state, let:
 
 ```text
 p       current relaxed representative position
@@ -150,10 +190,9 @@ R0      ceil(max(0, H - G0) / a)
 ```
 
 `R0` is a safe maximum terrain-search radius because the local terrain below the
-state supplies a relaxed fallback surface. If the local sample does not supply
-a valid fallback under the current operation, ocean policy, or snapshot
-coverage, fail open with zero landscaping heuristic until a separate proof is
-provided.
+state supplies a relaxed fallback surface. If the local sample does not provide
+a usable fallback under snapshot coverage, fail open with zero landscaping
+heuristic until a separate proof is provided.
 
 The concrete V2 state has a nonzero two-lane footprint. Map it to the scalar
 query through a small conservative support stencil. The stencil must cover the
@@ -178,7 +217,7 @@ small constant number of extrema lookups above it.
 
 ## Step 1: favorable terrain extrema and minimum horizon
 
-### Full diamond
+### Full unfiltered diamond
 
 For a terrain sample position `c` and nonnegative integer radius `r`, define:
 
@@ -190,6 +229,29 @@ U(c, r) = maximum exact precise terrain height over q in D(c, r)
 E(c, r) = (L(c, r), U(c, r))
 ```
 
+The initial extrema source includes every authoritative precise terrain sample
+inside the geometric diamond. It does not ask whether the sample:
+
+* lies inside the tower area;
+* lies on an ocean tile;
+* can host a generated V origin;
+* is blocked by a building or designation; or
+* remains reachable under the current history.
+
+A position outside the tower area or on ocean cannot normally host a V landing.
+Including its ground is nevertheless admissible:
+
+* an additional high sample can only raise the dumping maximum, reduce the
+  dumping gap, and weaken the heuristic; and
+* an additional low sample can only lower the mining minimum, reduce the mining
+  gap, and weaken the heuristic.
+
+The useful-height envelope should already prevent many searches that would
+require large extrema diamonds outside the practical domain. Proper candidate
+evaluation also restricts exploration into ocean. Avoid paying a per-sample
+eligibility cost until measurements show that unfiltered extrema materially
+weaken the heuristic.
+
 For the current above-ground state:
 
 ```text
@@ -200,8 +262,9 @@ dGround = ceil(delta / a)
 
 `F` is a favorable terrain ceiling, not necessarily the height of a concrete
 reachable landing point. The point supplying the maximum may be blocked,
-unreachable, or located in a direction that the eventual route does not take.
-Those relaxations can only raise `F`, reduce `delta`, and weaken the heuristic.
+unreachable, outside the tower area, on ocean, or located in a direction that
+the eventual route does not take. Those relaxations can only raise `F`, reduce
+`delta`, and weaken the dumping heuristic.
 
 For the later below-ground mining extension, use the symmetric floor:
 
@@ -224,7 +287,7 @@ height is strictly above `F`:
 pathHeight(i) >= H - i * a > F
 ```
 
-Every terrain point reachable within that many relaxed steps lies inside the
+Every terrain sample reachable within that many relaxed steps lies inside the
 queried diamond and has terrain height no greater than `F`. No terrain handoff
 can therefore occur before `dGround`.
 
@@ -233,7 +296,7 @@ profile by at most `a`, and every terrain sample in the queried domain is no
 lower than the favorable floor.
 
 This proves a minimum relaxed ground horizon without retaining travel axis,
-entry direction, profile mode, or generated history.
+entry direction, profile mode, generated history, or V-origin eligibility.
 
 ### Why the diamond cannot be cropped by travel direction
 
@@ -259,54 +322,56 @@ Do not derive `Tfixed` by dividing the scalar potential cost. The potential
 mixes travel, generated fixed overhead, exact G suffix distance, centre spokes,
 and fixed-provider terminal fees.
 
-The earliest compatible terminal horizon is:
+Define the proven terminal horizon in relaxed tile steps:
 
 ```text
-dTerminal = min(dGround, Tfixed)
+N = min(dGround, Tfixed)
 ```
 
 When no compatible fixed target exists, use `Tfixed = infinity`.
 
-#### Fixed targets crop the work horizon, not initially the terrain query
+`N` remains in relaxed cardinal-step units. This is the same unit as the diamond
+radius and naturally gives `N = 32` for an eight-level gap under a quarter-level
+per-tile maximum grade.
 
-For a direct-work-only bound, it can be safe to crop the terrain diamond to the
+### Fixed targets crop the work horizon, not initially the extrema query
+
+For a direct-work-only bound, it may be safe to crop the extrema diamond to the
 fixed-target horizon. The initial specification includes side rays, whose
 support can extend laterally beyond a nearby terminal's centre distance.
 Therefore:
 
 * build the extrema from the full local fallback radius `R0`; and
-* use `Tfixed` only to shorten the number of future generated slices charged by
-  `W`.
+* use `Tfixed` only to shorten the horizon passed to the work table.
 
 A later tighter formulation may crop the extrema radius only after proving that
 all direct-work samples and side-ray support capable of reducing pre-terminal
 work remain inside the cropped domain.
 
-### Conversion to unpaid generated slices
+### Charge-owning generated slices
 
-`dTerminal` counts relaxed cardinal tile steps. Landscaping is charged when a
-new generated V2 slice is entered, at four relaxed steps per origin stride. A
-terminal exactly at a stride boundary may replace that generated slice, so
-count only complete future slice entries strictly before the earliest terminal:
+The current state's landscaping work is already in `g` and must not be included
+in the heuristic.
+
+A future generated V2 slice is entered every four relaxed steps. A compatible
+terminal exactly at a stride boundary may replace the generated slice at that
+boundary. Therefore only future slice entries strictly before `N` are charged:
 
 ```text
-N = max(0, floor((dTerminal - 1) / 4))
+K(N) = max(0, floor((N - 1) / 4))
 ```
 
-This conversion is deliberately conservative. If later transition-specific
-analysis can prove that another generated slice is unavoidable, strengthen the
-conversion behind fixtures rather than assuming it.
+The initial table is indexed by `N`, not by `K`, even though several neighbouring
+`N` columns map to the same number of charge-owning slices. The table is only
+`9 x 33`, and retaining relaxed-step indexing avoids repeated conversion and
+boundary mistakes at runtime.
 
-The current state's landscaping work is already in `g` and is never included in
-`N` or `W`.
-
-## Step 2: landscaping work lower bound
+## Step 2: synthetic landscaping-work lower bound
 
 ### Synthetic straight landing
 
-For each residual height gap and each unpaid-slice prefix, evaluate or retrieve
-the work of an idealized two-lane straight V2 descent over flat terrain at
-elevation zero.
+For each residual height gap and relaxed horizon, score an idealized two-lane
+straight V2 descent over flat terrain at elevation zero.
 
 The synthetic continuation is more favorable than real V2:
 
@@ -320,7 +385,7 @@ The synthetic continuation is more favorable than real V2:
 * it pays no traversal or generated fixed overhead; and
 * it terminates without an additional landscaping charge.
 
-Use the actual descending V2 profile geometry in the work evaluator, including
+Use the actual descending V2 profile geometry in the table generator, including
 its outgoing edge and corner heights. Do not score a flat band at its centre
 height when a descending ramp exposes a lower outgoing edge; that would
 overstate the minimum side-ray work.
@@ -332,9 +397,9 @@ centerGap(k) = max(0, delta - k)
 ```
 
 when `delta` is expressed in physical levels and one V2 origin stride descends
-one level. The authoritative evaluator should construct the synthetic profile
-and invoke shared cost helpers rather than rely on this scalar expression for
-corner work.
+one level. The authoritative table generator should construct the synthetic
+profile and invoke shared cost helpers rather than rely on this scalar
+expression for corner work.
 
 ### Direct work
 
@@ -353,11 +418,11 @@ Do not include current-state work.
 
 Score only the ordinary exterior rays owned by a straight V2 slice. Use:
 
-* the same effective dumping-material slope selected by the real scorer,
-  including its safety factor;
-* the same cost-sample distances and rectangle-rule integration;
-* the same maximum ray distance and cost cap; and
-* the same side-ray weight and landscaping distance scale.
+* the same cost-sample distances and rectangle-rule integration as the real
+  scorer;
+* the same maximum ray distance and cost cap;
+* the same side-ray weight and landscaping distance scale; and
+* one fixed effective material slope selected for the table configuration.
 
 The initial lower-bound model may omit unresolved penalties and every fatal
 condition. Their omission only weakens the heuristic. If later fixtures prove
@@ -367,17 +432,40 @@ ceiling proof, it may be added separately.
 Do not add turn-owned frontal rays. The synthetic route has no turns, while a
 real turn can only add exposed-face work.
 
+### Fixed dumping material and slope
+
+Choose the dumping material in the same way as the real scorer for the current
+tower/accessway configuration. In the current scorer design, this means the
+runiest allowed disturbed dumping material.
+
+Derive one effective slope from that material, including the scorer's fixed
+conservative safety treatment, and freeze it for the entire `Wdump` table:
+
+```text
+mDump = fixed effective slope selected once for the dumping configuration
+```
+
+Do not inspect terrain material or vary the slope by synthetic slice or ray. The
+fixed slope is part of the table key. Requests with the same immutable
+landscaping configuration can reuse the same precomputed table.
+
+Using the same material as the real scorer gives the strongest initial synthetic
+bound under the simplified flat-terrain model. A future refinement may use a
+steeper, less runny heuristic-only material slope. That would reduce synthetic
+side work and weaken the heuristic, but could make a table reusable across a
+wider set of dumping configurations.
+
 ### Material-slope containment proof
 
 Let:
 
 ```text
-a = 0.25, the artificial maximum construction grade per relaxed tile
-m = effective dumping-material vertical fall per lateral tile
+a = 0.25, artificial maximum construction grade per relaxed tile
+m = fixed effective material vertical fall per lateral tile
 ```
 
-All permitted dumping materials are less runny than the artificial construction
-slope, so:
+The fixed effective dumping slope must be no runnier than the artificial
+construction envelope requires for containment:
 
 ```text
 m >= a
@@ -419,54 +507,168 @@ The straight maximum-grade synthetic landing therefore lower-bounds the unpaid
 direct-plus-side landscaping work of every concrete continuation that cannot
 terminate earlier than the proven horizon.
 
-### Work-function representation
+## Initial `Wdump` table
 
-Conceptually define a cumulative function:
+### Dimensions
 
-```text
-Wdump(dumpingConfiguration, delta, sliceCount)
-```
-
-where:
+For each immutable dumping configuration, precompute:
 
 ```text
-Wdump(delta, 0) = 0
-Wdump(delta, n) = cumulative synthetic dumping work
-                  of the first n unpaid future V2 slices
+WdumpTable[deltaIndex, N]
+
+deltaIndex = 0..8
+N          = 0..32 relaxed tile steps
 ```
 
-The dumping-configuration identity must include every setting that changes the
-synthetic score, including:
+The table contains `9 x 33 = 297` values.
 
-* effective dumping-material slope;
-* direct-work weight;
-* side-ray weight;
-* landscaping distance scale;
-* side-ray sample schedule;
-* maximum ray distance; and
-* maximum ray cost.
-
-The heuristic value is:
+Each row uses an exact integer synthetic gap in physical levels:
 
 ```text
-H_land(state) = Wdump(configuration, delta, N)
+deltaTable = deltaIndex
 ```
 
-The uncapped continuous shape is approximately:
+Each column contains the cumulative synthetic landscaping work of the
+charge-owning future V2 slices strictly before the relaxed horizon `N`:
 
 ```text
-direct-work accumulation = O(delta^2)
-side-wedge accumulation  = O(delta^3)
-total W                   = A * delta^2 + B * delta^3
+WdumpTable[d, N]
+    = cumulative direct and exterior-side work
+      of the first K(N) synthetic future slices
+
+K(N) = max(0, floor((N - 1) / 4))
 ```
 
-Discrete V2 profiles, side-ray sample distances, caps, and phase choices make a
-simple fitted polynomial less reliable than evaluation based on the shared
-scorers.
+The table generator may score one synthetic route per integer `delta` and store
+all cumulative horizon prefixes from that run.
 
-The exact representation of `Wdump` remains an open question. Do not encode a
-rounding or interpolation policy as a settled requirement yet; see
-[Open question: precision, discretization, and interpolation](#open-question-precision-discretization-and-interpolation).
+### Runtime lookup
+
+Given exact runtime `delta` and proven relaxed horizon `N`:
+
+```text
+d = min(8, floor(max(0, delta)))
+n = min(32, max(0, N))
+
+H_land = WdumpTable[d, n]
+```
+
+There is no interpolation.
+
+The lookup uses the lower integer gap endpoint. Because synthetic work must be
+nondecreasing in `delta`, this cannot exceed the synthetic work at the exact
+gap. Capping a larger gap at `8` and a longer horizon at `32` likewise returns
+only a safely accumulated prefix.
+
+This baseline is intentionally weak for:
+
+* gaps below one level;
+* noninteger gaps near the next integer boundary;
+* gaps above eight levels; and
+* unavoidable horizons beyond 32 relaxed steps.
+
+Those cases are expected to be less common or more expensive, but the actual
+distribution must be measured.
+
+### Table configuration and caching
+
+The table key must include every immutable setting that changes the synthetic
+score, including:
+
+```text
+V2 synthetic profile geometry/version
+fixed effective dumping slope
+selected dumping-material identity, when relevant
+direct-work weight
+side-ray weight
+landscaping distance scale
+side-ray sample schedule
+maximum ray distance
+maximum ray cost
+```
+
+Precompute the table when the configuration is first encountered, then cache it
+for reuse. If all relevant settings are global and immutable during a game
+session, one table may serve every request with the same dumping material and
+slope. Otherwise cache by configuration identity.
+
+Table construction must use the same shared direct-work and side-ray scoring
+helpers as the real scorer wherever practical. It must not duplicate a subtly
+different numerical integration.
+
+### Required monotonicity
+
+Validate:
+
+```text
+WdumpTable[d + 1, N] >= WdumpTable[d, N]
+WdumpTable[d, N + 1] >= WdumpTable[d, N]
+```
+
+A cap may make the function flat but must not make it decrease.
+
+The safety of lower-endpoint and capped lookup depends on this monotonicity.
+Treat a violation as a scorer/table-generation defect, not as a reason to sort
+or repair values after generation.
+
+## Later mining counterpart
+
+The mining extension reuses the same diamond-extrema cache and defines a
+separate synthetic work table, referred to here as `Wmine`:
+
+```text
+WmineTable[deltaIndex, N]
+```
+
+Use the same initial dimensions and lookup policy unless measurement justifies a
+different range:
+
+```text
+deltaIndex = 0..8, step 1
+N          = 0..32 relaxed tile steps
+lookup     = lower endpoint and cap
+```
+
+### Fixed mining material slope
+
+The real mining scorer samples the normal in-ground material at each cut ray.
+A location-independent heuristic table cannot do that.
+
+Inspect the normal in-ground terrain materials present anywhere in the tower
+area and select the least runny one:
+
+```text
+mMine = maximum effective stable slope among tower-area normal materials
+```
+
+With slope represented as vertical change per lateral tile, the least runny
+material has the largest slope. It produces the shortest synthetic cut ray and
+the smallest side wedge. Every actual local material in the tower area is at
+least as runny or equal, so its real cut-side work cannot be lower merely because
+of material slope.
+
+Freeze `mMine` for the mining table and include it in the table key. Rebuild or
+select another cached table when the tower-area material set changes.
+
+If no authoritative tower-area material slope can be obtained, fail weak by
+omitting the mining side-ray component or returning zero mining landscaping
+heuristic. Do not guess a runnier slope, which could overstate unavoidable work.
+
+### Mining synthetic route
+
+The mining table is sign-symmetric in terrain gap but not identical in scorer
+semantics. It should use:
+
+* the cached minimum terrain floor;
+* a straight maximum-grade synthetic ascent toward that floor;
+* the same direct cut-work normalization as the real scorer;
+* ordinary exterior cut rays only;
+* the fixed least-runny tower-area normal-material slope; and
+* mining-specific map-edge, ocean, cap, and unresolved behavior weakened as
+  necessary for admissibility.
+
+Implement and validate dumping first. Define the mining table now so the paired
+extrema cache and table-cache architecture do not need to be redesigned later.
 
 ## Exact recursive diamond extrema
 
@@ -529,11 +731,11 @@ numerical error.
 
 Do not round the cached minimum or maximum merely to make the result
 conservative. Rounding the maximum upward weakens the dumping heuristic, and
-rounding the minimum downward weakens the mining heuristic. Any necessary
-conservatism belongs at the later interfaces where an exact continuous gap is
-converted to a handoff horizon or a discrete/approximated work representation.
-Those choices remain open pending examination of the real handoff tolerance and
-work-function implementation.
+rounding the minimum downward weakens the mining heuristic.
+
+The first implementation weakens only the work lookup by selecting the lower
+integer gap endpoint and capping the supported range. Handoff-distance numerical
+behavior remains a separate graph-semantics issue.
 
 ### Subset relation
 
@@ -643,13 +845,13 @@ Radius zero is never inserted. The cache does not depend on:
 * operation class;
 * operation history;
 * generated origins already used;
+* tower-area membership or ocean eligibility;
 * fixed goals; or
 * the current goal set.
 
 It may therefore live on the immutable snapshot and be reused across sequential
-cluster requests until terrain or snapshot bounds invalidate it. If memory
-ownership is simpler, start request-scoped and promote it only after
-measurements.
+cluster requests until terrain or snapshot coverage changes. If memory ownership
+is simpler, start request-scoped and promote it only after measurements.
 
 ### Data structure
 
@@ -679,94 +881,106 @@ for the requested key. Calculate both extrema during that scan and cache the
 top-level pair if space permits. A budget must affect performance only; it must
 not replace an exact extremum by a weaker or unsafe value.
 
-### Missing and boundary samples
+### Coverage and physical-map boundaries
 
-A missing in-map terrain sample could hide either:
+Tower-area and ocean status do not affect the initial extrema query. Snapshot
+coverage does.
 
-* a higher support surface that reduces real dumping work; or
-* a lower open surface that reduces real mining work.
+If an in-physical-map terrain sample required by the geometric diamond is
+missing from the immutable snapshot, the entry may hide a favorable extremum.
+Mark the result incomplete and fail open for the affected operation:
 
-Mark the extrema entry as incomplete if any required in-map sample lacks
-authoritative coverage. A dumping query must then fail open with a ceiling at
-least `H`, and a mining query must fail open with a floor at most `H`, producing
-zero landscaping heuristic.
+* dumping uses a ceiling at least `H`; and
+* mining uses a floor at most `H`.
 
-Physical map exterior is not usable terrain and need not seed either extremum.
-Generated-centre bounds remain authoritative. Ocean support must use the same
-precise terrain/floor interpretation as the real landscaping scorer; do not use
-water-surface height as solid ground unless the real scorer does.
+Either produces zero landscaping heuristic.
 
-## Open question: precision, discretization, and interpolation
+Physical-map exterior has no terrain sample. Dumping and mining interact with
+map edges differently through their real side-ray scorers, so do not infer a
+stronger operation-independent extremum from missing exterior space. The first
+implementation should normally avoid such queries through request bounds and
+the useful-height envelope; otherwise fail weak where the proof does not cover
+the operation-specific edge behavior.
 
-The extrema cache should preserve exact snapshot terrain values. The unresolved
-precision questions arise after the exact residual gap has been calculated.
+## Future refinements
 
-### Handoff-distance conversion
+### Filtered landing extrema
 
-The simple formula is:
+A position outside the tower area or on ocean cannot host a generated V landing.
+A stronger future horizon proof may maintain separate values:
+
+```text
+F_landing = extremum over proven eligible landing positions
+F_support = extremum over all terrain that may reduce direct or side-ray work
+```
+
+Use `F_landing` to strengthen the ground horizon and `F_support` to preserve the
+work lower bound. Do not simply filter the shared extremum: terrain at an
+unlandable position may still physically reduce work performed by an in-bounds
+slice.
+
+Before implementing this split, measure:
+
+* how often the selected extremum lies outside the tower area;
+* how often it lies on ocean;
+* how much those samples reduce `delta` and `H_land`; and
+* the cost of eligibility checks compared with the saved A* expansions.
+
+### Work-table precision
+
+The fixed integer table is the baseline. Potential future improvements include:
+
+* half-, quarter-, or adaptive gap intervals;
+* per-horizon adaptive grids;
+* a shared adaptive grid bounded by maximum work loss;
+* exact evaluation above a configured large-gap threshold;
+* exact lazy memoization for encountered gaps;
+* a proven lower piecewise approximation; or
+* interval-specific analytical integration matching the discrete scorer.
+
+Ordinary linear interpolation between exact samples is not automatically safe.
+Where the synthetic function is convex, the chord can lie above the true
+function. Any interpolation must be proven not to exceed the synthetic scorer
+throughout its interval.
+
+### Alternative heuristic material slopes
+
+The initial dumping table uses the same material selection as the real scorer.
+A future heuristic-only table may use a less runny material or otherwise steeper
+fixed slope. That produces a smaller wedge and a weaker lower bound but may:
+
+* reduce table variants;
+* improve cross-request cache reuse; or
+* simplify configuration invalidation.
+
+The mining table already deliberately uses the least runny tower-area material
+rather than the actual local material. A still more conservative global slope
+may be considered if tower material scanning is expensive or unstable.
+
+### Handoff tolerance and numerical behavior
+
+The simple horizon formula is:
 
 ```text
 dGround = ceil(delta / a)
 ```
 
 Determine whether the authoritative terrain handoff accepts a profile within a
-nonzero epsilon of terrain. If it does, the heuristic must use the same semantic
-tolerance when proving that another V step is unavoidable. Do not introduce an
-arbitrary floating-point epsilon unrelated to graph behavior.
-
-Questions to resolve:
-
-* What exact terrain/profile comparison defines a legal handoff?
-* Is its tolerance expressed in physical height, half-levels, or another unit?
-* Can the calculation remain in an exact integral profile unit while retaining
-  the precise terrain float?
-* Which boundary cases make `ceil(delta / a)` change by one step?
-
-### Work-function evaluation
-
-Possible implementations for `Wdump(configuration, delta, N)` include:
-
-1. evaluate the synthetic scorer directly for every encountered exact `delta`;
-2. lazily memoize work values by an exact or canonicalized gap key;
-3. use a finely discretized lower-endpoint table;
-4. derive an exact piecewise function from V2 profile phases and side-ray sample
-   boundaries;
-5. construct a proven lower piecewise approximation; or
-6. use a hybrid table plus exact evaluation near discontinuities.
-
-A table indexed by a rounded-up gap is unsafe because `W` is nondecreasing. A
-table indexed by the lower endpoint is safe but can materially weaken a cubic
-heuristic. Ordinary linear interpolation between exact samples is not
-necessarily safe either: for a convex cubic region, the chord lies above the
-true function. Any interpolation must be proven to remain below the synthetic
-scorer throughout the interval.
-
-Potential safe approaches include:
-
-* exact evaluation;
-* lower-endpoint lookup;
-* tangent or otherwise proven lower-envelope segments where differentiability
-  and convexity are established;
-* interval-specific analytical integration matching the discrete scorer; or
-* downward-adjusted interpolation with a proven error bound.
-
-Measurements should compare heuristic strength and evaluation cost, especially
-for large gaps where a small loss in `delta` can cause a much larger loss in the
-cubic side-work component.
-
-### Numerical reproducibility
+nonzero semantic tolerance of terrain. If it does, the heuristic must use the
+same tolerance when proving that another relaxed step is unavoidable. Do not
+introduce an arbitrary floating-point epsilon unrelated to graph behavior.
 
 Also determine:
 
-* whether the cache and work evaluator should use `float` or `double`;
-* whether shared scorer operations are reproducible enough for direct reuse;
-* whether the final heuristic needs a tiny downward numerical guard even when
-  the mathematical model is admissible; and
-* how A* versus Dijkstra fixtures should distinguish a real admissibility defect
-  from floating-point tie noise.
+* whether horizon calculations should use `float`, `double`, or an exact profile
+  unit;
+* whether the shared scorer is reproducible enough for table generation;
+* whether table values need a tiny downward numerical guard; and
+* how A* versus Dijkstra fixtures distinguish admissibility defects from
+  floating-point tie noise.
 
-Do not settle these questions through blanket terrain rounding. Preserve exact
-extrema and make any later weakening explicit, localized, and measurable.
+Do not address these questions through blanket terrain-extrema rounding.
+Preserve exact extrema and localize any weakening to the relevant conversion.
 
 ## History and blocked-origin exclusions
 
@@ -787,17 +1001,9 @@ Either change could break admissibility.
 History-specific exclusions would also change the cache key from `(tile,
 radius)` to a path-dependent identity, destroying most recursive reuse.
 
-A later refinement may introduce separate fields:
-
-```text
-F_landing = extremum over proven eligible landing surfaces
-F_support = extremum over every terrain sample that may reduce landscaping work
-```
-
-Use a stronger landing field only after proving how it combines with the
-operation-specific work function. Static exclusions may be folded into the
-atomic terrain source only when an excluded sample is proven incapable of
-reducing work for every history reaching the same concrete state.
+A later refinement may combine proven eligibility with the separate landing and
+support extrema described above. Do not make the shared terrain-support cache
+history-specific.
 
 ## Integration with V2 A*
 
@@ -812,13 +1018,13 @@ The components cover disjoint cost portions:
 
 * the existing potential lower-bounds travel, generated fixed overhead, centre
   spokes, exact G suffix distance, and fixed-terminal fees; and
-* `H_land` lower-bounds only unpaid future direct and exterior-side landscaping
-  work.
+* `H_land` lower-bounds only unpaid future direct and ordinary exterior-side
+  landscaping work.
 
 Dijkstra continues to enqueue `h = 0` and remains the optimality reference for
 the same useful-height-envelope and graph-pruning configuration.
 
-Initially calculate `H_land` when a state is enqueued. If favorable-ground
+Initially calculate `H_land` when a state is enqueued. If terrain-extrema
 queries remain expensive for states that never pop, separately test deferred
 calculation on first pop with priority reinsertion. Do not combine both changes
 in the first experiment.
@@ -832,15 +1038,15 @@ H_land(s) <= real landscaping edge cost(s, t) + H_land(t)
 ```
 
 If inconsistency materially increases queue work, weaken the bound or adjust
-the scalar phase conversion rather than closing states prematurely.
+the horizon/table conversion rather than closing states prematurely.
 
 The mining extension later uses:
 
 * the same `DiamondTerrainExtremaCache`;
 * the cached minimum rather than maximum;
 * a sign-symmetric minimum ground horizon; and
-* a separate mining work evaluator because material selection, side-ray
-  behavior, ocean rules, and depth dependence differ from dumping.
+* the fixed-grid `Wmine` table using the least runny normal material in the
+  tower area.
 
 ## Diagnostics
 
@@ -850,12 +1056,12 @@ Record:
 
 * calls, zero results, and nonzero results by operation;
 * total and average landscaping heuristic added;
-* favorable extremum, residual gap, ground horizon, fixed horizon, terminal
-  horizon, and unpaid-slice count distributions;
-* work-function lookup or evaluation time; and
+* favorable extremum, exact residual gap, table gap, ground horizon, fixed
+  horizon, selected `N`, and `K(N)` distributions;
+* table lookup time; and
 * total heuristic evaluation time.
 
-### Diamond queries
+### Terrain extrema
 
 * top-level queries;
 * exact cache hits and misses;
@@ -868,24 +1074,36 @@ Record:
 * direct-scan fallbacks;
 * crescent-reuse queries, if enabled;
 * terrain samples read directly;
+* samples outside the tower area;
+* ocean samples;
+* selected extrema outside the tower area;
+* selected extrema on ocean;
 * maximum radius;
 * maximum and final cache entries;
 * cache bytes per entry and total memory estimate;
 * entries consumed by dumping queries;
 * entries consumed by mining queries;
 * entries consumed by both operation classes;
-* missing-coverage fail-open count; and
+* incomplete-coverage fail-open count; and
 * extrema calculation time.
 
-### Precision and work representation
+The tower-area and ocean counters should initially be diagnostics only. Do not
+add eligibility branches to the hot extrema path solely to populate them if the
+snapshot cannot provide them cheaply.
 
-* exact residual-gap distribution;
-* any canonicalized or table-indexed gap distribution;
-* weakening introduced by lower-endpoint lookup or another approximation;
-* interpolation or evaluation mode;
-* direct synthetic scorer calls;
-* work-cache hits and misses; and
-* downward numerical guards applied.
+### Work tables
+
+* table configurations created and reused;
+* table construction time;
+* table memory;
+* exact `delta` versus selected integer `d`;
+* exact `N` versus capped table horizon;
+* estimated weakening from gap flooring and caps;
+* lookup counts by table cell;
+* monotonicity validation results;
+* requests with `delta > 8`;
+* requests with `N > 32`; and
+* dumping/mining table cache hits and misses.
 
 ### Search outcomes
 
@@ -905,8 +1123,9 @@ Compare at least:
 5. four-child recursive memoization;
 6. optional five-child recursive prefetch;
 7. maximum-only versus paired-extrema cache memory and runtime;
-8. candidate `W` precision/evaluation strategies; and
-9. the older lazy successor-frontier heuristic.
+8. fixed integer `Wdump` table versus direct synthetic evaluation in diagnostics;
+9. unfiltered extrema versus diagnostics-estimated filtered strength; and
+10. the older lazy successor-frontier heuristic.
 
 ## Validation
 
@@ -917,10 +1136,14 @@ Compare at least:
 * equal extrema at multiple positions;
 * a higher peak and lower pit immediately outside the diamond;
 * rear-half extrema required by cheapest U-turn cases;
+* extrema outside the tower area are included;
+* ocean extrema are included;
+* inclusion of unlandable samples never strengthens either operation's bound;
 * fixed-target horizons shorter and longer than the ground horizon;
 * large local gaps and radius limits;
 * physical-map boundaries;
-* missing snapshot coverage returning zero heuristic for either operation; and
+* missing required snapshot coverage returns zero heuristic for the affected
+  operation; and
 * direct-scan equality with recursive extrema on randomized terrain fields.
 
 ### Recurrence and cache fixtures
@@ -940,34 +1163,39 @@ Compare at least:
 * each cached extremum is an exact original terrain sample;
 * a paired-extrema entry supports both dumping and mining mirror queries;
 * cache saturation falls back to an exact direct extrema result; and
-* cache ownership is invalidated with the snapshot.
+* cache ownership is invalidated with terrain snapshot coverage.
 
-### Work-function fixtures
+### `Wdump` table fixtures
 
-* zero gap and zero-slice prefixes return zero;
+* the table has exactly 9 gap rows and 33 horizon columns;
+* row `d` is generated from exact synthetic gap `d`;
+* column `N` includes exactly `K(N) = floor((N - 1) / 4)` nonnegative future
+  charge-owning slices;
+* zero gap and zero horizon return zero;
 * the current state is never charged;
 * synthetic successor centre and corner heights use the favorable descending
   phase;
 * direct work matches the shared real scorer on equivalent flat fixtures;
-* exterior side-ray work matches the shared scorer using the selected dumping
+* exterior side-ray work matches the shared scorer with the frozen dumping
   slope;
-* every prefix is nondecreasing in slice count;
-* exact synthetic work is nondecreasing in residual gap;
-* each candidate approximation is proven or exhaustively checked not to exceed
-  exact synthetic work over its supported domain;
-* fixed-terminal cropping returns the correct strict-before-terminal prefix;
-* caps match the configured side-ray cap; and
-* generated work values never exceed independently scored synthetic routes.
+* every row is nondecreasing in `N`;
+* every column is nondecreasing in `deltaIndex`;
+* runtime gaps use `floor(delta)` and never round upward;
+* runtime gaps above eight use row eight;
+* runtime horizons above 32 use column 32;
+* table caps match configured scorer caps;
+* generated values never exceed independently scored synthetic routes; and
+* table serialization or caching preserves exact configuration identity.
 
-### Precision fixtures
+### `Wmine` preparation fixtures
 
-* terrain extrema remain unrounded through the recursive cache;
-* handoff-distance boundaries immediately below, at, and above every quarter
-  level use the authoritative graph tolerance;
-* any lower-endpoint table reports the measured heuristic loss;
-* interpolation is rejected where it exceeds the exact synthetic function;
-* numerical guards never make the heuristic negative; and
-* equivalent `float` and `double` test paths identify material discrepancies.
+* the selected material is the least runny normal material present in the tower
+  area;
+* the selected effective slope is greater than or equal to every local normal
+  material slope under the chosen slope convention;
+* changing the tower-area material set invalidates or changes the mining table
+  key; and
+* missing material information fails weak rather than choosing an unsafe slope.
 
 ### Search validation
 
@@ -976,8 +1204,10 @@ Compare at least:
 * terrain rising or falling as favorably as construction grade permits;
 * high and low support terrain encountered by side rays;
 * immediate ground and fixed-frontage terminals;
+* terminals exactly on V2 stride boundaries;
 * combined requests in which each goal class wins;
-* U-turn routes that would invalidate a forward-half diamond;
+* U-turn routes that invalidate a forward-half diamond;
+* requests whose extrema come from outside the tower area or ocean;
 * equality between A* and Dijkstra success, selected total cost, and cost
   breakdown under the same graph-pruning configuration;
 * differential equality with the heuristic disabled; and
@@ -988,12 +1218,11 @@ Compare at least:
 1. Implement and measure the useful-height envelope.
 2. Preserve a trustworthy relaxed cardinal terminal-distance horizon, including
    compatible fixed frontages.
-3. Resolve or experimentally compare the open precision and work-function
-   representation options sufficiently to implement a diagnostics-only dumping
-   bound.
-4. Implement the synthetic dumping work evaluator and verify it against shared
-   direct-work and side-ray scorers.
-5. Add a direct-scan full-diamond terrain-extrema query and calculate the new
+3. Implement the synthetic `Wdump` generator with fixed slope, integer gaps
+   `0..8`, and relaxed horizons `0..32`.
+4. Verify the table against the shared direct-work and side-ray scorers and its
+   required monotonicity.
+5. Add a direct-scan full unfiltered diamond-extrema query and calculate the new
    dumping bound in diagnostics only.
 6. Enable the direct-scan heuristic behind an experimental flag and compare A*
    with Dijkstra.
@@ -1003,16 +1232,18 @@ Compare at least:
 9. Add four-child recursive memoization with budgets and measure prefetch
    utilization, opposite-parity misses, paired-extrema reuse, and total runtime.
 10. Test the omitted centre child only as an optional additional prefetch mode.
-11. Select the cheapest query and work-evaluation strategies from live
-    measurements; do not retain recursive prefetch merely because it has a high
-    cache-hit rate.
+11. Select the cheapest extrema-query strategy from live measurements; do not
+    retain recursive prefetch merely because it has a high cache-hit rate.
 12. Compare the selected scalar-diamond formulation with the older lazy
     profile-aware successor frontier.
-13. Add mining using the existing paired-extrema cache and a separate
-    minimum-terrain work conversion.
-14. Consider only proven static eligibility or history refinements that improve
-    end-to-end time without weakening cache reuse.
+13. Add `Wmine` using the existing paired-extrema cache and the least runny
+    tower-area normal material.
+14. Measure the strength lost to unfiltered extrema, integer gap flooring, and
+    the `delta = 8` / `N = 32` caps.
+15. Consider filtered landing extrema, finer/adaptive tables, exact large-gap
+    evaluation, or alternate heuristic material slopes only when measurements
+    justify the added complexity.
 
 Keep this heuristic only if its measured pruning benefit survives terrain-
-extrema lookup, work evaluation, cache memory, and queue overhead after useful-
-height pruning is already enabled.
+extrema lookup, fixed-table lookup, cache memory, and queue overhead after
+useful-height pruning is already enabled.
