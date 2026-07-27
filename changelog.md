@@ -1,3 +1,6 @@
+v0.5.5 [unreleased]
+
+
 v0.5.4 [released]
 * Fixed: Deleted mine control towers now properly reset farmland work in progress.
 * Changed: Retuned World safety policy slope and buffer presets (`Min`: [0.8, 0], `Low`: [0.85, 1], `Med`: [0.9, 2], `High`: [1.0, 3], `Max`: [1.1, 4]).
