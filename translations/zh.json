@@ -180,7 +180,11 @@
     "矿石质量"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "通道"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "矿井控制塔默认值"
   ],
   [
@@ -308,7 +312,11 @@
     "最大限度"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "路线成本"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "地形指定成本"
   ],
   [
@@ -324,7 +332,15 @@
     "应用于在生成的地形名称正上方或下方挖掘或倾倒地形的重量。"
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "侧向射线作业权重"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "应用于横向和转角地形作业射线的权重。"
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "候选射线最大距离"
   ],
   [
@@ -332,7 +348,35 @@
     "最大候选光线追踪距离。较高的值可以保护和定价非常大的侧楔，但会花费更多的搜索时间。默认值：16。"
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "搜索限制"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "最大访问节点数"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "检查的最大状态数。较高的值可以解决更困难的路线，但会使用更多时间和内存。"
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "搜索超时（秒）"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "单次通道搜索允许的最长实际时间。"
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "帧预算（毫秒）"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "每个游戏帧的近似搜索工作预算。较高的值会更快完成，但会造成更长的卡顿。"
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "每条光线的最大成本"
   ],
   [
@@ -604,7 +648,23 @@
     "在区域内无挖掘作业或矿塔暂停时，自动解除卡车的分配。\n当有新增挖掘工作后会自动重新分配卡车。"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "已分配：{0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "无"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "ATD 已释放："
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<已摧毁>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "转角(外侧): 放置突出的转角坡道。"
   ],
   [

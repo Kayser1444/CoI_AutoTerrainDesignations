@@ -180,7 +180,11 @@
     "Malmkvalitet"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Tillfartsvägar"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Standardvärden för gruvkontrolltorn"
   ],
   [
@@ -308,7 +312,11 @@
     "Maximal"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Ruttkostnader"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Kostnad för terränganvisning"
   ],
   [
@@ -324,7 +332,15 @@
     "Vikt som används för att gräva eller dumpa terräng direkt ovanför eller under genererade terränganvisningar."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Vikt för sidostrålsarbete"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Vikt som tillämpas på terrängarbetsstrålar i sidled och kurvor."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Maxavstånd för kandidatstråle"
   ],
   [
@@ -332,7 +348,35 @@
     "Maximalt avstånd för kandidatstrålespårning. Högre värden skyddar och prissätter mycket stora sidokilar men kostar mer söktid. Standard: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Sökgränser"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Maximalt antal besökta noder"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Maximalt antal granskade tillstånd. Högre värden kan lösa svårare rutter men använder mer tid och minne."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Tidsgräns för sökning (sekunder)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Maximal verklig tid för en tillfartsvägssökning."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Bildramsbudget (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Ungefärlig sökarbetsbudget per spelbildruta. Högre värden blir klara snabbare men orsakar längre stopp."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Högsta kostnad per stråle"
   ],
   [
@@ -604,7 +648,23 @@
     "Släpp tillfälligt lastbilar från detta torn när ingen anvisning har väntande grävarbete, eller när tornet är pausat.\nLastbilar spåras och tilldelas igen när grävarbetet återkommer."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Tilldelad: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "inga"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "Frigjord av ATD: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<förstörd>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Hörn (yttre): placera konvexa hörnramper."
   ],
   [

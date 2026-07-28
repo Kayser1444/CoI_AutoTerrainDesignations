@@ -200,6 +200,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.safety_policy.high", "High", "Full name for the High safety policy value.");
         public static LocStr SettingsSafetyPolicyMaximum =
             Loc.Str("settings.world.safety_policy.maximum", "Maximum", "Full name for the Maximum safety policy value.");
+        public static LocStr SettingsTabPathfinder =
+            Loc.Str("settings.tab.pathfinder", "Accessways", "Settings tab title for ATD accessway settings.");
+        public static LocStr SettingsPathfinderCostsHeading =
+            Loc.Str("settings.pathfinder.costs", "Route costs", "Pathfinder cost settings heading.");
         public static LocStr SettingsTerrainDesignationCostLabel =
             Loc.Str("settings.pathfinder.generated_v_fixed.label", "Terrain designation cost", "Pathfinder cost setting label for generated terrain designations.");
         public static LocStr SettingsTerrainDesignationCostTooltip =
@@ -208,10 +212,28 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.pathfinder.direct_work_weight.label", "Direct terrain-work weight", "Pathfinder cost setting label for direct terrain work.");
         public static LocStr SettingsDirectTerrainWorkWeightTooltip =
             Loc.Str("settings.pathfinder.direct_work_weight.tooltip", "Weight applied to digging or dumping terrain directly above or below generated terrain designations.", "Pathfinder cost setting tooltip for direct terrain work.");
+        public static LocStr SettingsSideRayWorkWeightLabel =
+            Loc.Str("settings.pathfinder.side_ray_weight.label", "Side-ray work weight", "Pathfinder cost setting label for lateral and turn-corner landscaping rays.");
+        public static LocStr SettingsSideRayWorkWeightTooltip =
+            Loc.Str("settings.pathfinder.side_ray_weight.tooltip", "Weight applied to lateral and turn-corner landscaping rays.", "Pathfinder cost setting tooltip for lateral and turn-corner landscaping rays.");
         public static LocStr SettingsCandidateRayMaxDistanceLabel =
             Loc.Str("settings.pathfinder.candidate_distance.label", "Candidate ray max distance", "Pathfinder setting label for candidate ray maximum distance.");
         public static LocStr SettingsCandidateRayMaxDistanceTooltip =
             Loc.Str("settings.pathfinder.candidate_distance.tooltip", "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16.", "Pathfinder setting tooltip for candidate ray maximum distance.");
+        public static LocStr SettingsPathfinderLimitsHeading =
+            Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.");
+        public static LocStr SettingsMaximumVisitedNodesLabel =
+            Loc.Str("settings.pathfinder.visited.label", "Maximum visited nodes", "Pathfinder setting label for the maximum number of states examined.");
+        public static LocStr SettingsMaximumVisitedNodesTooltip =
+            Loc.Str("settings.pathfinder.visited.tooltip", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", "Pathfinder setting tooltip for the maximum number of states examined.");
+        public static LocStr SettingsSearchTimeoutLabel =
+            Loc.Str("settings.pathfinder.timeout.label", "Search timeout (seconds)", "Pathfinder setting label for the per-search wall-clock timeout.");
+        public static LocStr SettingsSearchTimeoutTooltip =
+            Loc.Str("settings.pathfinder.timeout.tooltip", "Maximum wall-clock time for one accessway search.", "Pathfinder setting tooltip for the per-search wall-clock timeout.");
+        public static LocStr SettingsFrameBudgetLabel =
+            Loc.Str("settings.pathfinder.frame_budget.label", "Frame budget (ms)", "Pathfinder setting label for the per-frame work budget.");
+        public static LocStr SettingsFrameBudgetTooltip =
+            Loc.Str("settings.pathfinder.frame_budget.tooltip", "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls.", "Pathfinder setting tooltip for the per-frame work budget.");
         public static LocStr SettingsRayMaximumCostLabel =
             Loc.Str("settings.pathfinder.ray_max_cost.label", "Maximum cost per ray", "Pathfinder setting label for ray cost cap.");
         public static LocStr SettingsRayMaximumCostTooltip =
@@ -362,6 +384,14 @@ namespace AutoTerrainDesignations
                 "Automatically unassign trucks from this tower when no designation has pending excavation work, or while the tower is paused.\n" +
                 "Trucks are tracked and re-assigned when excavation work returns.",
                 "Tooltip on the auto-release trucks when idle toggle.");
+        public static LocStr FarmingVehicleStatusAssigned =
+            Loc.Str("panel.farming.vehicle_status.assigned", "Assigned: {0}", "Prefix for the mine-tower assigned-vehicle status summary. {0} is the vehicle list or the localized none value.");
+        public static LocStr FarmingVehicleStatusNone =
+            Loc.Str("panel.farming.vehicle_status.none", "none", "Value shown when no vehicles are assigned to a mine tower.");
+        public static LocStr FarmingVehicleStatusReleased =
+            Loc.Str("panel.farming.vehicle_status.released", "ATD-released: ", "Prefix for vehicles temporarily released by ATD.");
+        public static LocStr FarmingVehicleStatusDestroyed =
+            Loc.Str("panel.farming.vehicle_status.destroyed", "<destroyed>", "Title shown for a destroyed vehicle in the mine-tower status summary.");
         // ------------------------------------------------------------------ //
         // Toolbox items
         // ------------------------------------------------------------------ //

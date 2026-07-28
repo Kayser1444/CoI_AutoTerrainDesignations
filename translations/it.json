@@ -180,7 +180,11 @@
     "Qualità del minerale"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Vie d'accesso"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Predefiniti della torre di controllo miniera"
   ],
   [
@@ -308,7 +312,11 @@
     "Massimo"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Costi del percorso"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Costo della designazione del terreno"
   ],
   [
@@ -324,7 +332,15 @@
     "Peso applicato al terreno di scavo o scarico direttamente sopra o sotto le designazioni del terreno generate."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Peso di lavoro dei raggi laterali"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Peso applicato ai raggi di lavoro del paesaggio laterali e negli angoli."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Distanza massima del raggio candidato"
   ],
   [
@@ -332,7 +348,35 @@
     "Distanza massima del ray trace candidato. Valori più alti proteggono e prezzano cunei laterali molto grandi ma costano più tempo di ricerca. Predefinito: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Limiti di ricerca"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Numero massimo di nodi visitati"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Numero massimo di stati esaminati. Valori più alti possono risolvere percorsi più difficili, ma richiedono più tempo e memoria."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Timeout di ricerca (secondi)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Tempo massimo trascorso per una ricerca della via d'accesso."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Budget per fotogramma (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Budget approssimativo di lavoro di ricerca per fotogramma di gioco. Valori più alti terminano prima, ma causano blocchi più lunghi."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Costo massimo per raggio"
   ],
   [
@@ -604,7 +648,23 @@
     "Annulla automaticamente l'assegnazione dei camion da questa torre quando nessuna designazione ha lavori di scavo in sospeso o quando la torre è in pausa.\nI camion vengono tracciati e riassegnati quando riprendono i lavori di scavo."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Assegnato: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "nessuno"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "Rilasciato da ATD: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<distrutto>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Angolo (esterno): posizionare delle rampe angolari convesse."
   ],
   [

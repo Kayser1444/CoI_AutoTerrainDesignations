@@ -180,7 +180,11 @@
     "Calidad del mineral"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Accesos"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Predeterminados de la torre de control minera"
   ],
   [
@@ -308,7 +312,11 @@
     "Máximo"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Costes de ruta"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Costo de designación del terreno"
   ],
   [
@@ -324,7 +332,15 @@
     "Peso aplicado al terreno de excavación o vertido directamente encima o debajo de las designaciones de terreno generadas."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Peso de trabajo de rayos laterales"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Peso aplicado a los rayos de trabajo de paisajismo laterales y de giros."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Distancia máxima del rayo candidato"
   ],
   [
@@ -332,7 +348,35 @@
     "Distancia máxima de traza de rayo candidato. Los valores más altos protegen y ponen precio a las cuñas laterales muy grandes, pero cuestan más tiempo de búsqueda. Predeterminado: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Límites de búsqueda"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Máximo de nodos visitados"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Máximo de estados examinados. Los valores más altos pueden resolver rutas más difíciles, pero usan más tiempo y memoria."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Tiempo límite de búsqueda (segundos)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Tiempo máximo de reloj para una búsqueda de acceso."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Presupuesto por fotograma (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Presupuesto aproximado de trabajo de búsqueda por fotograma del juego. Los valores más altos terminan antes, pero provocan pausas más largas."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Costo máximo por rayo"
   ],
   [
@@ -604,7 +648,23 @@
     "Desasigna automáticamente los camiones de esta torre cuando ninguna designación tiene trabajos de excavación pendientes o cuando la torre está pausada.\nLos camiones se registran y se reasignan cuando vuelve a haber trabajos de excavación."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Asignado: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "ninguno"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "Liberado por ATD: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<destruido>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Esquina (exterior): coloca rampas de esquina convexas."
   ],
   [

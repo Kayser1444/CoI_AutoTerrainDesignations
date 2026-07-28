@@ -1,5 +1,8 @@
 v0.5.5 [unreleased]
 
+* Improved: Completed all supported language entries for the Accessways settings and mine-tower vehicle-status summary.
+* Improved: Replaced the Russian translation with the reviewed community-provided localization.
+
 
 v0.5.4 [released]
 * Fixed: Deleted mine control towers now properly reset farmland work in progress.

@@ -431,14 +431,14 @@ namespace AutoTerrainDesignations
                 if (vehicle == null || vehicle.IsDestroyed)
                     continue;
                 if (assignedCount == 0)
-                    sb.Append("Assigned: ");
+                    sb.Append(string.Format(AtdLocalization.FarmingVehicleStatusAssigned.TranslatedString, string.Empty));
                 else
                     sb.Append(", ");
                 sb.Append('[').Append(vehicle.Id).Append("] ").Append(vehicle.GetTitle());
                 assignedCount++;
             }
             if (assignedCount == 0)
-                sb.Append("Assigned: none");
+                sb.Append(string.Format(AtdLocalization.FarmingVehicleStatusAssigned.TranslatedString, AtdLocalization.FarmingVehicleStatusNone.TranslatedString));
 
             if (s_idleReleasedVehiclesByTower.TryGetValue(towerId, out List<Vehicle> released) && released.Count > 0)
             {
@@ -450,14 +450,14 @@ namespace AutoTerrainDesignations
                     if (first)
                     {
                         sb.AppendLine();
-                        sb.Append("ATD-released: ");
+                        sb.Append(AtdLocalization.FarmingVehicleStatusReleased.TranslatedString);
                         first = false;
                     }
                     else
                     {
                         sb.Append(", ");
                     }
-                    string title = vehicle.IsDestroyed ? "<destroyed>" : vehicle.GetTitle();
+                    string title = vehicle.IsDestroyed ? AtdLocalization.FarmingVehicleStatusDestroyed.TranslatedString : vehicle.GetTitle();
                     sb.Append('[').Append(vehicle.Id).Append("] ").Append(title);
                 }
             }

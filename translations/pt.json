@@ -180,7 +180,11 @@
     "Qualidade do minério"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Vias de acesso"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Padrões da torre de controle da mina"
   ],
   [
@@ -308,7 +312,11 @@
     "Máximo"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Custos da rota"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Custo de designação de terreno"
   ],
   [
@@ -324,7 +332,15 @@
     "Peso aplicado à escavação ou despejo de terreno diretamente acima ou abaixo das designações de terreno geradas."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Peso do trabalho dos raios laterais"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Peso aplicado aos raios de trabalho de paisagismo laterais e de curvas."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Distância máxima do raio candidato"
   ],
   [
@@ -332,7 +348,35 @@
     "Distância máxima do traçado do raio candidato. Valores mais altos protegem e precificam cunhas laterais muito grandes, mas custam mais tempo de pesquisa. Padrão: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Limites de busca"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Máximo de nós visitados"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Máximo de estados examinados. Valores mais altos podem resolver rotas mais difíceis, mas usam mais tempo e memória."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Tempo limite de busca (segundos)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Tempo máximo de relógio para uma busca de via de acesso."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Orçamento por quadro (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Orçamento aproximado de trabalho de busca por quadro do jogo. Valores mais altos terminam antes, mas causam travamentos mais longos."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Custo máximo por raio"
   ],
   [
@@ -604,7 +648,23 @@
     "Remove automaticamente a atribuição de caminhões desta torre quando nenhuma designação tiver trabalho de escavação pendente, ou enquanto a torre estiver pausada.\nOs caminhões são rastreados e reatribuídos quando o trabalho de escavação retornar."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Atribuído: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "nenhum"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "Liberado pelo ATD: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<destruído>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Quina (externa): colocar rampas de quina convexas."
   ],
   [

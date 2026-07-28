@@ -180,7 +180,11 @@
     "Erzqualität"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Zufahrtswege"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Standardwerte für Minenkontrollturm"
   ],
   [
@@ -308,7 +312,11 @@
     "Maximal"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Routenkosten"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Kosten für die Geländeausweisung"
   ],
   [
@@ -324,7 +332,15 @@
     "Gewicht, das beim Graben oder Abladen von Gelände direkt über oder unter den generierten Geländebezeichnungen angewendet wird."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Gewicht der seitlichen Strahlenarbeit"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Gewicht, das auf seitliche und Kurven-Landschaftsstrahlen angewendet wird."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Maximale Entfernung des Kandidatenstrahls"
   ],
   [
@@ -332,7 +348,35 @@
     "Maximale Raytrace-Entfernung des Kandidaten. Höhere Werte schützen und bepreisen sehr große Seitenkeile, kosten aber mehr Suchzeit. Standard: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Suchgrenzen"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Maximale besuchte Knoten"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Maximale Anzahl untersuchter Zustände. Höhere Werte können schwierigere Routen lösen, benötigen aber mehr Zeit und Speicher."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Suchzeitlimit (Sekunden)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Maximale Echtzeit für eine Zufahrtswegsuche."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Frame-Budget (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Ungefähres Sucharbeitsbudget pro Spielframe. Höhere Werte schließen früher ab, verursachen aber längere Hänger."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Maximale Kosten pro Strahl"
   ],
   [
@@ -604,7 +648,23 @@
     "Hebt automatisch die Zuweisung von LKWs von diesem Turm auf, wenn kein Gebiet ausstehende Aushubarbeiten hat oder wenn der Turm pausiert ist.\nLKWs werden verfolgt und erneut zugewiesen, sobald wieder Aushubarbeiten anstehen."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Zugewiesen: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "keine"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "Von ATD freigegeben: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<zerstört>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Ecke (außen): konvexe Eckrampen platzieren."
   ],
   [

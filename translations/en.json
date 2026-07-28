@@ -180,7 +180,11 @@
     "Ore quality"
   ],
   [
-    "settings.heading.mining_defaults",
+    "settings.tab.pathfinder",
+    "Accessways"
+  ],
+ [
+   "settings.heading.mining_defaults",
     "Mine control tower defaults"
   ],
   [
@@ -308,7 +312,11 @@
     "Maximum"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "settings.pathfinder.costs",
+    "Route costs"
+  ],
+ [
+   "settings.pathfinder.generated_v_fixed.label",
     "Terrain designation cost"
   ],
   [
@@ -324,7 +332,15 @@
     "Weight applied to digging or dumping terrain directly above or below generated terrain designations."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "settings.pathfinder.side_ray_weight.label",
+    "Side-ray work weight"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "Weight applied to lateral and turn-corner landscaping rays."
+  ],
+ [
+   "settings.pathfinder.candidate_distance.label",
     "Candidate ray max distance"
   ],
   [
@@ -332,7 +348,35 @@
     "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "settings.pathfinder.limits",
+    "Search limits"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "Maximum visited nodes"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "Maximum states examined. Higher values can solve harder routes but use more time and memory."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "Search timeout (seconds)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "Maximum wall-clock time for one accessway search."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "Frame budget (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls."
+  ],
+ [
+   "settings.pathfinder.ray_max_cost.label",
     "Maximum cost per ray"
   ],
   [
@@ -604,7 +648,23 @@
     "Automatically unassign trucks from this tower when no designation has pending excavation work, or while the tower is paused.\nTrucks are tracked and re-assigned when excavation work returns."
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "panel.farming.vehicle_status.assigned",
+    "Assigned: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "none"
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "ATD-released: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<destroyed>"
+  ],
+ [
+   "toolbox.corner_outer.tooltip",
     "Corner (outer): place convex corner ramps."
   ],
   [

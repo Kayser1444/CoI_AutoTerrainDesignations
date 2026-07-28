@@ -70,7 +70,7 @@ namespace AutoTerrainDesignations
             return new ModSettingsTab(
                 MOD_ID,
                 AtdLocalization.SettingsModName.AsFormatted,
-                Loc.Str("settings.tab.pathfinder", "Accessways", "Settings tab title for ATD accessway settings.").AsFormatted,
+                AtdLocalization.SettingsTabPathfinder.AsFormatted,
                 130,
                 BuildPathfinderContent,
                 PATHFINDER_ICON);
@@ -404,17 +404,17 @@ namespace AutoTerrainDesignations
                 },
                 FormatFloat,
                 refreshers));
-            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.costs", "Route costs", "Pathfinder cost settings heading.").AsFormatted));
+            content.Add(BuildSectionHeading(AtdLocalization.SettingsPathfinderCostsHeading.AsFormatted));
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsTerrainDesignationCostLabel, AtdLocalization.SettingsTerrainDesignationCostTooltip, () => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost, AutoTerrainDesignationsMod.SetAccessGeneratedVFixedCost);
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsDirectTerrainWorkWeightLabel, AtdLocalization.SettingsDirectTerrainWorkWeightTooltip, () => AutoTerrainDesignationsMod.AccessDirectWorkWeight, AutoTerrainDesignationsMod.SetAccessDirectWorkWeight);
-            AddPathfinderFloat(content, refreshers, "side_ray_weight", "Side-ray work weight", "Weight applied to lateral and turn-corner landscaping rays.", () => AutoTerrainDesignationsMod.AccessSideRayWeight, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
+            AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsSideRayWorkWeightLabel, AtdLocalization.SettingsSideRayWorkWeightTooltip, () => AutoTerrainDesignationsMod.AccessSideRayWeight, AutoTerrainDesignationsMod.SetAccessSideRayWeight);
 
             AddPathfinderInt(content, refreshers, AtdLocalization.SettingsCandidateRayMaxDistanceLabel, AtdLocalization.SettingsCandidateRayMaxDistanceTooltip, () => AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance, AutoTerrainDesignationsMod.SetAccessCandidateRayMaxDistance);
 
-            content.Add(BuildSectionHeading(Loc.Str("settings.pathfinder.limits", "Search limits", "Pathfinder search-limit settings heading.").AsFormatted));
-            AddPathfinderInt(content, refreshers, "visited", "Maximum visited nodes", "Maximum states examined. Higher values can solve harder routes but use more time and memory.", () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000, 50000, 100000);
-            AddPathfinderInt(content, refreshers, "timeout", "Search timeout (seconds)", "Maximum wall-clock time for one accessway search.", () => AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds, 5, 15, 60);
-            AddPathfinderInt(content, refreshers, "frame_budget", "Frame budget (ms)", "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls.", () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 1, 5, 10);
+            content.Add(BuildSectionHeading(AtdLocalization.SettingsPathfinderLimitsHeading.AsFormatted));
+            AddPathfinderInt(content, refreshers, AtdLocalization.SettingsMaximumVisitedNodesLabel, AtdLocalization.SettingsMaximumVisitedNodesTooltip, () => AutoTerrainDesignationsMod.AccessMaxVisitedNodes, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes, 10000, 50000, 100000);
+            AddPathfinderInt(content, refreshers, AtdLocalization.SettingsSearchTimeoutLabel, AtdLocalization.SettingsSearchTimeoutTooltip, () => AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds, 5, 15, 60);
+            AddPathfinderInt(content, refreshers, AtdLocalization.SettingsFrameBudgetLabel, AtdLocalization.SettingsFrameBudgetTooltip, () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 1, 5, 10);
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsRayMaximumCostLabel, AtdLocalization.SettingsRayMaximumCostTooltip, () => AutoTerrainDesignationsMod.AccessRayMaxCost, AutoTerrainDesignationsMod.SetAccessRayMaxCost, 10f, 50f, 100f);
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsUnresolvedRayPenaltyLabel, AtdLocalization.SettingsUnresolvedRayPenaltyTooltip, () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty, 10f, 50f, 100f);
         }
@@ -514,10 +514,11 @@ namespace AutoTerrainDesignations
 
         private static void AddPathfinderInt(Column content, List<Action> refreshers,
             LocStr label, LocStr tooltip, Func<int> getter, Action<int> setter,
-            int baseStep = 1)
+            int step = 1, int shiftStep = 5, int ctrlStep = 10)
             => content.Add(BuildIntStepRow(
                 label.AsFormatted, tooltip.AsFormatted,
-                getter, setter, value => value.ToString(CultureInfo.InvariantCulture), refreshers, baseStep));
+                getter, setter, value => value.ToString(CultureInfo.InvariantCulture), refreshers,
+                step, shiftStep, ctrlStep));
 
         private static void AddPanelDefaultsSection(Column content, List<Action> refreshers)
         {
