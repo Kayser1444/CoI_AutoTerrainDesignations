@@ -1,3 +1,6 @@
+v0.5.6 [unreleased]
+
+
 v0.5.5 [released]
 
 * Fixed vehicle assigner row visibility when starting a new game where vehicle technology is not yet unlocked but initial starting vehicles (Pickups/Excavators) are owned (`stats.Owned > 0`).
