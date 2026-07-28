@@ -5,6 +5,116 @@ Captain of Industry structures accessible.
 
 ## Accessway pathfinding
 
+**V2 source launch**:
+A feasible two-slice, 2×2-origin prefix whose initial slice contains a source
+obligation and whose successor slice proves the first longitudinal Mega move.
+Each origin may reuse compatible fixed work or use newly planned V-profile
+work; the initial slice adds no traversal, while its successor does.
+_Avoid_: Synthetic companion, flat 2×2 seed, exposed source frontage
+
+**V2 source center**:
+The set of source origins sharing the minimum distance from the source
+cluster's arithmetic center. Every tied origin is equally central; none is
+selected by a coordinate tie-break.
+_Avoid_: Tie-broken start origin, single center tile
+
+**V2 source-center distance tier**:
+A set of source origins sharing the same distance from the source cluster's
+arithmetic center. V2 tries tiers from the center outward and advances to a
+less-central tier only when every route from the current tier fails.
+_Avoid_: Perimeter seed scan, synthetic source-distance penalty
+
+**V2 fixed-navigation profile**:
+An existing terrain-work shape through which a width-two search may navigate
+using its exact finished geometry and physical clearance. Ordinary flat, ramp,
+and V-prime corner profiles are current examples; eligibility is not a shape
+whitelist and does not imply that an accessway may generate the shape.
+Navigation eligibility is independent of origin-cluster ownership and does not
+by itself establish a grounded terminal.
+_Avoid_: Endpoint-only profile, generatable profile
+
+**V2 route profile**:
+A terrain-work shape that a V2 accessway may generate and propagate. The
+current set contains ordinary flat and axis-aligned ramp profiles, excluding
+corner and saddle profiles. Existing traversable profiles are instead projected
+into ground navigation at their finished target surface.
+_Avoid_: Fixed-navigation profile, any traversable profile
+
+**Projected fixed-ground graph**:
+The clearance-exact Mega vehicle-center graph over existing terrain-work target
+surfaces and their connections to physical ground. It supplies ordinary
+cardinal and diagonal travel through fixed work without requiring V-prime
+generation transitions or exposed fixed frontages.
+_Avoid_: Fixed-band graph, optimistic provider field
+
+**Projected-ground heuristic relaxation**:
+The G-like lower-bound layer over projected fixed terrain, with unit cardinal
+and square-root-of-two diagonal travel. It may admit diagonals that fail real
+corner clearance and edges that fail real steepness because extra heuristic
+edges can only shorten the estimate; the exact graph still validates every
+route edge.
+_Avoid_: Exact projected-ground graph, clearance or steepness proof
+
+**Resolved V2 move**:
+A generated-band movement whose newly encountered origins are resolved as
+newly planned V-profile work or transitions into projected fixed ground.
+Generated expansion and projected-ground navigation remain parts of one route
+rather than separate search phases.
+_Avoid_: Fringe handoff, fixed-body preprocessing
+
+**Goal-connected projected-ground component**:
+A clearance-exact Mega navigation component containing tower-reachable physical
+ground and any fixed target surfaces connected to it. Reaching any node in the
+component supplies an exact downstream route to tower ground.
+_Avoid_: Fixed-frontage terminal, optimistic provider component
+
+**Fixed-to-ground transition**:
+A clearance-exact edge between a fixed target surface and adjacent physical
+ground. It belongs to the projected fixed-ground graph and adds physical travel
+but no generated designation or generated-work cost.
+_Avoid_: Generated V/G seam, fixed frontage fee
+
+**Projected fixed provider chain**:
+A complete clearance-exact route from an origin cluster to tower ground through
+existing but possibly unfinished terrain work. It requires no new accessway
+designations and remains waiting until its fixed work becomes live-pathable
+from the ground side.
+_Avoid_: Zero-work failure, already-accessible provider
+
+**Greedy outward access provisioning**:
+The policy of connecting inaccessible origin clusters from near to far, with
+each cluster minimizing its complete grounded route against infrastructure
+established by earlier clusters. It deliberately does not jointly optimize the
+provider network across all clusters.
+_Avoid_: Global access-network optimization, remote-first provisioning
+
+**Accessway route cost**:
+An additive comparison of complete grounded driving distance and the work,
+cleanup, and origin overhead needed to establish the route. Driving distance
+is not a hard priority; the player controls its exchange rate with landscaping
+through the landscaping-cost distance scale.
+_Avoid_: Shortest driving path, lexicographic travel priority
+
+**Cheapest-label history ownership**:
+The bounded-search policy in which the cheapest arrival at a V2 band owns the
+generated geometry, ray, and cleanup history used for later expansion.
+More-expensive arrivals with different histories are discarded, accepting a
+small completeness risk to avoid multi-label state growth.
+_Avoid_: History-complete search, Pareto-label search
+
+**Useful-material rebate**:
+The reduction in excavation cost for material that the mining operation values
+as useful product rather than waste. It uses the access-planning definition of
+useful material, independent of tower scan filters or mining priority.
+_Avoid_: Useful-ore rebate, mining-priority discount
+
+**Projected fixed terrain**:
+The terrain surface obtained by overlaying reusable fixed designation targets
+onto captured physical terrain. Navigation and heuristics use already-scheduled
+fixed work at its finished target height, where it contributes no new
+landscaping charge.
+_Avoid_: Raw terrain under fixed work, zero-height fixed work
+
 **Terrain-extrema landscaping heuristic**:
 An admissible V2 A* estimate of unpaid future landscaping work derived from
 favorable terrain extrema and a proven charge horizon, independent of how the
