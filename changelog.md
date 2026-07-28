@@ -1,5 +1,6 @@
 v0.5.5 [unreleased]
 
+* Fixed vehicle assigner row visibility when starting a new game where vehicle technology is not yet unlocked but initial starting vehicles (Pickups/Excavators) are owned (`stats.Owned > 0`).
 * Improved: Completed all supported language entries for the Accessways settings and mine-tower vehicle-status summary.
 * Improved: Replaced the Russian translation with the reviewed community-provided localization.
 

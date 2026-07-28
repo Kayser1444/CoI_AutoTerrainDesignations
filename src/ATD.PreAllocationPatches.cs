@@ -245,7 +245,7 @@ namespace AutoTerrainDesignations
                             
                             bool enabled = stats.Assignable > 0 || (canBeAssigned && isUnlocked);
                             plusBtn.Enabled(enabled);
-                            __instance.Visible(assignedCount > 0 || queuedCount > 0 || (canBeAssigned && isUnlocked));
+                            __instance.Visible(assignedCount > 0 || queuedCount > 0 || (canBeAssigned && (isUnlocked || stats.Owned > 0)));
                             
                             bool minusEnabled = assignedCount > 0 || queuedCount > 0;
                             minusBtn.Enabled(minusEnabled);
