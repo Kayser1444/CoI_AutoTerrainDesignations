@@ -8,8 +8,9 @@ Captain of Industry structures accessible.
 **V2 source launch**:
 A feasible two-slice, 2×2-origin prefix whose initial slice contains a source
 obligation and whose successor slice proves the first longitudinal Mega move.
-Each origin may reuse compatible fixed work or use newly planned V-profile
-work; the initial slice adds no traversal, while its successor does.
+Each origin may reuse compatible fixed work or use newly planned route-profile
+work, including one bounded V2 transition band; the initial slice adds no
+traversal, while its successor does.
 _Avoid_: Synthetic companion, flat 2×2 seed, exposed source frontage
 
 **V2 source center**:
@@ -40,6 +41,43 @@ corner and saddle profiles. Existing traversable profiles are instead projected
 into ground navigation at their finished target surface.
 _Avoid_: Fixed-navigation profile, any traversable profile
 
+**V2 transition band**:
+The single width-two generated adapter at a projected-ground boundary; its
+other side may be a propagating route-profile band or another projected
+surface, and each lane may reuse compatible fixed work or use newly planned V
+or canonical V-prime work. It is admitted by exact Mega connectivity, has no
+projected-side orientation, is charged once without becoming a propagating move
+type or satisfying a route-profile predecessor requirement, and may recur only
+at distinct crossings. After acceptance it becomes ordinary fixed-target
+context and may seed transition work in a later provisioning search.
+_Avoid_: V-prime route profile, lateral-exit special case
+
+**V2 transition crossing**:
+An exact Mega vehicle-center path through a resolved V2 transition band,
+charging unit cardinal or square-root-of-two diagonal travel independently of
+the band’s generated work. It has no categorical straight, strafe, turn, or
+spoke travel fee.
+_Avoid_: Transition surcharge, synthetic strafe
+
+**Accessway-owned origin**:
+An origin deliberately included in newly planned accessway terrain work. It
+remains an explicit designation when its target already matches current terrain,
+so later disturbance is restored while the provider is being established; a
+candidate is invalid if that designation cannot be retained.
+_Avoid_: Exact-terrain no-op, omitted companion
+
+**V-prime candidate origin**:
+A non-fixed origin with one to three cardinal non-conflicting fixed-target
+neighbours, marking where lazy transition-band resolution may consider
+generated V-prime work. Every terrain-designation target seeds the catalog
+regardless of current Mega connectivity, while physical ground does not;
+diagonal neighbours constrain shared corner heights during resolution but do
+not themselves add or pre-remove entries. Only catalogued origins may receive
+newly planned V-prime profiles; generated history never seeds more candidates
+within the same search. The catalog is refreshed whenever accepted accessway
+work changes the fixed-target snapshot.
+_Avoid_: V-prime eligible origin, diagonal candidate halo
+
 **Projected fixed-ground graph**:
 The clearance-exact Mega vehicle-center graph over existing terrain-work target
 surfaces and their connections to physical ground. It supplies ordinary
@@ -48,11 +86,12 @@ generation transitions or exposed fixed frontages.
 _Avoid_: Fixed-band graph, optimistic provider field
 
 **Projected-ground heuristic relaxation**:
-The G-like lower-bound layer over projected fixed terrain, with unit cardinal
-and square-root-of-two diagonal travel. It may admit diagonals that fail real
-corner clearance and edges that fail real steepness because extra heuristic
-edges can only shorten the estimate; the exact graph still validates every
-route edge.
+The G-like lower-bound layer over projected fixed terrain and possible V2
+transition bands, with unit cardinal and square-root-of-two diagonal travel.
+It omits transition construction cost and may admit edges that fail real
+clearance or steepness, including chains of candidate bands forbidden by exact
+search, because extra heuristic edges can only shorten the estimate; exact
+search still validates and charges every route.
 _Avoid_: Exact projected-ground graph, clearance or steepness proof
 
 **Resolved V2 move**:
@@ -96,10 +135,12 @@ through the landscaping-cost distance scale.
 _Avoid_: Shortest driving path, lexicographic travel priority
 
 **Cheapest-label history ownership**:
-The bounded-search policy in which the cheapest arrival at a V2 band owns the
-generated geometry, ray, and cleanup history used for later expansion.
-More-expensive arrivals with different histories are discarded, accepting a
-small completeness risk to avoid multi-label state growth.
+The bounded-search policy in which the cheapest arrival at a V2 band,
+transition continuation, or projected-ground center owns the generated
+geometry, ray, and cleanup history used for later expansion. More-expensive
+arrivals with different histories are discarded, accepting a small
+completeness risk to avoid multi-label state growth; equal-cost ownership uses
+a canonical geometry-based tie-break.
 _Avoid_: History-complete search, Pareto-label search
 
 **Useful-material rebate**:
@@ -117,8 +158,9 @@ _Avoid_: Raw terrain under fixed work, zero-height fixed work
 
 **Terrain-extrema landscaping heuristic**:
 An admissible V2 A* estimate of unpaid future landscaping work derived from
-favorable terrain extrema and a proven charge horizon, independent of how the
-extrema are queried.
+favorable terrain extrema and a proven charge horizon. Possible V2 transition
+bands provisionally count as ground and end any landscaping charge that is not
+proven unavoidable before reaching them.
 _Avoid_: Recursive-diamond landscaping heuristic
 
 **Charge horizon**:

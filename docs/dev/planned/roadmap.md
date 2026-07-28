@@ -19,6 +19,11 @@ The access framework and the V2-style accessway search are now part of the imple
 - Cut/copy/paste or blueprint-style designation workflows.
 - Rail incline (12.5%) designation support.
 - Saddle designation support.
+- Demand-weighted accessway travel cost, where permanent driving distance
+  matters more for clusters with larger expected mining or filling workloads.
+- A useful-material rebate for accessway excavation cost. Its implementation
+  must preserve terrain-extrema heuristic admissibility or weaken that
+  heuristic component to zero wherever the rebate can apply.
 - Underground pipe construction support for both vanilla and modded scenarios, if the complexity becomes practical.
 
 ## Reliability and quality work
