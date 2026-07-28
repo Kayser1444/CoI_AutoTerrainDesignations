@@ -1,3 +1,8 @@
+v0.5.5 | 2026-07-28
+* Fixed: Vehicle assigner row visibility when starting a new game where vehicle technology is not yet unlocked but starting vehicles are owned
+* Improved: Completed language entries for Accessways settings and mine control tower vehicle status summary
+* Improved: Updated Russian translation with reviewed community localization
+
 v0.5.4 | 2026-07-27
 * Fixed: Deleted mine control towers now properly reset farmland work in progress
 * Changed: Adjusted Safety policy slope and buffer presets for improved terrain clearance, with default slope factor 0.9 and buffer 2 tiles
