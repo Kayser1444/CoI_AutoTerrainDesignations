@@ -1,52 +1,32 @@
 # Roadmap
 
-Planned and candidate improvements for Kayser's Automatic Terrain Designations.
+Current priorities for Kayser's Automatic Terrain Designations. This version is intentionally shorter and more grounded in what has already landed versus what still needs attention.
 
-# Planned
-* Cut/Copy/Paste/Blueprint designations?
-* rail incline (12.5%) designations
+## Status summary
 
-## Accessways and pathfinding
+The access framework and the V2-style accessway search are now part of the implemented baseline. The roadmap below focuses on polish, reliability, and the remaining feature gaps that still affect gameplay quality.
 
-1. [Domain pruning: useful-height envelope](accessway-pathfinding-height-envelope.md)
-2. [Lazy unavoidable-landscaping heuristic](accessway-pathfinding-lazy-landscaping-heuristic.md),
-   evaluated only after the envelope; later restrict its relaxed frontier to
-   eligible V origins if measurements justify it
-3. [V1 ground-to-V optimization backport](accessway-v1-ground-to-v-optimization.md)
-   is implemented; live measurement remains before considering monotonic
-   profile-proof reuse.
-4. [V2 deterministic ground-to-V handoff](accessway-v2-ground-to-v-grid-prefilter.md)
-   replaces reverse corridor BFS with an every-G, pre-enumerated profile test
-   and parallel post-work cardinal proofs from the future V face back to G.
+## Near-term priorities
 
-* Landscaping rebate when digging useful oreemaining work: reuse the material-aware disturbance ray tracer and tower-owned harvest-marker tracking when generating ordinary mine designations. Keep direct building footprint/clearance checks separate from terrain-disturbance prediction. When either avoidance option is disabled, allow the plan but warn when the corresponding projected hazard is detected.
-* Improve wide ramps' ability to connect to mining designations with jagged or sloped faces
+- Improve wide-ramp and mining-face connections where jagged or sloped terrain still produces awkward joins.
+- Tighten generated mining-body clearance so narrow one-origin waists are less likely to block Mega/T3 vehicles.
+- Continue improving construction assistance around tower overlap, soil export, and ground preparation behavior.
+- Make designation creation consider possible farming work more explicitly when the surrounding terrain and tower context suggest it.
+- Review vehicle auto-release and auto-assign behavior so tower ownership remains predictable.
 
-## Generated mining-body vehicle clearance — future refinement
+## Feature ideas worth keeping on the radar
 
-Rare generated mining bodies can contain a one-origin waist that is too narrow for Mega/T3 vehicles. Add a clearance-aware minimal-change widening/removal pass eventually; this is not a blocker for V2 accessway rollout.
+- Cut/copy/paste or blueprint-style designation workflows.
+- Rail incline (12.5%) designation support.
+- Saddle designation support.
+- Underground pipe construction support for both vanilla and modded scenarios, if the complexity becomes practical.
 
-## Construction assist
-Handle overlapping towers?
-Auto-prepare ground anywhere
-- If farm placed outside mining tower area -> warn that global filling rules must be adjusted
-- Handle case where no storage exports soil -> warn, force-export, or alter truck behavior
-- Not supported yet: Gas injection pump (requires 6 levels of limestone)
+## Reliability and quality work
 
-## Make Create Designations consider possible farming work
+- Keep refining accessway heuristics and terrain-disturbance prediction, especially around avoidance settings and hazard warnings.
+- Investigate topsoil optimization so farmability can be satisfied with less over-placing where it is safe to do so.
+- Address concurrency and thread-safety issues around idle vehicle release and entity enumeration so the mod remains stable under broader game and mod interactions.
 
-## Issue?: Vehichles auto-released can be assigned to the tower again (or to something else)
-Maybe reverse meaning and make auto-assign instead of auto-unassign?
+## Notes
 
-## Saddle designation?
-
-### Long term: Support underground pipe construction both for modded and unmodded games
-* Highly complicated if unmodded: must dig trench, place pipes, build pipes, prepare remaining ground, place rest of BP.
-
-## Topsoil Optimization
-Investigate placing only the minimum required soil to satisfy farmability (e.g., 95% thickness) instead of a full topsoil band. Deferred during the access framework rewrite.
-
-## Concurrency issue in TickIdleVehicleRelease
-`AutoDepthDesignation.TickIdleVehicleRelease()` runs on the simulation thread (`~Sim` thread) and iterates over active towers using `m_entitiesManager.GetAllEntitiesOfType<MineTower>()`. This can collide with the Unity main thread (`~Mai` thread) when other UI elements (like `PollutionWorldRenderer` or other mods) try to enumerate entities of any type concurrently using MaFi's non-thread-safe `LystMutableDuringIter` collections, triggering `Outer enumerator finished first?` assertions in the game's log.
-
-**Solution:** Query and snapshot the entities safely on a main-thread tick or copy them to avoid concurrent enumeration.
+This roadmap deliberately omits older planning items that are now implemented or superseded by the current access framework and V2 accessway work.
