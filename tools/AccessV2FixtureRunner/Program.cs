@@ -50,7 +50,27 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 string coreFailure = coreInvokeArgs[0] as string ?? string.Empty;
                 Console.WriteLine(
                     $"V1 core fixtures: success={coreSuccess} failure={coreFailure}");
-                return coreSuccess ? 0 : 1;
+                if (!coreSuccess) return 1;
+
+                Type state = assembly.GetType(
+                    "AutoTerrainDesignations.AutoDepthDesignation", true);
+                MethodInfo validateRemoval = state.GetMethod(
+                    "ValidateGeneratedDesignationRemovalFixtures",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        state.FullName,
+                        "ValidateGeneratedDesignationRemovalFixtures");
+                object[] removalArgs = { string.Empty };
+                bool removalSuccess = (bool)(
+                    validateRemoval.Invoke(null, removalArgs) ?? false);
+                string removalFailure =
+                    removalArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Generated designation removal fixtures: "
+                    + $"success={removalSuccess} "
+                    + $"failure={removalFailure}");
+                return removalSuccess ? 0 : 1;
             }
             catch (TargetInvocationException ex)
             {

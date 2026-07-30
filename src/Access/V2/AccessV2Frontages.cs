@@ -9,18 +9,29 @@ namespace AutoTerrainDesignations.Access.V2
     {
         public AccessV2BandState State { get; }
         public Tile2i FixedSeedOrigin { get; }
-        public Tile2i? SyntheticCompanionOrigin { get; }
+        public AccessV2Transition? InitialTransition { get; }
+        public AccessV2Transition? LaunchSuccessor { get; }
 
-        public bool HasSyntheticCompanion => SyntheticCompanionOrigin.HasValue;
+        public bool IsSourceLaunch => LaunchSuccessor != null;
+
+        public AccessV2StartFrontage(
+            AccessV2BandState state,
+            Tile2i fixedSeedOrigin)
+        {
+            State = state;
+            FixedSeedOrigin = fixedSeedOrigin;
+        }
 
         public AccessV2StartFrontage(
             AccessV2BandState state,
             Tile2i fixedSeedOrigin,
-            Tile2i? syntheticCompanionOrigin)
+            AccessV2Transition? initialTransition,
+            AccessV2Transition launchSuccessor)
         {
             State = state;
             FixedSeedOrigin = fixedSeedOrigin;
-            SyntheticCompanionOrigin = syntheticCompanionOrigin;
+            InitialTransition = initialTransition;
+            LaunchSuccessor = launchSuccessor;
         }
     }
 
@@ -47,8 +58,8 @@ namespace AutoTerrainDesignations.Access.V2
             new Dictionary<string, int>(StringComparer.Ordinal);
 
         public int SeedCount { get; internal set; }
-        public int SyntheticStartCount { get; internal set; }
-        public int ExistingPairStartCount { get; internal set; }
+        public int SourceLaunchCount { get; internal set; }
+        public int DirectFixtureStartCount { get; internal set; }
         public int FixedGoalOriginCount { get; internal set; }
         public int FixedFrontageCount { get; internal set; }
         public IReadOnlyDictionary<string, int> Rejections => m_rejections;
@@ -64,6 +75,7 @@ namespace AutoTerrainDesignations.Access.V2
     internal sealed class AccessV2EndpointSet
     {
         public IReadOnlyList<AccessV2StartFrontage> Starts { get; }
+        public IReadOnlyList<IReadOnlyList<AccessV2StartFrontage>> StartTiers { get; }
         public IReadOnlyList<AccessV2FixedFrontage> FixedGoals { get; }
         public AccessV2FrontageDiagnostics Diagnostics { get; }
 
@@ -71,17 +83,38 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<AccessV2StartFrontage> starts,
             IReadOnlyList<AccessV2FixedFrontage> fixedGoals,
             AccessV2FrontageDiagnostics diagnostics)
+            : this(
+                new[] { starts },
+                fixedGoals,
+                diagnostics)
         {
-            Starts = starts;
+        }
+
+        public AccessV2EndpointSet(
+            IReadOnlyList<IReadOnlyList<AccessV2StartFrontage>> startTiers,
+            IReadOnlyList<AccessV2FixedFrontage> fixedGoals,
+            AccessV2FrontageDiagnostics diagnostics)
+        {
+            StartTiers = startTiers;
+            Starts = startTiers.Count == 0
+                ? Array.Empty<AccessV2StartFrontage>()
+                : startTiers[0];
             FixedGoals = fixedGoals;
             Diagnostics = diagnostics;
         }
+
+        public AccessV2EndpointSet ForStartTier(int tierIndex)
+            => new AccessV2EndpointSet(
+                new[] { StartTiers[tierIndex] },
+                FixedGoals,
+                Diagnostics);
     }
 
     /// <summary>
-    /// Converts one-origin work seeds and local fixed-provider pairs into the
-    /// canonical two-origin V2 frontage representation. Discovery is
-    /// side-effect free: a synthetic companion is merely a candidate delta.
+    /// Enumerates complete two-slice source launches from arithmetic-center
+    /// distance tiers, plus the retained fixed-provider goal frontages.
+    /// Discovery is side-effect free: generated launch origins remain
+    /// candidate deltas until the search evaluates them.
     /// </summary>
     internal static class AccessV2FrontageDiscovery
     {
@@ -93,31 +126,46 @@ namespace AutoTerrainDesignations.Access.V2
             IEnumerable<Tile2i> fixedGoalOrigins)
         {
             var diagnostics = new AccessV2FrontageDiagnostics();
-            var starts = new Dictionary<AccessV2BandState, AccessV2StartFrontage>();
             var goals = new Dictionary<AccessV2BandState, AccessV2FixedFrontage>();
             var seeds = new HashSet<Tile2i>(startSeedOrigins);
             var allowedGoalOrigins = new HashSet<Tile2i>(fixedGoalOrigins);
             diagnostics.SeedCount = seeds.Count;
             diagnostics.FixedGoalOriginCount = allowedGoalOrigins.Count;
 
-            foreach (Tile2i seed in seeds.OrderBy(item => item.X).ThenBy(item => item.Y))
+            var startTiers =
+                new List<IReadOnlyList<AccessV2StartFrontage>>();
+            foreach (IReadOnlyList<Tile2i> seedTier
+                in BuildSourceCenterDistanceTiers(seeds))
             {
-                if (!fixedProfiles.TryGetValue(seed, out AccessHeightProfile seedProfile))
+                var starts =
+                    new Dictionary<SourceLaunchKey, AccessV2StartFrontage>();
+                foreach (Tile2i seed in seedTier)
                 {
-                    diagnostics.Reject("MissingSeedProfile");
-                    continue;
+                    if (!fixedProfiles.TryGetValue(
+                            seed, out AccessHeightProfile seedProfile))
+                    {
+                        diagnostics.Reject("MissingSeedProfile");
+                        continue;
+                    }
+                    IReadOnlyList<AccessV2TravelAxis> axes =
+                        GetEnabledAxes(seedProfile);
+                    if (axes.Count == 0)
+                    {
+                        diagnostics.Reject("SeedProfileDisabled");
+                        continue;
+                    }
+                    for (int axisIndex = 0;
+                        axisIndex < axes.Count;
+                        axisIndex++)
+                    {
+                        AddSourceLaunchesForAxis(
+                            axes[axisIndex], seed, seedProfile,
+                            boundsMin, boundsMax, fixedProfiles,
+                            starts, diagnostics);
+                    }
                 }
-                IReadOnlyList<AccessV2TravelAxis> axes = GetEnabledAxes(seedProfile);
-                if (axes.Count == 0)
-                {
-                    diagnostics.Reject("SeedProfileDisabled");
-                    continue;
-                }
-                for (int axisIndex = 0; axisIndex < axes.Count; axisIndex++)
-                    AddStartsForAxis(
-                        axes[axisIndex], seed, seedProfile,
-                        boundsMin, boundsMax, fixedProfiles, seeds,
-                        starts, diagnostics);
+                if (starts.Count > 0)
+                    startTiers.Add(starts.Values.ToList());
             }
 
             foreach (Tile2i origin in allowedGoalOrigins
@@ -138,13 +186,15 @@ namespace AutoTerrainDesignations.Access.V2
                     allowedGoalOrigins, goals, diagnostics);
             }
 
-            diagnostics.SyntheticStartCount = starts.Values.Count(
-                item => item.HasSyntheticCompanion);
-            diagnostics.ExistingPairStartCount = starts.Count
-                - diagnostics.SyntheticStartCount;
+            IEnumerable<AccessV2StartFrontage> allStarts =
+                startTiers.SelectMany(tier => tier);
+            diagnostics.SourceLaunchCount = allStarts.Count(
+                item => item.IsSourceLaunch);
+            diagnostics.DirectFixtureStartCount = allStarts.Count()
+                - diagnostics.SourceLaunchCount;
             diagnostics.FixedFrontageCount = goals.Count;
             return new AccessV2EndpointSet(
-                starts.Values.ToList(), goals.Values.ToList(), diagnostics);
+                startTiers, goals.Values.ToList(), diagnostics);
         }
 
         public static AccessV2EndpointSet Build(
@@ -158,15 +208,14 @@ namespace AutoTerrainDesignations.Access.V2
                 startSeedOrigins,
                 fixedGoalOrigins);
 
-        private static void AddStartsForAxis(
+        private static void AddSourceLaunchesForAxis(
             AccessV2TravelAxis axis,
             Tile2i seed,
             AccessHeightProfile seedProfile,
             Tile2i boundsMin,
             Tile2i boundsMax,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
-            ISet<Tile2i> sourceClusterOrigins,
-            IDictionary<AccessV2BandState, AccessV2StartFrontage> starts,
+            IDictionary<SourceLaunchKey, AccessV2StartFrontage> starts,
             AccessV2FrontageDiagnostics diagnostics)
         {
             Tile2i laneDirection = AccessV2BandProfile.GetLaneDirection(axis);
@@ -176,18 +225,8 @@ namespace AutoTerrainDesignations.Access.V2
                     seed, AccessV2Geometry.Scale(laneDirection, side));
                 bool companionIsFixed = fixedProfiles.TryGetValue(
                     companion, out AccessHeightProfile companionProfile);
-                bool companionIsSource = companionIsFixed
-                    && sourceClusterOrigins.Contains(companion);
-                if (!companionIsSource)
-                {
-                    // A Mega vehicle approaches the cluster centered across
-                    // both lanes. A synthetic lane beside one incomplete work
-                    // origin is useful generated terrain, but it is not a
-                    // complete width-two work face and cannot prove that the
-                    // vehicle can enter or operate on the source cluster.
-                    diagnostics.Reject("StartSourceMegaPairMissing");
-                    continue;
-                }
+                if (!companionIsFixed)
+                    companionProfile = seedProfile;
                 Tile2i anchor = side < 0 ? companion : seed;
                 AccessHeightProfile lane0 = side < 0 ? companionProfile : seedProfile;
                 AccessHeightProfile lane1 = side < 0 ? seedProfile : companionProfile;
@@ -207,21 +246,154 @@ namespace AutoTerrainDesignations.Access.V2
                     var state = new AccessV2BandState(anchor, band, direction);
                     if (!AccessV2Geometry.IsInsideBounds(state, boundsMin, boundsMax))
                     {
-                        diagnostics.Reject("OutOfAreaFrontage");
+                        diagnostics.Reject("OutOfAreaSourceLaunch");
                         continue;
                     }
-                    if (!IsExposed(state, direction, fixedProfiles))
+
+                    AccessV2Transition? initial = null;
+                    if (!companionIsFixed)
                     {
-                        diagnostics.Reject("StartFrontageNotExposed");
-                        continue;
-                    }
-                    if (!starts.ContainsKey(state))
-                        starts.Add(
+                        int companionLane =
+                            state.GetLaneOrigin(0) == companion ? 0 : 1;
+                        initial = new AccessV2Transition(
+                            AccessV2TransitionKind.SourceLaunch,
                             state,
+                            new[] { state.GetLane(companionLane) },
+                            new[] { seed },
+                            scoreOnlyGeneratedExteriorRays: true);
+                    }
+
+                    foreach (AccessV2Transition candidate
+                        in AccessV2Geometry.EnumerateStraight(state))
+                    {
+                        if (!TryResolveSuccessor(
+                                candidate, fixedProfiles,
+                                out AccessV2Transition successor))
+                        {
+                            diagnostics.Reject(
+                                "SourceLaunchSuccessorFixedConflict");
+                            continue;
+                        }
+                        if (!AccessV2Geometry.IsInsideBounds(
+                                successor, boundsMin, boundsMax))
+                        {
+                            diagnostics.Reject("OutOfAreaSourceLaunch");
+                            continue;
+                        }
+                        var key = new SourceLaunchKey(
+                            seed, state, successor.Next);
+                        if (starts.ContainsKey(key)) continue;
+                        starts.Add(
+                            key,
                             new AccessV2StartFrontage(
                                 state,
                                 seed,
-                                syntheticCompanionOrigin: null));
+                                initial,
+                                successor));
+                    }
+                }
+            }
+        }
+
+        private static bool TryResolveSuccessor(
+            AccessV2Transition candidate,
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
+            out AccessV2Transition resolved)
+        {
+            var generated = new List<AccessV2OriginProfile>(2);
+            var context = new List<Tile2i>(
+                candidate.LocalContextOrigins);
+            for (int lane = 0; lane < 2; lane++)
+            {
+                AccessV2OriginProfile item = candidate.Next.GetLane(lane);
+                if (fixedProfiles.TryGetValue(
+                        item.Origin, out AccessHeightProfile fixedProfile))
+                {
+                    if (!ProfilesEqual(item.Profile, fixedProfile))
+                    {
+                        resolved = null!;
+                        return false;
+                    }
+                    context.Add(item.Origin);
+                }
+                else
+                {
+                    generated.Add(item);
+                }
+            }
+            resolved = new AccessV2Transition(
+                AccessV2TransitionKind.Straight,
+                candidate.Next,
+                generated,
+                context,
+                scoreOnlyGeneratedExteriorRays: true);
+            return true;
+        }
+
+        private static bool ProfilesEqual(
+            AccessHeightProfile left,
+            AccessHeightProfile right)
+            => left.Nw2 == right.Nw2
+                && left.Ne2 == right.Ne2
+                && left.Se2 == right.Se2
+                && left.Sw2 == right.Sw2;
+
+        private static IReadOnlyList<IReadOnlyList<Tile2i>>
+            BuildSourceCenterDistanceTiers(ISet<Tile2i> seeds)
+        {
+            if (seeds.Count == 0)
+                return Array.Empty<IReadOnlyList<Tile2i>>();
+            long sumCenterX = 0;
+            long sumCenterY = 0;
+            foreach (Tile2i seed in seeds)
+            {
+                sumCenterX += seed.X + 2;
+                sumCenterY += seed.Y + 2;
+            }
+            int count = seeds.Count;
+            return seeds
+                .GroupBy(seed =>
+                    Math.Abs((long)(seed.X + 2) * count - sumCenterX)
+                    + Math.Abs((long)(seed.Y + 2) * count - sumCenterY))
+                .OrderBy(group => group.Key)
+                .Select(group => (IReadOnlyList<Tile2i>)group
+                    .OrderBy(seed => seed.X)
+                    .ThenBy(seed => seed.Y)
+                    .ToList())
+                .ToList();
+        }
+
+        private readonly struct SourceLaunchKey : IEquatable<SourceLaunchKey>
+        {
+            private readonly Tile2i m_sourceRoot;
+            private readonly AccessV2BandState m_initial;
+            private readonly AccessV2BandState m_successor;
+
+            public SourceLaunchKey(
+                Tile2i sourceRoot,
+                AccessV2BandState initial,
+                AccessV2BandState successor)
+            {
+                m_sourceRoot = sourceRoot;
+                m_initial = initial;
+                m_successor = successor;
+            }
+
+            public bool Equals(SourceLaunchKey other)
+                => m_sourceRoot == other.m_sourceRoot
+                    && m_initial.Equals(other.m_initial)
+                    && m_successor.Equals(other.m_successor);
+
+            public override bool Equals(object? obj)
+                => obj is SourceLaunchKey other && Equals(other);
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = m_sourceRoot.GetHashCode();
+                    hash = (hash * 397) ^ m_initial.GetHashCode();
+                    return (hash * 397) ^ m_successor.GetHashCode();
                 }
             }
         }

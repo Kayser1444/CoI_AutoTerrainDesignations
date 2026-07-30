@@ -408,6 +408,20 @@ public sealed class AtdConsoleCommands
             : "[ATD] V2 Mega pathability overlay OFF.";
     }
 
+    [ConsoleCommand(false, false, "Toggles the access-cluster overlay: identity, state, origin count, arithmetic center, and tied center roots. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
+    private string atdAccessClusterOverlay(string value = "")
+    {
+        bool current = AutoDepthDesignation.ShowAccessClusterOverlay;
+        if (!TryParseConsoleBool(value, out bool parsed))
+            parsed = !current;
+        AutoDepthDesignation.ShowAccessClusterOverlay = parsed;
+        if (!parsed)
+            AutoDepthDesignation.ClearAccessClusterOverlay();
+        return parsed
+            ? "[ATD] Access cluster overlay ON. Re-run designation generation to populate it."
+            : "[ATD] Access cluster overlay OFF.";
+    }
+
     [ConsoleCommand(false, false, "Builds the experimental access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
     private string atdAccessHeightEnvelope(string value = "")
     {

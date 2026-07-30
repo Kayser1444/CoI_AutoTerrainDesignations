@@ -177,14 +177,53 @@ namespace AutoTerrainDesignations.Access.V2
             return false;
         }
 
+        public static bool IsCanonicalVPrime(
+            AccessHeightProfile profile)
+        {
+            int[] corners =
+            {
+                profile.Nw2,
+                profile.Ne2,
+                profile.Se2,
+                profile.Sw2,
+            };
+            for (int offsetCorner = 0;
+                offsetCorner < corners.Length;
+                offsetCorner++)
+            {
+                int baseHeight2 = corners[(offsetCorner + 1) & 3];
+                if (Math.Abs(corners[offsetCorner] - baseHeight2) != 2)
+                    continue;
+                bool othersMatch = true;
+                for (int corner = 0; corner < corners.Length; corner++)
+                {
+                    if (corner != offsetCorner
+                        && corners[corner] != baseHeight2)
+                    {
+                        othersMatch = false;
+                        break;
+                    }
+                }
+                if (othersMatch)
+                    return true;
+            }
+            return false;
+        }
+
         private static AccessV2BandProfileKind Classify(
             AccessV2TravelAxis axis,
             AccessHeightProfile lane0,
             AccessHeightProfile lane1)
         {
-            if (!TryGetProfileMode(lane0, out AccessSearchMode mode0)
-                || !TryGetProfileMode(lane1, out AccessSearchMode mode1))
-                return AccessV2BandProfileKind.Invalid;
+            bool lane0IsRouteProfile =
+                TryGetProfileMode(lane0, out AccessSearchMode mode0);
+            bool lane1IsRouteProfile =
+                TryGetProfileMode(lane1, out AccessSearchMode mode1);
+            if (!lane0IsRouteProfile || !lane1IsRouteProfile)
+                return (lane0IsRouteProfile || IsCanonicalVPrime(lane0))
+                    && (lane1IsRouteProfile || IsCanonicalVPrime(lane1))
+                        ? AccessV2BandProfileKind.MechanicallyValidDeferred
+                        : AccessV2BandProfileKind.Invalid;
 
             if (mode0 == AccessSearchMode.Flat
                 && mode1 == AccessSearchMode.Flat)

@@ -770,7 +770,9 @@ namespace AutoTerrainDesignations
                         prospectiveV2HandoffSpanCache,
                         useV2CornerCrestRule: true,
                         propCleanupByOrigin: propCleanupByOrigin),
-                 usefulHeightEnvelope: usefulHeightEnvelope);
+                 usefulHeightEnvelope: usefulHeightEnvelope,
+                 terrainPathableWithoutBlockers:
+                    terrainPathableWithoutProps);
             snapshotTimer.Stop();
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -1371,18 +1373,21 @@ namespace AutoTerrainDesignations
                 string startSamples = string.Join(";", v2Endpoints.Starts.Take(8)
                     .Select(start =>
                         $"{start.State.Anchor}/{start.State.Axis}/{start.State.EntryDirection}" +
-                        (start.HasSyntheticCompanion
-                            ? $"/synthetic={start.SyntheticCompanionOrigin.GetValueOrDefault()}"
-                            : "/fixed-pair")));
+                        (start.IsSourceLaunch
+                            ? $"/launch={start.LaunchSuccessor!.Next.Anchor}" +
+                                $"/initialGenerated={start.InitialTransition?.Delta.Count ?? 0}" +
+                                $"/successorGenerated={start.LaunchSuccessor.Delta.Count}"
+                            : "/direct-fixture-start")));
                 string goalSamples = string.Join(";", v2Endpoints.FixedGoals.Take(8)
                     .Select(goal =>
                         $"{goal.State.Anchor}/{goal.State.Axis}/exposed={goal.ExposedDirection}" +
                         $"/terminal={goal.TerminalCost.ToString("0.##", CultureInfo.InvariantCulture)}"));
                 LogExperimentalAccessDebug(
                     $"[ATD V2 Frontages] seeds={diagnostics.SeedCount} " +
+                    $"startTiers={v2Endpoints.StartTiers.Count} " +
                     $"starts={v2Endpoints.Starts.Count} " +
-                    $"syntheticStarts={diagnostics.SyntheticStartCount} " +
-                    $"existingPairStarts={diagnostics.ExistingPairStartCount} " +
+                    $"sourceLaunches={diagnostics.SourceLaunchCount} " +
+                    $"directFixtureStarts={diagnostics.DirectFixtureStartCount} " +
                     $"fixedGoalOrigins={diagnostics.FixedGoalOriginCount} " +
                     $"fixedFrontages={v2Endpoints.FixedGoals.Count} " +
                     $"providerNodes={providerField?.ProviderNodeCount ?? 0} " +
@@ -1636,6 +1641,7 @@ namespace AutoTerrainDesignations
                 {
                     diagnostics +=
                     $" v2Expand=[G:{diag.V2GroundExpansions},V:{diag.V2BandExpansions}] " +
+                    $"v2StartTiers=[attempted:{diag.V2StartTiersAttempted},redundantSkipped:{diag.V2RedundantStartTiersSkipped},seedsSkipped:{diag.V2RedundantStartSeedsSkipped}] " +
                     $"v2LabelDominance=[early:{diag.V2EarlyLabelDominancePrunes},exact:{diag.V2ExactLabelDominancePrunes}] " +
                     $"v2Suffix=[attempts:{diag.V2GroundSuffixAttempts},success:{diag.V2GroundSuffixSuccesses}," +
                     $"fallback:{diag.V2GroundSuffixFallbacks},steps:{diag.V2GroundSuffixSteps}] " +
@@ -1691,6 +1697,10 @@ namespace AutoTerrainDesignations
                 LogExperimentalAccessTrace(
                     $"[ATD V2 Ground Suffix] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.V2GroundSuffixDetails));
+            if (diag.V2VPrimeAdapterDetails.Count > 0)
+                LogExperimentalAccessDebug(
+                    $"[ATD V2 VPrime Adapter] cluster={cluster.ClusterId} " +
+                    string.Join("; ", diag.V2VPrimeAdapterDetails));
             if (!string.IsNullOrEmpty(diag.V2DryRunSummary))
                 LogExperimentalAccessDebug(
                     $"[ATD V2 Search] cluster={cluster.ClusterId} " +
@@ -3305,7 +3315,8 @@ namespace AutoTerrainDesignations
 
             var placedHandoffs = new List<(
                 AccessV2HandoffCandidate Handoff,
-                bool IsGroundToV)>();
+                bool IsGroundToV,
+                AccessV2BandState State)>();
             if (result.V2Route.RouteSteps.Count > 0)
             {
                 for (int stepIndex = 0;
@@ -3319,22 +3330,43 @@ namespace AutoTerrainDesignations
                     bool isGroundToV = stepIndex > 0
                         && result.V2Route.RouteSteps[stepIndex - 1].IsGround
                         && !step.IsGround;
-                    placedHandoffs.Add((step.Handoff, isGroundToV));
+                    placedHandoffs.Add(
+                        (step.Handoff, isGroundToV, step.State));
                 }
             }
             else if (result.V2Route.Handoff != null)
             {
-                placedHandoffs.Add((result.V2Route.Handoff, false));
+                placedHandoffs.Add((
+                    result.V2Route.Handoff,
+                    false,
+                    result.V2Route.States[
+                        result.V2Route.States.Count - 1]));
             }
             for (int index = 0; index < placedHandoffs.Count; index++)
             {
                 AccessV2HandoffCandidate handoff =
                     placedHandoffs[index].Handoff;
-                Tile2i liveExitDirection = placedHandoffs[index].IsGroundToV
-                    ? new Tile2i(
-                        -handoff.ExitDirection.X,
-                        -handoff.ExitDirection.Y)
-                    : handoff.ExitDirection;
+                if (placedHandoffs[index].IsGroundToV)
+                {
+                    if (!AccessV2Handoffs.TryValidatePlacedGroundToVBridge(
+                        placedHandoffs[index].State,
+                        handoff,
+                        result.V2Route.VehicleWidth,
+                        (Tile2i tile, out float height) =>
+                            TryGetLiveGroundToVPostWorkHeight(
+                                placedHandoffs[index].State,
+                                handoff.Lane0Operation,
+                                tile,
+                                out height),
+                        _ => false,
+                        out string bridgeReason))
+                    {
+                        reason = "LiveGroundToVBridgeMismatch:"
+                            + bridgeReason;
+                        return false;
+                    }
+                    continue;
+                }
                 if (handoff.IsQuickPath
                     && handoff.SpanLength == 1
                     && handoff.Lane0Operation
@@ -3348,18 +3380,22 @@ namespace AutoTerrainDesignations
                         handoff.Lane0Operation,
                         handoff.Lane0Contact,
                         handoff.GroundEntryCenters,
-                        liveExitDirection,
+                        handoff.ExitDirection,
                         lane: 0,
-                        requiresCrest: handoff.Lane0RequiresCrest,
+                        requiresCrest:
+                            !placedHandoffs[index].IsGroundToV
+                            && handoff.Lane0RequiresCrest,
                         out string laneReason)
                     || !ValidateLiveLane(
                         handoff.Lane1TerminalOrigins,
                         handoff.Lane1Operation,
                         handoff.Lane1Contact,
                         handoff.GroundEntryCenters,
-                        liveExitDirection,
+                        handoff.ExitDirection,
                         lane: 1,
-                        requiresCrest: handoff.Lane1RequiresCrest,
+                        requiresCrest:
+                            !placedHandoffs[index].IsGroundToV
+                            && handoff.Lane1RequiresCrest,
                         out laneReason))
                 {
                     reason = laneReason;
@@ -3477,6 +3513,60 @@ namespace AutoTerrainDesignations
                     return false;
                 }
                 return true;
+            }
+
+            bool TryGetLiveGroundToVPostWorkHeight(
+                AccessV2BandState state,
+                AccessHandoffOperation operation,
+                Tile2i tile,
+                out float height)
+            {
+                float natural =
+                    terrMgr.GetHeight(tile).Value.ToFloat();
+                return AccessV2Handoffs
+                    .TryResolvePlacedGroundToVPostWorkHeight(
+                        state,
+                        operation,
+                        tile,
+                        natural,
+                        TryGetProjectedDesignationHeight,
+                        out height);
+            }
+
+            float? TryGetProjectedDesignationHeight(Tile2i tile)
+            {
+                int baseX = (int)Math.Floor(tile.X / 4.0) * 4;
+                int baseY = (int)Math.Floor(tile.Y / 4.0) * 4;
+                int minX = tile.X == baseX ? baseX - 4 : baseX;
+                int minY = tile.Y == baseY ? baseY - 4 : baseY;
+                float? resolved = null;
+                for (int originX = minX;
+                    originX <= baseX;
+                    originX += 4)
+                {
+                    for (int originY = minY;
+                        originY <= baseY;
+                        originY += 4)
+                    {
+                        var origin = new Tile2i(originX, originY);
+                        Option<TerrainDesignation> designation =
+                            s_desigManager!.GetDesignationAt(origin);
+                        if (!designation.HasValue
+                            || !IsTerrainWorkDesignationProto(
+                                designation.Value.Prototype))
+                            continue;
+                        float candidate = GetDesignationTargetHeightAt(
+                                designation.Value.Data,
+                                tile.X - originX,
+                                tile.Y - originY)
+                            .Value.ToFloat();
+                        if (resolved.HasValue
+                            && Math.Abs(resolved.Value - candidate) > 0.0001f)
+                            return null;
+                        resolved = candidate;
+                    }
+                }
+                return resolved;
             }
         }
 
@@ -4036,6 +4126,7 @@ namespace AutoTerrainDesignations
                 case AccessSearchMode.XNegative: return "X-";
                 case AccessSearchMode.YPositive: return "Y+";
                 case AccessSearchMode.YNegative: return "Y-";
+                case AccessSearchMode.VPrime: return "V'";
                 case AccessSearchMode.Existing: return "Existing";
                 default: return mode.ToString();
             }

@@ -491,6 +491,104 @@ namespace AutoTerrainDesignations
                 registered.Remove(origin);
         }
 
+        internal static void OnTerrainDesignationRemoved(Tile2i origin)
+        {
+            origin = TerrainDesignation.GetOrigin(origin);
+            var affectedTowers = new HashSet<EntityId>();
+            RemoveOwnership(
+                s_generatedDesignationOriginsByTowerEntityId);
+            RemoveOwnership(
+                s_generatedAccesswayOriginsByTowerEntityId);
+            foreach (EntityId towerId in affectedTowers)
+                if (s_towerSettingsByEntityId.TryGetValue(
+                        towerId, out ATDTowerSettings settings))
+                    settings.MarkMiningPlanDirty();
+
+            void RemoveOwnership(
+                IDictionary<EntityId, HashSet<Tile2i>> ownership)
+            {
+                var emptyOwners = new List<EntityId>();
+                foreach (KeyValuePair<EntityId, HashSet<Tile2i>> pair
+                    in ownership)
+                {
+                    if (pair.Value.Remove(origin))
+                        affectedTowers.Add(pair.Key);
+                    if (pair.Value.Count == 0)
+                        emptyOwners.Add(pair.Key);
+                }
+                for (int index = 0; index < emptyOwners.Count; index++)
+                    ownership.Remove(emptyOwners[index]);
+            }
+        }
+
+        public static void RemoveDesignationPostfix(Tile2i __0)
+            => OnTerrainDesignationRemoved(__0);
+
+        internal static bool ValidateGeneratedDesignationRemovalFixtures(
+            out string failure)
+        {
+            EntityId towerId = EntityId.Invalid;
+            var unrelatedTowerId = new EntityId(987654321);
+            var origin = new Tile2i(124, 456);
+            var settings = new ATDTowerSettings(
+                1, 2, 1, null, 0, 1);
+            settings.MarkMiningPlanClean("fixture-clean");
+            var unrelatedSettings = new ATDTowerSettings(
+                1, 2, 1, null, 0, 1);
+            unrelatedSettings.MarkMiningPlanClean(
+                "fixture-unrelated-clean");
+            s_towerSettingsByEntityId[towerId] = settings;
+            s_towerSettingsByEntityId[unrelatedTowerId] =
+                unrelatedSettings;
+            s_generatedDesignationOriginsByTowerEntityId[towerId] =
+                new HashSet<Tile2i> { origin };
+            s_generatedAccesswayOriginsByTowerEntityId[towerId] =
+                new HashSet<Tile2i> { origin };
+            try
+            {
+                OnTerrainDesignationRemoved(origin);
+                OnTerrainDesignationRemoved(origin);
+                bool designationOwned =
+                    s_generatedDesignationOriginsByTowerEntityId
+                        .TryGetValue(
+                            towerId,
+                            out HashSet<Tile2i> designationOrigins)
+                    && designationOrigins.Contains(origin);
+                bool accesswayOwned =
+                    s_generatedAccesswayOriginsByTowerEntityId
+                        .TryGetValue(
+                            towerId,
+                            out HashSet<Tile2i> accesswayOrigins)
+                    && accesswayOrigins.Contains(origin);
+                if (designationOwned
+                    || accesswayOwned
+                    || !settings.MiningPlanDirty
+                    || unrelatedSettings.MiningPlanDirty)
+                {
+                    failure =
+                        "Removing a generated terrain designation must clear ordinary/accessway ownership and dirty its tower plan: "
+                        + $"designationOwned={designationOwned} "
+                        + $"accesswayOwned={accesswayOwned} "
+                        + $"dirty={settings.MiningPlanDirty} "
+                        + "unrelatedDirty="
+                        + unrelatedSettings.MiningPlanDirty;
+                    return false;
+                }
+                failure = string.Empty;
+                return true;
+            }
+            finally
+            {
+                s_towerSettingsByEntityId.Remove(towerId);
+                s_towerSettingsByEntityId.Remove(
+                    unrelatedTowerId);
+                s_generatedDesignationOriginsByTowerEntityId.Remove(
+                    towerId);
+                s_generatedAccesswayOriginsByTowerEntityId.Remove(
+                    towerId);
+            }
+        }
+
         private static bool IsGeneratedDesignationOrigin(IAreaManagingTower tower, Tile2i origin)
         {
             return TryGetTowerEntityId(tower, out EntityId entityId)

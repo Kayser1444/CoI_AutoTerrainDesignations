@@ -154,12 +154,16 @@ namespace AutoTerrainDesignations.Access.V2
         public AccessV2GroundEscapePotentialField(
             AccessV2GroundGraph ground,
             AccessV2PotentialField vPotential,
-            float minimumGeneratedEntryCost = 0f)
+            float minimumGeneratedEntryCost = 0f,
+            Func<Tile2i, bool>? canExitToGeneratedV = null)
         {
             var queue = new SortedDictionary<float, Queue<Tile2i>>();
             foreach (Tile2i tile in ground.TraversableNodes)
             {
-                if (ground.IsGoalConnected(tile)) continue;
+                if (ground.IsGoalConnected(tile)
+                    || (canExitToGeneratedV != null
+                        && !canExitToGeneratedV(tile)))
+                    continue;
                 Seed(tile, vPotential.GetPotential(tile)
                     + Math.Max(0f, minimumGeneratedEntryCost));
             }

@@ -59,6 +59,7 @@ namespace AutoTerrainDesignations
             AtdDiagnostics.ResetToBuildDefault();
             ShowCursorOverlay = false;
             ShowExperimentalAccessSearchOverlay = false;
+            ShowAccessClusterOverlay = false;
             ResetWorldPathfinderSettingsToDefaults();
             s_batchSize = BATCH_SIZE;
             ResetPurityLevelDefaults();
@@ -517,6 +518,16 @@ namespace AutoTerrainDesignations
                         migrateGeneratedDefaults,
                         false))
                     ShowExperimentalAccessSearchOverlay = experimentalAccessSearchOverlayEnabled.Value;
+
+                bool? accessClusterOverlayEnabled = ParseBool(
+                    json, "accessClusterOverlayEnabled");
+                if (accessClusterOverlayEnabled.HasValue
+                    && ShouldPreserveBool(
+                        accessClusterOverlayEnabled.Value,
+                        migrateGeneratedDefaults,
+                        false))
+                    ShowAccessClusterOverlay =
+                        accessClusterOverlayEnabled.Value;
 
                 bool? accessAvoidOcean = ParseBool(json, "accessAvoidOcean");
                 if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
@@ -977,6 +988,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to draw fading yellow dots on the terrain for nodes explored by the sliced experimental access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
             sb.AppendLine($"  \"experimentalAccessSearchOverlayEnabled\": {BoolToJsonStr(ShowExperimentalAccessSearchOverlay)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessClusterOverlayEnabled\": \"Whether to show access-cluster identity, state, origin count, arithmetic center, and tied center roots at game start. Default: false. The atd_access_cluster_overlay console command can still override this for the current session.\",");
+            sb.AppendLine($"  \"accessClusterOverlayEnabled\": {BoolToJsonStr(ShowAccessClusterOverlay)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that avoids ocean in accessways and Mining Designations. Mining cells directly overlapping ocean are excluded and projected underwater cutting is avoided. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");

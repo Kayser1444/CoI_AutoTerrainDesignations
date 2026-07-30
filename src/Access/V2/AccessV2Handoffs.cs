@@ -244,7 +244,8 @@ namespace AutoTerrainDesignations.Access.V2
             candidate = null!;
             if (vehicleWidth <= 0
                 || (operation != AccessHandoffOperation.Mining
-                    && operation != AccessHandoffOperation.Dumping))
+                    && operation != AccessHandoffOperation.Dumping
+                    && operation != AccessHandoffOperation.Leveling))
                 return false;
 
             bool travelsX = state.EntryDirection.X != 0;
@@ -346,6 +347,82 @@ namespace AutoTerrainDesignations.Access.V2
                 new[] { lane0Origin }, new[] { lane1Origin },
                 escape, new[] { groundEntry }, Array.Empty<string>(), 0f,
                 centerSpokeCost: centerSpokeCost);
+            return true;
+        }
+
+        internal static bool TryValidatePlacedGroundToVBridge(
+            AccessV2BandState state,
+            AccessV2HandoffCandidate recorded,
+            int vehicleWidth,
+            AccessV2PostWorkHeightEvaluator postWorkHeight,
+            AccessV2DumpingPropBlockerEvaluator dumpingPropBlocker,
+            out string reason)
+        {
+            if (recorded.GroundEntryCenters.Count != 1)
+            {
+                reason = "GroundToVGroundEntryCount";
+                return false;
+            }
+            if (recorded.Lane0Operation != recorded.Lane1Operation)
+            {
+                reason = "GroundToVMixedOperations";
+                return false;
+            }
+            if (!TryCreateDeterministicGroundToVBridge(
+                    state,
+                    recorded.GroundEntryCenters[0],
+                    recorded.Lane0Operation,
+                    vehicleWidth,
+                    recorded.CenterSpokeCost,
+                    postWorkHeight,
+                    dumpingPropBlocker,
+                    out AccessV2HandoffCandidate replayed))
+            {
+                reason = "GroundToVDeterministicBridgeInvalid";
+                return false;
+            }
+            if (replayed.ExitDirection != recorded.ExitDirection
+                || replayed.SpanLength != recorded.SpanLength
+                || replayed.Lane0Operation != recorded.Lane0Operation
+                || replayed.Lane1Operation != recorded.Lane1Operation
+                || replayed.Lane0Contact != recorded.Lane0Contact
+                || replayed.Lane1Contact != recorded.Lane1Contact
+                || !replayed.Lane0TerminalOrigins.SequenceEqual(
+                    recorded.Lane0TerminalOrigins)
+                || !replayed.Lane1TerminalOrigins.SequenceEqual(
+                    recorded.Lane1TerminalOrigins)
+                || !replayed.EscapeCenters.SequenceEqual(
+                    recorded.EscapeCenters)
+                || !replayed.GroundEntryCenters.SequenceEqual(
+                    recorded.GroundEntryCenters))
+            {
+                reason = "GroundToVDeterministicBridgeMismatch";
+                return false;
+            }
+            reason = string.Empty;
+            return true;
+        }
+
+        internal static bool TryResolvePlacedGroundToVPostWorkHeight(
+            AccessV2BandState state,
+            AccessHandoffOperation operation,
+            Tile2i tile,
+            float naturalHeight,
+            Func<Tile2i, float?> projectedHeight,
+            out float height)
+        {
+            if (TryGetBandTargetHeight(state, tile, out float target))
+            {
+                height = operation == AccessHandoffOperation.Mining
+                    ? Math.Min(naturalHeight, target)
+                    : operation == AccessHandoffOperation.Dumping
+                        ? Math.Max(naturalHeight, target)
+                        : target;
+                return true;
+            }
+
+            float? projected = projectedHeight(tile);
+            height = projected ?? naturalHeight;
             return true;
         }
 
@@ -469,6 +546,7 @@ namespace AutoTerrainDesignations.Access.V2
                     projectedCenterOverlapsWork,
                     postWorkCenterValidator,
                     groundEntryValidator,
+                    vehicleWidth,
                     centerSpokeCost, requiredGroundEntry, result,
                     diagnostics);
             }
@@ -501,6 +579,7 @@ namespace AutoTerrainDesignations.Access.V2
                         projectedCenterOverlapsWork,
                         postWorkCenterValidator,
                         groundEntryValidator,
+                        vehicleWidth,
                         centerSpokeCost, requiredGroundEntry, result,
                         diagnostics);
                 }
@@ -1010,6 +1089,7 @@ namespace AutoTerrainDesignations.Access.V2
             Func<Tile2i, AccessV2History, bool>? projectedCenterOverlapsWork,
             AccessV2HandoffCenterEvaluator? postWorkCenterValidator,
             AccessV2HandoffGroundEntryEvaluator? groundEntryValidator,
+            int vehicleWidth,
             float centerSpokeCost,
             Tile2i? requiredGroundEntry,
             ICollection<AccessV2HandoffCandidate> result,
@@ -1038,11 +1118,19 @@ namespace AutoTerrainDesignations.Access.V2
                 var leveledLane1 = new AccessGroundHandoff(
                     lane1Contact, AccessHandoffOperation.Leveling,
                     new[] { bridge.Tile }, spanLength);
-                if (TryBuildLevelingBridgeEscape(
-                        leveledLane0, leveledLane1, exitDirection,
+                if (TryBuildLevelingGroundEscape(
+                        leveledLane0, leveledLane1,
+                        lane0TerminalOrigins, lane1TerminalOrigins,
+                        exitDirection,
                         lane0TerminalOrigins.Count, bridge.Tile,
+                        ground, history, groundEntryValidator,
+                        vehicleWidth, cleanupCostScale,
+                        requiredGroundEntry,
                         out IReadOnlyList<Tile2i> leveledCenters,
-                        out IReadOnlyList<Tile2i> leveledEntries))
+                        out IReadOnlyList<Tile2i> leveledEntries,
+                        out IReadOnlyCollection<string> cleanupKeys,
+                        out float cleanupCost,
+                        out int outwardSteps))
                 {
                     if (diagnostics != null)
                         diagnostics.V2LevelingBridgeAccepts++;
@@ -1053,9 +1141,10 @@ namespace AutoTerrainDesignations.Access.V2
                         lane1TerminalOrigins,
                         leveledCenters,
                         leveledEntries,
-                        Array.Empty<string>(), 0f,
+                        cleanupKeys, cleanupCost,
                         isQuickPath: true,
-                        centerSpokeCost: centerSpokeCost));
+                        centerSpokeCost:
+                            centerSpokeCost + outwardSteps));
                 }
                 return;
             }
@@ -1206,6 +1295,79 @@ namespace AutoTerrainDesignations.Access.V2
             return new Tile2i(
                 Math.Max(origin.X, Math.Min(origin.X + 4, bridge.X)),
                 exitDirection.Y > 0 ? origin.Y + 4 : origin.Y);
+        }
+
+        private static bool TryBuildLevelingGroundEscape(
+            AccessGroundHandoff lane0,
+            AccessGroundHandoff lane1,
+            IReadOnlyList<Tile2i> lane0TerminalOrigins,
+            IReadOnlyList<Tile2i> lane1TerminalOrigins,
+            Tile2i exitDirection,
+            int spanLength,
+            Tile2i bridge,
+            AccessV2GroundGraph ground,
+            AccessV2History history,
+            AccessV2HandoffGroundEntryEvaluator? groundEntryValidator,
+            int vehicleWidth,
+            float cleanupCostScale,
+            Tile2i? requiredGroundEntry,
+            out IReadOnlyList<Tile2i> escape,
+            out IReadOnlyList<Tile2i> groundEntries,
+            out IReadOnlyCollection<string> cleanupKeys,
+            out float cleanupCost,
+            out int outwardSteps)
+        {
+            escape = Array.Empty<Tile2i>();
+            groundEntries = Array.Empty<Tile2i>();
+            cleanupKeys = Array.Empty<string>();
+            cleanupCost = 0f;
+            outwardSteps = 0;
+            if (!TryBuildLevelingBridgeEscape(
+                    lane0, lane1, exitDirection,
+                    spanLength, bridge,
+                    out IReadOnlyList<Tile2i> interior,
+                    out _))
+                return false;
+
+            int forwardX = Math.Sign(exitDirection.X);
+            int forwardY = Math.Sign(exitDirection.Y);
+            var outward = new Tile2i(forwardX, forwardY);
+            int maxOutward = Math.Max(1, vehicleWidth);
+            var clearingOrigins = new HashSet<Tile2i>(
+                lane0TerminalOrigins);
+            clearingOrigins.UnionWith(lane1TerminalOrigins);
+            for (int offset = 0; offset <= maxOutward; offset++)
+            {
+                Tile2i candidate = AccessV2Geometry.Add(
+                    bridge, AccessV2Geometry.Scale(outward, offset));
+                if (requiredGroundEntry.HasValue
+                    && candidate != requiredGroundEntry.Value)
+                    continue;
+                if (!ground.IsTraversable(candidate, history)
+                    || (groundEntryValidator != null
+                        && !groundEntryValidator(
+                            candidate, clearingOrigins, history))
+                    || !ground.TryValidateLocalEscape(
+                        new[] { candidate }, history, cleanupCostScale,
+                        out IReadOnlyCollection<string> candidateCleanupKeys,
+                        out float candidateCleanupCost))
+                    continue;
+
+                var centers = new List<Tile2i>(
+                    interior.Count + offset);
+                centers.AddRange(interior);
+                for (int step = 1; step <= offset; step++)
+                    centers.Add(AccessV2Geometry.Add(
+                        bridge,
+                        AccessV2Geometry.Scale(outward, step)));
+                escape = centers;
+                groundEntries = new[] { candidate };
+                cleanupKeys = candidateCleanupKeys;
+                cleanupCost = candidateCleanupCost;
+                outwardSteps = offset;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>

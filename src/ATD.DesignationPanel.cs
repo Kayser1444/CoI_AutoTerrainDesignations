@@ -209,6 +209,7 @@ namespace AutoTerrainDesignations
                         var tower = getTower();
                         if (tower == null) return;
                         AutoDepthDesignation.ClearTowerLastRampOutcome(tower);
+                        AutoDepthDesignation.ClearAccessClusterOverlay();
                         if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                             AutoDepthDesignation.ClearDesignationsForTower(tower);
                         else

@@ -9,7 +9,7 @@ Captain of Industry structures accessible.
 A feasible two-slice, 2×2-origin prefix whose initial slice contains a source
 obligation and whose successor slice proves the first longitudinal Mega move.
 Each origin may reuse compatible fixed work or use newly planned route-profile
-work, including one bounded V2 transition band; the initial slice adds no
+work, including one bounded V2 transition adapter; the initial slice adds no
 traversal, while its successor does.
 _Avoid_: Synthetic companion, flat 2×2 seed, exposed source frontage
 
@@ -22,7 +22,10 @@ _Avoid_: Tie-broken start origin, single center tile
 **V2 source-center distance tier**:
 A set of source origins sharing the same distance from the source cluster's
 arithmetic center. V2 tries tiers from the center outward and advances to a
-less-central tier only when every route from the current tier fails.
+less-central tier only when every route from the current tier fails. A backup
+tier is skipped unless it contributes a launch search state that no earlier
+tier explored; coordinate reuse with a distinct axis, profile, or navigation
+identity remains a novel fallback.
 _Avoid_: Perimeter seed scan, synthetic source-distance penalty
 
 **V2 fixed-navigation profile**:
@@ -41,19 +44,20 @@ corner and saddle profiles. Existing traversable profiles are instead projected
 into ground navigation at their finished target surface.
 _Avoid_: Fixed-navigation profile, any traversable profile
 
-**V2 transition band**:
-The single width-two generated adapter at a projected-ground boundary; its
-other side may be a propagating route-profile band or another projected
-surface, and each lane may reuse compatible fixed work or use newly planned V
-or canonical V-prime work. It is admitted by exact Mega connectivity, has no
-projected-side orientation, is charged once without becoming a propagating move
-type or satisfying a route-profile predecessor requirement, and may recur only
-at distinct crossings. After acceptance it becomes ordinary fixed-target
-context and may seed transition work in a later provisioning search.
-_Avoid_: V-prime route profile, lateral-exit special case
+**V2 transition adapter**:
+The bounded width-two generated repair at a projected-ground boundary. It uses
+one longitudinal slice for a jagged fringe or one complementary two-slice pair
+for a slanted fringe; a third slice is forbidden. Its far side may be a
+propagating route-profile band or another projected surface, and each lane may
+reuse compatible fixed work or use newly planned V or canonical V-prime work.
+It is admitted by exact Mega connectivity, has no projected-side orientation,
+and never becomes a propagating move type or satisfies a route-profile
+predecessor requirement. After acceptance its slices become ordinary fixed
+target context and may seed transition work in a later provisioning search.
+_Avoid_: V-prime route profile, transition-band chain, lateral-exit special case
 
 **V2 transition crossing**:
-An exact Mega vehicle-center path through a resolved V2 transition band,
+An exact Mega vehicle-center path through a resolved V2 transition adapter,
 charging unit cardinal or square-root-of-two diagonal travel independently of
 the band’s generated work. It has no categorical straight, strafe, turn, or
 spoke travel fee.
@@ -68,7 +72,7 @@ _Avoid_: Exact-terrain no-op, omitted companion
 
 **V-prime candidate origin**:
 A non-fixed origin with one to three cardinal non-conflicting fixed-target
-neighbours, marking where lazy transition-band resolution may consider
+neighbours, marking where lazy transition-adapter resolution may consider
 generated V-prime work. Every terrain-designation target seeds the catalog
 regardless of current Mega connectivity, while physical ground does not;
 diagonal neighbours constrain shared corner heights during resolution but do
@@ -78,21 +82,52 @@ within the same search. The catalog is refreshed whenever accepted accessway
 work changes the fixed-target snapshot.
 _Avoid_: V-prime eligible origin, diagonal candidate halo
 
+**FV navigation space**:
+The directionless, clearance-exact Mega navigation space over compatible
+width-two fixed-navigation bands. Cardinal travel costs four, while diagonal
+travel costs four square-root-of-two and is legal only when both corresponding
+cardinal sweeps are free.
+_Avoid_: Propagating V space, optimistic fixed-origin adjacency
+
 **Projected fixed-ground graph**:
-The clearance-exact Mega vehicle-center graph over existing terrain-work target
-surfaces and their connections to physical ground. It supplies ordinary
-cardinal and diagonal travel through fixed work without requiring V-prime
+The unified clearance-exact Mega navigation graph joining FV navigation space
+to physical ground. It permits travel through fixed work without V-prime
 generation transitions or exposed fixed frontages.
-_Avoid_: Fixed-band graph, optimistic provider field
+_Avoid_: Optimistic provider field, generated V graph
 
 **Projected-ground heuristic relaxation**:
 The G-like lower-bound layer over projected fixed terrain and possible V2
-transition bands, with unit cardinal and square-root-of-two diagonal travel.
+transition adapters, with unit cardinal and square-root-of-two diagonal travel.
 It omits transition construction cost and may admit edges that fail real
 clearance or steepness, including chains of candidate bands forbidden by exact
 search, because extra heuristic edges can only shorten the estimate; exact
 search still validates and charges every route.
 _Avoid_: Exact projected-ground graph, clearance or steepness proof
+
+**Global mixed route potential**:
+A proposed reverse shortest-path lower bound over strict-diagonal physical G,
+relaxed-octagonal fixed navigation, and actual 4x4 generated V origins.
+Generated cardinal propagation charges four traversal units plus one
+generated-origin fixed overhead. Goal G and matching fixed targets seed zero;
+handoff, terminal, and grounded suffix costs remain part of the field.
+_Avoid_: Terrain-extrema heuristic, physical-tile F/4 smear
+
+**Component-conditioned V commitment potential**:
+A proposed replacement route potential for a V label launched from one
+non-goal G component. It inherits complete global-potential values at that
+component's useful V merge fringe and flood-fills backward through its sparse V
+shadow at one cardinal-origin traversal plus fixed overhead per step. The
+source component is carried as potential ownership; the field replaces rather
+than augments the global route potential while that commitment remains active.
+_Avoid_: Additive V surcharge, component-independent V potential
+
+**Potential-owner state**:
+The proposed identity selecting either the global mixed route potential or the
+component-conditioned field belonging to the G component from which the
+current uninterrupted V route launched. One physical origin may have values
+for several component owners; reaching the owner's useful V merge fringe
+returns ownership to the global field.
+_Avoid_: Physical-origin partition, generated history
 
 **Resolved V2 move**:
 A generated-band movement whose newly encountered origins are resolved as

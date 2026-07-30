@@ -166,7 +166,7 @@ namespace AutoTerrainDesignations.Access.V2
             }
             endpoints.Diagnostics.FixedFrontageCount = charged.Count;
             return new AccessV2EndpointSet(
-                endpoints.Starts, charged, endpoints.Diagnostics);
+                endpoints.StartTiers, charged, endpoints.Diagnostics);
         }
     }
 }

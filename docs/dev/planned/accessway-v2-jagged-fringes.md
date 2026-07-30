@@ -21,8 +21,10 @@ The design therefore separates two concerns:
   target and navigate it like ground.
 * Propagating accessway work remains generated V space, limited to flat and
   axis-aligned ramp profiles.
-* One bounded transition band may generate canonical V-prime profiles to join
-  projected ground to V or another projected surface.
+* One bounded transition adapter may generate canonical V-prime profiles to
+  join projected ground to V or another projected surface. It uses one
+  longitudinal slice where possible and one complementary two-slice pair
+  where a slanted fringe requires it.
 
 This makes jagged and slanted patching and one-origin starts ordinary resolved
 boundaries between generated work and projected ground rather than special
@@ -92,6 +94,35 @@ This replaces:
 Reverse distances in the exact projected-ground graph supply real downstream
 travel costs. No exposed-pair terminal fee is needed.
 
+### Fixed-navigation V space
+
+Represent the fixed-target portion of the exact graph in directionless **FV
+navigation space** rather than expanding every physical vehicle-center tile.
+An FV node is a compatible width-two fixed-navigation band; it does not inherit
+generated-V profile propagation, entry-heading, predecessor, strafe, turn, or
+generatable-profile restrictions.
+
+An exact cardinal FV move advances one origin and costs `4`. An exact diagonal
+FV move advances one origin on both axes and costs `4 * sqrt(2)`. Diagonal
+travel is strict: both corresponding cardinal swept corridors must be legal.
+Every FV edge must prove the complete intermediate Mega vehicle-center path,
+including projected height, steepness, obstacle, cleanup, and history-dependent
+clearance. Replay expands the edge back into that exact center path.
+
+Source centers, physical-G contacts, transition-adapter contacts, cleanup changes,
+and irregular fringe contacts are explicit FV portals. The FV representation
+must preserve the connectivity, travel cost, cleanup ownership, and available
+crossings of the clearance-exact vehicle-center graph; it is not optimistic
+fixed-origin adjacency.
+
+The one-adapter transition limit constrains generated designation origins, not
+the number of vehicle-center steps between an FV canonical center and the
+contact. The projected Mega footprint extends beyond an origin edge. Exact
+portal probing may therefore retain up to eight straight or diagonal center
+steps: one four-tile origin band plus the fixed-side footprint offset. It stops
+at the first non-projected or cleanup center and never flood-fills the fixed
+body.
+
 A free fixed-to-ground edge is legal only for pre-existing fixed work. Any edge
 from a generated-owned target surface into physical G must still use the
 authoritative generated V/G seam evaluator so operation selection, workability,
@@ -135,11 +166,18 @@ Group source origins into distance tiers:
 6. Do not advance after `VisitedLimit`, `CostLimit`, cancellation, or another
    resource failure, because those outcomes do not prove the tier lacks a
    route.
+7. Skip a backup tier unless it contributes at least one launch search state
+   that no earlier tier explored. Novelty uses the authoritative V2 label
+   identity rather than the displayed coordinate, so a distinct axis, band
+   profile, projected-navigation portal, or adapter role remains a valid
+   fallback.
 
 Centrality is lexicographic: any successful route from a more-central tier wins
 even if a later tier could be cheaper. The tier fallback avoids making an
 unusable centroid a permanent failure without returning to zero-cost
-perimeter-wide start discovery.
+perimeter-wide start discovery. Exhausting a tier proves that re-seeding an
+already-explored launch state would only repeat its reachable search component;
+such a seed does not justify replaying the tier.
 
 ## 5. Replace Synthetic Starts with a V2 Source Launch
 
@@ -178,7 +216,8 @@ For each source root, enumerate:
 * every eligible Mega center;
 * every compatible fixed-target reuse;
 * every legal generated V companion and successor profile;
-* one bounded V-prime transition band where the source fringe permits it; and
+* one bounded V-prime transition adapter where the source fringe permits it;
+  and
 * both travel directions where distinct.
 
 Deduplicate identical resolved launch plans, but retain distinct pathable
@@ -200,6 +239,12 @@ The companion is generated beside the source and the two down-ramps form the
 perpendicular successor and immediate handoff. This is not a flat 2x2 fill and
 must emerge from profile enumeration and costing.
 
+The handoff seam begins at the ramp face, but its G entry is the first captured
+Mega-pathable center reached outward from that face. Any intervening centers
+remain part of the proven handoff spoke and pay ordinary cardinal travel cost;
+the search must not require an extra V band merely to move the entry center
+clear of the ramp footprint.
+
 An exact-terrain generated companion remains an explicit designation. It may
 have zero direct-work cost, but it still pays generated-origin overhead and
 creates a persistent, tracked corridor.
@@ -211,9 +256,9 @@ creates a persistent, tracked corridor.
   ordinary V frontier with its complete generated history.
 * A physically valid mixed launch that cannot form an enabled uniform V band
   may queue a projected-ground start carrying its generated history.
-* A source-side transition band uses the same resolver, candidate rules, exact
+* A source-side transition adapter uses the same resolver, candidate rules, exact
   crossing, ownership, and cost as every other projected-ground boundary.
-* A V-prime transition band supplies physical launch geometry but never counts
+* A V-prime transition adapter supplies physical launch geometry but never counts
   as a route-profile predecessor for a later strafe or turn.
 * Generated origins always remain owned, replayed, and materialized. Projected
   navigation never reclassifies them as fixed work.
@@ -223,11 +268,14 @@ creates a persistent, tracked corridor.
 This replaces the fake initial `Strafe`, the first-state replay special case,
 and `StartSourceMegaPairMissing` as a structural rejection.
 
-## 6. Resolve Fixed Fringes with One Transition Band
+## 6. Resolve Fixed Fringes with One Bounded Transition Adapter
 
 Search may alternate among generated V, projected fixed ground, and physical G
 within one route. At each projected-ground boundary, one width-two transition
-band may resolve the surface mismatch without becoming a propagating V state.
+adapter may resolve the surface mismatch without becoming a propagating V
+state. A jagged repair normally occupies one longitudinal slice. A slanted
+repair may occupy one complementary pair of consecutive slices whose far face
+is an ordinary level or ramp face. No adapter may grow to a third slice.
 
 Each transition lane may:
 
@@ -237,21 +285,22 @@ Each transition lane may:
   `+1` or `-1`.
 
 Saddles, arbitrary four-corner interpolation, and larger corner offsets remain
-non-generatable. Every V-prime origin must independently belong to the
-candidate catalog described below. A transition band cannot be followed
-directly by another transition band, satisfy a V predecessor requirement, or
-seed more V-prime work during the same search. After an accepted route changes
-the fixed snapshot, its former transition work is ordinary fixed context and
-may seed a later route.
+non-generatable. Every first-slice V-prime origin must independently belong to
+the candidate catalog described below. A first V-prime slice may be followed
+only by its complementary second adapter slice when that slice exposes an
+ordinary continuation. Neither slice may satisfy a V predecessor requirement,
+seed unrelated V-prime work, or begin another transition adapter during the
+same crossing. After an accepted route changes the fixed snapshot, its former
+transition work is ordinary fixed context and may seed a later route.
 
-The other side of a transition band may be:
+The other side of a transition adapter may be:
 
 * an ordinary propagating V band;
 * another projected fixed-ground surface, including another node in the same
   component; or
 * physical G through the authoritative generated-to-ground seam.
 
-A route may use several transition bands at distinct crossings. Direct
+A route may use several transition adapters at distinct crossings. Direct
 projected-to-projected bridges are legal and may repair a one-band gap without
 forcing an artificial V segment.
 
@@ -400,6 +449,10 @@ The A* lower bound gains a projected-ground relaxation:
   side-corridor checks may be omitted; and
 * the exact graph and replay still enforce every real edge.
 
+Exact FV diagonals therefore remain strict even though the heuristic relaxation
+may include a diagonal whose two cardinal corridors are not both available.
+That additional heuristic edge can only shorten the estimate.
+
 Ignoring those constraints adds heuristic shortcuts and can only lower the
 estimate. The relaxation may even chain adjacent transition candidates that
 exact search forbids; encoding the one-band budget in the heuristic is not
@@ -424,8 +477,8 @@ fixed designation targets onto captured physical terrain and regard those
 targets as ground. Raw terrain underneath already-scheduled work contributes
 no new landscaping charge.
 
-Fixed projected travel and possible transition bands consume no charge.
-Reaching a candidate transition band ends the terrain-extrema charge horizon
+Fixed projected travel and possible transition adapters consume no charge.
+Reaching a candidate transition adapter ends the terrain-extrema charge horizon
 unless generated landscaping before that contact is independently proven
 unavoidable. If the relaxed envelope cannot prove unavoidable work after
 projected-ground and transition-candidate closure, the extrema landscaping
@@ -460,7 +513,7 @@ component weakens to zero.
 14. Remove fixed-frontage discovery, terminal matching, optimistic provider
     terminal fees, `IsExposed`, synthetic-companion-as-strafe handling, and
     obsolete diagnostics.
-15. Live-verify one-origin launches, jagged and slanted transition bands,
+15. Live-verify one-origin launches, jagged and slanted transition adapters,
     exact-terrain designation retention, corner-rich mining bodies, incidental
     cross-cluster connections, and waiting provider chains behind the existing
     experimental accessway gate.
@@ -488,6 +541,8 @@ At minimum, cover:
 * a successful central tier beats every less-central tier;
 * a one-origin flat source at `+1` can choose a flat companion, two down-ramps,
   and a valid ground handoff;
+* a leveling handoff advances outward to captured G without generating a
+  terminal flat band;
 * exact-terrain launch companions remain explicit generated origins;
 * a corner-profile source launch can resolve one mixed V/V-prime transition
   band before entering ordinary V;
@@ -510,15 +565,17 @@ At minimum, cover:
 * snapshot-static template caching never caches route-history authorization or
   cost;
 * one generated V-prime lane repairs a jagged fringe;
-* two compatible generated V-prime lanes repair a slanted fringe;
+* two complementary generated V-prime slices repair a slanted fringe and
+  expose an ordinary outbound face;
 * both `+1` and `-1` canonical corner variants work, while saddles and arbitrary
   corner profiles remain rejected;
 * one adapter can expose two equal-cost continuation orientations without
   classifying either as a strafe or turn;
 * distinct centers and outgoing states survive geometric deduplication;
 * equal-cost arrivals at one state use the canonical geometry tie-break;
-* a V-prime transition band cannot seed a strafe, turn, another transition
-  band, or same-route V-prime expansion;
+* a V-prime transition adapter cannot seed a strafe, turn, third adapter
+  slice, separate transition adapter, or unrelated same-route V-prime
+  expansion;
 * direct projected-to-projected bridges work across different or identical
   projected components;
 * a fixed-seeded V-prime adapter may hand off to physical G only through the
@@ -538,7 +595,7 @@ At minimum, cover:
 * projected-ground heuristic relaxation treats transition candidates as G-like
   cardinal/diagonal travel, may chain them optimistically, and never exceeds
   Dijkstra;
-* terrain-extrema charge accounting stops at a possible transition band unless
+* terrain-extrema charge accounting stops at a possible transition adapter unless
   earlier generated work is proven unavoidable;
 * both `IsExposed` failure shapes now route through projected ground;
 * fixed-frontage and unified projected-ground routes agree on retained legacy
@@ -557,7 +614,8 @@ At minimum, cover:
 ## Expected Benefits
 
 * Jagged source and provider boundaries need no exposed flat pair.
-* Slanted fringes can normalize through at most one bounded V-prime band.
+* Slanted fringes can normalize through at most one bounded two-slice V-prime
+  adapter.
 * One-origin sources use the normal launch and transition cost model.
 * Existing corner-rich mining work becomes naturally navigable, while new
   V-prime work remains confined to fixed-fringe adapters.

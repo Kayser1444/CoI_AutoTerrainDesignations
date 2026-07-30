@@ -29,6 +29,7 @@ namespace AutoTerrainDesignations.Access.V2
         internal const float DiagonalCost = 1.41421356237f;
 
         private readonly HashSet<Tile2i> m_groundNodes;
+        private readonly HashSet<Tile2i> m_projectedFixedNodes;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_cleanupByTile;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo>
             m_generatedClearableByTile;
@@ -48,9 +49,13 @@ namespace AutoTerrainDesignations.Access.V2
         public AccessV2GroundGraph(
             IEnumerable<Tile2i> groundNodes,
             IEnumerable<Tile2i> goals,
-            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile)
+            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile,
+            IEnumerable<Tile2i>? projectedFixedNodes = null)
         {
             m_groundNodes = new HashSet<Tile2i>(groundNodes);
+            m_projectedFixedNodes = projectedFixedNodes != null
+                ? new HashSet<Tile2i>(projectedFixedNodes)
+                : new HashSet<Tile2i>();
             m_goals = new HashSet<Tile2i>(goals);
             m_cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>();
             m_generatedClearableByTile =
@@ -67,6 +72,9 @@ namespace AutoTerrainDesignations.Access.V2
         }
 
         public bool IsGround(Tile2i tile) => m_groundNodes.Contains(tile);
+
+        internal bool IsProjectedFixedGround(Tile2i tile)
+            => m_projectedFixedNodes.Contains(tile);
 
         public bool IsCleanupGround(Tile2i tile)
             => m_cleanupByTile.ContainsKey(tile);
@@ -88,6 +96,24 @@ namespace AutoTerrainDesignations.Access.V2
         internal bool IsGoalConnected(Tile2i tile)
             => m_componentByTile.TryGetValue(tile, out int component)
                 && m_goalComponents.Contains(component);
+
+        internal HashSet<int> CollectGoalOrExitComponents(
+            Func<Tile2i, bool> canExitToGeneratedV)
+        {
+            var components = new HashSet<int>(m_goalComponents);
+            foreach (KeyValuePair<Tile2i, int> pair in m_componentByTile)
+                if (!components.Contains(pair.Value)
+                    && canExitToGeneratedV(pair.Key))
+                    components.Add(pair.Value);
+            return components;
+        }
+
+        internal bool IsInComponent(
+            Tile2i tile,
+            ISet<int> components)
+            => m_componentByTile.TryGetValue(
+                    tile, out int component)
+                && components.Contains(component);
 
         public bool CanTraverse(Tile2i from, Tile2i to)
         {

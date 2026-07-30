@@ -105,6 +105,36 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    /// <summary>
+    /// Stable, transient diagnostic projection of one access cluster.
+    /// Coordinates refer to the centers of 4x4 designation origins.
+    /// </summary>
+    public sealed class AccessClusterOverlayRecord
+    {
+        public int ClusterId { get; }
+        public AccessClusterState State { get; }
+        public int OriginCount { get; }
+        public float CenterX { get; }
+        public float CenterY { get; }
+        public IReadOnlyList<Tile2i> CenterRoots { get; }
+
+        public AccessClusterOverlayRecord(
+            int clusterId,
+            AccessClusterState state,
+            int originCount,
+            float centerX,
+            float centerY,
+            IReadOnlyList<Tile2i> centerRoots)
+        {
+            ClusterId = clusterId;
+            State = state;
+            OriginCount = originCount;
+            CenterX = centerX;
+            CenterY = centerY;
+            CenterRoots = centerRoots;
+        }
+    }
+
     public class AccessProvider
     {
         public IReadOnlyList<Tile2i> Tiles { get; }

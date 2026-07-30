@@ -1640,16 +1640,27 @@ namespace AutoTerrainDesignations.Access
                     terrainCenterHeightProvider:
                         request.Snapshot.GetTerrainCenterHeight2,
                     groundToVMinimumGeneratedCost:
-                        2f * GeneratedVFixedOverhead,
+                        GeneratedVFixedOverhead,
                     usefulHeightEnvelope: requestHeightEnvelope,
-                    generatedOriginValidator: request.Snapshot.IsOriginInside,
+                    generatedOriginValidator:
+                        request.Snapshot.IsGeneratedVOriginEligible,
                     diagnostics: diagnostics,
                     preciseTerrainHeightProvider: tile =>
                         request.Snapshot.TryGetPreciseTerrainHeight(
                             tile, out float height) ? height : (float?)null,
                     groundToVCenterSpokeCost:
                         AccessV2CostModel.GetCenterSpokeCost(
-                            GeneratedVFixedOverhead));
+                            GeneratedVFixedOverhead),
+                    fixedProfileProvider: origin =>
+                        request.Snapshot.TryGetFixedProfile(
+                            origin, out AccessHeightProfile fixedProfile)
+                                ? fixedProfile
+                                : (AccessHeightProfile?)null,
+                    fixedNavigationGraph:
+                        request.Snapshot.V2FixedNavigationGraph,
+                    generatedVPrimeOriginValidator:
+                        request.Snapshot.IsGeneratedVPrimeOriginEligible,
+                    vehicleWidth: request.Snapshot.VehicleWidth);
                 return new AccessPathSearchSession(
                     v2Session, start, diagnostics);
             }
@@ -2241,7 +2252,8 @@ namespace AutoTerrainDesignations.Access
                     v2Result.GeneratedProfiles,
                     v2Result.Handoff,
                     v2Result.GroundPath,
-                    v2Result.RouteSteps);
+                    v2Result.RouteSteps,
+                    m_v2Session!.VehicleWidth);
                 return new AccessSearchResult(
                     true, string.Empty, m_startOrigin,
                     Array.Empty<AccessSearchNode>(),
@@ -4702,36 +4714,27 @@ namespace AutoTerrainDesignations.Access
                     GetV2CanonicalCenter(transition.Next))
                 : 0f;
 
-            bool exactTerrainBand = !V2BandHasTerrainDelta(
-                snapshot, transition.Next);
-            // Exact straight successors are real zero-work G seams. Keep one
-            // terminal V state so the ordinary handoff evaluator can prove the
-            // width-two boundary, but prohibit any further V expansion. An
-            // orientation-only turn must still evaluate its old-direction
-            // clearance rays, so it deliberately falls through below.
-            // Ground-originated exact bands are similarly dominated by staying
-            // in G. Synthetic fixed-source companions remain the sole exception.
-            if (!connectedFixedOrigin.HasValue
-                && exactTerrainBand
-                && transition.Kind != AccessV2TransitionKind.Strafe
-                && transition.Kind != AccessV2TransitionKind.Turn)
+            // A projected-ground adapter is an already scheduled, exact fixed
+            // frontage used only to represent the G-to-V seam in replay. It
+            // owns no generated work and contributes no V traversal or rays;
+            // the handoff records the physical center travel separately.
+            if (transition.Kind
+                == AccessV2TransitionKind.ProjectedGroundAdapter)
+            {
+                for (int lane = 0; lane < 2; lane++)
+                {
+                    AccessV2OriginProfile item =
+                        transition.Next.GetLane(lane);
+                    if (!snapshot.TryGetFixedProfile(
+                            item.Origin, out AccessHeightProfile fixedProfile)
+                        || !AccessV2BandProfile.ProfilesEqual(
+                            item.Profile, fixedProfile))
+                        return AccessV2TransitionEvaluation.Reject(
+                            "ProjectedGroundAdapterFixedMismatch");
+                }
                 return new AccessV2TransitionEvaluation(
-                    true, string.Empty,
-                    traversalCost, 0f, 0f,
-                    requiresGroundTransition: true);
-
-            // Every newly owned V origin must survive materialization. This is
-            // the swept 2x2 rule for strafes and the width-two brush rule for
-            // straight/turn deltas. A mixed exact/work delta otherwise leaves
-            // either an illegal one-cell passage or a redundant appendix.
-            if (!connectedFixedOrigin.HasValue
-                && transition.Delta.Any(item =>
-                    !V2ProfileHasTerrainDelta(
-                        snapshot, item.Origin, item.Profile)))
-                return AccessV2TransitionEvaluation.Reject(
-                    transition.Kind == AccessV2TransitionKind.Strafe
-                        ? "StrafeRequiresCompleteMaterializedDelta"
-                        : "TransitionRequiresCompleteMaterializedDelta");
+                    true, string.Empty, 0f, 0f, 0f);
+            }
 
             var rayConstraints = new List<AccessRayHeightConstraint>();
             var cleanupKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -4832,38 +4835,6 @@ namespace AutoTerrainDesignations.Access
                 cleanupCost += snapshot.LandscapingCostDistanceScale
                     * AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree);
             }
-        }
-
-        private static bool V2BandHasTerrainDelta(
-            AccessSearchSnapshot snapshot,
-            AccessV2BandState state)
-        {
-            for (int lane = 0; lane < 2; lane++)
-            {
-                Tile2i origin = state.GetLaneOrigin(lane);
-                AccessHeightProfile profile = state.GetLane(lane).Profile;
-                if (V2ProfileHasTerrainDelta(snapshot, origin, profile))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool V2ProfileHasTerrainDelta(
-            AccessSearchSnapshot snapshot,
-            Tile2i origin,
-            AccessHeightProfile profile)
-        {
-            for (int y = 0; y <= 4; y++)
-                for (int x = 0; x <= 4; x++)
-                {
-                    Tile2i tile = origin + new RelTile2i(x, y);
-                    if (!snapshot.TryGetGroundHeight2(
-                            tile, out int terrainHeight2)
-                        || profile.GetHeight2NumeratorAt(x, y)
-                            != terrainHeight2 * 16)
-                        return true;
-                }
-            return false;
         }
 
         internal static IReadOnlyList<AccessV2HandoffCandidate>
@@ -5009,14 +4980,16 @@ namespace AutoTerrainDesignations.Access
             bool scoreLane1 = transition.Delta.Any(
                 item => item.Origin == next.GetLaneOrigin(1));
             bool isSyntheticSourceBand = !current.HasValue
-                && connectedFixedOrigin.HasValue;
-            if (transition.Kind != AccessV2TransitionKind.Strafe
+                && connectedFixedOrigin.HasValue
+                && transition.Kind == AccessV2TransitionKind.Strafe
+                && !transition.ScoreOnlyGeneratedExteriorRays;
+            if ((!transition.ScoreOnlyGeneratedExteriorRays
+                    && transition.Kind != AccessV2TransitionKind.Strafe)
                 || isSyntheticSourceBand)
             {
-                // A synthetic start owns only one origin, but a Mega vehicle
-                // occupies the complete two-lane mouth. Score the reused
-                // cluster lane's outer clearance too; omitting it allowed a
-                // route to begin inside a cluster beside an impassable wall.
+                // Ordinary route transitions own a complete new band. Source
+                // launches instead resolve fixed reuse explicitly and charge
+                // exterior work only for their generated origins.
                 scoreLane0 = true;
                 scoreLane1 = true;
             }

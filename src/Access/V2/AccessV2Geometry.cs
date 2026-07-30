@@ -6,6 +6,8 @@ namespace AutoTerrainDesignations.Access.V2
 {
     internal enum AccessV2TransitionKind
     {
+        SourceLaunch,
+        ProjectedGroundAdapter,
         Straight,
         Strafe,
         Turn,
@@ -110,6 +112,7 @@ namespace AutoTerrainDesignations.Access.V2
         public IReadOnlyCollection<Tile2i> LocalContextOrigins { get; }
         public IReadOnlyList<AccessV2TurnRay> OldDirectionTurnRays { get; }
         public AccessHandoffOperation WorkOperation { get; }
+        public bool ScoreOnlyGeneratedExteriorRays { get; }
 
         public AccessV2Transition(
             AccessV2TransitionKind kind,
@@ -118,7 +121,8 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<Tile2i> localContextOrigins,
             IReadOnlyList<AccessV2TurnRay>? oldDirectionTurnRays = null,
             AccessHandoffOperation workOperation =
-                AccessHandoffOperation.Leveling)
+                AccessHandoffOperation.Leveling,
+            bool scoreOnlyGeneratedExteriorRays = false)
         {
             Kind = kind;
             Next = next;
@@ -127,6 +131,8 @@ namespace AutoTerrainDesignations.Access.V2
             OldDirectionTurnRays = oldDirectionTurnRays
                 ?? Array.Empty<AccessV2TurnRay>();
             WorkOperation = workOperation;
+            ScoreOnlyGeneratedExteriorRays =
+                scoreOnlyGeneratedExteriorRays;
         }
     }
 

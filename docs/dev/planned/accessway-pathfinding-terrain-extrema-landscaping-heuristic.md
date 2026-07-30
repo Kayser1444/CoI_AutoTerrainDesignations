@@ -1294,6 +1294,14 @@ under dumping semantics:
 h = existingPotential + H_land
 ```
 
+A separate proposed refinement,
+[Component-Conditioned V Commitment Potential](accessway-pathfinding-component-conditioned-v-potential.md),
+may later replace `existingPotential` with either a global mixed G/fixed/V
+route field `P` or a source-component-owned extension `S_C`. That proposal
+continues to own traversal and generated fixed overhead; it does not move
+either cost into `H_land`. The composition here would become
+`h = Hroute + H_land`.
+
 The components cover disjoint cost portions:
 
 * the existing potential lower-bounds travel, generated fixed overhead, centre

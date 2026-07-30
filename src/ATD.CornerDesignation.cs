@@ -1048,6 +1048,37 @@ namespace AutoTerrainDesignations
                 Log.Warning($"[AutoDepth] EXCEPTION patching AddOrReplaceDesignation: {ex}");
             }
 
+            // Terrain-designation ownership is runtime bookkeeping. Manual
+            // deletion or replacement must release both ordinary generated
+            // ownership and accessway ownership immediately.
+            try
+            {
+                var removeDesignationMethod =
+                    typeof(TerrainDesignationsManager).GetMethod(
+                        "RemoveDesignation",
+                        BindingFlags.Instance
+                            | BindingFlags.Public
+                            | BindingFlags.NonPublic,
+                        null,
+                        new[] { typeof(Tile2i) },
+                        null);
+                if (removeDesignationMethod != null)
+                    harmony.Patch(
+                        removeDesignationMethod,
+                        postfix: new HarmonyMethod(
+                            typeof(AutoDepthDesignation),
+                            nameof(RemoveDesignationPostfix)));
+                else
+                    Log.Warning(
+                        "[AutoDepth] RemoveDesignation(Tile2i) method not found");
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(
+                    "[AutoDepth] EXCEPTION patching RemoveDesignation: "
+                    + ex);
+            }
+
             // Patch TerrainDesignationsRenderer.AddOrUpdatePreviewDesignation and
             // RemovePreviewDesignation to suppress the game's own preview calls while
             // ATD's corner mode is active (prevents flicker).

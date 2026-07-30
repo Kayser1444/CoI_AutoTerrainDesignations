@@ -21,6 +21,7 @@ namespace AutoTerrainDesignations.Access
         XNegative,
         YPositive,
         YNegative,
+        VPrime,
         Existing
     }
 
@@ -302,10 +303,13 @@ namespace AutoTerrainDesignations.Access
         private readonly Dictionary<Tile2i, AccessTerrainColumn> m_terrainColumns;
         private readonly Dictionary<Tile2i, int> m_terrainCenterHeight2;
         private readonly Dictionary<Tile2i, AccessHeightProfile> m_fixedProfiles;
+        private readonly HashSet<Tile2i> m_generatedVPrimeOrigins;
         private readonly HashSet<Tile2i> m_workOrigins;
         private readonly HashSet<Tile2i> m_groundNodes;
+        private readonly HashSet<Tile2i> m_projectedFixedGroundNodes;
         private readonly HashSet<Tile2i> m_goalGroundNodes;
         private readonly HashSet<Tile2i> m_occupiedTiles;
+        private readonly HashSet<Tile2i> m_terrainPathableWithoutBlockers;
         private readonly HashSet<Tile2i> m_expandedBuildingRayBlockers;
         private readonly HashSet<Tile2i> m_cutDesignationRayBlockers;
         private readonly HashSet<Tile2i> m_fillDesignationRayBlockers;
@@ -371,6 +375,8 @@ namespace AutoTerrainDesignations.Access
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public V2.AccessV2GroundGraph? V2GroundGraph { get; }
+        public V2.AccessV2FixedNavigationGraph?
+            V2FixedNavigationGraph { get; }
         internal AccessV1GroundGoalDistance? V1GroundGoalDistance
             => m_v1GroundGoalDistance;
         /// <summary>
@@ -436,7 +442,8 @@ namespace AutoTerrainDesignations.Access
             Func<IReadOnlyList<AccessHandoffSpanCell>,
                 IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffSpans = null,
             float vehicleMaxSteepnessDelta = 0.5f,
-            AccessUsefulHeightEnvelope? usefulHeightEnvelope = null)
+            AccessUsefulHeightEnvelope? usefulHeightEnvelope = null,
+            IEnumerable<Tile2i>? terrainPathableWithoutBlockers = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -473,6 +480,11 @@ namespace AutoTerrainDesignations.Access
             m_groundNodes = new HashSet<Tile2i>(groundNodes);
             m_goalGroundNodes = new HashSet<Tile2i>(goalGroundNodes);
             m_occupiedTiles = new HashSet<Tile2i>(occupiedTiles);
+            m_terrainPathableWithoutBlockers =
+                terrainPathableWithoutBlockers != null
+                    ? new HashSet<Tile2i>(
+                        terrainPathableWithoutBlockers)
+                    : new HashSet<Tile2i>();
             m_expandedBuildingRayBlockers = BuildExpandedBuildingRayBlockers(
                 occupiedTiles, boundsMin, boundsMax);
             m_cutDesignationRayBlockers = BuildDesignationRayBlockers(
@@ -509,16 +521,33 @@ namespace AutoTerrainDesignations.Access
                 ? new AccessV1GroundGoalDistance(
                     m_groundNodes, m_propCleanupByTile, m_goalGroundNodes)
                 : null;
-            V2GroundGraph = VehicleWidth > 4
-                ? new V2.AccessV2GroundGraph(
-                    m_groundNodes, m_goalGroundNodes, m_propCleanupByTile)
-                : null;
+            if (VehicleWidth > 4)
+            {
+                HashSet<Tile2i> projectedGround =
+                    BuildProjectedFixedGroundNodes(
+                        out m_projectedFixedGroundNodes);
+                V2GroundGraph = new V2.AccessV2GroundGraph(
+                    projectedGround, m_goalGroundNodes,
+                    m_propCleanupByTile,
+                    m_projectedFixedGroundNodes);
+                V2FixedNavigationGraph =
+                    new V2.AccessV2FixedNavigationGraph(
+                        m_fixedProfiles, V2GroundGraph);
+            }
+            else
+            {
+                m_projectedFixedGroundNodes = new HashSet<Tile2i>();
+                V2GroundGraph = null;
+                V2FixedNavigationGraph = null;
+            }
             int eligibleCleanupOriginCount = 0;
             foreach (AccessPropCleanupInfo info in m_propCleanupByOrigin.Values)
                 if (info.IsEligible)
                     eligibleCleanupOriginCount++;
             EligibleCleanupOriginCount = eligibleCleanupOriginCount;
             m_validOrigins = new HashSet<Tile2i>(m_terrainCenterHeight2.Keys);
+            m_generatedVPrimeOrigins =
+                BuildGeneratedVPrimeOrigins();
             Tile2i goalDistanceMin = boundsMin;
             Tile2i goalDistanceMax = boundsMax;
             foreach (Tile2i tile in m_groundNodes)
@@ -615,9 +644,59 @@ namespace AutoTerrainDesignations.Access
 
         public bool IsOriginInside(Tile2i origin) => m_validOrigins.Contains(origin);
 
+        public bool IsGeneratedVOriginEligible(Tile2i origin)
+            => IsOriginInside(origin)
+                && !m_workOrigins.Contains(origin)
+                && !m_fixedProfiles.ContainsKey(origin);
+
+        public bool IsGeneratedVPrimeOriginEligible(Tile2i origin)
+            => IsGeneratedVOriginEligible(origin)
+                && m_generatedVPrimeOrigins.Contains(origin);
+
         public bool IsTileInside(Tile2i tile)
             => tile.X >= BoundsMin.X && tile.Y >= BoundsMin.Y
                 && tile.X <= BoundsMax.X && tile.Y <= BoundsMax.Y;
+
+        private HashSet<Tile2i> BuildGeneratedVPrimeOrigins()
+        {
+            var candidates = new HashSet<Tile2i>();
+            Tile2i[] cardinalDirections =
+            {
+                new Tile2i(-4, 0),
+                new Tile2i(4, 0),
+                new Tile2i(0, -4),
+                new Tile2i(0, 4),
+            };
+            foreach (Tile2i fixedOrigin in m_fixedProfiles.Keys)
+            {
+                for (int directionIndex = 0;
+                    directionIndex < cardinalDirections.Length;
+                    directionIndex++)
+                {
+                    Tile2i candidate = V2.AccessV2Geometry.Add(
+                        fixedOrigin, cardinalDirections[directionIndex]);
+                    if (!m_validOrigins.Contains(candidate)
+                        || m_workOrigins.Contains(candidate)
+                        || m_fixedProfiles.ContainsKey(candidate))
+                        continue;
+                    int fixedNeighborCount = 0;
+                    for (int neighborIndex = 0;
+                        neighborIndex < cardinalDirections.Length;
+                        neighborIndex++)
+                    {
+                        Tile2i neighbor = V2.AccessV2Geometry.Add(
+                            candidate,
+                            cardinalDirections[neighborIndex]);
+                        if (m_fixedProfiles.ContainsKey(neighbor))
+                            fixedNeighborCount++;
+                    }
+                    if (fixedNeighborCount >= 1
+                        && fixedNeighborCount <= 3)
+                        candidates.Add(candidate);
+                }
+            }
+            return candidates;
+        }
 
         public bool IsWorkOrigin(Tile2i origin) => m_workOrigins.Contains(origin);
         public IReadOnlyDictionary<Tile2i, AccessHeightProfile> FixedProfiles
@@ -1325,6 +1404,136 @@ namespace AutoTerrainDesignations.Access
             return Math.Max(horizontalDistance, verticalDistance);
         }
         public bool TryGetGroundHeight2(Tile2i tile, out int height2) => m_groundHeight2.TryGetValue(tile, out height2);
+
+        /// <summary>
+        /// Builds the exact post-work Mega surface around fixed terrain
+        /// designations. Fixed target samples replace the captured terrain
+        /// samples, while unaffected centers retain the authoritative vanilla
+        /// pathability result captured in <see cref="m_groundNodes"/>.
+        /// </summary>
+        private HashSet<Tile2i> BuildProjectedFixedGroundNodes(
+            out HashSet<Tile2i> projectedFixedNodes)
+        {
+            var result = new HashSet<Tile2i>(m_groundNodes);
+            projectedFixedNodes = new HashSet<Tile2i>();
+            if (m_fixedProfiles.Count == 0)
+                return result;
+
+            const float epsilon = 0.0001f;
+            var fixedHeightBySample = new Dictionary<Tile2i, float>();
+            var conflictingSamples = new HashSet<Tile2i>();
+            foreach (KeyValuePair<Tile2i, AccessHeightProfile> pair
+                in m_fixedProfiles)
+            {
+                for (int y = 0; y <= 4; y++)
+                    for (int x = 0; x <= 4; x++)
+                    {
+                        Tile2i sample = pair.Key + new RelTile2i(x, y);
+                        float height = pair.Value.GetHeight2NumeratorAt(
+                            x, y) / 32f;
+                        if (fixedHeightBySample.TryGetValue(
+                                sample, out float existing)
+                            && Math.Abs(existing - height) > epsilon)
+                            conflictingSamples.Add(sample);
+                        else
+                            fixedHeightBySample[sample] = height;
+                    }
+            }
+
+            int clearance = Math.Max(1, VehicleWidth);
+            int half = clearance / 2;
+            var affectedCenters = new HashSet<Tile2i>();
+            foreach (Tile2i origin in m_fixedProfiles.Keys)
+            {
+                // A center is affected when its clearance mask, including the
+                // +X/+Y slope samples, can touch this 4x4 target surface.
+                int minX = origin.X - clearance + half;
+                int minY = origin.Y - clearance + half;
+                int maxX = origin.X + 4 + half;
+                int maxY = origin.Y + 4 + half;
+                for (int y = minY; y <= maxY; y++)
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        var center = new Tile2i(x, y);
+                        if (center.X >= BoundsMin.X
+                            && center.Y >= BoundsMin.Y
+                            && center.X <= BoundsMax.X
+                            && center.Y <= BoundsMax.Y)
+                            affectedCenters.Add(center);
+                    }
+            }
+
+            foreach (Tile2i center in affectedCenters)
+            {
+                bool valid = IsProjectedCenterValid(center);
+                if (valid)
+                {
+                    result.Add(center);
+                    projectedFixedNodes.Add(center);
+                }
+                else
+                {
+                    result.Remove(center);
+                }
+            }
+            return result;
+
+            bool IsProjectedCenterValid(Tile2i center)
+            {
+                // If the terrain-only mask admitted this center but the full
+                // vehicle mask did not, a non-terrain object is responsible.
+                // Fixed height projection must not silently remove it. An
+                // eligible prop remains available through the graph's cleanup
+                // node rather than becoming free projected ground.
+                if (!m_groundNodes.Contains(center)
+                    && m_terrainPathableWithoutBlockers.Contains(center)
+                    && m_groundExclusionReasons.TryGetValue(
+                        center, out string exclusion)
+                    && (exclusion == "NotPathable"
+                        || exclusion == "T1Only"))
+                    return false;
+
+                Tile2i corner = center + new RelTile2i(-half, -half);
+                for (int y = 0; y < clearance; y++)
+                    for (int x = 0; x < clearance; x++)
+                    {
+                        Tile2i tile = corner + new RelTile2i(x, y);
+                        if (AvoidBuildings && m_occupiedTiles.Contains(tile))
+                            return false;
+                        if (AvoidOcean && m_oceanTiles.Contains(tile))
+                            return false;
+                        if (!TryGetHeight(tile, out float height)
+                            || !TryGetHeight(
+                                tile + new RelTile2i(1, 0),
+                                out float plusX)
+                            || !TryGetHeight(
+                                tile + new RelTile2i(0, 1),
+                                out float plusY))
+                            return false;
+                        if (Math.Max(
+                                Math.Abs(height - plusX),
+                                Math.Abs(height - plusY))
+                            > VehicleMaxSteepnessDelta + epsilon)
+                            return false;
+                    }
+                return true;
+            }
+
+            bool TryGetHeight(Tile2i tile, out float height)
+            {
+                if (tile.X < PhysicalTerrainMin.X
+                    || tile.Y < PhysicalTerrainMin.Y
+                    || tile.X > PhysicalTerrainMax.X
+                    || tile.Y > PhysicalTerrainMax.Y
+                    || conflictingSamples.Contains(tile))
+                {
+                    height = 0f;
+                    return false;
+                }
+                return fixedHeightBySample.TryGetValue(tile, out height)
+                    || m_preciseTerrainHeights.TryGetValue(tile, out height);
+            }
+        }
 
         public bool IsProjectedV2CenterPathable(
             Tile2i center,
@@ -2062,6 +2271,9 @@ namespace AutoTerrainDesignations.Access
         public long PropCleanupTicks;
         public int V2GroundExpansions;
         public int V2BandExpansions;
+        public int V2StartTiersAttempted;
+        public int V2RedundantStartTiersSkipped;
+        public int V2RedundantStartSeedsSkipped;
         public int V2EarlyLabelDominancePrunes;
         public int V2ExactLabelDominancePrunes;
         public int V2GroundSuffixAttempts;
@@ -2106,6 +2318,7 @@ namespace AutoTerrainDesignations.Access
         public List<string> FirstGeneratedHandoffDetails { get; } = new List<string>();
         public List<string> V2RouteHandoffDetails { get; } = new List<string>();
         public List<string> V2GroundSuffixDetails { get; } = new List<string>();
+        public List<string> V2VPrimeAdapterDetails { get; } = new List<string>();
         public List<V2HandoffTrace> V2HandoffTraces { get; } = new List<V2HandoffTrace>();
         public string V2DryRunSummary = string.Empty;
         public string V2DryRunPath = string.Empty;
@@ -2138,9 +2351,18 @@ namespace AutoTerrainDesignations.Access
                 V2GroundSuffixDetails.Add(detail);
         }
 
+        public void RecordV2VPrimeAdapter(string detail)
+        {
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
+                return;
+            if (V2VPrimeAdapterDetails.Count < MaxV2RouteDiagnosticDetails
+                && !V2VPrimeAdapterDetails.Contains(detail))
+                V2VPrimeAdapterDetails.Add(detail);
+        }
+
         public void RecordV2HandoffTrace(Tile2i anchor, IEnumerable<Tile2i> entries)
         {
-            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
+            if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug)) return;
             if (V2HandoffTraces.Count < MaxV2RouteDiagnosticDetails)
                 V2HandoffTraces.Add(new V2HandoffTrace(anchor, entries));
         }

@@ -623,6 +623,7 @@ namespace AutoTerrainDesignations
                     "terrain-work cluster(s) to use ghost goals instead of " +
                     "active-tower reachability");
             }
+            RecordAccessClusterOverlay(originClusters, states);
 
             // Log initial states
             foreach (var cluster in originClusters)
@@ -766,37 +767,26 @@ namespace AutoTerrainDesignations
                             && experimentalPlan != null
                             && experimentalPlan.IsValid
                             && experimentalPlan.Designations.Count == 0
-                            && experimentalPlan.CleanupOrigins.Count == 0
-                            // A zero-work result is only an existing route if the live
-                            // designation can actually accept its vehicle. In particular,
-                            // farming may request access for a level/dumping designation
-                            // whose projected profile reaches a ground goal even though a
-                            // vehicle cannot reach or start that designation yet.
-                            && cluster.Origins.All(origin =>
-                                IsClusterOriginReadyAndPathable(tower, origin.Origin)))
+                            && experimentalPlan.CleanupOrigins.Count == 0)
                         {
-                            states[cluster] = AccessClusterState.AccessibleViaProvider;
+                            bool liveReady = cluster.Origins.All(origin =>
+                                IsClusterOriginReadyAndPathable(
+                                    tower, origin.Origin));
+                            states[cluster] =
+                                AccessReachability.ClassifyProjectedProvider(
+                                    liveReady);
+                            RecordAccessClusterOverlay(
+                                originClusters, states);
                             validatedExistingRoute = true;
                             LogExperimentalAccessDebug(
                                 $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
-                                $"selected=existing-route goal={experimentalResult.ReachedGoalKind} " +
+                                $"selected={(liveReady ? "existing-route" : "waiting-for-provider")} " +
+                                $"goal={experimentalResult.ReachedGoalKind} " +
                                 $"reused={experimentalPlan.ReusedNodeCount}");
                             continue;
                         }
 
-                        if (experimentalResult.Success
-                            && experimentalPlan != null
-                            && experimentalPlan.IsValid
-                            && experimentalPlan.Designations.Count == 0
-                            && experimentalPlan.CleanupOrigins.Count == 0)
-                        {
-                            experimentalFailureSummary =
-                                "zero-work route rejected because the live designation is not vehicle-ready";
-                            LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
-                                "rejected=zero-work-route reason=live-designation-not-ready");
-                        }
-                        else if (!experimentalResult.Success)
+                        if (!experimentalResult.Success)
                         {
                             experimentalFailureSummary =
                                 FormatExperimentalFailureSummary(experimentalResult);
@@ -953,6 +943,7 @@ namespace AutoTerrainDesignations
                                 $"providerOrigins={providerOrigins.Count}");
                         if (v2ProviderValid || overrideProviderValid)
                             states[cluster] = AccessClusterState.AccessibleViaProvider;
+                        RecordAccessClusterOverlay(originClusters, states);
                         if (states[cluster] == AccessClusterState.AccessibleViaProvider
                             || states[cluster] == AccessClusterState.AccessibleDirect)
                         {
@@ -986,6 +977,7 @@ namespace AutoTerrainDesignations
                                 Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                                 return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                             });
+                        RecordAccessClusterOverlay(originClusters, states);
                         LogExperimentalAccessDebug($"[ATD Experimental Access] cluster={cluster.ClusterId} post-placement provider validation failed; using legacy fallback.");
                     }
                     else
@@ -1065,10 +1057,13 @@ namespace AutoTerrainDesignations
                                 Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                                 return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                             });
+                        RecordAccessClusterOverlay(originClusters, states);
                     }
                     else
                     {
                         worstOutcome = RampPlacementOutcome.Failed;
+                        states[cluster] = AccessClusterState.Blocked;
+                        RecordAccessClusterOverlay(originClusters, states);
                         AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, BlockedReason.NoCandidate, 0f));
                         Log.Warning($"[ATD Access] warning tower={towerPos} originCluster={cluster.ClusterId} reason=no valid accessway candidate{FormatOptionalAccessFailure(experimentalFailureSummary)}; work cannot progress");
                     }
@@ -1076,6 +1071,8 @@ namespace AutoTerrainDesignations
                 else
                 {
                     worstOutcome = RampPlacementOutcome.Failed;
+                    states[cluster] = AccessClusterState.Blocked;
+                    RecordAccessClusterOverlay(originClusters, states);
                     AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, BlockedReason.NoCandidate, 0f));
                     Log.Warning($"[ATD Access] warning tower={towerPos} originCluster={cluster.ClusterId} reason=no valid accessway candidate{FormatOptionalAccessFailure(experimentalFailureSummary)}; work cannot progress");
                 }

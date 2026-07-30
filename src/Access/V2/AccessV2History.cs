@@ -107,7 +107,7 @@ namespace AutoTerrainDesignations.Access.V2
                 transition.LocalContextOrigins,
                 Array.Empty<AccessRayHeightConstraint>(),
                 Array.Empty<string>(),
-                transition.Kind == AccessV2TransitionKind.Turn,
+                AllowsEmptyDelta(transition.Kind),
                 out next,
                 out reason);
 
@@ -122,7 +122,7 @@ namespace AutoTerrainDesignations.Access.V2
                 transition.LocalContextOrigins,
                 rayDelta,
                 cleanupKeyDelta,
-                transition.Kind == AccessV2TransitionKind.Turn,
+                AllowsEmptyDelta(transition.Kind),
                 out next,
                 out reason);
 
@@ -185,7 +185,11 @@ namespace AutoTerrainDesignations.Access.V2
             out string reason)
             => TryValidateApply(
                 transition.Delta, transition.LocalContextOrigins,
-                transition.Kind == AccessV2TransitionKind.Turn, out reason);
+                AllowsEmptyDelta(transition.Kind), out reason);
+
+        private static bool AllowsEmptyDelta(AccessV2TransitionKind kind)
+            => kind == AccessV2TransitionKind.Turn
+                || kind == AccessV2TransitionKind.ProjectedGroundAdapter;
 
         private bool TryValidateApply(
             IReadOnlyList<AccessV2OriginProfile> delta,

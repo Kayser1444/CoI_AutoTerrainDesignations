@@ -55,10 +55,11 @@ namespace AutoTerrainDesignations.Access.V2
             if (initialDelta.Count > 0)
             {
                 var initial = new AccessV2Transition(
-                    AccessV2TransitionKind.Strafe,
+                    AccessV2TransitionKind.SourceLaunch,
                     first,
                     initialDelta,
-                    initialContext);
+                    initialContext,
+                    scoreOnlyGeneratedExteriorRays: true);
                 if (!Apply(
                         snapshot, null, initial, connectedFixed,
                         ref history, ordered, out reason))
@@ -182,8 +183,9 @@ namespace AutoTerrainDesignations.Access.V2
             if (initialDelta.Count > 0)
             {
                 var initial = new AccessV2Transition(
-                    AccessV2TransitionKind.Strafe,
-                    first, initialDelta, initialContext);
+                    AccessV2TransitionKind.SourceLaunch,
+                    first, initialDelta, initialContext,
+                    scoreOnlyGeneratedExteriorRays: true);
                 if (!Apply(
                         snapshot, null, initial, connectedFixed,
                         ref history, ordered, out reason))
@@ -204,8 +206,24 @@ namespace AutoTerrainDesignations.Access.V2
                     AccessV2BandState? current = previous.IsGround
                         ? (AccessV2BandState?)null
                         : previous.State;
+                    Tile2i? transitionConnectedFixed = null;
+                    if (step.Transition.ScoreOnlyGeneratedExteriorRays
+                        && current.HasValue)
+                    {
+                        for (int lane = 0; lane < 2; lane++)
+                        {
+                            Tile2i origin =
+                                current.Value.GetLaneOrigin(lane);
+                            if (!route.GeneratedProfiles.ContainsKey(origin))
+                            {
+                                transitionConnectedFixed = origin;
+                                break;
+                            }
+                        }
+                    }
                     if (!Apply(
-                            snapshot, current, step.Transition, null,
+                            snapshot, current, step.Transition,
+                            transitionConnectedFixed,
                             ref history, ordered, out reason))
                         return false;
 
@@ -248,6 +266,31 @@ namespace AutoTerrainDesignations.Access.V2
                 Tile2i center = step.GroundCenter!.Value;
                 if (!previous.IsGround)
                 {
+                    if (step.IsProjectedGroundEntry)
+                    {
+                        AccessV2GroundGraph? projectedGraph =
+                            snapshot.V2GroundGraph;
+                        AccessV2History entryHistory = history;
+                        if (step.Handoff != null
+                            || projectedGraph == null
+                            || !IsProjectedGroundEntryValid(
+                                previous.State, center,
+                                origin => snapshot.TryGetFixedProfile(
+                                    origin,
+                                    out AccessHeightProfile fixedProfile)
+                                        ? fixedProfile
+                                        : (AccessHeightProfile?)null,
+                                projectedGraph.IsProjectedFixedGround,
+                                tile => snapshot
+                                    .IsProjectedV2CenterPathable(
+                                        tile, entryHistory)))
+                        {
+                            reason =
+                                "V2ReplayProjectedGroundEntryMismatch";
+                            return false;
+                        }
+                        continue;
+                    }
                     if (step.Handoff == null)
                     {
                         reason = "V2ReplayVToGroundSeamMissing";
@@ -335,6 +378,31 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
             reason = string.Empty;
+            return true;
+        }
+
+        internal static bool IsProjectedGroundEntryValid(
+            AccessV2BandState fixedState,
+            Tile2i groundCenter,
+            Func<Tile2i, AccessHeightProfile?> fixedProfileProvider,
+            Func<Tile2i, bool> projectedGroundValidator,
+            Func<Tile2i, bool> pathabilityValidator)
+        {
+            if (groundCenter
+                    != AccessV2PotentialField.GetCanonicalCenter(fixedState)
+                || !projectedGroundValidator(groundCenter)
+                || !pathabilityValidator(groundCenter))
+                return false;
+            for (int lane = 0; lane < 2; lane++)
+            {
+                AccessV2OriginProfile item = fixedState.GetLane(lane);
+                AccessHeightProfile? fixedProfile =
+                    fixedProfileProvider(item.Origin);
+                if (!fixedProfile.HasValue
+                    || !ProfilesEqual(
+                        fixedProfile.Value, item.Profile))
+                    return false;
+            }
             return true;
         }
 

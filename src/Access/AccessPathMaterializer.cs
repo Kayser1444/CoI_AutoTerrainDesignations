@@ -309,8 +309,6 @@ namespace AutoTerrainDesignations.Access
                     return AccessDesignationPlan.Invalid(
                         "V2PlanCornerFight", result.StartOrigin);
 
-                bool hasTerrainDelta = ProfileHasTerrainDelta(
-                    snapshot, item.Origin, item.Profile);
                 if (snapshot.TryGetPropCleanupInfo(
                         item.Origin, out AccessPropCleanupInfo generatedCleanup)
                     && generatedCleanup.IsEligibleWithinGeneratedV)
@@ -325,11 +323,15 @@ namespace AutoTerrainDesignations.Access
                             : generatedCleanup;
                     MergeCleanupInfo(cleanupByOrigin, approved);
                 }
-                if (!hasTerrainDelta) continue;
                 if (!AccessV2BandProfile.TryGetProfileMode(
-                        item.Profile, out AccessSearchMode mode))
+                        item.Profile, out AccessSearchMode mode)
+                    && !AccessV2BandProfile.IsCanonicalVPrime(
+                        item.Profile))
                     return AccessDesignationPlan.Invalid(
                         "V2PlanProfileMode", result.StartOrigin);
+                if (!AccessV2BandProfile.TryGetProfileMode(
+                        item.Profile, out mode))
+                    mode = AccessSearchMode.VPrime;
                 terrainWorkOrigins.Add(item.Origin);
                 designations.Add(new AccessPlannedDesignation(
                     item.Origin, mode, item.Profile));

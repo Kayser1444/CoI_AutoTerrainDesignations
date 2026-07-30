@@ -18,6 +18,69 @@ namespace AutoTerrainDesignations.Access
         };
 
         /// <summary>
+        /// Classifies a zero-generated-work route through an existing provider.
+        /// The projected target surface proves that no additional accessway is
+        /// needed; live pathability decides whether vehicles can use it now or
+        /// must wait for the provider's terrain work to finish.
+        /// </summary>
+        public static AccessClusterState ClassifyProjectedProvider(
+            bool isLiveReady)
+            => isLiveReady
+                ? AccessClusterState.AccessibleViaProvider
+                : AccessClusterState.WaitingForProviderCompletion;
+
+        public static IReadOnlyList<AccessClusterOverlayRecord>
+            BuildOverlayRecords(
+                IReadOnlyList<AccessOriginCluster> clusters,
+                IReadOnlyDictionary<AccessOriginCluster, AccessClusterState>
+                    states)
+        {
+            var records = new List<AccessClusterOverlayRecord>(
+                clusters.Count);
+            foreach (AccessOriginCluster cluster in clusters
+                .OrderBy(item => item.ClusterId))
+            {
+                if (cluster.Origins.Count == 0)
+                    continue;
+                float centerX = cluster.Origins.Average(
+                    item => item.Origin.X + 2f);
+                float centerY = cluster.Origins.Average(
+                    item => item.Origin.Y + 2f);
+                float minimumDistance2 = cluster.Origins.Min(item =>
+                {
+                    float dx = item.Origin.X + 2f - centerX;
+                    float dy = item.Origin.Y + 2f - centerY;
+                    return dx * dx + dy * dy;
+                });
+                const float epsilon = 0.0001f;
+                Tile2i[] centerRoots = cluster.Origins
+                    .Where(item =>
+                    {
+                        float dx = item.Origin.X + 2f - centerX;
+                        float dy = item.Origin.Y + 2f - centerY;
+                        return Math.Abs(
+                            dx * dx + dy * dy - minimumDistance2)
+                            <= epsilon;
+                    })
+                    .Select(item => item.Origin)
+                    .OrderBy(item => item.X)
+                    .ThenBy(item => item.Y)
+                    .ToArray();
+                records.Add(new AccessClusterOverlayRecord(
+                    cluster.ClusterId,
+                    states.TryGetValue(
+                        cluster, out AccessClusterState state)
+                            ? state
+                            : AccessClusterState.AnalysisPending,
+                    cluster.Origins.Count,
+                    centerX,
+                    centerY,
+                    centerRoots));
+            }
+            return records;
+        }
+
+        /// <summary>
         /// Evaluates the reachability of a set of clusters using a single fixpoint forward flood.
         /// </summary>
         public static Dictionary<AccessOriginCluster, AccessClusterState> EvaluateReachability(
