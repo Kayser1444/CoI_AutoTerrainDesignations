@@ -1,14 +1,13 @@
 # V2 Source Launches and Projected Fixed Ground
 
-**Status: Proposed**
+**Status: Implemented through step 14; live verification remains**
 
 ## Motivation
 
-V2 currently requires exposed two-origin fixed frontages for both source starts
-and fixed-provider goals. That fails on jagged boundaries and cannot safely
-start from a one-origin source. The earlier synthetic-companion implementation
-also modeled the missing source lane as a fake strafe, while current code
-rejects the one-origin source entirely.
+The former V2 model required exposed two-origin fixed frontages for both source
+starts and fixed-provider goals. That failed on jagged boundaries and could not
+safely start from a one-origin source. The earlier synthetic-companion
+implementation also modeled the missing source lane as a fake strafe.
 
 Generated mining bodies add a deeper constraint: their continuous target
 surface may contain V-prime corner designations. Those profiles are traversable
@@ -510,7 +509,7 @@ component weakens to zero.
    step.
 13. Add transition candidates to the projected-ground heuristic relaxation and
     prove A*/Dijkstra equivalence.
-14. Remove fixed-frontage discovery, terminal matching, optimistic provider
+14. **Implemented:** remove fixed-frontage discovery, terminal matching, optimistic provider
     terminal fees, `IsExposed`, synthetic-companion-as-strafe handling, and
     obsolete diagnostics.
 15. Live-verify one-origin launches, jagged and slanted transition adapters,
@@ -597,9 +596,10 @@ At minimum, cover:
   Dijkstra;
 * terrain-extrema charge accounting stops at a possible transition adapter unless
   earlier generated work is proven unavoidable;
-* both `IsExposed` failure shapes now route through projected ground;
-* fixed-frontage and unified projected-ground routes agree on retained legacy
-  fixtures during migration; and
+* the former `IsExposed` failure shapes route through projected ground without
+  frontage-specific eligibility tests;
+* no fixed-frontage terminal type, provider-distance terminal fee, or
+  terminal-marker search state remains; and
 * A* and Dijkstra return the same success/failure and route cost.
 
 ## 12. Deferred Work

@@ -1,16 +1,20 @@
 # Terrain-Extrema Landscaping Heuristic
 
-Status: proposed alternative to the lazy unavoidable-landscaping heuristic;
-recursive diamond memoization is one replaceable extrema-query strategy
+Status: proposed landscaping heuristic; recursive diamond memoization is one
+replaceable extrema-query strategy
 
 Drafted: 2026-07-26
+
+Architecture note (2026-07-30): V2 no longer has fixed-frontage terminals or
+provider terminal fees. References to them below describe the earlier baseline;
+the current equivalent is reaching compatible projected G/FV navigation, whose
+exact suffix cost belongs to the route potential.
 
 Related designs:
 
 * [Accessway Pathfinding](../done/accessway-pathfinding.md)
 * [Accessway Pathfinding Side-Ray Landscaping Cost Amendment](../done/accessway-pathfinding-side-ray-cost.md)
 * [Accessway Pathfinding Useful-Height Envelope](../done/accessway-pathfinding-height-envelope.md)
-* [Lazy Unavoidable-Landscaping Heuristic](accessway-pathfinding-lazy-landscaping-heuristic.md)
 * [Unified Goal Search and Snapshot Potential Heuristic](../in-progress/unified-goal-search-snapshot-potential-heuristic.md)
 
 ## Summary
@@ -104,9 +108,6 @@ reduction in visited states, pending high-water, and total search time exceeds:
 * additional cache memory for paired extrema; and
 * any extra queue work caused by inconsistency.
 
-Keep the older lazy-frontier proposal as a comparison mode until live
-measurements select one formulation.
-
 The first implementation is a non-persistent experiment behind a runtime flag.
 It adds no save-state data and performs no gameplay mutation. Any invariant,
 configuration-identity, or required-coverage failure returns zero landscaping
@@ -148,9 +149,9 @@ The first implementation settles the following choices:
 13. Use the earliest-any-contact charge-indexed reach predicate to derive the
     baseline terrain charge horizon. Defer stronger complete-frontage
     aggregation until the baseline is validated.
-14. In the first baseline, use `Kfixed = 0` whenever a compatible fixed
-    frontage exists. Add a dedicated fixed-terminal charge relaxation only if
-    terrain-only measurements justify it.
+14. Stop the charge horizon at the first useful projected-ground endpoint
+    (physical G or FV). Do not use route-potential cost, contact distance, or
+    a separate fixed-terminal charge count to derive that horizon.
 
 These choices favor a small, verifiable implementation. Strengthening the
 heuristic is deferred until the baseline has been validated against Dijkstra
@@ -494,52 +495,17 @@ Do not manually crop that envelope to a front half. A direction-specific subset
 is valid only when it follows from the preserved transition rules or a separate
 dominance proof.
 
-### Fixed-terminal charge horizon
+### Projected-ground-aware endpoint horizon
 
-Preserve or construct a trustworthy lower bound on the number of future
-charge-owning slices before the nearest compatible fixed terminal:
+`Kcharge` counts future charge-owning slices before a useful projected-ground
+endpoint: physical G or FV. It is neither a route-distance estimate nor a
+fixed-terminal charge count, and must not be derived from route potential.
 
-```text
-Kfixed = minimum conservative future charge count to any compatible fixed target
-```
-
-Do not derive `Kfixed` by dividing the scalar potential cost. The potential
-mixes travel, generated fixed overhead, exact G suffix distance, centre spokes,
-and fixed-provider terminal fees.
-
-Define the charge horizon:
-
-```text
-Kcharge = min(Kterrain, Kfixed)
-```
-
-When no compatible fixed target exists, use `Kfixed = infinity`. When no
-admissible fixed-terminal charge proof exists, use `Kfixed = 0`.
-
-The first baseline deliberately implements only those two cases. Any compatible
-fixed frontage sets `Kfixed = 0`, so `Kcharge` and the landscaping heuristic
-become zero for that state/request. Record this suppression rate. Build a
-dedicated fixed-terminal charge-count relaxation only if terrain-only
-measurements first show that the heuristic is otherwise worthwhile and fixed
-frontages remove too much applicability.
-
-`Kcharge` counts future charge-owning slices, not turns, total V2 moves, or
-relaxed cardinal distance.
-
-### Fixed targets crop the charge horizon, not initially the extrema query
-
-For a direct-work-only bound, it may be safe to crop the work domain to the
-fixed-target geometry. The initial specification includes side rays, whose
-support can extend laterally beyond a nearby terminal.
-Therefore:
-
-* build the extrema from the full charge-indexed domain required by the tested
-  prefix; and
-* use `Kfixed` only to shorten the charge prefix passed to the work table.
-
-A later tighter formulation may crop the exact work domain only after proving
-that all direct-work samples and side-ray support capable of reducing
-pre-terminal work remain inside the cropped set.
+The initial proof uses the earliest-any-contact charge-indexed reach predicate.
+It may stop once a useful projected-ground endpoint is reachable, but it does
+not crop the extrema domain to one chosen endpoint: ordinary side-ray support
+can extend laterally beyond it. A tighter endpoint-specific domain requires a
+separate containment proof.
 
 ### Charge-owning generated slices
 
@@ -939,243 +905,11 @@ semantics. It should use:
 Implement and validate dumping first. Define the mining table now so the paired
 extrema cache and table-cache architecture do not need to be redesigned later.
 
-## Optional conservative recursive-diamond backend
-
-This backend is not part of the initial implementation. Retain it as a
-comparison design only if exact swept-mask scans prove expensive enough to
-justify evaluating a larger, weaker geometric superset. Its recurrence is exact
-for each queried diamond, but the diamond itself is only a conservative
-superset of the semantic contact or work domain.
-
-### Base cases and recurrence
-
-Radius zero is not cached:
-
-```text
-E(c, 0) = (terrain(c), terrain(c))
-```
-
-The precise terrain value is already available in the immutable snapshot.
-Caching it would duplicate terrain storage while replacing a direct terrain
-lookup with a cache lookup.
-
-Radius one is calculated directly and may be cached as the first reusable
-level:
-
-```text
-samples = terrain at { c, north, south, east, west }
-
-E(c, 1) = (
-    minimum sample,
-    maximum sample)
-```
-
-For `r >= 2`:
-
-```text
-children = {
-    E(c + north, r - 1),
-    E(c + south, r - 1),
-    E(c + east,  r - 1),
-    E(c + west,  r - 1)
-}
-
-E(c, r) = (
-    minimum child.Minimum,
-    maximum child.Maximum)
-```
-
-The centre subdiamond `E(c, r - 1)` is unnecessary. Every non-centre point in
-`D(c, r)` is one step closer to at least one cardinal neighbour. For `r >= 2`,
-the centre itself is also inside every cardinal child diamond. The four child
-diamonds therefore exactly cover `D(c, r)`.
-
-A parent assembled from cached children costs four reads, three minimum
-comparisons, and three maximum comparisons. Calculating both extrema does not
-change the recursive state family or require additional terrain reads.
-
-The omitted centre child may be tested only as an optional prefetch strategy if
-measurements later show that its extra subset family is frequently consumed.
-
-### Exact terrain values
-
-Store the extrema using the same precise terrain values supplied to the real
-landscaping scorer. The recurrence performs only comparisons and selection; its
-result is always one of the original terrain samples and does not accumulate
-numerical error.
-
-Do not round the cached minimum or maximum merely to make the result
-conservative. Rounding the maximum upward weakens the dumping heuristic, and
-rounding the minimum downward weakens the mining heuristic.
-
-The first implementation weakens only the work lookup by selecting the lower
-integer gap endpoint and capping the supported range. Handoff-distance numerical
-behavior remains a separate graph-semantics issue.
-
-### Subset relation
-
-Every cached query satisfying:
-
-```text
-ManhattanDistance(childCenter, parentCenter) + childRadius <= parentRadius
-```
-
-is an exact subset of the parent diamond.
-
-A radius-`r` diamond contains:
-
-```text
-2r^2 + 2r + 1
-```
-
-terrain positions. One immediate radius-`r - 1` directional child differs from
-it by only `4r` positions, which also permits a cheaper opportunistic crescent
-mode when full recursive prefetch is disabled.
-
-### Recursive evaluation cone and parity
-
-A cold recursive query for `(c, R)` does not create every geometrically
-contained `(tile, radius)` key. Each recursive edge moves the centre by one
-cardinal tile while reducing the radius by one. It therefore creates exactly
-the positive-radius states `(q, k)` satisfying:
-
-```text
-ManhattanDistance(c, q) <= R - k
-and
-ManhattanDistance(c, q) has the same parity as R - k
-and
-1 <= k <= R
-```
-
-The opposite-parity contained subsets are not needed to calculate the parent.
-They remain available for later on-demand evaluation if A* requests them.
-
-At recursive depth `t = R - k`, the number of reachable centres is:
-
-```text
-(t + 1)^2
-```
-
-Therefore a cold radius-`R` query creates:
-
-```text
-sum from i = 1 to R of i^2
-= R * (R + 1) * (2R + 1) / 6
-```
-
-cached positive-radius entries.
-
-This remains `O(R^3)`, but is approximately half the leading-order cache work
-of the earlier five-child full-cone recurrence. Radius-zero terrain samples are
-read as leaves and are not stored as cache entries.
-
-A single direct scan is still only `O(R^2)`. Recursive evaluation becomes
-attractive when the search later requests a meaningful fraction of the
-prefetched parity-compatible subset family.
-
-### Expected A* access pattern
-
-The heuristic itself is expected to favor lower-gap descendants and postpone
-larger-gap supersets. Consequently:
-
-* many required child queries should already be cached when a superset is
-  evaluated;
-* a superset assembled from four cached children costs only four reads and six
-  extrema comparisons; and
-* when a superset is evaluated first, its recursively generated
-  parity-compatible subsets are likely to become top-level heuristic queries
-  before the request finishes.
-
-There is a second reuse hypothesis: when an above-ground state is evaluated, a
-nearby or mirrored below-ground state may also be competitive because their
-non-landscaping path costs are similar. Storing both extrema means the later
-query can reuse the same spatial cache even though it uses the opposite bound.
-
-These are performance hypotheses, not admissibility assumptions. Instrument
-prefetch utilization and compare it with direct scanning. Also record misses
-caused specifically by a requested subset belonging to the opposite-parity
-family and reuse of entries by both dumping and mining queries.
-
-### Optional diamond-cache ownership and key
-
-If this comparison backend is implemented, its atomic terrain-extrema cache
-depends only on immutable precise terrain and snapshot coverage:
-
-```text
-key   = (tile, positiveRadius)
-value = (
-    minimumTerrainHeight,
-    maximumTerrainHeight,
-    coverageStatus)
-```
-
-Optional `argminTile` and `argmaxTile` fields may be added if they support a
-measured containment shortcut. Omit them initially to keep each entry compact.
-
-Radius zero is never inserted. The cache does not depend on:
-
-* current path height;
-* travel axis or direction;
-* profile mode;
-* operation class;
-* operation history;
-* generated origins already used;
-* tower-area membership or ocean eligibility;
-* fixed goals; or
-* the current goal set.
-
-It may therefore live on the immutable snapshot and be reused across sequential
-cluster requests until terrain or snapshot coverage changes. If memory ownership
-is simpler, start request-scoped and promote it only after measurements.
-
-### Data structure
-
-Start with a packed-key dictionary or a sparse per-centre radius vector. Avoid
-allocating a dense `(x, y, radius)` volume over the complete snapshot.
-
-If profiling shows dictionary overhead dominates, replace it with:
-
-* one sparse radius array per touched centre; or
-* radius layers over the locally warmed search region.
-
-The logical recurrence must remain identical.
-
-### Stack and work budgets
-
-Implement the logical recursion with an explicit post-order stack if radii can
-be large enough to risk call-stack growth.
-
-Track:
-
-* maximum cache entries per snapshot or request;
-* maximum new recursive entries per top-level query; and
-* optional maximum recursive radius.
-
-When a recursive budget is exhausted, fall back to an exact direct diamond scan
-for the requested key. Calculate both extrema during that scan and cache the
-top-level pair if space permits. A budget must affect performance only; it must
-not replace an exact extremum by a weaker or unsafe value.
-
-### Coverage and physical-map boundaries
-
-Intersect the translated contact and work masks with the immutable physical-map
-bounds. A position outside the physical map cannot host a legal contact or
-provide terrain to a legal direct-work or side-ray sample, so excluding it is a
-proof-preserving graph fact rather than an eligibility optimization.
-
-Tower-area and ocean status do not filter the remaining samples. Their terrain
-may still favorably weaken contact or work even when the position cannot host a
-generated origin.
-
-If any required in-map terrain sample is missing from the immutable snapshot,
-the mask may hide a favorable extremum. Mark the result incomplete and return
-zero landscaping heuristic for that state and operation. Do not skip the sample
-or substitute a low dumping height or high mining height.
-
-Record incomplete contact-mask and work-mask coverage separately. If either is
-frequent, widen snapshot capture from the precomputed maximum relative mask
-extent rather than weakening the failure rule.
-
+## Archived recursive-diamond backend
+
+The recursive Manhattan-diamond comparison backend is archived in
+[Recursive-Diamond Terrain-Extrema Backend](../superseded/accessway-pathfinding-terrain-extrema-diamond-backend.md).
+The active plan deliberately uses exact translated swept-mask scans instead.
 ## Future refinements
 
 ### Filtered landing extrema
@@ -1294,18 +1028,16 @@ under dumping semantics:
 h = existingPotential + H_land
 ```
 
-A separate proposed refinement,
-[Component-Conditioned V Commitment Potential](accessway-pathfinding-component-conditioned-v-potential.md),
-may later replace `existingPotential` with either a global mixed G/fixed/V
-route field `P` or a source-component-owned extension `S_C`. That proposal
-continues to own traversal and generated fixed overhead; it does not move
-either cost into `H_land`. The composition here would become
-`h = Hroute + H_land`.
+The approved [Sparse V-Type Route Potential](accessway-pathfinding-sparse-v-route-potential.md)
+will replace `existingPotential` with a sparse V/FV route field `P` and a
+component-local G escape lookup. A separate component-conditioned commitment
+idea remains deferred. The route field owns traversal and generated fixed
+overhead; it does not move either cost into `H_land`.
 
 The components cover disjoint cost portions:
 
-* the existing potential lower-bounds travel, generated fixed overhead, centre
-  spokes, exact G suffix distance, and fixed-terminal fees; and
+* the route potential lower-bounds travel, generated fixed overhead, centre
+  spokes, and exact G/FV suffix distance; and
 * `H_land` lower-bounds only unpaid future direct and ordinary exterior-side
   landscaping work.
 
@@ -1313,8 +1045,8 @@ Use addition, not `max`, because every concrete continuation pays both disjoint
 portions. Preserve that separation in implementation: do not add traversal,
 generated fixed overhead, spokes, terminal fees, ground-suffix cost, cleanup,
 or turn-owned frontal-ray cost to `Wdump`. Conversely, do not add direct or
-ordinary exterior-ray landscaping to the existing potential without revisiting
-the composition proof.
+ordinary exterior-ray landscaping to the route potential without revisiting the
+composition proof.
 
 Dijkstra continues to enqueue `h = 0` and remains the optimality reference for
 the same useful-height-envelope and graph-pruning configuration.
@@ -1378,11 +1110,6 @@ Record:
 * incomplete-coverage fail-open count; and
 * extrema calculation time.
 
-If the optional recursive-diamond backend is benchmarked, additionally record
-radius-one evaluations, positive-radius entries, prefetch utilization,
-opposite-parity misses, crescent reuse, maximum radius, and weakening relative
-to the exact swept-mask extremum.
-
 The tower-area and ocean counters should initially be diagnostics only. Do not
 add eligibility branches to the hot extrema path solely to populate them if the
 snapshot cannot provide them cheaply.
@@ -1420,8 +1147,7 @@ Compare at least:
 6. optional five-child recursive prefetch;
 7. maximum-only versus paired-extrema cache memory and runtime;
 8. fixed integer `Wdump` table versus direct synthetic evaluation in diagnostics;
-9. unfiltered extrema versus diagnostics-estimated filtered strength; and
-10. the older lazy successor-frontier heuristic.
+9. unfiltered extrema versus diagnostics-estimated filtered strength.
 
 ## Validation
 
@@ -1463,25 +1189,6 @@ all enabled band profiles, axes, entry directions, and turn-pending states:
 Any production transition not contained by the relaxed templates is an
 admissibility failure and must fail validation rather than silently weaken
 coverage.
-
-### Optional recursive-backend fixtures
-
-* radius zero reads exact terrain directly and creates no cache entry;
-* radius one equals the minimum and maximum of the centre and four cardinal
-  terrain samples;
-* every radius-at-least-two parent extrema pair equals the combined extrema of
-  its four directional children;
-* four directional child diamonds exactly cover every tested parent diamond;
-* a cold superset build contains every parity-compatible subset predicted by the
-  recurrence and need not contain opposite-parity subsets;
-* child-first evaluation makes a parent constant-work;
-* parent-first evaluation records later top-level consumption of prefetched
-  children;
-* the recursive entry count matches `R * (R + 1) * (2R + 1) / 6`;
-* each cached extremum is an exact original terrain sample;
-* a paired-extrema entry supports both dumping and mining mirror queries;
-* cache saturation falls back to an exact direct extrema result; and
-* cache ownership is invalidated with terrain snapshot coverage.
 
 ### `Wdump` table fixtures
 
@@ -1536,8 +1243,8 @@ coverage.
 1. Implement and measure the useful-height envelope.
 2. Precompute and fixture-test the exact relaxed V2 state, contact-support, and
    swept work-support offset sets for charge prefixes `1..7`.
-3. Implement the charge-indexed earliest-any-contact predicate, including the
-   baseline compatible-fixed-frontage suppression rule.
+3. Implement the charge-indexed earliest-any-contact predicate with the
+   projected-ground-aware endpoint horizon.
 4. Implement the synthetic `Wdump` generator with fixed slope, integer work
    gaps `0..8`, and charge horizons `0..7`.
 5. Verify the table against the shared direct-work and side-ray scorers, the
@@ -1549,15 +1256,11 @@ coverage.
 8. Measure repeated translated queries and overlap between neighbouring masks.
    Add exact whole-query caching or incremental overlap reuse only when those
    measurements justify it.
-9. Benchmark a conservative recursive-diamond evaluator only if exact-mask scan
-   time remains material; record both runtime and heuristic weakening.
-10. Compare the selected terrain-extrema formulation with the older lazy
-    profile-aware successor frontier.
-11. Add `Wmine` using paired exact-mask extrema and the least runny tower-area
-    normal material.
-12. Measure the strength lost to global work ceilings, unfiltered extrema,
-    integer gap flooring, and the `deltaWork = 8` / `Kcharge = 7` caps.
-13. Consider localized work ceilings, filtered landing extrema, finer/adaptive
+9. Add `Wmine` using paired exact-mask extrema and the least runny tower-area
+   normal material.
+10. Measure the strength lost to global work ceilings, unfiltered extrema,
+   integer gap flooring, and the `deltaWork = 8` / `Kcharge = 7` caps.
+11. Consider localized work ceilings, filtered landing extrema, finer/adaptive
     tables, exact large-gap evaluation, or alternate heuristic material slopes
     only when measurements justify the added complexity.
 

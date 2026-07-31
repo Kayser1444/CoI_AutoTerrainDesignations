@@ -180,11 +180,7 @@
     "矿石质量"
   ],
   [
-    "settings.tab.pathfinder",
-    "通道"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "矿井控制塔默认值"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "控制 ATD 何时使用游戏的快速移除操作来清除通道碎片。快速去除花Unity。此政策不适用于矿塔清除碎片按钮。"
+    "控制 ATD 何时使用游戏的快速移除操作来清除通道碎片。快速移除仅在游戏未暂停时消耗 Unity。此政策不适用于矿塔清除碎片按钮。"
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "最大限度"
   ],
   [
+    "settings.tab.pathfinder",
+    "通道"
+  ],
+  [
     "settings.pathfinder.costs",
     "路线成本"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "地形指定成本"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "应用于横向和转角地形作业射线的权重。"
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "候选射线最大距离"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "每个游戏帧的近似搜索工作预算。较高的值会更快完成，但会造成更长的卡顿。"
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "每条光线的最大成本"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<已摧毁>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "转角(外侧): 放置突出的转角坡道。"
   ],
   [

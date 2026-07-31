@@ -171,7 +171,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsQuickRemoveDebrisLabel =
             Loc.Str("settings.world.quick_remove_debris.label", "Quick remove debris", "Accessway setting label for Quick Remove policy.");
         public static LocStr SettingsQuickRemoveDebrisTooltip =
-            Loc.Str("settings.world.quick_remove_debris.tooltip", "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity. This policy does not apply to the mine-tower Clear debris button.", "Accessway setting tooltip explaining that Quick remove costs Unity.");
+            Loc.Str("settings.world.quick_remove_debris.tooltip", "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity only when the game is unpaused. This policy does not apply to the mine-tower Clear debris button.", "Accessway setting tooltip explaining that Quick remove costs Unity only while unpaused.");
         public static LocStr SettingsQuickRemoveDebrisAlways =
             Loc.Str("settings.world.quick_remove_debris.always", "Always", "Quick Remove policy value.");
         public static LocStr SettingsQuickRemoveDebrisAlwaysTooltip =

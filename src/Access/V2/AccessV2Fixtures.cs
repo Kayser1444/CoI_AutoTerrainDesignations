@@ -623,8 +623,7 @@ namespace AutoTerrainDesignations.Access.V2
                 [seed] = flat,
             };
             AccessV2EndpointSet synthetic = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>());
+                boundsMin, boundsMax, oneWide, new[] { seed });
             if (synthetic.Starts.Count == 0)
             {
                 failure = "One-origin flat source must enumerate V2 source launches";
@@ -633,8 +632,7 @@ namespace AutoTerrainDesignations.Access.V2
 
             oneWide[seed] = xPositive;
             AccessV2EndpointSet ramp = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>());
+                boundsMin, boundsMax, oneWide, new[] { seed });
             if (ramp.Starts.Count == 0
                 || ramp.Starts.Any(start =>
                     start.State.Axis != AccessV2TravelAxis.X))
@@ -648,8 +646,7 @@ namespace AutoTerrainDesignations.Access.V2
                 out AccessHeightProfile raisedFlat);
             oneWide[seed] = raisedFlat;
             AccessV2EndpointSet raised = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, oneWide, new[] { seed },
-                Array.Empty<Tile2i>());
+                boundsMin, boundsMax, oneWide, new[] { seed });
             IReadOnlyList<AccessV2StartFrontage> downLaunches =
                 raised.Starts.Where(start =>
                     start.IsSourceLaunch
@@ -678,8 +675,7 @@ namespace AutoTerrainDesignations.Access.V2
             };
             AccessV2EndpointSet tiered = AccessV2FrontageDiscovery.Build(
                 boundsMin, boundsMax, tierProfiles,
-                new[] { outerRight, centerLeft, outerLeft, centerRight },
-                Array.Empty<Tile2i>());
+                new[] { outerRight, centerLeft, outerLeft, centerRight });
             if (tiered.StartTiers.Count != 2
                 || !tiered.StartTiers[0]
                     .Select(start => start.FixedSeedOrigin)
@@ -703,52 +699,12 @@ namespace AutoTerrainDesignations.Access.V2
                 [paired] = flat,
             };
             AccessV2EndpointSet existing = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, fixedPair, new[] { seed, paired },
-                Array.Empty<Tile2i>());
+                boundsMin, boundsMax, fixedPair, new[] { seed, paired });
             if (!existing.Starts.Any(start =>
                     start.IsSourceLaunch
                     && start.InitialTransition == null))
             {
                 failure = "Existing compatible companion must be reusable in a source launch";
-                return false;
-            }
-
-            AccessV2EndpointSet exposedGoals = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, fixedPair, Array.Empty<Tile2i>(),
-                new[] { seed, paired });
-            if (exposedGoals.FixedGoals.Count != 2)
-            {
-                failure = "Adjacent fixed pair must expose both open outer frontages";
-                return false;
-            }
-
-            Tile2i yAxisPair = new Tile2i(12, 8);
-            var verticalPair = new Dictionary<Tile2i, AccessHeightProfile>
-            {
-                [seed] = flat,
-                [yAxisPair] = flat,
-            };
-            AccessV2EndpointSet verticalGoals = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, verticalPair, Array.Empty<Tile2i>(),
-                new[] { seed, yAxisPair });
-            if (verticalGoals.FixedGoals.Count != 2
-                || verticalGoals.FixedGoals.Any(
-                    goal => goal.State.Axis != AccessV2TravelAxis.Y))
-            {
-                failure = "Fixed frontage discovery must be symmetric across both axes";
-                return false;
-            }
-
-            fixedPair[new Tile2i(12, 8)] = flat;
-            fixedPair[new Tile2i(12, 12)] = flat;
-            AccessV2EndpointSet oneSideExposed = AccessV2FrontageDiscovery.Build(
-                boundsMin, boundsMax, fixedPair, Array.Empty<Tile2i>(),
-                new[] { seed, paired });
-            if (oneSideExposed.FixedGoals.Count != 1
-                || oneSideExposed.FixedGoals[0].ExposedDirection
-                    != new Tile2i(-4, 0))
-            {
-                failure = "Fixed goal frontage must reject the occupied outer edge only";
                 return false;
             }
 
@@ -1326,7 +1282,6 @@ namespace AutoTerrainDesignations.Access.V2
             var disconnectedVPotential = new AccessV2PotentialField(
                 Tile2i.Zero, new Tile2i(11, 0),
                 disconnectedGraph,
-                Array.Empty<AccessV2FixedFrontage>(),
                 minimumVTravelCostPerTile: 2.25f);
             var disconnectedEscapePotential =
                 new AccessV2GroundEscapePotentialField(
@@ -1610,7 +1565,6 @@ namespace AutoTerrainDesignations.Access.V2
                     new AccessV2StartFrontage(
                         largeStart, largeStart.GetLaneOrigin(0)),
                 },
-                Array.Empty<AccessV2FixedFrontage>(),
                 new AccessV2FrontageDiagnostics());
             var sparseSession = new AccessV2SearchSession(
                 largeEndpoints,
@@ -2006,7 +1960,7 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
-            Tile2i slantedProjectedGround = new Tile2i(6, 10);
+            Tile2i slantedProjectedGround = new Tile2i(8, 10);
             bool SlantedGeneratedOrigin(Tile2i origin)
                 => origin == slantedAnchor
                     || origin == slantedCompanion;
@@ -2015,6 +1969,18 @@ namespace AutoTerrainDesignations.Access.V2
                     origin, out AccessHeightProfile profile)
                         ? profile
                         : (AccessHeightProfile?)null;
+            if (AccessV2SearchSession.CanExitGroundComponentToV(
+                    new Tile2i(6, 10),
+                    SlantedGeneratedOrigin,
+                    SlantedFixedProfile)
+                || !AccessV2SearchSession
+                    .CanUseCanonicalGroundToVLaunchPosition(
+                        slantedProjectedGround, new Tile2i(4, 0)))
+            {
+                failure =
+                    "G-to-V fixed-fringe exits must reject noncanonical centers while retaining the corresponding canonical launch";
+                return false;
+            }
             if (!AccessV2SearchSession.CanExitGroundComponentToV(
                     slantedProjectedGround,
                     SlantedGeneratedOrigin,
@@ -2251,179 +2217,6 @@ namespace AutoTerrainDesignations.Access.V2
                     "The slanted adapter selection fixture requires an ordinary competing exit";
                 return false;
             }
-            AccessV2BandState realSlantedExpensiveGoal =
-                AccessV2Geometry.EnumerateStraight(
-                    realSlantedExpensiveSuccessor.Next).First().Next;
-
-            var realSlantedEndpoints = new AccessV2EndpointSet(
-                new[]
-                {
-                    new AccessV2StartFrontage(
-                        realSlantedStart,
-                        realSlantedStart.GetLaneOrigin(0)),
-                    new AccessV2StartFrontage(
-                        realSlantedExpensiveStart,
-                        realSlantedExpensiveStart.GetLaneOrigin(0)),
-                },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        realSlantedGoal,
-                        AccessV2Geometry.Scale(
-                            realSlantedGoal.EntryDirection, -1)),
-                    new AccessV2FixedFrontage(
-                        realSlantedExpensiveGoal,
-                        AccessV2Geometry.Scale(
-                            realSlantedExpensiveGoal.EntryDirection, -1)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var realSlantedTerrainHeight2 =
-                new Dictionary<Tile2i, int>();
-            var realSlantedPreciseTerrain =
-                new Dictionary<Tile2i, float>();
-            for (int y = 0; y <= 32; y++)
-                for (int x = 0; x <= 32; x++)
-                {
-                    var tile = new Tile2i(x, y);
-                    realSlantedTerrainHeight2[tile] = 2;
-                    realSlantedPreciseTerrain[tile] = 1f;
-                }
-            var realSlantedCenterHeight2 =
-                new Dictionary<Tile2i, int>();
-            for (int y = 0; y <= 28; y += 4)
-                for (int x = 0; x <= 28; x += 4)
-                    realSlantedCenterHeight2[
-                        new Tile2i(x, y)] = 2;
-            var realSlantedSnapshot = new AccessSearchSnapshot(
-                Tile2i.Zero, new Tile2i(32, 32),
-                new Tile2i(28, 28),
-                -8, 8,
-                true, true, false,
-                1f, 1f,
-                realSlantedTerrainHeight2,
-                realSlantedCenterHeight2,
-                realSlantedSelectionFixedProfiles,
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                Array.Empty<AccessDurabilityCorner>(),
-                preciseTerrainHeights:
-                    realSlantedPreciseTerrain,
-                physicalTerrainMin: Tile2i.Zero,
-                physicalTerrainMax: new Tile2i(32, 32),
-                rayLevelingDesignationOrigins:
-                    Array.Empty<Tile2i>(),
-                vehicleWidth: 5);
-            AccessV2GroundGraph realSlantedGroundGraph =
-                realSlantedSnapshot.V2GroundGraph!;
-            AccessV2TransitionEvaluation EvaluateSlantedSelection(
-                AccessV2BandState? current,
-                AccessV2Transition transition,
-                AccessV2History history,
-                Tile2i? connected)
-            {
-                bool cheap = transition.Next.Equals(realSlantedState)
-                    || transition.Next.Equals(realSlantedPair.Next)
-                    || transition.Next.Equals(realSlantedOrdinary.Next);
-                bool expensive =
-                    transition.Next.Equals(realSlantedExpensive.Next)
-                    || transition.Next.Equals(
-                        realSlantedExpensiveSuccessor.Next);
-                if (!cheap && !expensive)
-                    return AccessV2TransitionEvaluation.Reject(
-                        "FixtureOnlySlantedAlternatives");
-                float work = transition.Delta.Count
-                    * (cheap ? 1f : 100f);
-                return new AccessV2TransitionEvaluation(
-                    true, string.Empty, 4f, work, 0f,
-                    directWorkCost: work);
-            }
-            AccessV2HandoffCandidate? SlantedGroundToV(
-                AccessV2BandState state,
-                Tile2i ground,
-                AccessHandoffOperation operation,
-                AccessV2History history)
-                => AccessPathSearch.EvaluateV2GroundToVHandoff(
-                    realSlantedSnapshot,
-                    state,
-                    ground,
-                    operation,
-                    history);
-            var slantedSelectionDiagnostics =
-                new AccessSearchDiagnostics();
-            AccessV2SearchResult RunSlantedSelection(
-                AccessV2HeuristicEvaluator? heuristic)
-            {
-                var selection = new AccessV2SearchSession(
-                    realSlantedEndpoints,
-                    Tile2i.Zero, new Tile2i(32, 32),
-                    EvaluateSlantedSelection,
-                    10000, float.MaxValue,
-                    heuristicEvaluator: heuristic,
-                    groundGraph: realSlantedGroundGraph,
-                    terrainCenterHeightProvider: _ => 2,
-                    preciseTerrainHeightProvider: _ => 1f,
-                    groundToVHandoffEvaluator: SlantedGroundToV,
-                    diagnostics: slantedSelectionDiagnostics,
-                    fixedProfileProvider:
-                        origin => realSlantedSelectionFixedProfiles
-                            .TryGetValue(
-                            origin,
-                            out AccessHeightProfile fixedProfile)
-                                ? fixedProfile
-                                : (AccessHeightProfile?)null,
-                    generatedVPrimeOriginValidator:
-                        origin => origin == realSlantedAnchor
-                            || origin == realSlantedCompanion);
-                while (!selection.IsComplete)
-                    selection.Step(31);
-                return selection.Result;
-            }
-            AccessV2SearchResult slantedDijkstra =
-                RunSlantedSelection(null);
-            if (!slantedDijkstra.Success
-                || slantedDijkstra.GeneratedProfiles.Count != 6
-                || !slantedDijkstra.States.Contains(
-                    realSlantedPair.Next)
-                || !slantedDijkstra.States.Contains(
-                    realSlantedOrdinary.Next)
-                || slantedDijkstra.States.Contains(
-                    realSlantedExpensive.Next)
-                || slantedDijkstra.GeneratedWorkCost >= 200f)
-            {
-                failure =
-                    "V2 search must select the bounded two-slice slanted adapter over the available expensive ordinary exit"
-                    + $": success={slantedDijkstra.Success}"
-                    + $" reason={slantedDijkstra.FailureReason}"
-                    + $" states={slantedDijkstra.States.Count}"
-                    + $" generated={slantedDijkstra.GeneratedProfiles.Count}"
-                    + $" cost={slantedDijkstra.Cost}"
-                    + $" rejects=[{string.Join(",", slantedDijkstra.Rejections.Select(pair => pair.Key + ":" + pair.Value))}]"
-                    + $" adapters=[{string.Join(";", slantedSelectionDiagnostics.V2VPrimeAdapterDetails)}]";
-                return false;
-            }
-            AccessV2SearchResult slantedAStar =
-                RunSlantedSelection(_ => 0f);
-            if (!slantedAStar.Success
-                || !slantedAStar.UsedAStar
-                || Math.Abs(
-                    slantedAStar.Cost - slantedDijkstra.Cost) > 0.0001f
-                || !slantedAStar.States.SequenceEqual(
-                    slantedDijkstra.States)
-                || !slantedAStar.GeneratedProfiles.OrderBy(pair => pair.Key.X)
-                    .ThenBy(pair => pair.Key.Y)
-                    .SequenceEqual(
-                        slantedDijkstra.GeneratedProfiles
-                            .OrderBy(pair => pair.Key.X)
-                            .ThenBy(pair => pair.Key.Y)))
-            {
-                failure =
-                    "V2 A* must reproduce the Dijkstra slanted-adapter route, cost, and generated profiles";
-                return false;
-            }
-
             AccessHeightProfile.TryForMode(
                 AccessSearchMode.Flat, 0,
                 out AccessHeightProfile jaggedFlat);
@@ -2488,144 +2281,6 @@ namespace AutoTerrainDesignations.Access.V2
                 new Tile2i(8, 8),
                 jaggedAdapterBand,
                 new Tile2i(4, 0));
-            AccessV2Transition jaggedOrdinary =
-                AccessV2Geometry.EnumerateStraight(
-                    jaggedAdapter).First();
-            AccessV2BandState jaggedGoal =
-                AccessV2Geometry.EnumerateStraight(
-                    jaggedOrdinary.Next).First().Next;
-            var jaggedEndpoints = new AccessV2EndpointSet(
-                new[]
-                {
-                    new AccessV2StartFrontage(
-                        jaggedStart,
-                        jaggedStart.GetLaneOrigin(0)),
-                },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        jaggedGoal,
-                        AccessV2Geometry.Scale(
-                            jaggedGoal.EntryDirection, -1)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var jaggedGroundGraph = new AccessV2GroundGraph(
-                Array.Empty<Tile2i>(),
-                Array.Empty<Tile2i>(),
-                new Dictionary<Tile2i, AccessPropCleanupInfo>(),
-                new[] { jaggedGround });
-            AccessV2SearchResult RunJagged(
-                AccessV2HeuristicEvaluator? heuristic)
-            {
-                var search = new AccessV2SearchSession(
-                    jaggedEndpoints,
-                    Tile2i.Zero, new Tile2i(32, 32),
-                    (current, transition, history, connected) =>
-                        transition.Next.Equals(jaggedAdapter)
-                            || transition.Next.Equals(
-                                jaggedOrdinary.Next)
-                                ? new AccessV2TransitionEvaluation(
-                                    true, string.Empty,
-                                    4f, transition.Delta.Count, 0f)
-                                : AccessV2TransitionEvaluation.Reject(
-                                    "FixtureOnlyJaggedAdapter"),
-                    10000, float.MaxValue,
-                    heuristicEvaluator: heuristic,
-                    groundGraph: jaggedGroundGraph,
-                    terrainCenterHeightProvider: _ => 0,
-                    preciseTerrainHeightProvider: _ => 0f,
-                    groundToVHandoffEvaluator:
-                        (state, ground, operation, history) =>
-                            new AccessV2HandoffCandidate(
-                                state.EntryDirection,
-                                1,
-                                new AccessGroundHandoff(
-                                    ground, operation),
-                                new AccessGroundHandoff(
-                                    ground, operation),
-                                new[] { state.GetLaneOrigin(0) },
-                                new[] { state.GetLaneOrigin(1) },
-                                new[] { ground },
-                                new[] { ground },
-                                Array.Empty<string>(),
-                                0f),
-                    fixedProfileProvider:
-                        origin => jaggedFixedProfiles.TryGetValue(
-                            origin,
-                            out AccessHeightProfile fixedProfile)
-                                ? fixedProfile
-                                : (AccessHeightProfile?)null,
-                    generatedVPrimeOriginValidator:
-                        origin => origin == new Tile2i(8, 12));
-                while (!search.IsComplete)
-                    search.Step(31);
-                return search.Result;
-            }
-            AccessV2SearchResult jaggedDijkstra = RunJagged(null);
-            AccessV2SearchResult jaggedAStar = RunJagged(_ => 0f);
-            if (!jaggedDijkstra.Success
-                || !jaggedAStar.Success
-                || !jaggedAStar.UsedAStar
-                || Math.Abs(
-                    jaggedAStar.Cost - jaggedDijkstra.Cost) > 0.0001f
-                || !jaggedAStar.States.SequenceEqual(
-                    jaggedDijkstra.States)
-                || jaggedDijkstra.GeneratedProfiles.Count != 4
-                || jaggedDijkstra.GeneratedProfiles.Count(pair =>
-                    AccessV2BandProfile.IsCanonicalVPrime(
-                        pair.Value)) != 1)
-            {
-                failure =
-                    "V2 A* must reproduce the Dijkstra one-lane jagged-adapter route, cost, and generated profiles";
-                return false;
-            }
-
-            var slantedRoute = new AccessV2RouteData(
-                slantedDijkstra.States,
-                slantedDijkstra.GeneratedProfiles,
-                slantedDijkstra.Handoff,
-                slantedDijkstra.GroundPath,
-                slantedDijkstra.RouteSteps);
-            var slantedResult = new AccessSearchResult(
-                true, string.Empty,
-                realSlantedStart.GetLaneOrigin(0),
-                Array.Empty<AccessSearchNode>(),
-                slantedDijkstra.Cost,
-                slantedDijkstra.Visited,
-                slantedDijkstra.Rejections,
-                slantedDijkstra.TraversalCost,
-                slantedDijkstra.GeneratedWorkCost
-                    - slantedDijkstra.GeneratedFixedCost,
-                slantedDijkstra.GeneratedFixedCost,
-                0f,
-                slantedDijkstra.CleanupCost,
-                AccessReachedGoalKind.FixedNetwork,
-                generatedDirectWorkCost:
-                    slantedDijkstra.DirectWorkCost,
-                rightSideRayCost:
-                    slantedDijkstra.ExteriorRayCost,
-                v2Route: slantedRoute);
-            AccessDesignationPlan slantedPlan =
-                AccessPathMaterializer.Materialize(
-                    realSlantedSnapshot,
-                    slantedResult);
-            if (!slantedPlan.IsValid
-                || slantedPlan.Designations.Count != 6
-                || slantedPlan.Designations.Count(designation =>
-                    designation.Mode == AccessSearchMode.VPrime) != 2
-                || slantedPlan.Designations.Any(designation =>
-                    !slantedDijkstra.GeneratedProfiles.ContainsKey(
-                        designation.Origin)))
-            {
-                failure =
-                    "Slanted adapter search, replay, and materialization must retain all six generated owned origins, including exact-terrain companions"
-                    + $": valid={slantedPlan.IsValid}"
-                    + $" reason={slantedPlan.FailureReason}"
-                    + $" designations={slantedPlan.Designations.Count}"
-                    + $" generated={slantedDijkstra.GeneratedProfiles.Count}";
-                return false;
-            }
-
             Tile2i mixedGround = new Tile2i(8, 8);
             Tile2i mixedTravel = new Tile2i(4, 0);
             Tile2i mixedAnchor = AccessV2SearchSession
@@ -2663,7 +2318,7 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
-            Tile2i fixedAdapterGround = new Tile2i(10, 10);
+            Tile2i fixedAdapterGround = new Tile2i(8, 10);
             Tile2i fixedAdapterTravel = new Tile2i(4, 0);
             Tile2i fixedAdapterAnchor = AccessV2SearchSession
                 .GetGroundToVBandAnchor(
@@ -2735,17 +2390,6 @@ namespace AutoTerrainDesignations.Access.V2
                     out AccessV2BandState goalState, out failure))
                 return false;
 
-            var endpoints = new AccessV2EndpointSet(
-                new[]
-                {
-                    new AccessV2StartFrontage(start, start.Anchor),
-                },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        goalState, new Tile2i(-4, 0), terminalCost: 7f),
-                },
-                new AccessV2FrontageDiagnostics());
             AccessV2TransitionEvaluation UnitEvaluator(
                 AccessV2BandState? current,
                 AccessV2Transition transition,
@@ -2768,40 +2412,11 @@ namespace AutoTerrainDesignations.Access.V2
                     {
                         [raisedLaunchOrigin] = raisedLaunchFlat,
                     },
-                    new[] { raisedLaunchOrigin },
-                    Array.Empty<Tile2i>());
+                    new[] { raisedLaunchOrigin });
             AccessV2StartFrontage raisedLaunch =
                 raisedLaunchCandidates.Starts.First(candidate =>
                     candidate.LaunchSuccessor?.Next.Band.Lane0.Center2 == 1
                     && candidate.LaunchSuccessor.Next.Band.Lane1.Center2 == 1);
-            AccessV2Transition raisedLaunchGoal =
-                AccessV2Geometry.EnumerateStraight(
-                    raisedLaunch.LaunchSuccessor!.Next).First();
-            var launchEndpoints = new AccessV2EndpointSet(
-                new[] { raisedLaunch },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        raisedLaunchGoal.Next,
-                        AccessV2Geometry.Scale(
-                            raisedLaunch.State.EntryDirection, -1)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var launchSearch = new AccessV2SearchSession(
-                launchEndpoints,
-                Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue);
-            while (!launchSearch.IsComplete) launchSearch.Step(7);
-            if (!launchSearch.Result.Success
-                || launchSearch.Result.States.Count != 2
-                || launchSearch.Result.GeneratedProfiles.Count != 3
-                || launchSearch.Result.StraightTransitions != 1
-                || launchSearch.Result.StrafeTransitions != 0
-                || Math.Abs(launchSearch.Result.Cost - 7f) > 0.0001f)
-            {
-                failure = "One-origin source launch must own its companion and mandatory successor without a synthetic strafe";
-                return false;
-            }
             Tile2i launchGroundGoal = new Tile2i(24, 24);
             var launchGroundGraph = new AccessV2GroundGraph(
                 new[] { launchGroundGoal },
@@ -2822,7 +2437,6 @@ namespace AutoTerrainDesignations.Access.V2
             var launchGroundSession = new AccessV2SearchSession(
                 new AccessV2EndpointSet(
                     new[] { raisedLaunch },
-                    Array.Empty<AccessV2FixedFrontage>(),
                     new AccessV2FrontageDiagnostics()),
                 Tile2i.Zero, new Tile2i(32, 32),
                 LaunchGroundEvaluator, 10000, float.MaxValue,
@@ -2863,33 +2477,6 @@ namespace AutoTerrainDesignations.Access.V2
                     "A valid but expensive ramp-to-G handoff must not suppress a cheaper exact-terrain V continuation";
                 return false;
             }
-            var launchAStar = new AccessV2SearchSession(
-                launchEndpoints,
-                Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue,
-                heuristicEvaluator: _ => 0f);
-            while (!launchAStar.IsComplete)
-                launchAStar.Step(7);
-            if (!launchAStar.Result.Success
-                || !launchAStar.Result.UsedAStar
-                || Math.Abs(
-                    launchAStar.Result.Cost
-                    - launchSearch.Result.Cost) > 0.0001f
-                || !launchAStar.Result.States.SequenceEqual(
-                    launchSearch.Result.States)
-                || !launchAStar.Result.GeneratedProfiles.OrderBy(
-                        pair => pair.Key.X)
-                    .ThenBy(pair => pair.Key.Y)
-                    .SequenceEqual(
-                        launchSearch.Result.GeneratedProfiles
-                            .OrderBy(pair => pair.Key.X)
-                            .ThenBy(pair => pair.Key.Y)))
-            {
-                failure =
-                    "V2 A* must reproduce the Dijkstra one-origin launch route, cost, and generated profiles";
-                return false;
-            }
-
             if (!TryCreateUniformState(
                     new Tile2i(16, 4), AccessV2TravelAxis.X,
                     new Tile2i(4, 0), AccessSearchMode.Flat, 0,
@@ -2913,12 +2500,34 @@ namespace AutoTerrainDesignations.Access.V2
                             outerTierStart, outerTierStart.Anchor),
                     },
                 },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        outerTierGoal, new Tile2i(-4, 0)),
-                },
                 new AccessV2FrontageDiagnostics());
+            Tile2i tierGroundGoal = new Tile2i(28, 8);
+            var tierGroundGraph = new AccessV2GroundGraph(
+                new[] { tierGroundGoal },
+                new[] { tierGroundGoal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            IReadOnlyList<AccessV2HandoffCandidate> TierHandoff(
+                IReadOnlyList<AccessV2BandState> recent,
+                AccessV2History history,
+                Tile2i? requiredGroundEntry)
+            {
+                AccessV2BandState terminal = recent[0];
+                if (!terminal.Equals(outerTierGoal))
+                    return Array.Empty<AccessV2HandoffCandidate>();
+                var handoff = new AccessGroundHandoff(
+                    tierGroundGoal, AccessHandoffOperation.Leveling);
+                return new[]
+                {
+                    new AccessV2HandoffCandidate(
+                        terminal.EntryDirection, 1,
+                        handoff, handoff,
+                        new[] { terminal.GetLaneOrigin(0) },
+                        new[] { terminal.GetLaneOrigin(1) },
+                        new[] { tierGroundGoal },
+                        new[] { tierGroundGoal },
+                        Array.Empty<string>(), 0f),
+                };
+            }
             var tierFallback = new AccessV2SearchSession(
                 tierFallbackEndpoints,
                 Tile2i.Zero, new Tile2i(32, 32),
@@ -2929,7 +2538,9 @@ namespace AutoTerrainDesignations.Access.V2
                         : UnitEvaluator(
                             current, transition, history,
                             connectedFixedOrigin),
-                10000, float.MaxValue);
+                10000, float.MaxValue,
+                TierHandoff,
+                groundGraph: tierGroundGraph);
             while (!tierFallback.IsComplete) tierFallback.Step(7);
             if (!tierFallback.Result.Success
                 || tierFallback.Result.States.Count == 0
@@ -2954,11 +2565,6 @@ namespace AutoTerrainDesignations.Access.V2
                             start, start.Anchor),
                     },
                 },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        outerTierGoal, new Tile2i(-4, 0)),
-                },
                 new AccessV2FrontageDiagnostics());
             var redundantTierDiagnostics = new AccessSearchDiagnostics();
             var redundantTierSearch = new AccessV2SearchSession(
@@ -2968,6 +2574,8 @@ namespace AutoTerrainDesignations.Access.V2
                     AccessV2TransitionEvaluation.Reject(
                         "FixtureAllRoutesBlocked"),
                 10000, float.MaxValue,
+                TierHandoff,
+                groundGraph: tierGroundGraph,
                 diagnostics: redundantTierDiagnostics);
             int redundantTierStartPops = 0;
             Tile2i redundantTierStartCenter =
@@ -2997,7 +2605,9 @@ namespace AutoTerrainDesignations.Access.V2
                 Tile2i.Zero, new Tile2i(32, 32),
                 UnitEvaluator,
                 maxVisited: 1,
-                maxCost: float.MaxValue);
+                maxCost: float.MaxValue,
+                handoffEvaluator: TierHandoff,
+                groundGraph: tierGroundGraph);
             while (!noResourceFallback.IsComplete)
                 noResourceFallback.Step(7);
             if (noResourceFallback.Result.Success
@@ -3020,7 +2630,9 @@ namespace AutoTerrainDesignations.Access.V2
                                 : 0f,
                         0f, 0f),
                 maxVisited: 10000,
-                maxCost: 1f);
+                maxCost: 1f,
+                handoffEvaluator: TierHandoff,
+                groundGraph: tierGroundGraph);
             while (!noCostFallback.IsComplete)
                 noCostFallback.Step(7);
             if (noCostFallback.Result.Success
@@ -3031,263 +2643,17 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
-            var straightDiagnostics = new AccessSearchDiagnostics();
-            var straight = new AccessV2SearchSession(
-                endpoints, Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue,
-                diagnostics: straightDiagnostics);
-            while (!straight.IsComplete) straight.Step(7);
-            if (!straight.Result.Success
-                || straight.Result.States.Count != 3
-                || straight.Result.GeneratedProfiles.Count != 4
-                || Math.Abs(straight.Result.Cost - 19f) > 0.0001f
-                || Math.Abs(straight.Result.TraversalCost - 15f) > 0.0001f
-                || straightDiagnostics.V2EarlyLabelDominancePrunes == 0
-                || !straight.Result.Rejections.ContainsKey(
-                    "FlatStrafeDominatedByTurn"))
-            {
-                failure = "V2 Dijkstra cost, early label dominance, or flat-strafe dominance failed";
-                return false;
-            }
-
-            var fixedPotential = new AccessV2PotentialField(
-                Tile2i.Zero, new Tile2i(32, 32),
-                ground: null, fixedGoals: endpoints.FixedGoals);
-            Tile2i fixedMatchCenter =
-                AccessV2PotentialField.GetCanonicalCenter(goalState)
-                + new RelTile2i(-4, 0);
-            if (Math.Abs(fixedPotential.GetPotential(start) - 15f) > 0.0001f
-                || Math.Abs(fixedPotential.GetPotential(fixedMatchCenter) - 7f)
-                    > 0.0001f)
-            {
-                failure = "V2 fixed-frontage charged potential seed or propagation failed";
-                return false;
-            }
             const float fixtureFixedOriginCost = 5f;
             float minimumVRate =
                 AccessV2CostModel.GetMinimumVTravelCostPerTile(
                     fixtureFixedOriginCost);
             float centerSpoke = AccessV2CostModel.GetCenterSpokeCost(
                 fixtureFixedOriginCost);
-            var weightedPotential = new AccessV2PotentialField(
-                Tile2i.Zero, new Tile2i(32, 32),
-                ground: null, fixedGoals: endpoints.FixedGoals,
-                minimumVTravelCostPerTile: minimumVRate);
             if (Math.Abs(minimumVRate - 2.25f) > 0.0001f
-                || Math.Abs(centerSpoke - 4.5f) > 0.0001f
-                || Math.Abs(weightedPotential.GetPotential(start) - 25f)
-                    > 0.0001f)
+                || Math.Abs(centerSpoke - 4.5f) > 0.0001f)
             {
-                failure = "V2 weighted cardinal potential and center spoke must share the minimum V rate";
-                return false;
-            }
-            var straightAStar = new AccessV2SearchSession(
-                endpoints, Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue,
-                potentialField: fixedPotential);
-            while (!straightAStar.IsComplete) straightAStar.Step(7);
-            if (!straightAStar.Result.Success
-                || !straightAStar.Result.UsedAStar
-                || Math.Abs(straightAStar.Result.Cost
-                    - straight.Result.Cost) > 0.0001f
-                || !straightAStar.Result.States.SequenceEqual(
-                    straight.Result.States))
-            {
-                failure = "V2 fixed-frontage potential A* must reproduce Dijkstra";
-                return false;
-            }
-
-            if (!TryCreateUniformState(
-                    new Tile2i(24, 4), AccessV2TravelAxis.X,
-                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
-                    out AccessV2BandState farGoalState, out failure))
-                return false;
-            var feeChoiceEndpoints = new AccessV2EndpointSet(
-                endpoints.Starts,
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        goalState, new Tile2i(-4, 0), terminalCost: 20f),
-                    new AccessV2FixedFrontage(
-                        farGoalState, new Tile2i(-4, 0), terminalCost: 0f),
-                },
-                new AccessV2FrontageDiagnostics());
-            var feeChoiceDijkstra = new AccessV2SearchSession(
-                feeChoiceEndpoints, Tile2i.Zero, new Tile2i(36, 32),
-                UnitEvaluator, 10000, float.MaxValue);
-            while (!feeChoiceDijkstra.IsComplete) feeChoiceDijkstra.Step(7);
-            var feeChoicePotential = new AccessV2PotentialField(
-                Tile2i.Zero, new Tile2i(36, 32),
-                ground: null, fixedGoals: feeChoiceEndpoints.FixedGoals);
-            var feeChoiceAStar = new AccessV2SearchSession(
-                feeChoiceEndpoints, Tile2i.Zero, new Tile2i(36, 32),
-                UnitEvaluator, 10000, float.MaxValue,
-                potentialField: feeChoicePotential);
-            while (!feeChoiceAStar.IsComplete) feeChoiceAStar.Step(7);
-            if (!feeChoiceDijkstra.Result.Success
-                || !feeChoiceAStar.Result.Success
-                || Math.Abs(feeChoiceDijkstra.Result.Cost - 24f) > 0.0001f
-                || Math.Abs(feeChoiceAStar.Result.Cost - 24f) > 0.0001f
-                || feeChoiceDijkstra.Result.States.Last().Anchor
-                    != new Tile2i(20, 4)
-                || !feeChoiceAStar.Result.States.SequenceEqual(
-                    feeChoiceDijkstra.Result.States))
-            {
-                failure = "V2 must prefer lower total cost over nearer fixed frontage geometry";
-                return false;
-            }
-
-            if (!TryCreateUniformState(
-                    new Tile2i(4, 20), AccessV2TravelAxis.X,
-                    new Tile2i(4, 0), AccessSearchMode.XPositive, 1,
-                    out AccessV2BandState rampStart, out failure)
-                || !AccessV2Geometry.TryStraight(
-                    rampStart, out AccessV2Transition rampStep1, out failure)
-                || !AccessV2Geometry.TryStraight(
-                    rampStep1.Next, out AccessV2Transition rampStep2, out failure))
-                return false;
-            var rampGoal = new AccessV2BandState(
-                rampStep2.Next.Anchor,
-                rampStep2.Next.Band,
-                rampStep2.Next.EntryDirection);
-            var rampEndpoints = new AccessV2EndpointSet(
-                new[]
-                {
-                    new AccessV2StartFrontage(
-                        rampStart, rampStart.Anchor),
-                },
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        rampGoal, new Tile2i(-4, 0)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var ramp = new AccessV2SearchSession(
-                rampEndpoints, Tile2i.Zero, new Tile2i(40, 36),
-                UnitEvaluator, 10000, float.MaxValue);
-            while (!ramp.IsComplete) ramp.Step(9);
-            if (!ramp.Result.Success
-                || ramp.Result.States.Count != 2
-                || ramp.Result.States[1].Band.Kind
-                    != AccessV2BandProfileKind.UniformRamp)
-            {
-                failure = "V2 Dijkstra uniform-ramp route failed";
-                return false;
-            }
-
-            if (!AccessV2Geometry.TryStrafe(
-                    rampStep1.Next, 1, out AccessV2Transition desiredStrafe,
-                    out failure)
-                || !AccessV2Geometry.TryStraight(
-                    desiredStrafe.Next,
-                    out AccessV2Transition strafeExit, out failure))
-                return false;
-            var strafeGoal = new AccessV2BandState(
-                strafeExit.Next.Anchor,
-                strafeExit.Next.Band,
-                strafeExit.Next.EntryDirection);
-            var strafeEndpoints = new AccessV2EndpointSet(
-                rampEndpoints.Starts,
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        strafeGoal, new Tile2i(-4, 0)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var strafe = new AccessV2SearchSession(
-                strafeEndpoints, Tile2i.Zero, new Tile2i(40, 36),
-                UnitEvaluator, 10000, float.MaxValue);
-            while (!strafe.IsComplete) strafe.Step(5);
-            if (!strafe.Result.Success
-                || strafe.Result.States.Count != 3
-                || strafe.Result.States[2].Anchor
-                    != desiredStrafe.Next.Anchor
-                || strafe.Result.GeneratedProfiles.Count != 4)
-            {
-                failure = "V2 Dijkstra swept-width strafe or delta ownership failed"
-                    + $": success={strafe.Result.Success}"
-                    + $" states={strafe.Result.States.Count}"
-                    + $" generated={strafe.Result.GeneratedProfiles.Count}"
-                    + $" reason={strafe.Result.FailureReason}";
-                return false;
-            }
-
-            if (!AccessV2Geometry.TryStraight(
-                    start, out AccessV2Transition landingAdvance, out failure)
-                || !AccessV2Geometry.TryTurn(
-                    start, landingAdvance.Next, 1,
-                    out AccessV2Transition turn, out failure))
-                return false;
-            Tile2i turnGoalAnchor = AccessV2Geometry.Add(
-                turn.Next.Anchor, turn.Next.EntryDirection);
-            var turnGoalState = new AccessV2BandState(
-                turnGoalAnchor, turn.Next.Band, turn.Next.EntryDirection);
-            var turnEndpoints = new AccessV2EndpointSet(
-                endpoints.Starts,
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        turnGoalState,
-                        AccessV2Geometry.Scale(turn.Next.EntryDirection, -1)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var switchback = new AccessV2SearchSession(
-                turnEndpoints, Tile2i.Zero, new Tile2i(40, 40),
-                UnitEvaluator, 50000, float.MaxValue);
-            while (!switchback.IsComplete) switchback.Step(11);
-            if (!switchback.Result.Success
-                || switchback.Result.States.Count < 3
-                || !switchback.Result.States.Any(
-                    state => state.Axis == AccessV2TravelAxis.Y))
-            {
-                failure = "V2 Dijkstra flat 2x2 landing turn route failed";
-                return false;
-            }
-
-            AccessV2TransitionEvaluation BlockForward(
-                AccessV2BandState? current,
-                AccessV2Transition transition,
-                AccessV2History history,
-                Tile2i? connectedFixedOrigin)
-                => transition.Delta.Any(item => item.Origin.X >= 8)
-                    ? AccessV2TransitionEvaluation.Reject("InjectedDurability")
-                    : UnitEvaluator(current, transition, history, connectedFixedOrigin);
-            var blocked = new AccessV2SearchSession(
-                endpoints, new Tile2i(0, 0), new Tile2i(20, 16),
-                BlockForward, 10000, float.MaxValue);
-            while (!blocked.IsComplete) blocked.Step(13);
-            if (blocked.Result.Success
-                || !blocked.Result.Rejections.ContainsKey("InjectedDurability"))
-            {
-                failure = "V2 Dijkstra durability/no-path rejection failed";
-                return false;
-            }
-
-            string sharedCleanup = "prop:shared";
-            AccessV2TransitionEvaluation CleanupEvaluator(
-                AccessV2BandState? current,
-                AccessV2Transition transition,
-                AccessV2History history,
-                Tile2i? connectedFixedOrigin)
-            {
-                bool charge = !history.ContainsCleanupKey(sharedCleanup);
-                return new AccessV2TransitionEvaluation(
-                    true, string.Empty,
-                    current.HasValue ? 4f : 0f,
-                    transition.Delta.Count,
-                    charge ? 8f : 0f,
-                    cleanupKeys: charge
-                        ? new[] { sharedCleanup }
-                        : Array.Empty<string>());
-            }
-            var cleanup = new AccessV2SearchSession(
-                endpoints, Tile2i.Zero, new Tile2i(32, 32),
-                CleanupEvaluator, 10000, float.MaxValue);
-            while (!cleanup.IsComplete) cleanup.Step(17);
-            if (!cleanup.Result.Success
-                || Math.Abs(cleanup.Result.Cost - 27f) > 0.0001f)
-            {
-                failure = "V2 Dijkstra cleanup keys were charged more than once";
+                failure =
+                    "V2 minimum travel and center-spoke rates must share the fixed-origin cost";
                 return false;
             }
 
@@ -3632,6 +2998,26 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
+            Tile2i lane1GroundEntry = new Tile2i(
+                first.GetLaneOrigin(0).X + 4,
+                corridorMinY + 5);
+            IReadOnlyList<AccessV2HandoffCandidate> wrongOwnerCorridor =
+                AccessV2Handoffs.Evaluate(
+                    new[] { first }, AccessV2History.Empty,
+                    graph, UniformSingle, Span,
+                    postWorkCenterValidator:
+                        (origin, operation, center, history, handoffOrigins) =>
+                            center.X < first.GetLaneOrigin(0).X + 4
+                                || origin == first.GetLaneOrigin(0),
+                    requiredGroundEntry: lane1GroundEntry);
+            if (wrongOwnerCorridor.Any(candidate =>
+                    candidate.ExitDirection == new Tile2i(4, 0)))
+            {
+                failure =
+                    "V2 post-work handoff must classify an outside spoke by the lane containing its vehicle center";
+                return false;
+            }
+
             Tile2i alternateGroundEntry = new Tile2i(
                 first.GetLaneOrigin(0).X + 4,
                 corridorMinY + 5);
@@ -3787,7 +3173,6 @@ namespace AutoTerrainDesignations.Access.V2
 
             var endpoints = new AccessV2EndpointSet(
                 new[] { new AccessV2StartFrontage(first, first.Anchor) },
-                Array.Empty<AccessV2FixedFrontage>(),
                 new AccessV2FrontageDiagnostics());
 
             IReadOnlyList<AccessGroundHandoff> PartialMiningSingle(
@@ -4033,7 +3418,7 @@ namespace AutoTerrainDesignations.Access.V2
                 var center = new Tile2i(baseX + x, baseY + y);
                 Tile2i[] actual = canonicalDirections
                     .Where(direction =>
-                        AccessV2SearchSession.CanUseDirectGroundToVLevelingBridge(
+                        AccessV2SearchSession.CanUseCanonicalGroundToVLaunchPosition(
                             center, direction))
                     .ToArray();
                 var expected = new List<Tile2i>(2);
@@ -4082,7 +3467,7 @@ namespace AutoTerrainDesignations.Access.V2
             }
             Tile2i mirroredGround = new Tile2i(756, 1526);
             Tile2i mirroredAnchor = new Tile2i(756, 1524);
-            if (!AccessV2SearchSession.CanUseDirectGroundToVLevelingBridge(
+            if (!AccessV2SearchSession.CanUseCanonicalGroundToVLaunchPosition(
                     mirroredGround, new Tile2i(4, 0))
                 || AccessV2SearchSession.GetGroundToVBandAnchor(
                     mirroredGround, new Tile2i(4, 0)) != mirroredAnchor)
@@ -4498,7 +3883,6 @@ namespace AutoTerrainDesignations.Access.V2
                     new AccessV2StartFrontage(
                         first, first.GetLaneOrigin(0)),
                 },
-                Array.Empty<AccessV2FixedFrontage>(),
                 new AccessV2FrontageDiagnostics());
             var exactGroundSession = new AccessV2SearchSession(
                 exactGroundEndpoints,
@@ -4670,35 +4054,12 @@ namespace AutoTerrainDesignations.Access.V2
                 out AccessV2BandProfile providerBand, out _);
             var providerGoalState = new AccessV2BandState(
                 new Tile2i(4, 4), providerBand, new Tile2i(4, 0));
-            var providerEndpoints = new AccessV2EndpointSet(
-                Array.Empty<AccessV2StartFrontage>(),
-                new[]
-                {
-                    new AccessV2FixedFrontage(
-                        providerGoalState, new Tile2i(-4, 0)),
-                },
-                new AccessV2FrontageDiagnostics());
-            var providerField = new AccessV2ProviderDistanceField(
-                providerSnapshot, providerProfiles.Keys);
-            AccessV2EndpointSet chargedProviderEndpoints =
-                providerField.ApplyTerminalCosts(providerEndpoints);
-            if (providerField.ProviderNodeCount != 45
-                || providerField.ConnectedNodeCount != 45
-                || chargedProviderEndpoints.FixedGoals.Count != 1
-                || Math.Abs(chargedProviderEndpoints.FixedGoals[0].TerminalCost
-                    - 10f) > 0.0001f)
-            {
-                failure = "V2 accepted-provider field did not charge entry plus exact provider/G suffix";
-                return false;
-            }
-
             var projectedChainEndpoints = new AccessV2EndpointSet(
                 new[]
                 {
                     new AccessV2StartFrontage(
                         providerGoalState, new Tile2i(4, 4)),
                 },
-                Array.Empty<AccessV2FixedFrontage>(),
                 new AccessV2FrontageDiagnostics());
             var projectedChainSearch = new AccessV2SearchSession(
                 projectedChainEndpoints,

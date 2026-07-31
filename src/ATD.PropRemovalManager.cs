@@ -372,7 +372,7 @@ namespace AutoTerrainDesignations
             }
         }
 
-        public void Tick()
+        public void Tick(bool allowQuickRemoval = true)
         {
             if (m_isSaving || m_operations.Count == 0)
             {
@@ -406,7 +406,7 @@ namespace AutoTerrainDesignations
                     continue;
                 }
 
-                bool madeProgress = AdvanceOperation(operation);
+                bool madeProgress = AdvanceOperation(operation, allowQuickRemoval);
                 steps++;
                 if (!madeProgress
                     || operation.Stage == ATDPropRemovalStage.Completed)
@@ -437,12 +437,18 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private bool AdvanceOperation(Operation operation)
+        private bool AdvanceOperation(Operation operation, bool allowQuickRemoval)
         {
             operation.QuickTargets.RemoveWhere(
                 propId => !m_props.TerrainProps.ContainsKey(propId));
             if (operation.QuickTargets.Count > 0)
+            {
+                // Paused ticks show a legacy-style mining preview for Quick
+                // remove targets, but must not consume Unity.
+                if (!allowQuickRemoval)
+                    return TryPlacePausedQuickRemovalPreview(operation);
                 return AdvanceQuickRemoval(operation);
+            }
 
             TerrainPropId[] remaining = operation.TargetProps
                 .Where(m_props.TerrainProps.ContainsKey).ToArray();
@@ -510,6 +516,57 @@ namespace AutoTerrainDesignations
                 return true;
             }
             return true;
+        }
+
+        private bool TryPlacePausedQuickRemovalPreview(Operation operation)
+        {
+            // An existing player or pathfinder designation is already a clear
+            // visual marker for this origin. Preserve it instead of replacing
+            // it with the temporary Quick-remove preview.
+            if (operation.Original != null)
+                return false;
+            if (operation.HasTemporaryDesignation)
+            {
+                if (OwnsLiveTemporaryDesignation(operation))
+                    return false;
+                FinishOperation(operation, ATDPropRemovalOutcome.PlayerOverride,
+                    restoreOriginal: false);
+                return true;
+            }
+            if (!IsOriginalOrEmpty(operation,
+                    m_designations.GetDesignationAt(operation.Origin)))
+            {
+                FinishOperation(operation, ATDPropRemovalOutcome.PlayerOverride,
+                    restoreOriginal: false);
+                return true;
+            }
+
+            DesignationData preview = GetLegacyQuickRemovalPreview(
+                operation.Origin);
+            if (!m_designations.AddOrReplaceDesignation(m_miningProto, preview))
+                return false;
+
+            operation.OriginalSuspendedByManager = operation.Original != null;
+            operation.TemporaryData = preview;
+            operation.TemporaryProto = m_miningProto;
+            operation.TemporaryTargetPropId = operation.PropId;
+            operation.HasTemporaryDesignation = true;
+            operation.Stage = ATDPropRemovalStage.QuickPending;
+            AutoDepthDesignation.LogExperimentalAccessDebug(
+                $"[ATD Prop Removal] quick-preview prop={operation.PropId} " +
+                $"origin={operation.Origin} data={preview}");
+            return true;
+        }
+
+        private DesignationData GetLegacyQuickRemovalPreview(Tile2i origin)
+        {
+            HeightTilesI CornerHeight(int x, int y) => new HeightTilesI(
+                (int)Math.Ceiling(m_terrain.GetHeight(
+                    origin + new RelTile2i(x, y)).Value.ToFloat() + 1f));
+
+            return new DesignationData(origin,
+                CornerHeight(0, 0), CornerHeight(4, 0),
+                CornerHeight(4, 4), CornerHeight(0, 4));
         }
 
         private bool AdvanceQuickRemoval(Operation operation)

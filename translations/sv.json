@@ -180,11 +180,7 @@
     "Malmkvalitet"
   ],
   [
-    "settings.tab.pathfinder",
-    "Tillfartsvägar"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Standardvärden för gruvkontrolltorn"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Styr när ATD använder spelets snabbborttagningsåtgärd för skräp från åtkomstvägar. Snabb bort spenderar Unity. Denna policy gäller inte knappen Rensa skräp i mintornet."
+    "Styr när ATD använder spelets snabbborttagningsåtgärd för skräp från åtkomstvägar. Snabb bort spenderar Unity endast när spelet inte är pausat. Denna policy gäller inte knappen Rensa skräp i mintornet."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Maximal"
   ],
   [
+    "settings.tab.pathfinder",
+    "Tillfartsvägar"
+  ],
+  [
     "settings.pathfinder.costs",
     "Ruttkostnader"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Kostnad för terränganvisning"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Vikt som tillämpas på terrängarbetsstrålar i sidled och kurvor."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Maxavstånd för kandidatstråle"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Ungefärlig sökarbetsbudget per spelbildruta. Högre värden blir klara snabbare men orsakar längre stopp."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Högsta kostnad per stråle"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<förstörd>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Hörn (yttre): placera konvexa hörnramper."
   ],
   [

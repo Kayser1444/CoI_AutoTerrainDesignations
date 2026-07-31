@@ -1336,7 +1336,6 @@ namespace AutoTerrainDesignations
             AccessSearchSnapshot snapshot,
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
-            IEnumerable<Tile2i> acceptedProviderOrigins,
             float maxCostLimit = float.MaxValue,
             IEnumerable<Tile2i>? groundGoalOverride = null)
         {
@@ -1349,17 +1348,8 @@ namespace AutoTerrainDesignations
             AccessV2EndpointSet? v2Endpoints = requiredWidth == 2
                 ? AccessV2FrontageDiscovery.Build(
                     snapshot,
-                    cluster.Origins.Select(origin => origin.Origin),
-                    fixedGoals)
+                    cluster.Origins.Select(origin => origin.Origin))
                 : null;
-            AccessV2ProviderDistanceField? providerField = null;
-            if (v2Endpoints != null && v2Endpoints.FixedGoals.Count > 0)
-            {
-                providerField = new AccessV2ProviderDistanceField(
-                    snapshot,
-                    acceptedProviderOrigins.Concat(fixedGoals).Distinct());
-                v2Endpoints = providerField.ApplyTerminalCosts(v2Endpoints);
-            }
             if (v2Endpoints != null)
             {
                 AccessV2FrontageDiagnostics diagnostics = v2Endpoints.Diagnostics;
@@ -1378,22 +1368,14 @@ namespace AutoTerrainDesignations
                                 $"/initialGenerated={start.InitialTransition?.Delta.Count ?? 0}" +
                                 $"/successorGenerated={start.LaunchSuccessor.Delta.Count}"
                             : "/direct-fixture-start")));
-                string goalSamples = string.Join(";", v2Endpoints.FixedGoals.Take(8)
-                    .Select(goal =>
-                        $"{goal.State.Anchor}/{goal.State.Axis}/exposed={goal.ExposedDirection}" +
-                        $"/terminal={goal.TerminalCost.ToString("0.##", CultureInfo.InvariantCulture)}"));
                 LogExperimentalAccessDebug(
                     $"[ATD V2 Frontages] seeds={diagnostics.SeedCount} " +
                     $"startTiers={v2Endpoints.StartTiers.Count} " +
                     $"starts={v2Endpoints.Starts.Count} " +
                     $"sourceLaunches={diagnostics.SourceLaunchCount} " +
                     $"directFixtureStarts={diagnostics.DirectFixtureStartCount} " +
-                    $"fixedGoalOrigins={diagnostics.FixedGoalOriginCount} " +
-                    $"fixedFrontages={v2Endpoints.FixedGoals.Count} " +
-                    $"providerNodes={providerField?.ProviderNodeCount ?? 0} " +
-                    $"providerConnected={providerField?.ConnectedNodeCount ?? 0} " +
                     $"rejections=[{rejections}] startSamples=[{startSamples}] " +
-                    $"goalSamples=[{goalSamples}]");
+                    $"projectedGoals={fixedGoals.Count}");
             }
             return new AccessPathRequest(
                 $"merged-goals-cluster-{cluster.ClusterId}",

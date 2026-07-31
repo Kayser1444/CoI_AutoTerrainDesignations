@@ -35,23 +35,6 @@ namespace AutoTerrainDesignations.Access.V2
         }
     }
 
-    internal sealed class AccessV2FixedFrontage
-    {
-        public AccessV2BandState State { get; }
-        public Tile2i ExposedDirection { get; }
-        public float TerminalCost { get; }
-
-        public AccessV2FixedFrontage(
-            AccessV2BandState state,
-            Tile2i exposedDirection,
-            float terminalCost = 0f)
-        {
-            State = state;
-            ExposedDirection = exposedDirection;
-            TerminalCost = Math.Max(0f, terminalCost);
-        }
-    }
-
     internal sealed class AccessV2FrontageDiagnostics
     {
         private readonly Dictionary<string, int> m_rejections =
@@ -60,8 +43,6 @@ namespace AutoTerrainDesignations.Access.V2
         public int SeedCount { get; internal set; }
         public int SourceLaunchCount { get; internal set; }
         public int DirectFixtureStartCount { get; internal set; }
-        public int FixedGoalOriginCount { get; internal set; }
-        public int FixedFrontageCount { get; internal set; }
         public IReadOnlyDictionary<string, int> Rejections => m_rejections;
 
         internal void Reject(string reason)
@@ -76,43 +57,37 @@ namespace AutoTerrainDesignations.Access.V2
     {
         public IReadOnlyList<AccessV2StartFrontage> Starts { get; }
         public IReadOnlyList<IReadOnlyList<AccessV2StartFrontage>> StartTiers { get; }
-        public IReadOnlyList<AccessV2FixedFrontage> FixedGoals { get; }
         public AccessV2FrontageDiagnostics Diagnostics { get; }
 
         public AccessV2EndpointSet(
             IReadOnlyList<AccessV2StartFrontage> starts,
-            IReadOnlyList<AccessV2FixedFrontage> fixedGoals,
             AccessV2FrontageDiagnostics diagnostics)
             : this(
                 new[] { starts },
-                fixedGoals,
                 diagnostics)
         {
         }
 
         public AccessV2EndpointSet(
             IReadOnlyList<IReadOnlyList<AccessV2StartFrontage>> startTiers,
-            IReadOnlyList<AccessV2FixedFrontage> fixedGoals,
             AccessV2FrontageDiagnostics diagnostics)
         {
             StartTiers = startTiers;
             Starts = startTiers.Count == 0
                 ? Array.Empty<AccessV2StartFrontage>()
                 : startTiers[0];
-            FixedGoals = fixedGoals;
             Diagnostics = diagnostics;
         }
 
         public AccessV2EndpointSet ForStartTier(int tierIndex)
             => new AccessV2EndpointSet(
                 new[] { StartTiers[tierIndex] },
-                FixedGoals,
                 Diagnostics);
     }
 
     /// <summary>
     /// Enumerates complete two-slice source launches from arithmetic-center
-    /// distance tiers, plus the retained fixed-provider goal frontages.
+    /// distance tiers.
     /// Discovery is side-effect free: generated launch origins remain
     /// candidate deltas until the search evaluates them.
     /// </summary>
@@ -122,15 +97,11 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i boundsMin,
             Tile2i boundsMax,
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
-            IEnumerable<Tile2i> startSeedOrigins,
-            IEnumerable<Tile2i> fixedGoalOrigins)
+            IEnumerable<Tile2i> startSeedOrigins)
         {
             var diagnostics = new AccessV2FrontageDiagnostics();
-            var goals = new Dictionary<AccessV2BandState, AccessV2FixedFrontage>();
             var seeds = new HashSet<Tile2i>(startSeedOrigins);
-            var allowedGoalOrigins = new HashSet<Tile2i>(fixedGoalOrigins);
             diagnostics.SeedCount = seeds.Count;
-            diagnostics.FixedGoalOriginCount = allowedGoalOrigins.Count;
 
             var startTiers =
                 new List<IReadOnlyList<AccessV2StartFrontage>>();
@@ -168,45 +139,24 @@ namespace AutoTerrainDesignations.Access.V2
                     startTiers.Add(starts.Values.ToList());
             }
 
-            foreach (Tile2i origin in allowedGoalOrigins
-                .OrderBy(item => item.X).ThenBy(item => item.Y))
-            {
-                if (!fixedProfiles.TryGetValue(origin, out AccessHeightProfile profile))
-                {
-                    diagnostics.Reject("MissingFixedGoalProfile");
-                    continue;
-                }
-                AddFixedGoalPair(
-                    AccessV2TravelAxis.X, origin, profile,
-                    boundsMin, boundsMax, fixedProfiles,
-                    allowedGoalOrigins, goals, diagnostics);
-                AddFixedGoalPair(
-                    AccessV2TravelAxis.Y, origin, profile,
-                    boundsMin, boundsMax, fixedProfiles,
-                    allowedGoalOrigins, goals, diagnostics);
-            }
-
             IEnumerable<AccessV2StartFrontage> allStarts =
                 startTiers.SelectMany(tier => tier);
             diagnostics.SourceLaunchCount = allStarts.Count(
                 item => item.IsSourceLaunch);
             diagnostics.DirectFixtureStartCount = allStarts.Count()
                 - diagnostics.SourceLaunchCount;
-            diagnostics.FixedFrontageCount = goals.Count;
             return new AccessV2EndpointSet(
-                startTiers, goals.Values.ToList(), diagnostics);
+                startTiers, diagnostics);
         }
 
         public static AccessV2EndpointSet Build(
             AccessSearchSnapshot snapshot,
-            IEnumerable<Tile2i> startSeedOrigins,
-            IEnumerable<Tile2i> fixedGoalOrigins)
+            IEnumerable<Tile2i> startSeedOrigins)
             => Build(
                 snapshot.BoundsMin,
                 snapshot.BoundsMax,
                 snapshot.FixedProfiles,
-                startSeedOrigins,
-                fixedGoalOrigins);
+                startSeedOrigins);
 
         private static void AddSourceLaunchesForAxis(
             AccessV2TravelAxis axis,
@@ -397,68 +347,6 @@ namespace AutoTerrainDesignations.Access.V2
                 }
             }
         }
-
-        private static void AddFixedGoalPair(
-            AccessV2TravelAxis axis,
-            Tile2i origin,
-            AccessHeightProfile profile,
-            Tile2i boundsMin,
-            Tile2i boundsMax,
-            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
-            ISet<Tile2i> allowedGoalOrigins,
-            IDictionary<AccessV2BandState, AccessV2FixedFrontage> goals,
-            AccessV2FrontageDiagnostics diagnostics)
-        {
-            Tile2i companion = AccessV2Geometry.Add(
-                origin, AccessV2BandProfile.GetLaneDirection(axis));
-            if (!allowedGoalOrigins.Contains(companion)) return;
-            if (!fixedProfiles.TryGetValue(
-                    companion, out AccessHeightProfile companionProfile))
-            {
-                diagnostics.Reject("MissingFixedGoalProfile");
-                return;
-            }
-            if (!AccessV2BandProfile.TryCreateEnabled(
-                    axis, profile, companionProfile,
-                    out AccessV2BandProfile band, out string bandReason))
-            {
-                diagnostics.Reject(bandReason);
-                return;
-            }
-
-            for (int exposedSign = -1; exposedSign <= 1; exposedSign += 2)
-            {
-                Tile2i exposedDirection = axis == AccessV2TravelAxis.X
-                    ? new Tile2i(4 * exposedSign, 0)
-                    : new Tile2i(0, 4 * exposedSign);
-                var state = new AccessV2BandState(
-                    origin, band,
-                    AccessV2Geometry.Scale(exposedDirection, -1));
-                if (!AccessV2Geometry.IsInsideBounds(state, boundsMin, boundsMax))
-                {
-                    diagnostics.Reject("OutOfAreaFixedFrontage");
-                    continue;
-                }
-                if (!IsExposed(state, exposedDirection, fixedProfiles))
-                {
-                    diagnostics.Reject("FixedFrontageNotExposed");
-                    continue;
-                }
-                if (!goals.ContainsKey(state))
-                    goals.Add(
-                        state,
-                        new AccessV2FixedFrontage(state, exposedDirection));
-            }
-        }
-
-        private static bool IsExposed(
-            AccessV2BandState state,
-            Tile2i outwardDirection,
-            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles)
-            => !fixedProfiles.ContainsKey(AccessV2Geometry.Add(
-                    state.GetLaneOrigin(0), outwardDirection))
-                && !fixedProfiles.ContainsKey(AccessV2Geometry.Add(
-                    state.GetLaneOrigin(1), outwardDirection));
 
         private static IReadOnlyList<AccessV2TravelAxis> GetEnabledAxes(
             AccessHeightProfile profile)

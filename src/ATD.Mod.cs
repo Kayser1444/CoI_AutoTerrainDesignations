@@ -631,6 +631,8 @@ public static string Tt(string text) => text;
             m_saveManager = resolver.Resolve<ISaveManager>();
             m_gameLoopEvents.Terminate.AddNonSaveable(this, onGameTerminated);
             m_simLoopEvents.BeforeSave.AddNonSaveable(this, beforeSave);
+            m_simLoopEvents.UpdateAfterCmdProc.AddNonSaveable(this,
+                onPausedSimUpdate);
             m_simLoopEvents.Update.AddNonSaveable(this, onSimUpdate);
             m_saveManager.OnSaveDone += onSaveDone;
 
@@ -699,6 +701,17 @@ public static string Tt(string text) => text;
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickIdleVehicleRelease"); }
         try { AutoDepthDesignation.PropRemovalManager?.Tick(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "ATDPropRemovalManager.Tick"); }
+    }
+
+    // The simulation's normal Update event is skipped while paused, but the
+    // command-processing events still run. Advance designation work there so
+    // pending cleanup is visible without allowing Quick remove to execute.
+    private void onPausedSimUpdate()
+    {
+        if (m_simLoopEvents == null || !m_simLoopEvents.IsSimPaused)
+            return;
+        try { AutoDepthDesignation.PropRemovalManager?.Tick(allowQuickRemoval: false); }
+        catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "ATDPropRemovalManager.TickWhilePaused"); }
     }
 
     private void beforeSave()

@@ -180,11 +180,7 @@
     "Calidad del mineral"
   ],
   [
-    "settings.tab.pathfinder",
-    "Accesos"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Predeterminados de la torre de control minera"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Controla cuándo ATD usa la acción de eliminación rápida del juego para los desechos enrutados en las vías de acceso. La eliminación rápida gasta Unity. Esta política no se aplica al botón Limpiar escombros de la torre de la mina."
+    "Controla cuándo ATD usa la acción de eliminación rápida del juego para los desechos enrutados en las vías de acceso. La eliminación rápida gasta Unity solo cuando el juego no está en pausa. Esta política no se aplica al botón Limpiar escombros de la torre de la mina."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Máximo"
   ],
   [
+    "settings.tab.pathfinder",
+    "Accesos"
+  ],
+  [
     "settings.pathfinder.costs",
     "Costes de ruta"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Costo de designación del terreno"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Peso aplicado a los rayos de trabajo de paisajismo laterales y de giros."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Distancia máxima del rayo candidato"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Presupuesto aproximado de trabajo de búsqueda por fotograma del juego. Los valores más altos terminan antes, pero provocan pausas más largas."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Costo máximo por rayo"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<destruido>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Esquina (exterior): coloca rampas de esquina convexas."
   ],
   [

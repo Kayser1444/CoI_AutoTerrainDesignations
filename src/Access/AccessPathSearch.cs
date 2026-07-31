@@ -1581,7 +1581,6 @@ namespace AutoTerrainDesignations.Access
                         request.Snapshot.GoalDistanceMin,
                         request.Snapshot.GoalDistanceMax,
                         request.Snapshot.V2GroundGraph,
-                        request.V2Endpoints.FixedGoals,
                         AccessV2CostModel.GetMinimumVTravelCostPerTile(
                             GeneratedVFixedOverhead))
                     : null;
@@ -1802,10 +1801,9 @@ namespace AutoTerrainDesignations.Access
             => request.RequiredWidth == 2
                 && request.Snapshot.UseAStar
                 && request.V2Endpoints != null
-                && (request.V2Endpoints.FixedGoals.Count > 0
-                    || (request.Snapshot.V2GroundGraph != null
-                        && request.Snapshot.HasV2WorkableHandoffEvaluator
-                        && request.Snapshot.GoalCount > 0));
+                && request.Snapshot.V2GroundGraph != null
+                && request.Snapshot.HasV2WorkableHandoffEvaluator
+                && request.Snapshot.GoalCount > 0;
 
         public sealed class AccessPathSearchSession
         {

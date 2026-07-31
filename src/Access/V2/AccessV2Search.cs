@@ -247,7 +247,6 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly Tile2i m_boundsMax;
         private readonly IReadOnlyList<IReadOnlyList<AccessV2StartFrontage>>
             m_startTiers;
-        private readonly IReadOnlyList<AccessV2FixedFrontage> m_goals;
         private readonly AccessV2TransitionEvaluator m_evaluator;
         private readonly AccessV2TerminalTransitionEvaluator?
             m_terminalTransitionEvaluator;
@@ -348,7 +347,6 @@ namespace AutoTerrainDesignations.Access.V2
             m_boundsMin = boundsMin;
             m_boundsMax = boundsMax;
             m_startTiers = endpoints.StartTiers;
-            m_goals = endpoints.FixedGoals;
             m_evaluator = evaluator;
             m_terminalTransitionEvaluator = terminalTransitionEvaluator;
             m_staggeredHandoffEvaluator = staggeredHandoffEvaluator;
@@ -400,9 +398,9 @@ namespace AutoTerrainDesignations.Access.V2
                 CompleteFailure("NoWidth2StartCompanion");
                 return;
             }
-            if (m_goals.Count == 0 && m_handoffEvaluator == null)
+            if (m_handoffEvaluator == null)
             {
-                CompleteFailure("V2NoFixedFrontageGoal");
+                CompleteFailure("V2GroundHandoffMissing");
                 return;
             }
 
@@ -444,11 +442,6 @@ namespace AutoTerrainDesignations.Access.V2
                     exploredHeight2,
                     current.GroundCenter.HasValue,
                     m_groundHeightProvider?.Invoke(exploredCenter));
-                if (current.IsFixedGoalTerminal)
-                {
-                    CompleteSuccess(current);
-                    break;
-                }
                 if (current.GroundCenter.HasValue)
                 {
                     if (m_groundGraph != null
@@ -486,9 +479,6 @@ namespace AutoTerrainDesignations.Access.V2
                         AtdDiagnostics.ElapsedSince(bandStart);
                     continue;
                 }
-                if (TryMatchGoal(current.State, out AccessV2FixedFrontage? fixedGoal))
-                    EnqueueFixedGoal(current, fixedGoal!);
-
                 EnqueueHandoffGoals(current);
                 if (!current.RequiresGroundTransition)
                     Expand(current);
@@ -1714,11 +1704,14 @@ namespace AutoTerrainDesignations.Access.V2
                             fixedNavigationPortalRoot));
             }
 
-            m_diagnostics.V2GroundToVCalls++;
-            long groundToVStart = AtdDiagnostics.Timestamp();
-            ExpandGroundToV(current);
-            m_diagnostics.V2GroundToVTicks +=
-                AtdDiagnostics.ElapsedSince(groundToVStart);
+            if (HasCanonicalGroundToVLaunchPosition(from))
+            {
+                m_diagnostics.V2GroundToVCalls++;
+                long groundToVStart = AtdDiagnostics.Timestamp();
+                ExpandGroundToV(current);
+                m_diagnostics.V2GroundToVTicks +=
+                    AtdDiagnostics.ElapsedSince(groundToVStart);
+            }
         }
 
         private bool TryCompleteGroundSuffix(
@@ -1848,6 +1841,9 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 Tile2i travel =
                     s_groundToVTravelDirections[directionIndex];
+                if (!CanUseCanonicalGroundToVLaunchPosition(
+                        ground, travel))
+                    continue;
                 AccessV2TravelAxis axis = travel.X != 0
                     ? AccessV2TravelAxis.X
                     : AccessV2TravelAxis.Y;
@@ -1896,11 +1892,8 @@ namespace AutoTerrainDesignations.Access.V2
                 float terrainHeight = m_preciseTerrainHeightProvider?.Invoke(
                     ground) ?? m_terrainCenterHeightProvider(ground) / 2f;
 
-                // The leveling shortcut is valid only at the shared cell edge.
-                // Rough candidates are deliberately evaluated from every G.
-                if (CanUseDirectGroundToVLevelingBridge(ground, travel)
-                    && Math.Abs(terrainHeight - Math.Round(terrainHeight))
-                        <= 0.0001f)
+                if (Math.Abs(terrainHeight - Math.Round(terrainHeight))
+                    <= 0.0001f)
                 {
                     foreach (GroundToVProfileCandidate candidate in
                         EnumerateDirectLevelingProfiles(
@@ -2244,11 +2237,12 @@ namespace AutoTerrainDesignations.Access.V2
                 || AccessV2BandProfile.IsCanonicalVPrime(band.Lane1);
 
         /// <summary>
-        /// The direct leveling shortcut starts from a captured vehicle center
-        /// on a canonical four-tile grid edge. Rough G-to-V candidates do not
-        /// use this restriction and are tested from every reached G.
+        /// A G-to-V handoff starts only from a captured vehicle center on the
+        /// canonical four-tile grid edge for its travel direction. Within that
+        /// restricted launch set, leveling, rough work, fixed adapters, and
+        /// V-prime adapters remain independently eligible.
         /// </summary>
-        internal static bool CanUseDirectGroundToVLevelingBridge(
+        internal static bool CanUseCanonicalGroundToVLaunchPosition(
             Tile2i ground,
             Tile2i travelDirection)
         {
@@ -2262,6 +2256,10 @@ namespace AutoTerrainDesignations.Access.V2
                 return (ground.Y & 3) == 0;
             return false;
         }
+
+        private static bool HasCanonicalGroundToVLaunchPosition(
+            Tile2i ground)
+            => (ground.X & 3) == 0 || (ground.Y & 3) == 0;
 
         internal static bool AreGroundToVBandOriginsEligible(
             Tile2i anchor,
@@ -2293,6 +2291,9 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 Tile2i travel =
                     s_groundToVTravelDirections[directionIndex];
+                if (!CanUseCanonicalGroundToVLaunchPosition(
+                        ground, travel))
+                    continue;
                 AccessV2TravelAxis axis = travel.X != 0
                     ? AccessV2TravelAxis.X
                     : AccessV2TravelAxis.Y;
@@ -2318,6 +2319,9 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 Tile2i travel =
                     s_groundToVTravelDirections[directionIndex];
+                if (!CanUseCanonicalGroundToVLaunchPosition(
+                        ground, travel))
+                    continue;
                 AccessV2TravelAxis axis = travel.X != 0
                     ? AccessV2TravelAxis.X
                     : AccessV2TravelAxis.Y;
@@ -2971,8 +2975,7 @@ namespace AutoTerrainDesignations.Access.V2
                     heuristic = Math.Max(0f,
                         m_groundEscapePotentialField.GetPotential(
                             node.GroundCenter.Value));
-                else if (!node.GroundCenter.HasValue
-                    && !node.IsFixedGoalTerminal)
+                else if (!node.GroundCenter.HasValue)
                     heuristic = m_potentialField != null
                         ? Math.Max(0f, m_potentialField.GetPotential(node.State))
                         : Math.Max(0f, m_heuristicEvaluator!(node.State));
@@ -3003,66 +3006,13 @@ namespace AutoTerrainDesignations.Access.V2
             return node;
         }
 
-        private bool TryMatchGoal(
-            AccessV2BandState state,
-            out AccessV2FixedFrontage? matched)
-        {
-            matched = null;
-            for (int index = 0; index < m_goals.Count; index++)
-            {
-                AccessV2FixedFrontage goal = m_goals[index];
-                if (state.Axis != goal.State.Axis
-                    || state.EntryDirection != goal.State.EntryDirection
-                    || state.Anchor != AccessV2Geometry.Add(
-                        goal.State.Anchor, goal.ExposedDirection))
-                    continue;
-                bool lane0 = AccessPathSearch.EdgesMatch(
-                    state.Band.Lane0, goal.State.Band.Lane0,
-                    state.EntryDirection);
-                bool lane1 = AccessPathSearch.EdgesMatch(
-                    state.Band.Lane1, goal.State.Band.Lane1,
-                    state.EntryDirection);
-                if (lane0 && lane1
-                    && (matched == null
-                        || goal.TerminalCost < matched.TerminalCost))
-                    matched = goal;
-            }
-            return matched != null;
-        }
-
-        private void EnqueueFixedGoal(
-            SearchNode current,
-            AccessV2FixedFrontage goal)
-        {
-            float cost = current.Cost + goal.TerminalCost;
-            if (cost > m_maxCost)
-            {
-                m_startTierHitCostLimit = true;
-                return;
-            }
-            Enqueue(new SearchNode(
-                current.State, current.History, cost,
-                current.TraversalCost + goal.TerminalCost,
-                current.GeneratedWorkCost,
-                current.DirectWorkCost,
-                current.GeneratedFixedCost,
-                current.ExteriorRayCost,
-                current.CleanupCost,
-                current, null, null,
-                groundCenter: null,
-                isFixedGoalTerminal: true));
-        }
-
         private void CompleteSuccess(SearchNode goal)
         {
             var reverse = new List<AccessV2BandState>();
             int straight = 0, strafe = 0, turn = 0;
             var groundReverse = new List<Tile2i>();
             var stepReverse = new List<AccessV2RouteStep>();
-            SearchNode? routeGoal = goal.IsFixedGoalTerminal
-                ? goal.Parent
-                : goal;
-            for (SearchNode? node = routeGoal; node != null; node = node.Parent)
+            for (SearchNode? node = goal; node != null; node = node.Parent)
             {
                 stepReverse.Add(new AccessV2RouteStep(
                     node.State, node.Transition,
@@ -3154,7 +3104,6 @@ namespace AutoTerrainDesignations.Access.V2
             public Tile2i? GroundCenter { get; }
             public AccessV2TravelAxis? FixedNavigationAxis { get; }
             public Tile2i? FixedNavigationPortalRoot { get; }
-            public bool IsFixedGoalTerminal { get; }
             public bool RequiresGroundTransition { get; }
             public bool IsGroundToVAdapter { get; }
             public bool IsProjectedGroundEntry { get; }
@@ -3173,7 +3122,6 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessV2Transition? transition,
                 AccessV2HandoffCandidate? handoff,
                 Tile2i? groundCenter = null,
-                bool isFixedGoalTerminal = false,
                 bool requiresGroundTransition = false,
                 bool isGroundToVAdapter = false,
                 bool isProjectedGroundEntry = false,
@@ -3196,7 +3144,6 @@ namespace AutoTerrainDesignations.Access.V2
                 FixedNavigationAxis = fixedNavigationAxis;
                 FixedNavigationPortalRoot =
                     fixedNavigationPortalRoot;
-                IsFixedGoalTerminal = isFixedGoalTerminal;
                 RequiresGroundTransition = requiresGroundTransition;
                 IsGroundToVAdapter = isGroundToVAdapter;
                 IsProjectedGroundEntry = isProjectedGroundEntry;
@@ -3356,7 +3303,6 @@ namespace AutoTerrainDesignations.Access.V2
             private readonly Tile2i? m_groundCenter;
             private readonly AccessV2TravelAxis? m_fixedNavigationAxis;
             private readonly Tile2i? m_fixedNavigationPortalRoot;
-            private readonly bool m_isFixedGoalTerminal;
             private readonly bool m_isGroundToVAdapter;
 
             public SearchKey(AccessV2BandState state)
@@ -3365,7 +3311,6 @@ namespace AutoTerrainDesignations.Access.V2
                 m_groundCenter = null;
                 m_fixedNavigationAxis = null;
                 m_fixedNavigationPortalRoot = null;
-                m_isFixedGoalTerminal = false;
                 m_isGroundToVAdapter = false;
             }
 
@@ -3375,7 +3320,6 @@ namespace AutoTerrainDesignations.Access.V2
                 m_fixedNavigationAxis = node.FixedNavigationAxis;
                 m_fixedNavigationPortalRoot =
                     node.FixedNavigationPortalRoot;
-                m_isFixedGoalTerminal = node.IsFixedGoalTerminal;
                 m_isGroundToVAdapter = node.IsGroundToVAdapter;
                 // Match V1's label dominance. The cheapest arrival owns the
                 // history used for later feasibility checks; history is not a
@@ -3391,7 +3335,6 @@ namespace AutoTerrainDesignations.Access.V2
                     && m_fixedNavigationAxis == other.m_fixedNavigationAxis
                     && m_fixedNavigationPortalRoot
                         == other.m_fixedNavigationPortalRoot
-                    && m_isFixedGoalTerminal == other.m_isFixedGoalTerminal
                     && m_isGroundToVAdapter == other.m_isGroundToVAdapter;
 
             public override bool Equals(object? obj)
@@ -3407,7 +3350,6 @@ namespace AutoTerrainDesignations.Access.V2
                         ^ m_fixedNavigationAxis.GetHashCode();
                     hash = (hash * 397)
                         ^ m_fixedNavigationPortalRoot.GetHashCode();
-                    hash = (hash * 397) ^ m_isFixedGoalTerminal.GetHashCode();
                     hash = (hash * 397) ^ m_isGroundToVAdapter.GetHashCode();
                     return hash;
                 }

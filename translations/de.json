@@ -180,11 +180,7 @@
     "Erzqualität"
   ],
   [
-    "settings.tab.pathfinder",
-    "Zufahrtswege"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Standardwerte für Minenkontrollturm"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Steuert, wann ATD die Schnellentfernungsaktion des Spiels für verlegte Zugangsschutt verwendet. Durch schnelles Entfernen wird Unity ausgegeben. Diese Richtlinie gilt nicht für die Schaltfläche „Trümmer entfernen“ im Minenturm."
+    "Steuert, wann ATD die Schnellentfernungsaktion des Spiels für verlegte Zugangsschutt verwendet. Durch schnelles Entfernen wird Unity nur ausgegeben, wenn das Spiel nicht pausiert ist. Diese Richtlinie gilt nicht für die Schaltfläche „Trümmer entfernen“ im Minenturm."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Maximal"
   ],
   [
+    "settings.tab.pathfinder",
+    "Zufahrtswege"
+  ],
+  [
     "settings.pathfinder.costs",
     "Routenkosten"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Kosten für die Geländeausweisung"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Gewicht, das auf seitliche und Kurven-Landschaftsstrahlen angewendet wird."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Maximale Entfernung des Kandidatenstrahls"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Ungefähres Sucharbeitsbudget pro Spielframe. Höhere Werte schließen früher ab, verursachen aber längere Hänger."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Maximale Kosten pro Strahl"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<zerstört>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Ecke (außen): konvexe Eckrampen platzieren."
   ],
   [

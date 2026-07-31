@@ -1,5 +1,9 @@
 # Ground-Recovery Distance Field for A* Heuristic
 
+Status: superseded on 2026-07-31 by the sparse V-type route potential and the
+projected-ground-aware terrain-extrema landscaping heuristic. Retained as an
+earlier reduced-state recovery-field exploration.
+
 ## Problem
 
 We need an admissible A* heuristic for a navigation problem over terrain.

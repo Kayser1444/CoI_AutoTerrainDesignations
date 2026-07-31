@@ -180,11 +180,7 @@
     "Qualidade do minério"
   ],
   [
-    "settings.tab.pathfinder",
-    "Vias de acesso"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Padrões da torre de controle da mina"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Controla quando o ATD usa a ação de remoção rápida do jogo para detritos de vias de acesso direcionados. A remoção rápida gasta Unity. Esta política não se aplica ao botão Limpar detritos da torre da mina."
+    "Controla quando o ATD usa a ação de remoção rápida do jogo para detritos de vias de acesso direcionados. A remoção rápida gasta Unity apenas quando o jogo não está pausado. Esta política não se aplica ao botão Limpar detritos da torre da mina."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Máximo"
   ],
   [
+    "settings.tab.pathfinder",
+    "Vias de acesso"
+  ],
+  [
     "settings.pathfinder.costs",
     "Custos da rota"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Custo de designação de terreno"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Peso aplicado aos raios de trabalho de paisagismo laterais e de curvas."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Distância máxima do raio candidato"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Orçamento aproximado de trabalho de busca por quadro do jogo. Valores mais altos terminam antes, mas causam travamentos mais longos."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Custo máximo por raio"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<destruído>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Quina (externa): colocar rampas de quina convexas."
   ],
   [

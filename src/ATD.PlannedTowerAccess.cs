@@ -190,7 +190,6 @@ namespace AutoTerrainDesignations
             AccessPathRequest request = BuildMergedGoalAccessRequest(
                 snapshot, cluster,
                 fixedGoalOrigins: Array.Empty<Tile2i>(),
-                acceptedProviderOrigins: Array.Empty<Tile2i>(),
                 groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
             IEnumerator search = RunExperimentalAccessDryRunSliced(

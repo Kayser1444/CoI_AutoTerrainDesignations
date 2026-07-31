@@ -1557,6 +1557,17 @@ namespace AutoTerrainDesignations.Access.V2
                 if (rankByTile[current] == rankCount - 1)
                 {
                     reachedLastRank = true;
+                    Tile2i lane0Origin =
+                        lane0Origins[lane0Origins.Count - 1];
+                    bool exitsThroughLane0 =
+                        IsInsideOrigin(current, lane0Origin);
+                    Tile2i outsideOwner = exitsThroughLane0
+                        ? lane0Origin
+                        : lane1Origins[lane1Origins.Count - 1];
+                    AccessHandoffOperation outsideOperation =
+                        exitsThroughLane0
+                            ? lane0.Operation
+                            : lane1.Operation;
                     var outsideSpoke = new List<Tile2i>();
                     for (int outsideRank = 1;
                         outsideRank <= maxOutsidePostWorkRanks;
@@ -1566,8 +1577,8 @@ namespace AutoTerrainDesignations.Access.V2
                             outward.X * outsideRank,
                             outward.Y * outsideRank);
                         if (!postWorkCenterValidator(
-                                lane0Origins[lane0Origins.Count - 1],
-                                lane0.Operation, outside, history,
+                                outsideOwner, outsideOperation,
+                                outside, history,
                                 handoffClearingOrigins))
                             break;
                         outsideSpoke.Add(outside);

@@ -180,11 +180,7 @@
     "Ore quality"
   ],
   [
-    "settings.tab.pathfinder",
-    "Accessways"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Mine control tower defaults"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity. This policy does not apply to the mine-tower Clear debris button."
+    "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity only when the game is unpaused. This policy does not apply to the mine-tower Clear debris button."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Maximum"
   ],
   [
+    "settings.tab.pathfinder",
+    "Accessways"
+  ],
+  [
     "settings.pathfinder.costs",
     "Route costs"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Terrain designation cost"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Weight applied to lateral and turn-corner landscaping rays."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Candidate ray max distance"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Maximum cost per ray"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<destroyed>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Corner (outer): place convex corner ramps."
   ],
   [

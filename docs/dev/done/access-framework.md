@@ -515,7 +515,20 @@ Implement the bounded heterogeneous graph from [Accessway Pathfinding](../planne
 
 **Implementation status:** the heterogeneous G/V state model, scaled profiles, mechanical transitions, fixed-profile reuse, V/G handoffs, bounds, durability/fight checks, additive cost, Dijkstra/A*, path reconstruction, rejection summary, final self-contact validation, and gated per-cluster dry-run hook are implemented. Snapshot-pure profile feasibility is enforced during expansion. Generated V expansion rejects origin revisits and nonlocal cardinal edge contact with earlier generated history while retaining the immediate predecessor and compatible diagonal corner contact. Every reached goal is fully materialized before search accepts it; an invalid goal is recorded and search continues. Executable transition and synthetic V-to-G fixtures run before snapshot construction. Representative straight-ramp and switchback save fixtures remain to be captured.
 
-V2 has separate band/profile, transition, parent-plus-delta history, Mega ground graph, accepted-provider distance, frontage, seam, request-potential, replay, and materialization types under `Access/V2`. Validated V-to-G seams enter explicit cardinal/diagonal G states carrying the same history; a disconnected G component can re-enter generated V at a situation-qualified boundary through the symmetric reverse seam. A* uses a request-scoped relaxed potential seeded by exact G suffix distances and fixed-frontage terminal fees while in V, exact ground distance in a goal-connected G component, and the component-aware G escape field otherwise. Both seam directions pay the same canonical-center spoke. A fixed fee includes the final four-tile entry and optimistic travel through only already accepted fixed designation/accessway profiles to tower ground; the same fee is a real queued terminal edge in Dijkstra and A*. `[ATD V2 Search]` reports the actual algorithm, cost breakdown, alternating V/G route, and both seam counts. Accepted routes are replayed before transactional designation placement and post-placement Mega-seam validation.
+V2 has separate band/profile, transition, parent-plus-delta history, projected
+Mega G/FV navigation, source-launch, seam, request-potential, replay, and
+materialization types under `Access/V2`. Validated V-to-G seams enter explicit
+cardinal/diagonal projected-ground states carrying the same history; a
+disconnected component can re-enter generated V at a situation-qualified
+boundary through the symmetric reverse seam. Existing fixed work is navigated
+in exact directionless FV space and reaches tower ground through the same
+graph; fixed-frontage terminals and provider-distance fees are no longer part
+of V2. A* uses exact projected-ground suffix distances, the relaxed V
+potential, and the component-aware G escape field. Both seam directions pay
+the same canonical-center spoke. `[ATD V2 Search]` reports the actual
+algorithm, cost breakdown, alternating V/G route, and both seam counts.
+Accepted routes are replayed before transactional designation placement and
+post-placement Mega-seam validation.
 
 ### Phase 5 - Candidate materialization and safety validation (implemented; save validation pending)
 

@@ -180,11 +180,7 @@
     "Qualità del minerale"
   ],
   [
-    "settings.tab.pathfinder",
-    "Vie d'accesso"
-  ],
- [
-   "settings.heading.mining_defaults",
+    "settings.heading.mining_defaults",
     "Predefiniti della torre di controllo miniera"
   ],
   [
@@ -253,7 +249,7 @@
   ],
   [
     "settings.world.quick_remove_debris.tooltip",
-    "Controlla quando ATD utilizza l'azione di rimozione rapida del gioco per i detriti dell'accesso instradati. La rimozione rapida spende Unità. Questa politica non si applica al pulsante Elimina detriti della torre mineraria."
+    "Controlla quando ATD utilizza l'azione di rimozione rapida del gioco per i detriti dell'accesso instradati. La rimozione rapida spende Unità solo quando il gioco non è in pausa. Questa politica non si applica al pulsante Elimina detriti della torre mineraria."
   ],
   [
     "settings.world.quick_remove_debris.always",
@@ -312,11 +308,15 @@
     "Massimo"
   ],
   [
+    "settings.tab.pathfinder",
+    "Vie d'accesso"
+  ],
+  [
     "settings.pathfinder.costs",
     "Costi del percorso"
   ],
- [
-   "settings.pathfinder.generated_v_fixed.label",
+  [
+    "settings.pathfinder.generated_v_fixed.label",
     "Costo della designazione del terreno"
   ],
   [
@@ -339,8 +339,8 @@
     "settings.pathfinder.side_ray_weight.tooltip",
     "Peso applicato ai raggi di lavoro del paesaggio laterali e negli angoli."
   ],
- [
-   "settings.pathfinder.candidate_distance.label",
+  [
+    "settings.pathfinder.candidate_distance.label",
     "Distanza massima del raggio candidato"
   ],
   [
@@ -375,8 +375,8 @@
     "settings.pathfinder.frame_budget.tooltip",
     "Budget approssimativo di lavoro di ricerca per fotogramma di gioco. Valori più alti terminano prima, ma causano blocchi più lunghi."
   ],
- [
-   "settings.pathfinder.ray_max_cost.label",
+  [
+    "settings.pathfinder.ray_max_cost.label",
     "Costo massimo per raggio"
   ],
   [
@@ -663,8 +663,8 @@
     "panel.farming.vehicle_status.destroyed",
     "<distrutto>"
   ],
- [
-   "toolbox.corner_outer.tooltip",
+  [
+    "toolbox.corner_outer.tooltip",
     "Angolo (esterno): posizionare delle rampe angolari convesse."
   ],
   [

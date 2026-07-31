@@ -15,9 +15,8 @@ namespace AutoTerrainDesignations.Access.V2
 
     /// <summary>
     /// Request-scoped relaxed lower bound for V2 canonical centers. Tower
-    /// ground contributes its exact G suffix; fixed frontages contribute the
-    /// exact canonical center at which their match test can succeed. Cardinal
-    /// propagation ignores all V feasibility and therefore cannot overestimate.
+    /// ground contributes its exact G suffix. Cardinal propagation ignores all
+    /// V feasibility and therefore cannot overestimate.
     /// </summary>
     internal sealed class AccessV2PotentialField
     {
@@ -36,7 +35,6 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i boundsMin,
             Tile2i boundsMax,
             AccessV2GroundGraph? ground,
-            IReadOnlyList<AccessV2FixedFrontage> fixedGoals,
             float minimumVTravelCostPerTile = 1f)
         {
             m_min = boundsMin;
@@ -52,16 +50,6 @@ namespace AutoTerrainDesignations.Access.V2
             if (ground != null)
                 foreach (KeyValuePair<Tile2i, float> pair in ground.GoalDistances)
                     Seed(pair.Key, pair.Value);
-            for (int index = 0; index < fixedGoals.Count; index++)
-            {
-                AccessV2FixedFrontage goal = fixedGoals[index];
-                Tile2i matchCenter = GetCanonicalCenter(goal.State)
-                    + new RelTile2i(
-                        goal.ExposedDirection.X,
-                        goal.ExposedDirection.Y);
-                Seed(matchCenter, goal.TerminalCost);
-            }
-
             while (queue.Count > 0)
             {
                 KeyValuePair<float, Queue<Tile2i>> first = First(queue);

@@ -1,8 +1,14 @@
 # Lazy Unavoidable-Landscaping Heuristic
 
-Status: proposed refinement after useful-height domain pruning
+Status: superseded on 2026-07-31 by the terrain-extrema landscaping heuristic
+with a projected-ground-aware endpoint horizon. Retained as the earlier lazy
+successor-frontier exploration.
 
 Drafted: 2026-07-16
+
+Architecture note (2026-07-30): V2 no longer has fixed-frontage terminals or
+provider terminal fees. Read those references below as compatible projected
+G/FV navigation and its exact route-potential suffix.
 
 Related designs:
 

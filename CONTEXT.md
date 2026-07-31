@@ -104,29 +104,63 @@ search, because extra heuristic edges can only shorten the estimate; exact
 search still validates and charges every route.
 _Avoid_: Exact projected-ground graph, clearance or steepness proof
 
-**Global mixed route potential**:
-A proposed reverse shortest-path lower bound over strict-diagonal physical G,
-relaxed-octagonal fixed navigation, and actual 4x4 generated V origins.
-Generated cardinal propagation charges four traversal units plus one
-generated-origin fixed overhead. Goal G and matching fixed targets seed zero;
-handoff, terminal, and grounded suffix costs remain part of the field.
-_Avoid_: Terrain-extrema heuristic, physical-tile F/4 smear
+**Sparse V-type route potential**:
+A reverse shortest-path lower bound over reusable FV and actual 4x4 generated
+V origins. Generated cardinal propagation charges four traversal units plus one
+generated-origin fixed overhead; goal-connected physical G contributes exact
+suffix values only at useful contacts, while non-goal G uses a separate
+component escape field rather than becoming dense global potential nodes. A
+lookup at a generated V origin assumes that origin's fixed overhead is already
+paid; a forward edge charges it only when entering another generated V origin.
+FV may use relaxed diagonal travel at four square-root-of-two, while generated
+V propagation remains cardinal. A live width-two band initially queries the
+minimum potential of its currently paid origins; a stronger paired-band bound
+requires a separate lane-projection proof.
+_Avoid_: Terrain-extrema heuristic, physical-tile F/4 smear, dense all-G P
+
+**Minimum center-spoke cost**:
+The shared V2 cost-model lower bound for the vehicle-center movement between a
+V-type route and physical G. It is derived from the generated-origin cost model
+and prevents a relaxed G-to-V-to-G route from understating the corresponding
+ground travel; it is not a player policy setting.
+_Avoid_: Handoff tuning knob, zero-cost G/V contact
+
+**Component-local G escape field**:
+A lazy reverse lower bound over one non-goal physical-G component. It reaches
+only canonical G-to-V launch positions, then inherits the sparse V-type route
+potential after the minimum center spoke; a first generated-origin overhead is
+added only when that contact actually enters generated V rather than reusable
+FV.
+It guides G labels only and neither owns V labels nor changes exact search
+feasibility. It and the global sparse potential are cached for one immutable
+request snapshot; incremental cross-cluster repair is a later refinement.
+_Avoid_: Potential-owner state, eager all-component field
+
+**Catalogued potential contact**:
+A sparse route-potential edge admitted solely by immutable V-prime catalog or
+fixed-navigation membership. It deliberately omits profile resolution, corner
+compatibility, handoff geometry, and transition-band budget; exact search is
+the sole feasibility authority.
+_Avoid_: Resolved transition, heuristic construction work
 
 **Component-conditioned V commitment potential**:
-A proposed replacement route potential for a V label launched from one
+A deferred replacement route potential for a V label launched from one
 non-goal G component. It inherits complete global-potential values at that
 component's useful V merge fringe and flood-fills backward through its sparse V
 shadow at one cardinal-origin traversal plus fixed overhead per step. The
 source component is carried as potential ownership; the field replaces rather
 than augments the global route potential while that commitment remains active.
+It is not part of the initial global-potential implementation because its
+commitment semantics require a separate dominance proof.
 _Avoid_: Additive V surcharge, component-independent V potential
 
 **Potential-owner state**:
-The proposed identity selecting either the global mixed route potential or the
+The deferred identity selecting either the global mixed route potential or the
 component-conditioned field belonging to the G component from which the
 current uninterrupted V route launched. One physical origin may have values
 for several component owners; reaching the owner's useful V merge fringe
-returns ownership to the global field.
+returns ownership to the global field. It is absent from the initial exact
+search state.
 _Avoid_: Physical-origin partition, generated history
 
 **Resolved V2 move**:
@@ -200,11 +234,12 @@ _Avoid_: Recursive-diamond landscaping heuristic
 
 **Charge horizon**:
 A lower bound on the number of future charge-owning V2 slices that every legal
-continuation must enter before reaching any compatible terminal. Straight and
+continuation must enter before reaching a useful projected-ground endpoint
+(physical G or FV). Straight and
 strafe transitions each consume one charge. Turns consume a traversal move but
 own no generated slice, so they affect charge-bounded spatial reach without
 advancing the charge index.
-_Avoid_: Contact distance, travel horizon
+_Avoid_: Kfixed, contact distance, travel horizon
 
 **Charge-indexed contact reach**:
 The union of contact supports across the exact charge-bounded relaxed V2
