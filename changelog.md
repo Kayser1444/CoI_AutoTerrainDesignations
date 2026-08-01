@@ -1,4 +1,4 @@
-v0.5.6a [unreleased]
+v0.5.7 [unreleased]
 
 
 v0.5.6 [released]
@@ -9,6 +9,7 @@ v0.5.6 [released]
 * Improved: Experimental T3 (V2) accessways can now connect directly to jagged and slanted terrain-designation fringes. Corner-capable transition bands allow efficient exits without detouring to a smooth edge.
 * Improved: Vehicle depot completion notifications trigger only for unassigned (free) excavators, skipping pre-assigned excavators and specifying the built excavator model.
 * Fixed: Manually clearing or replacing an ATD-owned terrain designation now releases its tower ownership and correctly marks designation generation dirty.
+* Fixed: The normal **Clear designations** action now also cancels pending accessway Quick remove requests and removes their temporary previews.
 
 
 v0.5.5 [released]
