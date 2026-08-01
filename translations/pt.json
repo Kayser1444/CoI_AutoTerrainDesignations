@@ -280,6 +280,14 @@
     "Política de segurança"
   ],
   [
+    "settings.world.allow_ramps_outside_tower_areas.label",
+    "Allow ramps outside tower areas"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
+  ],
+  [
     "settings.world.safety_policy.tooltip",
     "Controla a cautela com que o ATD prevê deslizamentos de terra e a distância que mantém dos oceanos e edifícios protegidos. Políticas mais elevadas reservam mais espaço; políticas mais baixas permitem o trabalho no terreno mais próximo dos perigos. Padrão: BAL."
   ],

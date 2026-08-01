@@ -171,6 +171,7 @@ namespace AutoTerrainDesignations
                     isMining: true, allowsMixedWork: true,
                     reachableFixedOrigins: null,
                     groundGoalOverride: ghostGroundGoals,
+                    generatedAreaMarginTiles: 0,
                     out AccessSearchSnapshot snapshot,
                     out string snapshotFailure))
             {

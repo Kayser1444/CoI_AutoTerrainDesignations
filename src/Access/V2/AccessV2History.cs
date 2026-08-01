@@ -290,6 +290,15 @@ namespace AutoTerrainDesignations.Access.V2
             AccessHeightProfile profile,
             IReadOnlyCollection<Tile2i>? supersededRayOwners,
             out AccessSideRayOperation operation)
+            => IsProfileBlockedByRayEnvelopeCore(
+                null, origin, profile, supersededRayOwners, out operation);
+
+        private bool IsProfileBlockedByRayEnvelopeCore(
+            AccessSearchSnapshot? snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            IReadOnlyCollection<Tile2i>? supersededRayOwners,
+            out AccessSideRayOperation operation)
         {
             const float epsilon = 0.0001f;
             // Straight continuations supersede the newest lane-owned fringe.
@@ -333,6 +342,22 @@ namespace AutoTerrainDesignations.Access.V2
                         continue;
                     float profileHeight =
                         profile.GetHeight2NumeratorAt(localX, localY) / 32f;
+                    if (snapshot != null)
+                    {
+                        AccessTerrainSampleKind sampleKind =
+                            snapshot.GetSideRayTerrainSample(
+                                constraint.Tile, out float terrainHeight);
+                        if (sampleKind != AccessTerrainSampleKind.MissingSnapshot
+                            && sampleKind
+                                != AccessTerrainSampleKind.PhysicalMapEdge
+                            && ((constraint.Operation
+                                        == AccessSideRayOperation.Cut
+                                    && profileHeight < terrainHeight - epsilon)
+                                || (constraint.Operation
+                                        == AccessSideRayOperation.Fill
+                                    && profileHeight > terrainHeight + epsilon)))
+                            continue;
+                    }
                     if (constraint.Operation == AccessSideRayOperation.Cut
                         && profileHeight > constraint.Height + epsilon)
                     {
@@ -357,6 +382,40 @@ namespace AutoTerrainDesignations.Access.V2
             out AccessSideRayOperation operation)
             => IsProfileBlockedByRayEnvelope(
                 origin, profile, null, out operation);
+
+        public bool IsProfileBlockedByRayEnvelope(
+            AccessSearchSnapshot snapshot,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            IReadOnlyCollection<Tile2i>? supersededRayOwners,
+            out AccessSideRayOperation operation)
+            => IsProfileBlockedByRayEnvelopeCore(
+                snapshot, origin, profile, supersededRayOwners, out operation);
+
+        public bool HasRayAt(
+            Tile2i tile,
+            AccessSideRayOperation operation,
+            IReadOnlyCollection<Tile2i>? supersededRayOwners = null)
+        {
+            for (AccessV2History? history = this;
+                history != null;
+                history = history.m_parent)
+            {
+                for (int index = 0; index < history.m_rayDelta.Count; index++)
+                {
+                    AccessRayHeightConstraint constraint = history.m_rayDelta[index];
+                    if (constraint.Tile != tile
+                        || constraint.Operation != operation
+                        || (constraint.OwnerOrigin.HasValue
+                            && supersededRayOwners != null
+                            && supersededRayOwners.Contains(
+                                constraint.OwnerOrigin.Value)))
+                        continue;
+                    return true;
+                }
+            }
+            return false;
+        }
 
         public IReadOnlyDictionary<Tile2i, AccessHeightProfile> Flatten()
         {

@@ -144,6 +144,7 @@ public static string Tt(string text) => text;
         TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1.5f);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
+        SetAllowRampsOutsideTowerAreas(true);
         SetAccessHarvestDisruptedTrees(true);
         SetAccessAllowDigToRemoveDebris(true);
         SetAccessQuickRemoveDebrisPolicy(QuickRemoveDebrisPolicy.Restrictive);
@@ -437,6 +438,19 @@ public static string Tt(string text) => text;
         if (AccessAvoidBuildings != value)
             AutoDepthDesignation.MarkAllMiningPlansDirty();
         AccessAvoidBuildings = value;
+    }
+
+    /// <summary>
+    /// Allows a bounded experimental accessway retry beyond the tower area
+    /// after the normal in-area search fails.
+    /// </summary>
+    public static bool AllowRampsOutsideTowerAreas { get; private set; } = true;
+
+    public static void SetAllowRampsOutsideTowerAreas(bool value)
+    {
+        if (AllowRampsOutsideTowerAreas != value)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        AllowRampsOutsideTowerAreas = value;
     }
 
     /// <summary>Marks every tree in the finalized accessway disturbance zone for harvest.</summary>

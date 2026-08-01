@@ -280,6 +280,14 @@
     "Säkerhetspolicy"
   ],
   [
+    "settings.world.allow_ramps_outside_tower_areas.label",
+    "Allow ramps outside tower areas"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
+  ],
+  [
     "settings.world.safety_policy.tooltip",
     "Styr hur försiktigt ATD förutsäger jordskred och hur långt avstånd den håller från skyddade hav och byggnader. Högre policyer reserverar mer utrymme; lägre policyer tillåter terrängarbete närmare faror. Standard: BAL."
   ],

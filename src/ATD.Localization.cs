@@ -186,6 +186,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.quick_remove_debris.never.tooltip", "Never spend Unity on Quick remove for accessway debris. Removal relies on excavation and the Landscape to remove debris setting, and may need the player to provide Quick remove assistance.", "Tooltip for Never Quick Remove policy.");
         public static LocStr SettingsSafetyPolicyLabel =
             Loc.Str("settings.world.safety_policy.label", "Safety policy", "World safety policy setting label.");
+        public static LocStr SettingsAllowRampsOutsideTowerAreasLabel =
+            Loc.Str("settings.world.allow_ramps_outside_tower_areas.label", "Allow ramps outside tower areas", "World setting label for bounded out-of-area accessway fallback.");
+        public static LocStr SettingsAllowRampsOutsideTowerAreasTooltip =
+            Loc.Str("settings.world.allow_ramps_outside_tower_areas.tooltip", "If no experimental ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, runs only after the in-area search fails, and may trigger the game's normal outside-area alarm. Default: enabled.", "Tooltip for bounded out-of-area accessway fallback.");
         public static LocStr SettingsSafetyPolicyTooltip =
             Loc.Str("settings.world.safety_policy.tooltip", "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL.", "World safety policy setting tooltip.");
         public static LocStr SettingsSafetyPolicyValueTooltip =

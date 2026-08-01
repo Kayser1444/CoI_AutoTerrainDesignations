@@ -67,15 +67,18 @@ namespace AutoTerrainDesignations.Access
         public AccessTerrainSampleKind Kind { get; }
         public float TerrainHeight { get; }
         public string? BlockerReason { get; }
+        public bool TerminatesSameOperationRay { get; }
 
         public AccessSideRayTerrainSample(
             AccessTerrainSampleKind kind,
             float terrainHeight,
-            string? blockerReason = null)
+            string? blockerReason = null,
+            bool terminatesSameOperationRay = false)
         {
             Kind = kind;
             TerrainHeight = terrainHeight;
             BlockerReason = blockerReason;
+            TerminatesSameOperationRay = terminatesSameOperationRay;
         }
     }
 
@@ -129,7 +132,9 @@ namespace AutoTerrainDesignations.Access
             float unresolvedPenalty = DefaultUnresolvedPenalty,
             int postTerminationSafetyMargin = 0,
             int? maxTraceDistance = null,
-            Tile2i? exemptDesignationOrigin = null)
+            Tile2i? exemptDesignationOrigin = null,
+            Func<Tile2i, AccessSideRayOperation, bool>?
+                terminatesAtSameOperationRay = null)
             => Score(
                 tile =>
                 {
@@ -137,7 +142,10 @@ namespace AutoTerrainDesignations.Access
                         snapshot.GetSideRayTerrainSample(tile, out float height);
                     return new AccessSideRayTerrainSample(
                         kind, height, snapshot.GetSideRayBlockerReason(
-                            tile, operation, exemptDesignationOrigin));
+                            tile, operation, exemptDesignationOrigin),
+                        terminatesSameOperationRay:
+                            terminatesAtSameOperationRay?.Invoke(
+                                tile, operation) == true);
                 },
                 corner,
                 lateralDirection,
@@ -197,6 +205,12 @@ namespace AutoTerrainDesignations.Access
                     return new AccessSideRayResult(
                         integratedCost, 0f, sampleCount, false, false,
                         disturbedDistance: disturbedDistance);
+                }
+                if (sample.TerminatesSameOperationRay)
+                {
+                    return new AccessSideRayResult(
+                        integratedCost, 0f, sampleCount, false, false,
+                        disturbedDistance: Math.Max(0, distance - 1));
                 }
                 float rayHeight = operation == AccessSideRayOperation.Fill
                     ? plannedCornerHeight - distance * materialSlope

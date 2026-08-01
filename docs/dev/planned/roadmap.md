@@ -4,7 +4,7 @@ Current priorities for Kayser's Automatic Terrain Designations. This version is 
 
 ## Status summary
 
-The access framework and the V2-style accessway search are now part of the implemented baseline. The roadmap below focuses on polish, reliability, and the remaining feature gaps that still affect gameplay quality.
+The access framework, V2-style accessway search, and bounded out-of-area ramp fallback are now part of the implemented baseline. The roadmap below focuses on polish, reliability, and the remaining feature gaps that still affect gameplay quality.
 
 ## Near-term priorities
 
@@ -24,13 +24,6 @@ The access framework and the V2-style accessway search are now part of the imple
 - A useful-material rebate for accessway excavation cost. Its implementation
   must preserve terrain-extrema heuristic admissibility or weaken that
   heuristic component to zero wherever the rebate can apply.
-- Optional out-of-area fallback ramps for generated mining designations: when
-  no ramp can fit inside the tower area, retry within a bounded distance beyond
-  its boundary. Add a world-level public setting, **Allow ramps outside tower
-  areas** (default: enabled), whose tooltip makes clear that this is a fallback
-  attempted only after the in-area search fails. The resulting vanilla alarm
-  about designations outside the tower area is acceptable and preferable to an
-  immediate ramp-generation failure.
 - Underground pipe construction support for both vanilla and modded scenarios, if the complexity becomes practical.
 
 ## Reliability and quality work

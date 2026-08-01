@@ -278,6 +278,7 @@ namespace AutoTerrainDesignations
             bool allowsMixedWork,
             IReadOnlyCollection<Tile2i>? reachableFixedOrigins,
             IReadOnlyCollection<Tile2i>? groundGoalOverride,
+            int generatedAreaMarginTiles,
             out AccessSearchSnapshot snapshot,
             out string failureReason)
         {
@@ -295,11 +296,26 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            Tile2i boundsMin = tower.Area.BoundingBoxMin;
-            Tile2i boundsMax = tower.Area.BoundingBoxMax;
+            generatedAreaMarginTiles = Math.Max(0, generatedAreaMarginTiles);
+            Tile2i towerBoundsMin = tower.Area.BoundingBoxMin;
+            Tile2i towerBoundsMax = tower.Area.BoundingBoxMax;
+            Tile2i boundsMin = new Tile2i(
+                Math.Max(0, towerBoundsMin.X - generatedAreaMarginTiles),
+                Math.Max(0, towerBoundsMin.Y - generatedAreaMarginTiles));
+            Tile2i boundsMax = new Tile2i(
+                generatedAreaMarginTiles > 0
+                    ? Math.Min(terrMgr.TerrainSize.X - 4,
+                        towerBoundsMax.X + generatedAreaMarginTiles)
+                    : towerBoundsMax.X,
+                generatedAreaMarginTiles > 0
+                    ? Math.Min(terrMgr.TerrainSize.Y - 4,
+                        towerBoundsMax.Y + generatedAreaMarginTiles)
+                    : towerBoundsMax.Y);
             Tile2i towerCenter = tower is IEntityWithPosition positioned
                 ? positioned.Position2f.Tile2i
-                : new Tile2i((boundsMin.X + boundsMax.X) / 2, (boundsMin.Y + boundsMax.Y) / 2);
+                : new Tile2i(
+                    (towerBoundsMin.X + towerBoundsMax.X) / 2,
+                    (towerBoundsMin.Y + towerBoundsMax.Y) / 2);
             Tile2i groundCaptureMin = new Tile2i(
                 Math.Min(boundsMin.X, towerCenter.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES,
                 Math.Min(boundsMin.Y, towerCenter.Y) - RAMP_ACCESS_SEARCH_MARGIN_TILES);
@@ -395,7 +411,9 @@ namespace AutoTerrainDesignations
                 for (int y = firstOriginY; y <= boundsMax.Y; y += 4)
                 {
                     Tile2i origin = new Tile2i(x, y);
-                    if (!IsOriginInsideTower(tower, origin)) continue;
+                    if (!IsOriginInsideGeneratedArea(
+                            tower, origin, generatedAreaMarginTiles))
+                        continue;
                     Tile2i center = origin + new RelTile2i(2, 2);
                     terrainCenterHeight2[origin] = groundHeight2.TryGetValue(center, out int h2)
                         ? h2
@@ -559,7 +577,7 @@ namespace AutoTerrainDesignations
             }
             else
             {
-                if (!TryBuildTowerReachableGround(tower, boundsMin, boundsMax,
+                if (!TryBuildTowerReachableGround(tower, towerBoundsMin, towerBoundsMax,
                     groundNodes, provider, pathParams,
                     out towerReachableGround, out groundStart))
                 {
@@ -4583,6 +4601,40 @@ namespace AutoTerrainDesignations
                 && tower.Area.ContainsTile(origin + new RelTile2i(3, 0))
                 && tower.Area.ContainsTile(origin + new RelTile2i(0, 3))
                 && tower.Area.ContainsTile(origin + new RelTile2i(3, 3));
+
+        private static bool IsOriginInsideGeneratedArea(
+            IAreaManagingTower tower,
+            Tile2i origin,
+            int marginTiles)
+        {
+            if (marginTiles <= 0)
+                return IsOriginInsideTower(tower, origin);
+            return IsTileWithinTowerAreaMargin(tower, origin, marginTiles)
+                && IsTileWithinTowerAreaMargin(
+                    tower, origin + new RelTile2i(3, 0), marginTiles)
+                && IsTileWithinTowerAreaMargin(
+                    tower, origin + new RelTile2i(0, 3), marginTiles)
+                && IsTileWithinTowerAreaMargin(
+                    tower, origin + new RelTile2i(3, 3), marginTiles);
+        }
+
+        private static bool IsTileWithinTowerAreaMargin(
+            IAreaManagingTower tower,
+            Tile2i tile,
+            int marginTiles)
+        {
+            if (tower.Area.ContainsTile(tile))
+                return true;
+            for (int dx = -marginTiles; dx <= marginTiles; dx++)
+            {
+                int remaining = marginTiles - Math.Abs(dx);
+                for (int dy = -remaining; dy <= remaining; dy++)
+                    if (tower.Area.ContainsTile(
+                            tile + new RelTile2i(dx, dy)))
+                        return true;
+            }
+            return false;
+        }
 
         private static bool TryBuildTowerReachableGround(
             IAreaManagingTower tower,

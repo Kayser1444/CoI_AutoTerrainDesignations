@@ -280,6 +280,14 @@
     "Политика безопасности"
   ],
   [
+    "settings.world.allow_ramps_outside_tower_areas.label",
+    "Allow ramps outside tower areas"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
+  ],
+  [
     "settings.world.safety_policy.tooltip",
     "Определяет, насколько осторожно «ATD» прогнозирует оползни и какое расстояние сохраняет до защищаемого океана и зданий. Более высокие уровни резервируют больше пространства; более низкие позволяют проводить карьерные работы ближе к опасным зонам. По умолчанию: Сбалансированная."
   ],

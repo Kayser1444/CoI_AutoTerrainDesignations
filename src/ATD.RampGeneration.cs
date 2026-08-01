@@ -131,6 +131,7 @@ namespace AutoTerrainDesignations
             public Tile2i TopRowTile = default;
             public bool InitialReachabilityEvaluated;
             public bool AllClustersInitiallyConnected;
+            public bool SuppressWarningNotification;
         }
 
         private struct RampVertexEdge
@@ -181,6 +182,11 @@ namespace AutoTerrainDesignations
         // options are always evaluated.  Capping prevents runaway BFS cost when many candidates
         // share the same general area but none are reachable (the fallback is used anyway).
         private const int MAX_RAMP_REACHABILITY_CHECKS = 50;
+
+        // The optional public fallback expands only the experimental
+        // generated-origin domain. Ground navigation already extends beyond
+        // the managed area.
+        private const int OUTSIDE_TOWER_RAMP_FALLBACK_TILES = 16;
 
         private static void BuildBuildingOccupiedTiles(IAreaManagingTower tower, bool forceRefresh = false)
         {
@@ -684,6 +690,7 @@ namespace AutoTerrainDesignations
                 bool containsExternalTerrainEndpoint = cluster.Origins.Any(
                     origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
                 EvaluatedAccessCandidate? experimentalCandidate = null;
+                bool experimentalCandidateUsesOutsideArea = false;
                 string experimentalFailureSummary = string.Empty;
                 if (experimentalSearchEnabled)
                 {
@@ -694,6 +701,7 @@ namespace AutoTerrainDesignations
                     if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,
                         experimentalIsMining, accesswayAllowsMixedWork, accessibleFixedGoals,
                         groundGoalOverride,
+                        generatedAreaMarginTiles: 0,
                         out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
                     {
                         experimentalSnapshot = refreshedSnapshot;
@@ -722,6 +730,54 @@ namespace AutoTerrainDesignations
                         while (mergedSearch.MoveNext())
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.Result!;
+
+                        if (!experimentalResult.Success
+                            && AllowRampsOutsideTowerAreas)
+                        {
+                            string inAreaFailure =
+                                FormatExperimentalFailureSummary(experimentalResult);
+                            LogExperimentalAccessDebug(
+                                $"[ATD Outside-Area Fallback] cluster={cluster.ClusterId} " +
+                                $"width={request.RequiredWidth} " +
+                                $"phase=retry margin={OUTSIDE_TOWER_RAMP_FALLBACK_TILES} " +
+                                $"inAreaFailure={inAreaFailure}");
+                            if (TryBuildExperimentalAccessSnapshot(
+                                    tower, accessWorkDepths, cornerHeights, terrMgr,
+                                    experimentalIsMining, accesswayAllowsMixedWork,
+                                    accessibleFixedGoals, groundGoalOverride,
+                                    OUTSIDE_TOWER_RAMP_FALLBACK_TILES,
+                                    out AccessSearchSnapshot outsideSnapshot,
+                                    out string outsideSnapshotFailure))
+                            {
+                                experimentalSnapshot = outsideSnapshot;
+                                request = BuildMergedGoalAccessRequest(
+                                    outsideSnapshot, cluster, accessibleFixedGoals,
+                                    groundGoalOverride: groundGoalOverride);
+                                var outsideDryRun =
+                                    new ExperimentalAccessDryRunResult();
+                                IEnumerator outsideSearch =
+                                    RunExperimentalAccessDryRunSliced(
+                                        request, cluster, currentClusterOrdinal,
+                                        unreachableClusterCount, outsideDryRun);
+                                while (outsideSearch.MoveNext())
+                                    yield return outsideSearch.Current;
+                                experimentalResult = outsideDryRun.Result!;
+                                experimentalCandidateUsesOutsideArea =
+                                    experimentalResult.Success;
+                                LogExperimentalAccessDebug(
+                                    $"[ATD Outside-Area Fallback] cluster={cluster.ClusterId} " +
+                                    $"width={request.RequiredWidth} " +
+                                    $"success={experimentalResult.Success} " +
+                                    $"result={FormatExperimentalFailureSummary(experimentalResult)}");
+                            }
+                            else
+                            {
+                                LogExperimentalAccessDebug(
+                                    $"[ATD Outside-Area Fallback] cluster={cluster.ClusterId} " +
+                                    $"width={request.RequiredWidth} " +
+                                    $"snapshotFailed={outsideSnapshotFailure}");
+                            }
+                        }
                         experimentalPlan = LastExperimentalAccessPlan;
                         Dictionary<Tile2i, string> designationStateAfterSearch =
                             CaptureTerrainDesignationState(tower);
@@ -940,6 +996,8 @@ namespace AutoTerrainDesignations
                         {
                             result.TopRowTile = experimentalTopTile;
                             placedAny = true;
+                            if (experimentalCandidateUsesOutsideArea)
+                                result.SuppressWarningNotification = true;
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
                             ClearLastExperimentalCleanupMaterialization();

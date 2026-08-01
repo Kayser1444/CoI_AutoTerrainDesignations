@@ -83,6 +83,8 @@ namespace AutoTerrainDesignations
             AppendJsonBool(sb, AccessAvoidOcean);
             sb.Append(",\"avoidBuildings\":");
             AppendJsonBool(sb, AccessAvoidBuildings);
+            sb.Append(",\"allowRampsOutsideTowerAreas\":");
+            AppendJsonBool(sb, AllowRampsOutsideTowerAreas);
             sb.Append(",\"harvestDisruptedTrees\":");
             AppendJsonBool(sb, AccessHarvestDisruptedTrees);
             sb.Append(",\"allowDigToRemoveDebris\":");
@@ -244,6 +246,8 @@ namespace AutoTerrainDesignations
                     SetAccessAvoidOcean(avoidOcean);
                 if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))
                     SetAccessAvoidBuildings(avoidBuildings);
+                if (TryGetBool(worldSettings, "allowRampsOutsideTowerAreas", out bool allowOutside))
+                    SetAllowRampsOutsideTowerAreas(allowOutside);
                 if (TryGetBool(worldSettings, "harvestDisruptedTrees", out bool harvestDisruptedTrees))
                     SetAccessHarvestDisruptedTrees(harvestDisruptedTrees);
                 if (TryGetBool(worldSettings, "allowDigToRemoveDebris", out bool allowDigToRemoveDebris))

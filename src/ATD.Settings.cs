@@ -537,6 +537,10 @@ namespace AutoTerrainDesignations
                 if (accessAvoidBuildings.HasValue && ShouldPreserveBool(accessAvoidBuildings.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidBuildings(accessAvoidBuildings.Value);
 
+                bool? allowRampsOutsideTowerAreas = ParseBool(json, "allowRampsOutsideTowerAreas");
+                if (allowRampsOutsideTowerAreas.HasValue && ShouldPreserveBool(allowRampsOutsideTowerAreas.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(allowRampsOutsideTowerAreas.Value);
+
                 bool? accessHarvestDisruptedTrees = ParseBool(json, "accessHarvestDisruptedTrees");
                 if (accessHarvestDisruptedTrees.HasValue && ShouldPreserveBool(accessHarvestDisruptedTrees.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(accessHarvestDisruptedTrees.Value);
@@ -997,6 +1001,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, experimental narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search fails. The game may show its normal outside-area alarm. Default: true.\",");
+            sb.AppendLine($"  \"allowRampsOutsideTowerAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways and Mining Designations mark trees in their disturbance zones for harvest; when disabled, ATD creates no tree harvest orders. Default: true.\",");
             sb.AppendLine($"  \"accessHarvestDisruptedTrees\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees)},");

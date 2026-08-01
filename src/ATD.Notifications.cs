@@ -329,6 +329,8 @@ namespace AutoTerrainDesignations
             {
                 if (!kvp.Value.LastRampOutcome.HasValue)
                     continue;
+                if (kvp.Value.SuppressLastRampWarningNotification)
+                    continue;
 
                 if (s_entitiesManager.TryGetEntity<IEntity>(kvp.Key, out IEntity entity) && entity is IAreaManagingTower tower)
                     UpdateTowerRampWarningNotification(tower, kvp.Value.LastRampOutcome.Value);

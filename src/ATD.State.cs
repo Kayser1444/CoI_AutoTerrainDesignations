@@ -97,6 +97,7 @@ namespace AutoTerrainDesignations
 
             /// <summary>Outcome of the most recent ramp generation attempt. Null = no scan run yet.</summary>
             public RampPlacementOutcome? LastRampOutcome { get; set; }
+            public bool SuppressLastRampWarningNotification { get; set; }
 
             public ATDTowerSettings(int maxHeightDiff, int rampWidth, int maxLayersToExcavate, int? maxDepthToDigTo, int orePurityLevel, int corridorClearance, bool autoReleaseExcavatorsWhenIdle = false, bool autoReleaseTrucksWhenIdle = false)
             {
@@ -234,6 +235,7 @@ namespace AutoTerrainDesignations
         private static int s_startupTowerPrioritySyncAttempts;
         private static bool s_accessAvoidOcean = true;
         private static bool s_accessAvoidBuildings = true;
+        private static bool s_allowRampsOutsideTowerAreas = true;
         private static bool s_accessHarvestDisruptedTrees = true;
         private static bool s_accessAllowDigToRemoveDebris = true;
         private static QuickRemoveDebrisPolicy s_accessQuickRemoveDebrisPolicy =
@@ -242,6 +244,8 @@ namespace AutoTerrainDesignations
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
+        internal static bool AllowRampsOutsideTowerAreas =>
+            s_allowRampsOutsideTowerAreas;
         internal static bool AccessHarvestDisruptedTrees => s_accessHarvestDisruptedTrees;
         internal static bool AccessAllowDigToRemoveDebris => s_accessAllowDigToRemoveDebris;
         internal static QuickRemoveDebrisPolicy AccessQuickRemoveDebrisPolicy =>
@@ -250,6 +254,8 @@ namespace AutoTerrainDesignations
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
+        internal static void SetAllowRampsOutsideTowerAreas(bool value) =>
+            s_allowRampsOutsideTowerAreas = value;
         internal static void SetAccessHarvestDisruptedTrees(bool value) => s_accessHarvestDisruptedTrees = value;
         internal static void SetAccessAllowDigToRemoveDebris(bool value) => s_accessAllowDigToRemoveDebris = value;
         internal static void SetAccessQuickRemoveDebrisPolicy(
@@ -259,6 +265,8 @@ namespace AutoTerrainDesignations
         {
             s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
             s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
+            s_allowRampsOutsideTowerAreas =
+                AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas;
             s_accessHarvestDisruptedTrees = AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees;
             s_accessAllowDigToRemoveDebris = AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris;
             s_accessQuickRemoveDebrisPolicy =
@@ -304,6 +312,8 @@ namespace AutoTerrainDesignations
         {
             AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
             AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
+            AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(
+                s_allowRampsOutsideTowerAreas);
             AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
             AutoTerrainDesignationsMod.SetAccessAllowDigToRemoveDebris(s_accessAllowDigToRemoveDebris);
             AutoTerrainDesignationsMod.SetAccessQuickRemoveDebrisPolicy(
@@ -704,15 +714,26 @@ namespace AutoTerrainDesignations
 
         internal static RampPlacementOutcome? GetTowerLastRampOutcome(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).LastRampOutcome;
 
-        internal static void SetTowerLastRampOutcome(IAreaManagingTower tower, RampPlacementOutcome outcome)
+        internal static void SetTowerLastRampOutcome(
+            IAreaManagingTower tower,
+            RampPlacementOutcome outcome,
+            bool suppressWarningNotification = false)
         {
-            GetOrCreateTowerSettings(tower).LastRampOutcome = outcome;
-            UpdateTowerRampWarningNotification(tower, outcome);
+            ATDTowerSettings settings = GetOrCreateTowerSettings(tower);
+            settings.LastRampOutcome = outcome;
+            settings.SuppressLastRampWarningNotification =
+                suppressWarningNotification;
+            if (suppressWarningNotification)
+                ClearTowerRampWarningNotification(tower);
+            else
+                UpdateTowerRampWarningNotification(tower, outcome);
         }
 
         internal static void ClearTowerLastRampOutcome(IAreaManagingTower tower)
         {
-            GetOrCreateTowerSettings(tower).LastRampOutcome = null;
+            ATDTowerSettings settings = GetOrCreateTowerSettings(tower);
+            settings.LastRampOutcome = null;
+            settings.SuppressLastRampWarningNotification = false;
             ClearTowerRampWarningNotification(tower);
         }
 

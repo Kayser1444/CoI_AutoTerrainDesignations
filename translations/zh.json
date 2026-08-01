@@ -280,6 +280,14 @@
     "安全政策"
   ],
   [
+    "settings.world.allow_ramps_outside_tower_areas.label",
+    "Allow ramps outside tower areas"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
+  ],
+  [
     "settings.world.safety_policy.tooltip",
     "控制 ATD 预测山体滑坡的谨慎程度以及与受保护的海洋和建筑物的距离。更高的政策预留更多的空间；较低的政策允许地形更接近危险。默认值：BAL。"
   ],

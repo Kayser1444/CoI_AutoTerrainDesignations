@@ -523,7 +523,9 @@ namespace AutoTerrainDesignations
                     allowExistingPlannedRampShortcut: true,
                     result: rampResult);
                 RampPlacementOutcome rampOutcome = rampResult.Outcome;
-                SetTowerLastRampOutcome(tower, rampOutcome);
+                SetTowerLastRampOutcome(
+                    tower, rampOutcome,
+                    rampResult.SuppressWarningNotification);
 
                 var protectedAccesswayOrigins = new HashSet<Tile2i>(preexistingTerrainWorkOrigins);
                 protectedAccesswayOrigins.UnionWith(placedAccesswayOrigins);
@@ -1004,7 +1006,9 @@ namespace AutoTerrainDesignations
                 repairResult.AllClustersInitiallyConnected =
                     rampResult.AllClustersInitiallyConnected;
             }
-            SetTowerLastRampOutcome(tower, rampResult.Outcome);
+            SetTowerLastRampOutcome(
+                tower, rampResult.Outcome,
+                rampResult.SuppressWarningNotification);
         }
 
         private const int RAMP_ACCESS_SEARCH_MARGIN_TILES = 48;

@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 182,
+  "total_keys": 184,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
@@ -9,6 +9,18 @@
     "dtk.settings.language.local",
     "dtk.settings.number_format.auto"
   ],
-  "keys": {},
-  "keys_needing_translation": 0
+  "keys": {
+    "settings.world.allow_ramps_outside_tower_areas.label": {
+      "en": "Allow ramps outside tower areas",
+      "context": "World setting label for bounded out-of-area accessway fallback.",
+      "de": null,
+      "es": null,
+      "it": null,
+      "pt": null,
+      "ru": null,
+      "sv": null,
+      "zh": null
+    }
+  },
+  "keys_needing_translation": 1
 }

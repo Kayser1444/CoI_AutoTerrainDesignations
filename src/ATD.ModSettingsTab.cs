@@ -436,6 +436,12 @@ namespace AutoTerrainDesignations
                 AutoDepthDesignation.SetAccessAvoidBuildings,
                 refreshers));
             content.Add(BuildToggleRow(
+                AtdLocalization.SettingsAllowRampsOutsideTowerAreasLabel.AsFormatted,
+                AtdLocalization.SettingsAllowRampsOutsideTowerAreasTooltip.AsFormatted,
+                () => AutoDepthDesignation.AllowRampsOutsideTowerAreas,
+                AutoDepthDesignation.SetAllowRampsOutsideTowerAreas,
+                refreshers));
+            content.Add(BuildToggleRow(
                 AtdLocalization.SettingsHarvestDisruptedTreesLabel.AsFormatted,
                 AtdLocalization.SettingsHarvestDisruptedTreesTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessHarvestDisruptedTrees,

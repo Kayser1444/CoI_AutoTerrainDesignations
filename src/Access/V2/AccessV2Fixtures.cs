@@ -3825,6 +3825,95 @@ namespace AutoTerrainDesignations.Access.V2
                     v2WorkableHandoffs: UniformSingle,
                     v2WorkableHandoffSpans: Span);
             AccessSearchSnapshot replaySnapshot = CreateReplaySnapshot();
+            Tile2i sameSortOrigin = new Tile2i(16, 16);
+            Tile2i sameSortTile = new Tile2i(18, 18);
+            var sameSortProfile = new AccessHeightProfile(4, 4, 4, 4);
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            new Tile2i(4, 4),
+                            new AccessHeightProfile(0, 0, 0, 0)),
+                    },
+                    Array.Empty<Tile2i>(),
+                    new[]
+                    {
+                        new AccessRayHeightConstraint(
+                            sameSortTile,
+                            AccessSideRayOperation.Cut,
+                            1.5f,
+                            new Tile2i(4, 4)),
+                    },
+                    Array.Empty<string>(),
+                    out AccessV2History sameSortCutHistory,
+                    out string sameSortHistoryReason))
+            {
+                failure = "V2 same-sort ray fixture history failed: "
+                    + sameSortHistoryReason;
+                return false;
+            }
+            var sameSortCutTerrain = new Dictionary<Tile2i, float>(preciseByTile)
+            {
+                [sameSortTile] = 3f,
+            };
+            var opposingFillTerrain = new Dictionary<Tile2i, float>(preciseByTile)
+            {
+                [sameSortTile] = 1f,
+            };
+            if (sameSortCutHistory.IsProfileBlockedByRayEnvelope(
+                    CreateReplaySnapshot(preciseTerrain: sameSortCutTerrain),
+                    sameSortOrigin, sameSortProfile, null, out _)
+                || !sameSortCutHistory.HasRayAt(
+                    sameSortTile, AccessSideRayOperation.Cut)
+                || sameSortCutHistory.HasRayAt(
+                    sameSortTile, AccessSideRayOperation.Fill)
+                || !sameSortCutHistory.IsProfileBlockedByRayEnvelope(
+                    CreateReplaySnapshot(preciseTerrain: opposingFillTerrain),
+                    sameSortOrigin, sameSortProfile, null,
+                    out AccessSideRayOperation opposingRayBlock)
+                || opposingRayBlock != AccessSideRayOperation.Cut)
+            {
+                failure =
+                    "V2 cut rays must merge with new cut work while still blocking opposing fill work";
+                return false;
+            }
+            if (!AccessV2History.Empty.TryApply(
+                    new[]
+                    {
+                        new AccessV2OriginProfile(
+                            new Tile2i(4, 4),
+                            new AccessHeightProfile(0, 0, 0, 0)),
+                    },
+                    Array.Empty<Tile2i>(),
+                    new[]
+                    {
+                        new AccessRayHeightConstraint(
+                            sameSortTile,
+                            AccessSideRayOperation.Fill,
+                            2.5f,
+                            new Tile2i(4, 4)),
+                    },
+                    Array.Empty<string>(),
+                    out AccessV2History sameSortFillHistory,
+                    out sameSortHistoryReason))
+            {
+                failure = "V2 same-sort fill-ray fixture history failed: "
+                    + sameSortHistoryReason;
+                return false;
+            }
+            if (sameSortFillHistory.IsProfileBlockedByRayEnvelope(
+                    CreateReplaySnapshot(preciseTerrain: opposingFillTerrain),
+                    sameSortOrigin, sameSortProfile, null, out _)
+                || !sameSortFillHistory.IsProfileBlockedByRayEnvelope(
+                    CreateReplaySnapshot(preciseTerrain: sameSortCutTerrain),
+                    sameSortOrigin, sameSortProfile, null,
+                    out opposingRayBlock)
+                || opposingRayBlock != AccessSideRayOperation.Fill)
+            {
+                failure =
+                    "V2 fill rays must merge with new fill work while still blocking opposing cut work";
+                return false;
+            }
             Tile2i lane0Source = first.GetLaneOrigin(0);
             Tile2i lane1Source = first.GetLaneOrigin(1);
             Tile2i firstLaneRayTile = new Tile2i(12, 3);
