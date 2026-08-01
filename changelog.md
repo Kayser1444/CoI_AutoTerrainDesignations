@@ -1,4 +1,11 @@
-v0.5.6 [unreleased]
+v0.5.6 [released]
+
+* Improved: While the game is paused, the prop-removal manager now advances pending cleanup far enough to show its temporary terrain designations.
+* Changed: Pending Quick remove requests show a temporary mining preview at `ceil(ground height + 1)` when their origin has no existing designation; Unity is spent only after the game is unpaused.
+* Improved: A player or pathfinder designation already present at a Quick remove origin remains in place and serves as that origin's visual marker.
+* Improved: Experimental T3 (V2) accessways can now connect directly to jagged and slanted terrain-designation fringes. Corner-capable transition bands allow efficient exits without detouring to a smooth edge.
+* Improved: Vehicle depot completion notifications trigger only for unassigned (free) excavators, skipping pre-assigned excavators and specifying the built excavator model.
+* Fixed: Manually clearing or replacing an ATD-owned terrain designation now releases its tower ownership and correctly marks designation generation dirty.
 
 
 v0.5.5 [released]

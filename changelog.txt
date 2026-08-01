@@ -1,3 +1,11 @@
+v0.5.6 | 2026-08-01
+* Improved: While paused, prop removal advances pending cleanup far enough to show temporary terrain designations
+* Changed: Pending Quick remove requests display a temporary mining preview when unassigned, spending Unity only after unpausing
+* Improved: Existing player or pathfinder designations at Quick remove origins remain in place as visual markers
+* Improved: Experimental T3 accessways connect directly to jagged and slanted terrain-designation fringes with corner-capable transition bands
+* Improved: Vehicle depot completion notifications trigger only for unassigned (free) excavators and specify the completed excavator model
+* Fixed: Manually clearing or replacing an ATD-owned terrain designation releases tower ownership and marks designation generation dirty
+
 v0.5.5 | 2026-07-28
 * Fixed: Vehicle assigner row visibility when starting a new game where vehicle technology is not yet unlocked but starting vehicles are owned
 * Improved: Completed language entries for Accessways settings and mine control tower vehicle status summary

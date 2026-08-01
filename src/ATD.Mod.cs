@@ -96,8 +96,8 @@ public static string Tt(string text) => text;
         }
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
-        AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         PreAllocationPatches.Apply(m_harmony);
+        AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
         CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
             m_harmony,

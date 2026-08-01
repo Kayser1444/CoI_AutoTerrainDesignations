@@ -493,7 +493,7 @@
   ],
   [
     "settings.notifications.excavator_completion.tooltip",
-    "Показывает ли «ATD» зелёное уведомление, когда любой автозавод завершает сборку экскаватора."
+    "Показывает ли ATD зеленое уведомление, когда какая-либо автобаза завершает неназначенный (бесплатный) экскаватор."
   ],
   [
     "settings.notifications.ramp_warning.label",
@@ -689,7 +689,7 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entity} завершил сборку экскаватора"
+    "[ATD] Пользователь {entity} завершил неназначенное задание {0}"
   ],
   [
     "notification.debris_cleanup_queued",

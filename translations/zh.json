@@ -493,7 +493,7 @@
   ],
   [
     "settings.notifications.excavator_completion.tooltip",
-    "当任意车辆基地完成一台挖掘机时，ATD 是否显示绿色通知。"
+    "当任何车辆段完成未分配（空闲）挖掘机时，ATD 是否显示绿色通知。"
   ],
   [
     "settings.notifications.ramp_warning.label",
@@ -689,7 +689,7 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entity}完成了挖掘机建造"
+    "[ATD] {entity} 完成了未分配的 {0}"
   ],
   [
     "notification.debris_cleanup_queued",

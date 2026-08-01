@@ -493,7 +493,7 @@
   ],
   [
     "settings.notifications.excavator_completion.tooltip",
-    "Om ATD visar en grön avisering när en fordonsdepå färdigställer en grävmaskin."
+    "Om ATD visar ett grönt meddelande när någon fordonsdepå slutför en otilldelad (gratis) grävmaskin."
   ],
   [
     "settings.notifications.ramp_warning.label",
@@ -689,7 +689,7 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entity} har färdigställt en grävmaskin"
+    "[ATD] {entity} slutförde en otilldelad {0}"
   ],
   [
     "notification.debris_cleanup_queued",

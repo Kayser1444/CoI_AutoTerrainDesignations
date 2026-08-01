@@ -493,7 +493,7 @@
   ],
   [
     "settings.notifications.excavator_completion.tooltip",
-    "Se o ATD mostra uma notificação verde quando qualquer depósito de veículos conclui uma escavadeira."
+    "Se o ATD mostra uma notificação verde quando qualquer depósito de veículos conclui uma escavadeira não atribuída (gratuita)."
   ],
   [
     "settings.notifications.ramp_warning.label",
@@ -689,7 +689,7 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entity} concluiu uma escavadeira"
+    "[ATD] {entity} concluiu um {0} não atribuído"
   ],
   [
     "notification.debris_cleanup_queued",

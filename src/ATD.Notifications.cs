@@ -28,8 +28,8 @@ namespace AutoTerrainDesignations
             new EntityNotificationProto.ID("ATD_RampAccessNotAccessible");
         internal static readonly EntityNotificationProto.ID FarmingCompleteId =
             new EntityNotificationProto.ID("ATD_FarmingComplete");
-        internal static readonly EntityNotificationProto.ID ExcavatorCompletedId =
-            new EntityNotificationProto.ID("ATD_ExcavatorCompleted");
+        internal static readonly EntityNotificationProto<string>.ID ExcavatorCompletedId =
+            new EntityNotificationProto<string>.ID("ATD_ExcavatorCompleted");
         internal static readonly EntityNotificationProto.ID DebrisCleanupQueuedId =
             new EntityNotificationProto.ID("ATD_DebrisCleanupQueued");
         internal static readonly EntityNotificationProto.ID DebrisCleanupNoneFoundId =
@@ -68,7 +68,7 @@ namespace AutoTerrainDesignations
                 registrator,
                 AtdLocalization.NotifFarmingComplete.TranslatedString,
                 FarmingCompleteId);
-            RegisterSuccess(
+            RegisterSuccessFormatted(
                 registrator,
                 AtdLocalization.NotifExcavatorCompleted.TranslatedString,
                 ExcavatorCompletedId,
@@ -143,6 +143,22 @@ namespace AutoTerrainDesignations
                 .BuildAndAdd(doNotRequireEntityIcon: true);
         }
 
+        private static void RegisterSuccessFormatted<T>(
+            ProtoRegistrator registrator,
+            string message,
+            EntityNotificationProto<T>.ID id,
+            string iconPath = "Assets/Unity/UserInterface/EntityIcons/Designation.png")
+        {
+            registrator.NotificationProtoBuilder
+                .StartFormatted(message, id)
+                .SetType(NotificationType.OneTimeOnly)
+                .SetStyle(NotificationStyle.Success)
+                .SetTimeToLive(Duration.FromSec(20))
+                .MuteAudio()
+                .AddIcon(iconPath)
+                .BuildAndAdd(doNotRequireEntityIcon: true);
+        }
+
         internal static bool IsAtdProto(NotificationProto proto)
         {
             return s_protoIds.Contains(proto.Id.Value);
@@ -191,7 +207,7 @@ namespace AutoTerrainDesignations
         private static EntityNotificationProto? s_rampAccessTruncatedNotificationProto;
         private static EntityNotificationProto? s_rampAccessNotAccessibleNotificationProto;
         private static EntityNotificationProto? s_farmingCompleteNotificationProto;
-        private static EntityNotificationProto? s_excavatorCompletedNotificationProto;
+        private static EntityNotificationProto<string>? s_excavatorCompletedNotificationProto;
         private static EntityNotificationProto? s_debrisCleanupQueuedNotificationProto;
         private static EntityNotificationProto? s_debrisCleanupNoneFoundNotificationProto;
         private static EntityNotificationProto? s_debrisCleanupNoneReachableNotificationProto;
@@ -212,12 +228,12 @@ namespace AutoTerrainDesignations
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.DebrisCleanupNoneReachableId, ref s_debrisCleanupNoneReachableNotificationProto);
         }
 
-        private static void TryInitializeTransientNotificationProto(
+        private static void TryInitializeTransientNotificationProto<TProto>(
             ProtosDb protosDb,
-            EntityNotificationProto.ID id,
-            ref EntityNotificationProto? proto)
+            Proto.ID id,
+            ref TProto? proto) where TProto : NotificationProto
         {
-            if (protosDb.TryGetProto(id, out EntityNotificationProto resolvedProto))
+            if (protosDb.TryGetProto(id, out TProto resolvedProto))
                 proto = resolvedProto;
             else
                 Log.Warning("[ATD] Transient notification proto not found: " + id.Value);
@@ -309,7 +325,6 @@ namespace AutoTerrainDesignations
         {
             if (s_entitiesManager == null)
                 return;
-
             foreach (KeyValuePair<EntityId, ATDTowerSettings> kvp in s_towerSettingsByEntityId.ToList())
             {
                 if (!kvp.Value.LastRampOutcome.HasValue)
@@ -379,7 +394,7 @@ namespace AutoTerrainDesignations
                 Option.None);
         }
 
-        private static void AddExcavatorCompletedNotification(IObjectWithTitle objectWithTitle)
+        private static void AddExcavatorCompletedNotification(IObjectWithTitle objectWithTitle, string vehicleTypeName)
         {
             if (s_notificationsManager == null || s_excavatorCompletedNotificationProto == null)
                 return;
@@ -387,7 +402,7 @@ namespace AutoTerrainDesignations
             s_notificationsManager.AddNotification(
                 s_excavatorCompletedNotificationProto,
                 Option<IObjectWithTitle>.Create(objectWithTitle),
-                Option.None);
+                vehicleTypeName);
         }
 
         private static bool HasTransientTowerNotification(IAreaManagingTower tower, TransientNotificationKind kind)

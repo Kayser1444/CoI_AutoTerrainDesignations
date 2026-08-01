@@ -293,7 +293,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsExcavatorNotificationsLabel =
             Loc.Str("settings.notifications.excavator_completion.label", "Excavator completion notifications", "Settings toggle label for excavator completion notifications.");
         public static LocStr SettingsExcavatorNotificationsTooltip =
-            Loc.Str("settings.notifications.excavator_completion.tooltip", "Whether ATD shows a green notification when any vehicle depot completes an excavator.", "Tooltip for excavator completion notifications.");
+            Loc.Str("settings.notifications.excavator_completion.tooltip", "Whether ATD shows a green notification when any vehicle depot completes an unassigned (free) excavator.", "Tooltip for excavator completion notifications.");
         public static LocStr SettingsRampNotificationsLabel =
             Loc.Str("settings.notifications.ramp_warning.label", "Ramp warning notifications", "Settings toggle label for ramp warning notifications.");
         public static LocStr SettingsRampNotificationsTooltip =
@@ -412,7 +412,7 @@ namespace AutoTerrainDesignations
         public static LocStr NotifFarmingComplete =
             Loc.Str("notification.farming_complete", "[ATD] {entity} farming preparation and filling complete", "Notification: farming complete. {entity} is substituted by the game.");
         public static LocStr NotifExcavatorCompleted =
-            Loc.Str("notification.excavator_completed", "[ATD] {entity} completed an excavator", "Notification: excavator built. {entity} is substituted by the game.");
+            Loc.Str("notification.excavator_completed", "[ATD] {entity} completed an unassigned {0}", "Notification: excavator built. {entity} is substituted by the game, {0} is vehicle type description.");
         public static LocStr NotifDebrisCleanupQueued =
             Loc.Str("notification.debris_cleanup_queued", "[ATD] {entity} has debris cleanup queued", "Notification: Clear debris requests are queued or active. {entity} is substituted by the game.");
         public static LocStr NotifDebrisCleanupNoneFound =

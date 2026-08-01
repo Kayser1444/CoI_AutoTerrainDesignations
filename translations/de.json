@@ -493,7 +493,7 @@
   ],
   [
     "settings.notifications.excavator_completion.tooltip",
-    "Ob ATD eine grüne Benachrichtigung zeigt, wenn ein Fahrzeugdepot einen Bagger fertigstellt."
+    "Ob ATD eine grüne Benachrichtigung anzeigt, wenn ein Fahrzeugdepot einen nicht zugewiesenen (kostenlosen) Bagger fertigstellt."
   ],
   [
     "settings.notifications.ramp_warning.label",
@@ -689,7 +689,7 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entity} hat einen Bagger fertiggestellt"
+    "[ATD] {entity} hat einen nicht zugewiesenen {0} abgeschlossen"
   ],
   [
     "notification.debris_cleanup_queued",
