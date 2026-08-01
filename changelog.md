@@ -1,3 +1,6 @@
+v0.5.6a [unreleased]
+
+
 v0.5.6 [released]
 
 * Improved: While the game is paused, the prop-removal manager now advances pending cleanup far enough to show its temporary terrain designations.
