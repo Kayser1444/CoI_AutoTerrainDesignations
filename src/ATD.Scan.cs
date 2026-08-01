@@ -37,6 +37,9 @@ namespace AutoTerrainDesignations
         private static readonly Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>
             s_manualDebrisRemovalRequestsByTower =
                 new Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>();
+        private static readonly Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>
+            s_accesswayPropRemovalRequestsByTower =
+                new Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>();
 
         private static IEnumerator RunCreateDesignationsWithDebugGate(
             IEnumerator routine,
@@ -1922,6 +1925,50 @@ namespace AutoTerrainDesignations
                 PropRemovalManager.Cancel(request);
             s_manualDebrisRemovalRequestsByTower.Remove(tower.Id);
             SetTowerDebrisCleanupQueuedNotification(tower, isQueued: false);
+        }
+
+        internal static void TrackAccesswayPropRemovalRequest(
+            IAreaManagingTower tower,
+            ATDPropRemovalRequestHandle request)
+        {
+            if (request.IsCompleted)
+                return;
+            EntityId towerId = tower.Id;
+            if (!s_accesswayPropRemovalRequestsByTower.TryGetValue(
+                    towerId, out List<ATDPropRemovalRequestHandle> requests))
+            {
+                requests = new List<ATDPropRemovalRequestHandle>();
+                s_accesswayPropRemovalRequestsByTower.Add(towerId, requests);
+            }
+            requests.Add(request);
+            request.OnCompleted(_ =>
+            {
+                if (!s_accesswayPropRemovalRequestsByTower.TryGetValue(
+                        towerId, out List<ATDPropRemovalRequestHandle> liveRequests))
+                    return;
+                liveRequests.Remove(request);
+                if (liveRequests.Count == 0)
+                    s_accesswayPropRemovalRequestsByTower.Remove(towerId);
+            });
+        }
+
+        private static void CancelAccesswayPropRemovalRequestsForTower(
+            IAreaManagingTower tower)
+        {
+            if (PropRemovalManager == null
+                || !s_accesswayPropRemovalRequestsByTower.TryGetValue(
+                    tower.Id, out List<ATDPropRemovalRequestHandle> requests))
+                return;
+            foreach (ATDPropRemovalRequestHandle request in requests.ToArray())
+                PropRemovalManager.Cancel(request);
+            s_accesswayPropRemovalRequestsByTower.Remove(tower.Id);
+        }
+
+        internal static void CancelPendingPropRemovalRequestsForTower(
+            IAreaManagingTower tower)
+        {
+            CancelManualDebrisRemovalRequestsForTower(tower);
+            CancelAccesswayPropRemovalRequestsForTower(tower);
         }
 
         private static float GetMinSurfaceHeightInDesignatableTile(Tile2i tileOrigin, TerrainManager terrMgr)

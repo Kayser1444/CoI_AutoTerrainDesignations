@@ -3224,6 +3224,8 @@ namespace AutoTerrainDesignations
                 : placementPlan.HandoffGround;
             LastExperimentalAccessPlan = placementPlan;
             s_lastExperimentalPropRemovalRequests.AddRange(placedCleanupRequests);
+            foreach (ATDPropRemovalRequestHandle request in placedCleanupRequests)
+                TrackAccesswayPropRemovalRequest(tower, request);
             s_lastExperimentalCleanupTreeSelections.AddRange(selectedCleanupTrees);
             RegisterGeneratedHarvestTreePositions(tower, selectedCleanupTrees);
             return true;

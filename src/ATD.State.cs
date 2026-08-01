@@ -825,6 +825,7 @@ namespace AutoTerrainDesignations
             s_generatedAccesswayOriginsByTowerEntityId.Clear();
             s_generatedHarvestTreePositionsByTowerEntityId.Clear();
             s_manualDebrisRemovalRequestsByTower.Clear();
+            s_accesswayPropRemovalRequestsByTower.Clear();
             s_startupTowerPrioritySyncCompleted = false;
             s_startupTowerPrioritySyncAttempts = 0;
 

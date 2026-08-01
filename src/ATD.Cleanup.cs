@@ -68,7 +68,7 @@ namespace AutoTerrainDesignations
 
         internal static void ClearDesignationsForTower(IAreaManagingTower tower)
         {
-            CancelManualDebrisRemovalRequestsForTower(tower);
+            CancelPendingPropRemovalRequestsForTower(tower);
             CaptureClearedAccesswayOrigins(tower);
             ClearDesignationsInArea(tower);
             ClearGeneratedHarvestTreesForTower(tower);
@@ -97,7 +97,7 @@ namespace AutoTerrainDesignations
 
         internal static void ClearGeneratedDesignationsForTower(IAreaManagingTower tower)
         {
-            CancelManualDebrisRemovalRequestsForTower(tower);
+            CancelPendingPropRemovalRequestsForTower(tower);
             CaptureClearedAccesswayOrigins(tower);
             ClearGeneratedHarvestTreesForTower(tower);
             if (s_desigManager == null)
