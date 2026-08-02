@@ -6,7 +6,6 @@
   "common.level.off": "Off",
   "notification.debris_cleanup_none_found": "[ATD] {entity} found no debris to clear",
   "notification.debris_cleanup_none_reachable": "[ATD] {entity} found no reachable debris to clear. Ctrl-click to include unreachable debris",
-  "notification.debris_cleanup_queued": "[ATD] {entity} has debris cleanup queued",
   "notification.excavator_completed": "[ATD] {entity} completed an unassigned {0}",
   "notification.farming_complete": "[ATD] {entity} farming preparation and filling complete",
   "notification.ramp_access_failed": "[ATD] {entity} could not start an access ramp",

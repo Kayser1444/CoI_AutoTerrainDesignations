@@ -697,19 +697,15 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entidad} completó un {0} no asignado"
-  ],
-  [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entidad} tiene la limpieza de escombros en cola"
+    "[ATD] {entity} completó un {0} no asignado"
   ],
   [
     "notification.debris_cleanup_none_found",
-    "[ATD] {entidad} no encontró escombros que limpiar"
+    "[ATD] {entity} no encontró escombros que limpiar"
   ],
   [
     "notification.debris_cleanup_none_reachable",
-    "[ATD] {entidad} no encontró escombros accesibles para limpiar. Ctrl-clic para incluir escombros inalcanzables"
+    "[ATD] {entity} no encontró escombros accesibles para limpiar. Ctrl-clic para incluir escombros inalcanzables"
   ],
   [
     "vehicle_order.confirm.singular",

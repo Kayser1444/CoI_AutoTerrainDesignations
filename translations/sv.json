@@ -700,10 +700,6 @@
     "[ATD] {entity} slutförde en otilldelad {0}"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} har skräprensning i kö"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} hittade inget skräp att rensa"
   ],

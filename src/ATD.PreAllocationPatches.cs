@@ -182,9 +182,9 @@ namespace AutoTerrainDesignations
                     {
                         var entity = entityProvider();
                         EnqueueAtNearestDepot(context, proto, entity);
-                        evt.StopPropagation();
+                        evt.StopImmediatePropagation();
                     }
-                });
+                }, UnityEngine.UIElements.TrickleDown.TrickleDown);
 
                 var minusBtn = buttons[1];
                 var originalOnMinusClick = ((Option<Action>)mOnClickField.GetValue(minusBtn)).ValueOrNull;
@@ -212,9 +212,9 @@ namespace AutoTerrainDesignations
                     {
                         var entity = entityProvider();
                         CancelEnqueuedVehicles(context, proto, entity, 1);
-                        evt.StopPropagation();
+                        evt.StopImmediatePropagation();
                     }
-                });
+                }, UnityEngine.UIElements.TrickleDown.TrickleDown);
 
                 // Setup unified observer to update assigned display count and plus button enabled state/tooltip safely.
                 // We observe everything the base game observes + our additions, so we always run last and overwrite correctly.

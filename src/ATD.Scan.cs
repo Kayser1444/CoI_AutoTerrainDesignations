@@ -1902,7 +1902,6 @@ namespace AutoTerrainDesignations
                 s_manualDebrisRemovalRequestsByTower.Add(towerId, requests);
             }
             requests.Add(request);
-            SetTowerDebrisCleanupQueuedNotification(tower, isQueued: true);
             request.OnCompleted(_ =>
             {
                 if (!s_manualDebrisRemovalRequestsByTower.TryGetValue(towerId,
@@ -1912,8 +1911,6 @@ namespace AutoTerrainDesignations
                 if (liveRequests.Count == 0)
                 {
                     s_manualDebrisRemovalRequestsByTower.Remove(towerId);
-                    SetTowerDebrisCleanupQueuedNotification(tower,
-                        isQueued: false);
                 }
             });
         }
@@ -1928,7 +1925,6 @@ namespace AutoTerrainDesignations
             foreach (ATDPropRemovalRequestHandle request in requests.ToArray())
                 PropRemovalManager.Cancel(request);
             s_manualDebrisRemovalRequestsByTower.Remove(tower.Id);
-            SetTowerDebrisCleanupQueuedNotification(tower, isQueued: false);
         }
 
         internal static void TrackAccesswayPropRemovalRequest(

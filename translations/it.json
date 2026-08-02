@@ -697,19 +697,15 @@
   ],
   [
     "notification.excavator_completed",
-    "[ATD] {entità} ha completato un {0} non assegnato"
-  ],
-  [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entità} ha in coda la pulizia dei detriti"
+    "[ATD] {entity} ha completato un {0} non assegnato"
   ],
   [
     "notification.debris_cleanup_none_found",
-    "[ATD] {entità} non ha trovato detriti da rimuovere"
+    "[ATD] {entity} non ha trovato detriti da rimuovere"
   ],
   [
     "notification.debris_cleanup_none_reachable",
-    "[ATD] {entità} non ha trovato detriti raggiungibili da rimuovere. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili"
+    "[ATD] {entity} non ha trovato detriti raggiungibili da rimuovere. Fare clic tenendo premuto Ctrl per includere detriti irraggiungibili"
   ],
   [
     "vehicle_order.confirm.singular",

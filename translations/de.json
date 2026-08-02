@@ -700,10 +700,6 @@
     "[ATD] {entity} hat einen nicht zugewiesenen {0} abgeschlossen"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} hat die Warteschlange für die Trümmerbeseitigung"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} hat keine zu beseitigenden Trümmer gefunden"
   ],

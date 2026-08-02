@@ -417,8 +417,6 @@ namespace AutoTerrainDesignations
             Loc.Str("notification.farming_complete", "[ATD] {entity} farming preparation and filling complete", "Notification: farming complete. {entity} is substituted by the game.");
         public static LocStr NotifExcavatorCompleted =
             Loc.Str("notification.excavator_completed", "[ATD] {entity} completed an unassigned {0}", "Notification: excavator built. {entity} is substituted by the game, {0} is vehicle type description.");
-        public static LocStr NotifDebrisCleanupQueued =
-            Loc.Str("notification.debris_cleanup_queued", "[ATD] {entity} has debris cleanup queued", "Notification: Clear debris requests are queued or active. {entity} is substituted by the game.");
         public static LocStr NotifDebrisCleanupNoneFound =
             Loc.Str("notification.debris_cleanup_none_found", "[ATD] {entity} found no debris to clear", "Notification: Clear debris found no blocking props. {entity} is substituted by the game.");
         public static LocStr NotifDebrisCleanupNoneReachable =

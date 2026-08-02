@@ -700,10 +700,6 @@
     "[ATD] {entity} concluiu um {0} não atribuído"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} tem limpeza de detritos na fila"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} não encontrou detritos para limpar"
   ],

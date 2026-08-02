@@ -700,10 +700,6 @@
     "[ATD] {entity} completed an unassigned {0}"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} has debris cleanup queued"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} found no debris to clear"
   ],

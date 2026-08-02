@@ -700,10 +700,6 @@
     "[ATD] {entity} 完成了未分配的 {0}"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} 已排队进行碎片清理"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} 发现没有需要清除的碎片"
   ],

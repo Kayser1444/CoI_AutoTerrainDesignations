@@ -700,10 +700,6 @@
     "[ATD] Пользователь {entity} завершил неназначенное задание {0}"
   ],
   [
-    "notification.debris_cleanup_queued",
-    "[ATD] {entity} поставил расчистку мусора в очередь"
-  ],
-  [
     "notification.debris_cleanup_none_found",
     "[ATD] {entity} не обнаружил мусора для расчистки"
   ],

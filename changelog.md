@@ -1,5 +1,9 @@
 v0.5.7 [unreleased]
 
+* Fixed: ATD notification messages now refresh after the game applies the selected mod translation, including the excavator-completed notification.
+* Changed: Removed the queued debris-cleanup notification; the main-thread removal designations now provide that progress feedback.
+* Fixed: Dot-prefixed translation metadata is excluded from runtime localization scans and release packages.
+* Fixed: Shift-Alt-clicking a tower vehicle-order button no longer enqueues both a pre-assigned truck and a second free truck.
 * Improved: Added an enabled-by-default **Allow ramps outside tower areas** world setting. When an in-area experimental ramp search drains its frontier or finds no feasible V2 start within the current bounds, narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary. Timeouts and other interrupted searches do not retry. A successful fallback relies on the game's normal outside-area alarm and suppresses ATD's redundant ramp warning.
 * Improved: Replaced V2 A*'s dense per-tile route potential with the sparse P-field foundation over paid generated origins and reusable FV nodes. Generated steps charge the next origin overhead, FV retains exact cardinal/diagonal suffix costs, and disconnected ground escape fields are built lazily per component.
 * Improved: Independent diagnostic controls now govern the commonly used fading access-search frontier and the persistent sparse P-field trace. Generated potential values use `P`; reusable fixed-navigation values use `FX` and `FY`. The designation Clear button and `atd_clear_diagnostic_overlays` command clear all stored diagnostic traces.
