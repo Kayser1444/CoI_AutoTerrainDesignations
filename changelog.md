@@ -1,4 +1,4 @@
-v0.5.7 [packaged]
+v0.5.7 [released]
 
 * Fixed: ATD notification messages now refresh after the game applies the selected mod translation, including the excavator-completed notification.
 * Changed: Removed the queued debris-cleanup notification; the main-thread removal designations now provide that progress feedback.
