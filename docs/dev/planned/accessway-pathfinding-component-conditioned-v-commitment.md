@@ -1,7 +1,11 @@
 # Component-Conditioned V Commitment Potential
 
-Status: deferred. Do not implement without a transformed-graph dominance proof
-and evidence that sparse `P` leaves material queue work to remove.
+Status: transformed ownership foundation implemented on 2026-08-02. Frontier
+diagnostics showed that G-launched V descendants account for most late V
+expansion. Exact labels now retain source-component ownership until they cross
+a center edge that static G cannot reproduce; pre-commit returns to that
+component are suppressed, while post-shortcut returns and returns to another
+component remain valid. The numeric `S_C` strengthening remains pending.
 
 Related designs:
 
@@ -44,9 +48,13 @@ Candidate `B_C` members are:
 * useful handoffs to G components other than `C`; and
 * a return to `C` only after `P` has represented its useful V portion.
 
-The last condition is unresolved: cleanup, projected history, alternate
-handoffs, adapters, profiles, and ties may invalidate it. Such an origin must
-become a merge seed or the field must weaken to `P`.
+The last condition does not make same-component returns categorically invalid.
+A pre-fringe return is dominated by staying on `G` in `C` and avoiding the V
+overhead. A post-fringe return remains part of the exact graph because the V
+prefix may be a genuine shortcut through `C`. Merely finding an origin in the
+sparse `P` dictionary is not sufficient: the implemented sparse field contains
+eligible generated origins over `C` as well. The merge test must identify a
+P-owned continuation that represents non-G-equivalent progress.
 
 ## Required exact-state semantics
 
@@ -66,6 +74,7 @@ G in C -> generated V       owner C
 V owned by C -> shadow V    owner C
 V owned by C -> B_C         owner GlobalP
 V owned by C -> other G D   leave V; later launch uses D
+V globally owned -> G in C  legal same-component return
 fixed/source V              owner GlobalP
 ```
 
@@ -74,13 +83,12 @@ partition of physical origins.
 
 ## Proof and validation questions
 
-Before revisiting this, settle:
+The numeric field implementation and validation must settle:
 
-1. the graph fact that makes each useful same-`C` shortcut reach P-owned V;
-2. cleanup and history effects that invalidate it;
-3. the minimal safe `B_C` and label-dominance key;
-4. band query semantics and directed handoff/spoke costs; and
-5. whether this still improves runtime after sparse `P` and terrain extrema.
+1. the minimal conservative test for non-G-equivalent V progress;
+2. cleanup and projected-history cases that require weakening rather than
+   excluding a route;
+3. band query semantics and directed handoff/spoke costs; and
+4. whether the transformed field reduces queue work on Cluster 2.
 
 Reference Dijkstra must use the same ownership and graph pruning as A*.
-

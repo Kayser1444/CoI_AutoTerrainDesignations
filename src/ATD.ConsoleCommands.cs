@@ -46,6 +46,8 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
+        sb.AppendLine($"  AccessSearchOverlay   = {AutoDepthDesignation.ShowExperimentalAccessSearchOverlay}");
+        sb.AppendLine($"  AccessPotentialOverlay = {AutoDepthDesignation.ShowExperimentalAccessPotentialOverlay}");
         sb.AppendLine($"  ExperimentalHeightHull = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
         sb.AppendLine($"  HeightHullV1LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}");
         sb.AppendLine($"  HeightHullV2LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}");
@@ -380,7 +382,7 @@ public sealed class AtdConsoleCommands
             : "[ATD] Cursor overlay OFF.";
     }
 
-    [ConsoleCommand(false, false, "Toggles the fading terrain-dot overlay for nodes explored by the sliced experimental access search. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
+    [ConsoleCommand(false, false, "Toggles the fading explored-node frontier. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
     private string atdAccessSearchOverlay(string value = "")
     {
         bool current = AutoDepthDesignation.ShowExperimentalAccessSearchOverlay;
@@ -390,8 +392,31 @@ public sealed class AtdConsoleCommands
         if (!parsed)
             AutoDepthDesignation.ClearExperimentalAccessSearchOverlay();
         return parsed
-            ? "[ATD] Experimental access search overlay ON."
+            ? "[ATD] Experimental access search overlay ON. Re-run accessway generation to populate it."
             : "[ATD] Experimental access search overlay OFF.";
+    }
+
+    [ConsoleCommand(false, false, "Toggles the persistent sparse P-field trace. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
+    private string atdAccessPotentialOverlay(string value = "")
+    {
+        bool current = AutoDepthDesignation
+            .ShowExperimentalAccessPotentialOverlay;
+        if (!TryParseConsoleBool(value, out bool parsed))
+            parsed = !current;
+        AutoDepthDesignation.ShowExperimentalAccessPotentialOverlay = parsed;
+        if (!parsed)
+            AutoDepthDesignation
+                .ClearExperimentalAccessPotentialOverlay();
+        return parsed
+            ? "[ATD] Experimental access P-field overlay ON. Re-run accessway generation to populate it."
+            : "[ATD] Experimental access P-field overlay OFF.";
+    }
+
+    [ConsoleCommand(false, false, "Clears all stored ATD diagnostic overlays without changing which overlays are enabled.", null)]
+    private string atdClearDiagnosticOverlays()
+    {
+        AutoDepthDesignation.ClearDiagnosticOverlays();
+        return "[ATD] Diagnostic overlays cleared.";
     }
 
     [ConsoleCommand(false, false, "Toggles a persistent V2 Mega-handoff overlay for the latest access search: red = locally pathable but disconnected from the tower, green = tower-reachable, cyan = selected route. Session-only.", null)]

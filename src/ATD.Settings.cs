@@ -59,6 +59,7 @@ namespace AutoTerrainDesignations
             AtdDiagnostics.ResetToBuildDefault();
             ShowCursorOverlay = false;
             ShowExperimentalAccessSearchOverlay = false;
+            ShowExperimentalAccessPotentialOverlay = false;
             ShowAccessClusterOverlay = false;
             ResetWorldPathfinderSettingsToDefaults();
             s_batchSize = BATCH_SIZE;
@@ -511,13 +512,49 @@ namespace AutoTerrainDesignations
                         false))
                     ShowCursorOverlay = cursorOverlayEnabled.Value;
 
-                bool? experimentalAccessSearchOverlayEnabled = ParseBool(json, "experimentalAccessSearchOverlayEnabled");
-                if (experimentalAccessSearchOverlayEnabled.HasValue
-                    && ShouldPreserveBool(
-                        experimentalAccessSearchOverlayEnabled.Value,
-                        migrateGeneratedDefaults,
-                        false))
-                    ShowExperimentalAccessSearchOverlay = experimentalAccessSearchOverlayEnabled.Value;
+                bool? experimentalAccessSearchOverlayEnabled = ParseBool(
+                    json, "experimentalAccessSearchOverlayEnabled");
+                if (experimentalAccessSearchOverlayEnabled.HasValue)
+                {
+                    if (ShouldPreserveBool(
+                            experimentalAccessSearchOverlayEnabled.Value,
+                            migrateGeneratedDefaults,
+                            false))
+                        ShowExperimentalAccessSearchOverlay =
+                            experimentalAccessSearchOverlayEnabled.Value;
+                }
+                else
+                {
+                    // Compatibility with the short-lived integer-duration
+                    // experiment: any positive duration keeps the overlay on.
+                    int? legacyOverlaySeconds = ParseInt(
+                        json, "experimentalAccessSearchOverlaySeconds");
+                    if (legacyOverlaySeconds > 0)
+                        ShowExperimentalAccessSearchOverlay = true;
+                }
+
+                bool? experimentalAccessPotentialOverlayEnabled = ParseBool(
+                    json, "experimentalAccessPotentialOverlayEnabled");
+                if (experimentalAccessPotentialOverlayEnabled.HasValue)
+                {
+                    if (ShouldPreserveBool(
+                            experimentalAccessPotentialOverlayEnabled.Value,
+                            migrateGeneratedDefaults,
+                            false))
+                        ShowExperimentalAccessPotentialOverlay =
+                            experimentalAccessPotentialOverlayEnabled.Value;
+                }
+                else
+                {
+                    // The immediately preceding combined overlay setting
+                    // displayed both traces. Preserve that behavior once,
+                    // then emit the independent key on save.
+                    int? legacyOverlaySeconds = ParseInt(
+                        json, "experimentalAccessSearchOverlaySeconds");
+                    ShowExperimentalAccessPotentialOverlay =
+                        experimentalAccessSearchOverlayEnabled == true
+                            || legacyOverlaySeconds > 0;
+                }
 
                 bool? accessClusterOverlayEnabled = ParseBool(
                     json, "accessClusterOverlayEnabled");
@@ -990,8 +1027,11 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_cursorOverlayEnabled\": \"Whether to show the bottom-left terrain cursor coordinates at game start. Coordinates are displayed as (x, y, z). The atd_cursor_overlay console command can still override this for the current session. Default: false.\",");
             sb.AppendLine($"  \"cursorOverlayEnabled\": {BoolToJsonStr(ShowCursorOverlay)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to draw fading yellow dots on the terrain for nodes explored by the sliced experimental access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
+            sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to show the fading explored-node frontier for the experimental access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
             sb.AppendLine($"  \"experimentalAccessSearchOverlayEnabled\": {BoolToJsonStr(ShowExperimentalAccessSearchOverlay)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_experimentalAccessPotentialOverlayEnabled\": \"Whether to show the persistent sparse P-field trace for V2 A*. The trace remains until replaced by a later search or cleared with the designation Clear button or atd_clear_diagnostic_overlays. Debug-only and default: false. The atd_access_potential_overlay console command can still override this for the current session.\",");
+            sb.AppendLine($"  \"experimentalAccessPotentialOverlayEnabled\": {BoolToJsonStr(ShowExperimentalAccessPotentialOverlay)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessClusterOverlayEnabled\": \"Whether to show access-cluster identity, state, origin count, arithmetic center, and tied center roots at game start. Default: false. The atd_access_cluster_overlay console command can still override this for the current session.\",");
             sb.AppendLine($"  \"accessClusterOverlayEnabled\": {BoolToJsonStr(ShowAccessClusterOverlay)},");
@@ -1002,7 +1042,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, experimental narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search fails. The game may show its normal outside-area alarm. Default: true.\",");
+            sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, experimental narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search exhausts its available routes. Timeouts and other interrupted searches do not retry. The game may show its normal outside-area alarm. Default: true.\",");
             sb.AppendLine($"  \"allowRampsOutsideTowerAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways and Mining Designations mark trees in their disturbance zones for harvest; when disabled, ATD creates no tree harvest orders. Default: true.\",");

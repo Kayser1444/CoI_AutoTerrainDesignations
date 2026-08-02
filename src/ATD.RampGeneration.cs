@@ -731,7 +731,7 @@ namespace AutoTerrainDesignations
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.Result!;
 
-                        if (!experimentalResult.Success
+                        if (experimentalResult.SearchSpaceExhausted
                             && AllowRampsOutsideTowerAreas)
                         {
                             string inAreaFailure =
@@ -777,6 +777,15 @@ namespace AutoTerrainDesignations
                                     $"width={request.RequiredWidth} " +
                                     $"snapshotFailed={outsideSnapshotFailure}");
                             }
+                        }
+                        else if (!experimentalResult.Success
+                            && AllowRampsOutsideTowerAreas)
+                        {
+                            LogExperimentalAccessDebug(
+                                $"[ATD Outside-Area Fallback] cluster={cluster.ClusterId} " +
+                                $"width={request.RequiredWidth} phase=skip " +
+                                $"reason={experimentalResult.FailureReason} " +
+                                "searchSpaceExhausted=false");
                         }
                         experimentalPlan = LastExperimentalAccessPlan;
                         Dictionary<Tile2i, string> designationStateAfterSearch =

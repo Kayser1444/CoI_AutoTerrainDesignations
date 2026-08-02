@@ -129,6 +129,8 @@ namespace AutoTerrainDesignations
         {
             public readonly HashSet<Tile2i> CutTiles = new HashSet<Tile2i>();
             public readonly HashSet<Tile2i> FillTiles = new HashSet<Tile2i>();
+            public readonly HashSet<Tile2i> CutSafetyTiles = new HashSet<Tile2i>();
+            public readonly HashSet<Tile2i> FillSafetyTiles = new HashSet<Tile2i>();
             public readonly Dictionary<Tile2i, float> CutSupportCeilings =
                 new Dictionary<Tile2i, float>();
             public readonly Dictionary<Tile2i, float> FillSurfaceFloors =
@@ -137,23 +139,56 @@ namespace AutoTerrainDesignations
                 new Dictionary<Tile2i, HashSet<Tile2i>>();
             public readonly Dictionary<Tile2i, HashSet<Tile2i>> FillSourcesByTile =
                 new Dictionary<Tile2i, HashSet<Tile2i>>();
+            public readonly Dictionary<Tile2i, HashSet<Tile2i>> CutSafetySourcesByTile =
+                new Dictionary<Tile2i, HashSet<Tile2i>>();
+            public readonly Dictionary<Tile2i, HashSet<Tile2i>> FillSafetySourcesByTile =
+                new Dictionary<Tile2i, HashSet<Tile2i>>();
             public int Count => CutTiles.Union(FillTiles).Count();
+            public int CutWorkCount => CutSupportCeilings.Count;
+            public int FillWorkCount => FillSurfaceFloors.Count;
+            public int CutSafetyCount => CutSafetyTiles.Count;
+            public int FillSafetyCount => FillSafetyTiles.Count;
             public bool Contains(Tile2i tile)
                 => CutTiles.Contains(tile) || FillTiles.Contains(tile);
+            public bool TryGetWorkHeight(
+                AccessSideRayOperation operation,
+                Tile2i tile,
+                out float height)
+            {
+                if (operation == AccessSideRayOperation.Cut)
+                    return CutSupportCeilings.TryGetValue(tile, out height);
+                if (operation == AccessSideRayOperation.Fill)
+                    return FillSurfaceFloors.TryGetValue(tile, out height);
+                height = 0f;
+                return false;
+            }
             public void Add(
                 AccessSideRayOperation operation,
                 Tile2i tile,
-                Tile2i sourceOrigin)
+                Tile2i sourceOrigin,
+                bool isSafetyOnly)
             {
                 if (operation == AccessSideRayOperation.Cut)
                 {
                     CutTiles.Add(tile);
                     AddSource(CutSourcesByTile, tile, sourceOrigin);
+                    if (isSafetyOnly)
+                    {
+                        CutSafetyTiles.Add(tile);
+                        AddSource(
+                            CutSafetySourcesByTile, tile, sourceOrigin);
+                    }
                 }
                 else if (operation == AccessSideRayOperation.Fill)
                 {
                     FillTiles.Add(tile);
                     AddSource(FillSourcesByTile, tile, sourceOrigin);
+                    if (isSafetyOnly)
+                    {
+                        FillSafetyTiles.Add(tile);
+                        AddSource(
+                            FillSafetySourcesByTile, tile, sourceOrigin);
+                    }
                 }
 
                 static void AddSource(
@@ -759,6 +794,10 @@ namespace AutoTerrainDesignations
                 projectedFillSurfaceFloors: projectedDesignationDisturbance.FillSurfaceFloors,
                 projectedCutSourcesByTile: projectedDesignationDisturbance.CutSourcesByTile,
                 projectedFillSourcesByTile: projectedDesignationDisturbance.FillSourcesByTile,
+                projectedCutSafetyTiles: projectedDesignationDisturbance.CutSafetyTiles,
+                projectedFillSafetyTiles: projectedDesignationDisturbance.FillSafetyTiles,
+                projectedCutSafetySourcesByTile: projectedDesignationDisturbance.CutSafetySourcesByTile,
+                projectedFillSafetySourcesByTile: projectedDesignationDisturbance.FillSafetySourcesByTile,
                 vehicleClearanceRadius: vehicleDisturbanceRadius,
                 avoidOcean: AccessAvoidOcean,
                 avoidBuildings: AccessAvoidBuildings,
@@ -808,7 +847,11 @@ namespace AutoTerrainDesignations
                 $"avoidOcean={snapshot.AvoidOcean} avoidBuildings={snapshot.AvoidBuildings} " +
                 $"materialSlopeSource={materialSlopeDiagnostic} " +
                 $"landslideSources={snapshot.LandslideSourceCount} " +
-                $"projectedDesignationBlockedTiles={projectedDesignationDisturbance.Count} " +
+                $"projectedDesignation=[blocked:{projectedDesignationDisturbance.Count}," +
+                $"cutWork:{projectedDesignationDisturbance.CutWorkCount}," +
+                $"fillWork:{projectedDesignationDisturbance.FillWorkCount}," +
+                $"cutSafety:{projectedDesignationDisturbance.CutSafetyCount}," +
+                $"fillSafety:{projectedDesignationDisturbance.FillSafetyCount}] " +
                 $"pathParams={pathParamsSource}");
             LogAccessPropCleanupDiagnostics(cleanupDiagnostics);
             return true;
@@ -1447,10 +1490,16 @@ namespace AutoTerrainDesignations
             Stopwatch createSessionTimer = Stopwatch.StartNew();
             var session = AccessPathSearch.CreateSession(request);
             createSessionTimer.Stop();
-            if (ShowExperimentalAccessSearchOverlay)
+            if (ShowExperimentalAccessSearchOverlay
+                || ShowExperimentalAccessPotentialOverlay)
             {
                 BeginExperimentalAccessSearchOverlay();
-                session.NodeExplored = RecordExperimentalAccessSearchNode;
+                if (ShowExperimentalAccessPotentialOverlay)
+                    RecordExperimentalAccessPotential(
+                        session.V2PotentialSamples);
+                if (ShowExperimentalAccessSearchOverlay)
+                    session.NodeExplored =
+                        RecordExperimentalAccessSearchNode;
             }
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
@@ -1641,8 +1690,21 @@ namespace AutoTerrainDesignations
                 {
                     diagnostics +=
                     $" v2Expand=[G:{diag.V2GroundExpansions},V:{diag.V2BandExpansions}] " +
+                    $"v2Potential=[generated:{diag.V2PotentialGeneratedNodes},fixed:{diag.V2PotentialFixedNodes}," +
+                    $"escapeComponents:{diag.V2PotentialGroundComponents},buildMs:{(diag.V2PotentialBuildTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}] " +
                     $"v2StartTiers=[attempted:{diag.V2StartTiersAttempted},redundantSkipped:{diag.V2RedundantStartTiersSkipped},seedsSkipped:{diag.V2RedundantStartSeedsSkipped}] " +
                     $"v2LabelDominance=[early:{diag.V2EarlyLabelDominancePrunes},exact:{diag.V2ExactLabelDominancePrunes}] " +
+                    $"[DEBUG-v2-frontier] v2ExpansionLabels=[first:{diag.V2LabelFirstExpansions},reopen:{diag.V2LabelReexpansions}," +
+                    $"queueAgeAvg:{(diag.V2LabelFirstExpansions + diag.V2LabelReexpansions > 0 ? (double)diag.V2ExpansionQueueAgeTotal / (diag.V2LabelFirstExpansions + diag.V2LabelReexpansions) : 0d).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                    $"queueAgeMax:{diag.V2ExpansionQueueAgeMax},uniqueVCenters:{diag.V2UniqueExpansionCenters},centerAliases:{diag.V2CenterAliasedFirstExpansions}," +
+                    $"initialV:{diag.V2InitialVExpansions},groundRelaunchedV:{diag.V2GroundRelaunchedVExpansions}] " +
+                    $"[DEBUG-v2-frontier] v2ShallowV=[expanded:{diag.V2ShallowVExpansions},reopen:{diag.V2ShallowVReexpansions}," +
+                    $"groundRelaunched:{diag.V2ShallowGroundRelaunchedVExpansions}," +
+                    $"queueAgeAvg:{(diag.V2ShallowVExpansions > 0 ? (double)diag.V2ShallowVQueueAgeTotal / diag.V2ShallowVExpansions : 0d).ToString("0.##", CultureInfo.InvariantCulture)}," +
+                    $"queueAgeMax:{diag.V2ShallowVQueueAgeMax}] " +
+                    $"v2RayOverlay=[hit:{diag.V2RayOverlayCacheHits},miss:{diag.V2RayOverlayCacheMisses}," +
+                    $"parentSteps:{diag.V2RayOverlayParentSteps},cacheEntries:{diag.V2RayOverlayCacheEntries}," +
+                    $"maxRaw:{diag.V2RayOverlayMaxRawConstraints},maxCollapsed:{diag.V2RayOverlayMaxCollapsedEntries}] " +
                     $"v2Suffix=[attempts:{diag.V2GroundSuffixAttempts},success:{diag.V2GroundSuffixSuccesses}," +
                     $"fallback:{diag.V2GroundSuffixFallbacks},steps:{diag.V2GroundSuffixSteps}] " +
                     $"v2G2V=[calls:{diag.V2GroundToVCalls},areaReject:{diag.V2GroundToVTowerAreaRejects},seeds:{diag.V2GroundToVSeedCalls}," +
@@ -4275,6 +4337,21 @@ namespace AutoTerrainDesignations
                             corner.X + direction.X * distance,
                             corner.Y + direction.Y * distance);
                         float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
+                        // Immutable FV rays share the same projected-ground
+                        // semantics as generated rays. An equal or stronger
+                        // same-sort surface resolves this ray; a deeper cut or
+                        // higher fill continues from that projected surface.
+                        if (result.TryGetWorkHeight(
+                                operation, tile,
+                                out float projectedGroundHeight))
+                            sampledHeight = operation
+                                == AccessSideRayOperation.Cut
+                                    ? Math.Min(
+                                        sampledHeight,
+                                        projectedGroundHeight)
+                                    : Math.Max(
+                                        sampledHeight,
+                                        projectedGroundHeight);
                         float rayHeight = operation == AccessSideRayOperation.Fill
                             ? plannedHeight - distance * materialSlope
                             : plannedHeight + distance * materialSlope;
@@ -4285,9 +4362,23 @@ namespace AutoTerrainDesignations
                         bool hasReachedDryCutHeight =
                             operation != AccessSideRayOperation.Cut
                             || rayHeight >= 1f;
+                        if (gap > 0f)
+                            AddProjected(operation, tile, rayHeight);
+                        else if (!hasReachedDryCutHeight)
+                            AddSafety(operation, tile);
                         if (hasPassedTerrain && hasReachedDryCutHeight)
                         {
-                            MarkThrough(distance + postTerminationSafetyMargin);
+                            int safetyEnd = Math.Min(
+                                physicalDistance,
+                                distance + postTerminationSafetyMargin);
+                            for (int safetyDistance = distance;
+                                safetyDistance <= safetyEnd;
+                                safetyDistance++)
+                                AddSafety(
+                                    operation,
+                                    new Tile2i(
+                                        corner.X + direction.X * safetyDistance,
+                                        corner.Y + direction.Y * safetyDistance));
                             return true;
                         }
                     }
@@ -4299,20 +4390,6 @@ namespace AutoTerrainDesignations
                         + "," + direction.Y.ToString(CultureInfo.InvariantCulture) + ")";
                     return false;
 
-                    void MarkThrough(int maxDistance)
-                    {
-                        maxDistance = Math.Min(maxDistance, physicalDistance);
-                        for (int distance = 1; distance <= maxDistance; distance++)
-                        {
-                            Tile2i disturbed = new Tile2i(
-                                corner.X + direction.X * distance,
-                                corner.Y + direction.Y * distance);
-                            float projectedHeight = operation == AccessSideRayOperation.Fill
-                                ? plannedHeight - distance * materialSlope
-                                : plannedHeight + distance * materialSlope;
-                            AddProjected(operation, disturbed, projectedHeight);
-                        }
-                    }
                 }
 
                 void TraceOutsideCorner(
@@ -4420,7 +4497,31 @@ namespace AutoTerrainDesignations
                         || tile.Y < relevantTerrainMin.Y - vehicleDisturbanceRadius
                         || tile.Y > relevantTerrainMax.Y + vehicleDisturbanceRadius)
                         return;
-                    result.AddHeight(operation, tile, projectedHeight);
+                    AddDisturbance(
+                        operation, tile,
+                        isSafetyOnly: false,
+                        projectedHeight);
+                }
+
+                void AddSafety(
+                    AccessSideRayOperation operation, Tile2i tile)
+                {
+                    if (tile.X < relevantTerrainMin.X - vehicleDisturbanceRadius
+                        || tile.X > relevantTerrainMax.X + vehicleDisturbanceRadius
+                        || tile.Y < relevantTerrainMin.Y - vehicleDisturbanceRadius
+                        || tile.Y > relevantTerrainMax.Y + vehicleDisturbanceRadius)
+                        return;
+                    AddDisturbance(
+                        operation, tile,
+                        isSafetyOnly: true,
+                        projectedHeight: 0f);
+                }
+
+                void AddDisturbance(
+                    AccessSideRayOperation operation, Tile2i tile,
+                    bool isSafetyOnly,
+                    float projectedHeight)
+                {
                     for (int dy = -vehicleDisturbanceRadius; dy <= vehicleDisturbanceRadius; dy++)
                     {
                         for (int dx = -vehicleDisturbanceRadius; dx <= vehicleDisturbanceRadius; dx++)
@@ -4430,7 +4531,15 @@ namespace AutoTerrainDesignations
                                 && blocked.X <= relevantTerrainMax.X
                                 && blocked.Y >= relevantTerrainMin.Y
                                 && blocked.Y <= relevantTerrainMax.Y)
-                                result.Add(operation, blocked, origin);
+                            {
+                                if (!isSafetyOnly)
+                                    result.AddHeight(
+                                        operation, blocked,
+                                        projectedHeight);
+                                result.Add(
+                                    operation, blocked, origin,
+                                    isSafetyOnly);
+                            }
                         }
                     }
                 }

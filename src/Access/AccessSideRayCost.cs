@@ -84,6 +84,10 @@ namespace AutoTerrainDesignations.Access
 
     internal readonly struct AccessSideRayResult
     {
+        private readonly ulong m_workMaskLow;
+        private readonly ulong m_workMaskHigh;
+        private readonly ulong m_safetyMaskLow;
+        private readonly ulong m_safetyMaskHigh;
         public float IntegratedCost { get; }
         public float UnresolvedPenalty { get; }
         public int SampleCount { get; }
@@ -93,6 +97,10 @@ namespace AutoTerrainDesignations.Access
         public int DisturbedDistance { get; }
         public float TotalCost => IntegratedCost + UnresolvedPenalty;
         public bool IsFatal => !string.IsNullOrEmpty(FatalReason);
+        public bool IsWorkDistance(int distance)
+            => HasDistance(m_workMaskLow, m_workMaskHigh, distance);
+        public bool IsSafetyOnlyDistance(int distance)
+            => HasDistance(m_safetyMaskLow, m_safetyMaskHigh, distance);
 
         public AccessSideRayResult(
             float integratedCost,
@@ -101,7 +109,11 @@ namespace AutoTerrainDesignations.Access
             bool isUnresolved,
             bool reachedCostCap,
             string? fatalReason = null,
-            int disturbedDistance = 0)
+            int disturbedDistance = 0,
+            ulong workMaskLow = 0,
+            ulong workMaskHigh = 0,
+            ulong safetyMaskLow = 0,
+            ulong safetyMaskHigh = 0)
         {
             IntegratedCost = integratedCost;
             UnresolvedPenalty = unresolvedPenalty;
@@ -110,6 +122,20 @@ namespace AutoTerrainDesignations.Access
             ReachedCostCap = reachedCostCap;
             FatalReason = fatalReason;
             DisturbedDistance = disturbedDistance;
+            m_workMaskLow = workMaskLow;
+            m_workMaskHigh = workMaskHigh;
+            m_safetyMaskLow = safetyMaskLow;
+            m_safetyMaskHigh = safetyMaskHigh;
+        }
+
+        private static bool HasDistance(
+            ulong low, ulong high, int distance)
+        {
+            if (distance < 1 || distance > 128) return false;
+            int bit = distance - 1;
+            return bit < 64
+                ? (low & (1UL << bit)) != 0
+                : (high & (1UL << (bit - 64))) != 0;
         }
     }
 
@@ -134,15 +160,40 @@ namespace AutoTerrainDesignations.Access
             int? maxTraceDistance = null,
             Tile2i? exemptDesignationOrigin = null,
             Func<Tile2i, AccessSideRayOperation, bool>?
-                terminatesAtSameOperationRay = null)
+                terminatesAtSameOperationRay = null,
+            Func<Tile2i, AccessSideRayOperation, AccessProjectedTerrainEffect>?
+                projectedTerrainAt = null,
+            Func<Tile2i, string?>? additionalBlockerAt = null)
             => Score(
                 tile =>
                 {
                     AccessTerrainSampleKind kind =
                         snapshot.GetSideRayTerrainSample(tile, out float height);
+                    AccessProjectedTerrainEffect projected =
+                        snapshot.GetProjectedDesignationEffect(
+                            tile, exemptDesignationOrigin);
+                    if (projectedTerrainAt != null)
+                        projected.Merge(projectedTerrainAt(tile, operation));
+                    if (operation == AccessSideRayOperation.Cut
+                        && projected.HasCutWork)
+                        height = Math.Min(height, projected.CutCeiling);
+                    else if (operation == AccessSideRayOperation.Fill
+                        && projected.HasFillWork)
+                        height = Math.Max(height, projected.FillFloor);
+                    string? blockerReason = snapshot.GetSideRayBlockerReason(
+                        tile, operation, exemptDesignationOrigin);
+                    if (string.IsNullOrEmpty(blockerReason))
+                        blockerReason = additionalBlockerAt?.Invoke(tile);
+                    if (string.IsNullOrEmpty(blockerReason)
+                        && ((operation == AccessSideRayOperation.Cut
+                                && (projected.HasFillWork
+                                    || projected.HasFillSafety))
+                            || (operation == AccessSideRayOperation.Fill
+                                && (projected.HasCutWork
+                                    || projected.HasCutSafety))))
+                        blockerReason = "SideRayOpposingProjectedWork";
                     return new AccessSideRayTerrainSample(
-                        kind, height, snapshot.GetSideRayBlockerReason(
-                            tile, operation, exemptDesignationOrigin),
+                        kind, height, blockerReason,
                         terminatesSameOperationRay:
                             terminatesAtSameOperationRay?.Invoke(
                                 tile, operation) == true);
@@ -186,6 +237,10 @@ namespace AutoTerrainDesignations.Access
             int previousDistance = 0;
             int sampleCount = 0;
             int disturbedDistance = 0;
+            ulong workMaskLow = 0;
+            ulong workMaskHigh = 0;
+            ulong safetyMaskLow = 0;
+            ulong safetyMaskHigh = 0;
             int maxDistance = maxTraceDistance
                 ?? s_sampleDistances[s_sampleDistances.Length - 1];
             for (int distance = 1; distance <= maxDistance; distance++)
@@ -204,13 +259,11 @@ namespace AutoTerrainDesignations.Access
                         return Fatal("SideRayFillMapEdge", sampleCount, integratedCost);
                     return new AccessSideRayResult(
                         integratedCost, 0f, sampleCount, false, false,
-                        disturbedDistance: disturbedDistance);
-                }
-                if (sample.TerminatesSameOperationRay)
-                {
-                    return new AccessSideRayResult(
-                        integratedCost, 0f, sampleCount, false, false,
-                        disturbedDistance: Math.Max(0, distance - 1));
+                        disturbedDistance: disturbedDistance,
+                        workMaskLow: workMaskLow,
+                        workMaskHigh: workMaskHigh,
+                        safetyMaskLow: safetyMaskLow,
+                        safetyMaskHigh: safetyMaskHigh);
                 }
                 float rayHeight = operation == AccessSideRayOperation.Fill
                     ? plannedCornerHeight - distance * materialSlope
@@ -218,12 +271,15 @@ namespace AutoTerrainDesignations.Access
                 float gap = operation == AccessSideRayOperation.Fill
                     ? rayHeight - sample.TerrainHeight
                     : sample.TerrainHeight - rayHeight;
-                bool hasPassedTerrain = gap <= 0f;
+                bool hasPassedTerrain = gap <= 0f
+                    || sample.TerminatesSameOperationRay;
                 bool hasReachedDryCutHeight =
                     operation != AccessSideRayOperation.Cut
                     || rayHeight >= MinimumDryOceanHeight;
                 if (hasPassedTerrain && hasReachedDryCutHeight)
                 {
+                    MarkDistance(
+                        ref safetyMaskLow, ref safetyMaskHigh, distance);
                     disturbedDistance = Math.Min(
                         maxDistance,
                         distance + postTerminationSafetyMargin);
@@ -236,6 +292,9 @@ namespace AutoTerrainDesignations.Access
                             corner.Y + lateralDirection.Y * safetyDistance);
                         AccessSideRayTerrainSample safetySample = sampleTerrain(safetyTile);
                         sampleCount++;
+                        MarkDistance(
+                            ref safetyMaskLow, ref safetyMaskHigh,
+                            safetyDistance);
                         if (safetySample.Kind == AccessTerrainSampleKind.MissingSnapshot)
                             return Fatal("SideRaySnapshotMissing", sampleCount, integratedCost);
                         if (safetySample.Kind == AccessTerrainSampleKind.PhysicalMapEdge)
@@ -262,7 +321,11 @@ namespace AutoTerrainDesignations.Access
                     }
                     return new AccessSideRayResult(
                         integratedCost, 0f, sampleCount, false, false,
-                        disturbedDistance: disturbedDistance);
+                        disturbedDistance: disturbedDistance,
+                        workMaskLow: workMaskLow,
+                        workMaskHigh: workMaskHigh,
+                        safetyMaskLow: safetyMaskLow,
+                        safetyMaskHigh: safetyMaskHigh);
                 }
                 if (avoidOcean
                     && operation == AccessSideRayOperation.Cut
@@ -278,9 +341,13 @@ namespace AutoTerrainDesignations.Access
                 // not additional excavation cost.
                 if (hasPassedTerrain)
                 {
+                    MarkDistance(
+                        ref safetyMaskLow, ref safetyMaskHigh, distance);
                     disturbedDistance = distance;
                     continue;
                 }
+
+                MarkDistance(ref workMaskLow, ref workMaskHigh, distance);
 
                 // Feasibility is dense: an ocean, building, designation, or
                 // terrain intersection at a skipped Fibonacci distance must
@@ -301,7 +368,11 @@ namespace AutoTerrainDesignations.Access
                 if (integratedCost >= maxRayCost)
                     return new AccessSideRayResult(
                         maxRayCost, 0f, sampleCount, true, true,
-                        disturbedDistance: disturbedDistance);
+                        disturbedDistance: disturbedDistance,
+                        workMaskLow: workMaskLow,
+                        workMaskHigh: workMaskHigh,
+                        safetyMaskLow: safetyMaskLow,
+                        safetyMaskHigh: safetyMaskHigh);
                 previousDistance = distance;
             }
 
@@ -314,7 +385,22 @@ namespace AutoTerrainDesignations.Access
                 sampleCount,
                 true,
                 integratedCost + appliedPenalty >= maxRayCost,
-                disturbedDistance: disturbedDistance);
+                disturbedDistance: disturbedDistance,
+                workMaskLow: workMaskLow,
+                workMaskHigh: workMaskHigh,
+                safetyMaskLow: safetyMaskLow,
+                safetyMaskHigh: safetyMaskHigh);
+        }
+
+        private static void MarkDistance(
+            ref ulong low, ref ulong high, int distance)
+        {
+            if (distance < 1 || distance > 128) return;
+            int bit = distance - 1;
+            if (bit < 64)
+                low |= 1UL << bit;
+            else
+                high |= 1UL << (bit - 64);
         }
 
         private static bool IsCostSampleDistance(int distance)

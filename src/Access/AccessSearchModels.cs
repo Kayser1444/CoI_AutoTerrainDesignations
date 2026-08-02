@@ -303,6 +303,8 @@ namespace AutoTerrainDesignations.Access
         private readonly Dictionary<Tile2i, AccessTerrainColumn> m_terrainColumns;
         private readonly Dictionary<Tile2i, int> m_terrainCenterHeight2;
         private readonly Dictionary<Tile2i, AccessHeightProfile> m_fixedProfiles;
+        private readonly Dictionary<Tile2i, int>
+            m_fixedProfileComponentByOrigin;
         private readonly HashSet<Tile2i> m_generatedVPrimeOrigins;
         private readonly HashSet<Tile2i> m_workOrigins;
         private readonly HashSet<Tile2i> m_groundNodes;
@@ -319,6 +321,14 @@ namespace AutoTerrainDesignations.Access
         private readonly Dictionary<Tile2i, HashSet<Tile2i>> m_projectedFillSourcesByTile;
         private readonly Dictionary<Tile2i, float> m_projectedCutSupportCeilings;
         private readonly Dictionary<Tile2i, float> m_projectedFillSurfaceFloors;
+        private readonly HashSet<Tile2i> m_projectedCutSafetyTiles;
+        private readonly HashSet<Tile2i> m_projectedFillSafetyTiles;
+        private readonly Dictionary<Tile2i, HashSet<Tile2i>>
+            m_projectedCutSafetySourcesByTile;
+        private readonly Dictionary<Tile2i, HashSet<Tile2i>>
+            m_projectedFillSafetySourcesByTile;
+        private readonly bool m_hasProjectedCutSafetyClassification;
+        private readonly bool m_hasProjectedFillSafetyClassification;
         private readonly HashSet<Tile2i> m_hardDesignationRayBlockers;
         private readonly HashSet<Tile2i> m_oceanTiles;
         private readonly Dictionary<Tile2i, AccessPropCleanupInfo> m_propCleanupByOrigin;
@@ -443,7 +453,13 @@ namespace AutoTerrainDesignations.Access
                 IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffSpans = null,
             float vehicleMaxSteepnessDelta = 0.5f,
             AccessUsefulHeightEnvelope? usefulHeightEnvelope = null,
-            IEnumerable<Tile2i>? terrainPathableWithoutBlockers = null)
+            IEnumerable<Tile2i>? terrainPathableWithoutBlockers = null,
+            IEnumerable<Tile2i>? projectedCutSafetyTiles = null,
+            IEnumerable<Tile2i>? projectedFillSafetyTiles = null,
+            IDictionary<Tile2i, HashSet<Tile2i>>?
+                projectedCutSafetySourcesByTile = null,
+            IDictionary<Tile2i, HashSet<Tile2i>>?
+                projectedFillSafetySourcesByTile = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -476,6 +492,8 @@ namespace AutoTerrainDesignations.Access
             HasDumpingMaterial = hasDumpingMaterial;
             m_terrainCenterHeight2 = new Dictionary<Tile2i, int>(terrainCenterHeight2);
             m_fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>(fixedProfiles);
+            m_fixedProfileComponentByOrigin =
+                BuildFixedProfileComponents(m_fixedProfiles);
             m_workOrigins = new HashSet<Tile2i>(workOrigins);
             m_groundNodes = new HashSet<Tile2i>(groundNodes);
             m_goalGroundNodes = new HashSet<Tile2i>(goalGroundNodes);
@@ -507,6 +525,20 @@ namespace AutoTerrainDesignations.Access
                 : new HashSet<Tile2i>();
             m_projectedCutSourcesByTile = CopySourceMap(projectedCutSourcesByTile);
             m_projectedFillSourcesByTile = CopySourceMap(projectedFillSourcesByTile);
+            m_hasProjectedCutSafetyClassification =
+                projectedCutSafetyTiles != null;
+            m_hasProjectedFillSafetyClassification =
+                projectedFillSafetyTiles != null;
+            m_projectedCutSafetyTiles = projectedCutSafetyTiles != null
+                ? new HashSet<Tile2i>(projectedCutSafetyTiles)
+                : new HashSet<Tile2i>();
+            m_projectedFillSafetyTiles = projectedFillSafetyTiles != null
+                ? new HashSet<Tile2i>(projectedFillSafetyTiles)
+                : new HashSet<Tile2i>();
+            m_projectedCutSafetySourcesByTile =
+                CopySourceMap(projectedCutSafetySourcesByTile);
+            m_projectedFillSafetySourcesByTile =
+                CopySourceMap(projectedFillSafetySourcesByTile);
             m_oceanTiles = new HashSet<Tile2i>(oceanTiles);
             m_propCleanupByOrigin = propCleanupByOrigin != null
                 ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
@@ -652,6 +684,19 @@ namespace AutoTerrainDesignations.Access
         public bool IsGeneratedVPrimeOriginEligible(Tile2i origin)
             => IsGeneratedVOriginEligible(origin)
                 && m_generatedVPrimeOrigins.Contains(origin);
+
+        internal IEnumerable<Tile2i> V2PotentialGeneratedOrigins
+        {
+            get
+            {
+                foreach (Tile2i origin in m_validOrigins)
+                    if (IsGeneratedVOriginEligible(origin))
+                        yield return origin;
+            }
+        }
+
+        internal IEnumerable<Tile2i> V2PotentialVPrimeOrigins
+            => m_generatedVPrimeOrigins;
 
         public bool IsTileInside(Tile2i tile)
             => tile.X >= BoundsMin.X && tile.Y >= BoundsMin.Y
@@ -1747,29 +1792,185 @@ namespace AutoTerrainDesignations.Access
         public string? GetSideRayBlockerReason(
             Tile2i tile, AccessSideRayOperation rayOperation,
             Tile2i? exemptDesignationOrigin = null)
-            => AvoidBuildings && m_expandedBuildingRayBlockers.Contains(tile)
-                ? "SideRayBuilding"
-                : exemptDesignationOrigin.HasValue
-                    && IsDesignationFootprintTile(tile, exemptDesignationOrigin.Value)
-                    ? null
-                : m_hardDesignationRayBlockers.Contains(tile)
-                    ? "SideRayDesignation"
-                : rayOperation == AccessSideRayOperation.Cut
-                        ? m_fillDesignationRayBlockers.Contains(tile)
-                            || IsProjectedBlockerFromOtherSource(
-                                tile, exemptDesignationOrigin,
-                                m_projectedFillRayBlockers,
-                                m_projectedFillSourcesByTile)
-                            ? "SideRayOpposingDesignationWork"
-                            : null
-                        : rayOperation == AccessSideRayOperation.Fill
-                            && (m_cutDesignationRayBlockers.Contains(tile)
-                                || IsProjectedBlockerFromOtherSource(
-                                    tile, exemptDesignationOrigin,
-                                    m_projectedCutRayBlockers,
-                                    m_projectedCutSourcesByTile))
-                                ? "SideRayOpposingDesignationWork"
-                                : null;
+        {
+            if (AvoidBuildings && m_expandedBuildingRayBlockers.Contains(tile))
+                return "SideRayBuilding";
+            if (exemptDesignationOrigin.HasValue
+                && IsDesignationFootprintTile(
+                    tile, exemptDesignationOrigin.Value))
+                return null;
+            if (m_hardDesignationRayBlockers.Contains(tile))
+                return "SideRayDesignation";
+
+            AccessProjectedTerrainEffect projected =
+                GetProjectedDesignationEffect(
+                    tile, exemptDesignationOrigin);
+            if (rayOperation == AccessSideRayOperation.Cut
+                && (m_fillDesignationRayBlockers.Contains(tile)
+                    || projected.HasFillWork
+                    || projected.HasFillSafety))
+                return "SideRayOpposingDesignationWork";
+            if (rayOperation == AccessSideRayOperation.Fill
+                && (m_cutDesignationRayBlockers.Contains(tile)
+                    || projected.HasCutWork
+                    || projected.HasCutSafety))
+                return "SideRayOpposingDesignationWork";
+            return null;
+        }
+
+        public AccessProjectedTerrainEffect GetProjectedDesignationEffect(
+            Tile2i tile,
+            Tile2i? exemptSafetyOrigin = null)
+            => GetProjectedDesignationEffectCore(
+                tile,
+                exemptSafetyOrigin,
+                exemptSafetyOrigins: null);
+
+        public AccessProjectedTerrainEffect
+            GetProjectedDesignationEffectExcept(
+                Tile2i tile,
+                IReadOnlyCollection<Tile2i>? exemptSafetyOrigins)
+            => GetProjectedDesignationEffectCore(
+                tile,
+                exemptSafetyOrigin: null,
+                exemptSafetyOrigins);
+
+        private AccessProjectedTerrainEffect
+            GetProjectedDesignationEffectCore(
+                Tile2i tile,
+                Tile2i? exemptSafetyOrigin,
+                IReadOnlyCollection<Tile2i>? exemptSafetyOrigins)
+        {
+            var result = new AccessProjectedTerrainEffect();
+            if (m_projectedCutSupportCeilings.TryGetValue(
+                    tile, out float cutCeiling))
+            {
+                result.HasCutWork = true;
+                result.CutCeiling = cutCeiling;
+            }
+            if (m_projectedFillSurfaceFloors.TryGetValue(
+                    tile, out float fillFloor))
+            {
+                result.HasFillWork = true;
+                result.FillFloor = fillFloor;
+            }
+
+            // Source exemptions waive only the uncertain clearance span. The
+            // predecessor's projected work surface remains available for
+            // height validation and incremental work credit.
+            result.HasCutSafety = m_hasProjectedCutSafetyClassification
+                ? IsProjectedBlockerFromOtherSources(
+                    tile, exemptSafetyOrigin, exemptSafetyOrigins,
+                    m_projectedCutSafetyTiles,
+                    m_projectedCutSafetySourcesByTile)
+                : IsProjectedBlockerFromOtherSources(
+                        tile, exemptSafetyOrigin, exemptSafetyOrigins,
+                        m_projectedCutRayBlockers,
+                        m_projectedCutSourcesByTile)
+                    && !result.HasCutWork;
+            result.HasFillSafety = m_hasProjectedFillSafetyClassification
+                ? IsProjectedBlockerFromOtherSources(
+                    tile, exemptSafetyOrigin, exemptSafetyOrigins,
+                    m_projectedFillSafetyTiles,
+                    m_projectedFillSafetySourcesByTile)
+                : IsProjectedBlockerFromOtherSources(
+                        tile, exemptSafetyOrigin, exemptSafetyOrigins,
+                        m_projectedFillRayBlockers,
+                        m_projectedFillSourcesByTile)
+                    && !result.HasFillWork;
+            return result;
+        }
+
+        private bool IsProjectedBlockerFromOtherSources(
+            Tile2i tile,
+            Tile2i? exemptSafetyOrigin,
+            IReadOnlyCollection<Tile2i>? exemptSafetyOrigins,
+            ISet<Tile2i> projectedBlockers,
+            IReadOnlyDictionary<Tile2i, HashSet<Tile2i>> sourcesByTile)
+        {
+            if (!projectedBlockers.Contains(tile)) return false;
+            bool hasSingleExemption = exemptSafetyOrigin.HasValue;
+            bool hasMultipleExemptions = exemptSafetyOrigins != null
+                && exemptSafetyOrigins.Count > 0;
+            if (!hasSingleExemption && !hasMultipleExemptions)
+                return true;
+            if (!sourcesByTile.TryGetValue(tile, out HashSet<Tile2i> sources))
+                return true;
+            foreach (Tile2i source in sources)
+            {
+                if (hasSingleExemption
+                    && IsSameFixedSafetyComponent(
+                        source, exemptSafetyOrigin!.Value))
+                    continue;
+                if (hasMultipleExemptions
+                    && exemptSafetyOrigins!.Any(exempt =>
+                        IsSameFixedSafetyComponent(source, exempt)))
+                    continue;
+                return true;
+            }
+            return false;
+        }
+
+        private bool IsSameFixedSafetyComponent(
+            Tile2i source,
+            Tile2i exemptOrigin)
+        {
+            if (source == exemptOrigin)
+                return true;
+            return m_fixedProfileComponentByOrigin.TryGetValue(
+                    source, out int sourceComponent)
+                && m_fixedProfileComponentByOrigin.TryGetValue(
+                    exemptOrigin, out int exemptComponent)
+                && sourceComponent == exemptComponent;
+        }
+
+        private static Dictionary<Tile2i, int> BuildFixedProfileComponents(
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles)
+        {
+            var result = new Dictionary<Tile2i, int>();
+            var queue = new Queue<Tile2i>();
+            Tile2i[] directions =
+            {
+                new Tile2i(4, 0), new Tile2i(-4, 0),
+                new Tile2i(0, 4), new Tile2i(0, -4),
+            };
+            int component = 0;
+            foreach (Tile2i root in fixedProfiles.Keys)
+            {
+                if (result.ContainsKey(root))
+                    continue;
+                result.Add(root, component);
+                queue.Enqueue(root);
+                while (queue.Count > 0)
+                {
+                    Tile2i current = queue.Dequeue();
+                    AccessHeightProfile currentProfile =
+                        fixedProfiles[current];
+                    for (int directionIndex = 0;
+                        directionIndex < directions.Length;
+                        directionIndex++)
+                    {
+                        Tile2i direction = directions[directionIndex];
+                        Tile2i neighbor = new Tile2i(
+                            current.X + direction.X,
+                            current.Y + direction.Y);
+                        if (result.ContainsKey(neighbor)
+                            || !fixedProfiles.TryGetValue(
+                                neighbor,
+                                out AccessHeightProfile neighborProfile)
+                            || !AccessPathSearch.EdgesMatch(
+                                currentProfile,
+                                neighborProfile,
+                                direction))
+                            continue;
+                        result.Add(neighbor, component);
+                        queue.Enqueue(neighbor);
+                    }
+                }
+                component++;
+            }
+            return result;
+        }
 
         private static bool IsProjectedBlockerFromOtherSource(
             Tile2i tile,
@@ -2120,17 +2321,57 @@ namespace AutoTerrainDesignations.Access
         public AccessSideRayOperation Operation { get; }
         public float Height { get; }
         public Tile2i? OwnerOrigin { get; }
+        public bool IsSafetyOnly { get; }
 
         public AccessRayHeightConstraint(
             Tile2i tile,
             AccessSideRayOperation operation,
             float height,
-            Tile2i? ownerOrigin = null)
+            Tile2i? ownerOrigin = null,
+            bool isSafetyOnly = false)
         {
             Tile = tile;
             Operation = operation;
             Height = height;
             OwnerOrigin = ownerOrigin;
+            IsSafetyOnly = isSafetyOnly;
+        }
+    }
+
+    /// <summary>
+    /// Effective work and safety effects projected onto one terrain sample.
+    /// Work heights describe approximate post-work ground. Safety-only effects
+    /// deliberately carry no usable height.
+    /// </summary>
+    internal struct AccessProjectedTerrainEffect
+    {
+        public bool HasCutWork;
+        public float CutCeiling;
+        public bool HasFillWork;
+        public float FillFloor;
+        public bool HasCutSafety;
+        public bool HasFillSafety;
+
+        public bool HasAny => HasCutWork || HasFillWork
+            || HasCutSafety || HasFillSafety;
+        public bool HasAmbiguousWork => HasCutWork && HasFillWork;
+
+        public void Merge(AccessProjectedTerrainEffect other)
+        {
+            if (other.HasCutWork
+                && (!HasCutWork || other.CutCeiling < CutCeiling))
+            {
+                HasCutWork = true;
+                CutCeiling = other.CutCeiling;
+            }
+            if (other.HasFillWork
+                && (!HasFillWork || other.FillFloor > FillFloor))
+            {
+                HasFillWork = true;
+                FillFloor = other.FillFloor;
+            }
+            HasCutSafety |= other.HasCutSafety;
+            HasFillSafety |= other.HasFillSafety;
         }
     }
 
@@ -2156,6 +2397,19 @@ namespace AutoTerrainDesignations.Access
         public AccessReachedGoalKind ReachedGoalKind { get; }
         public AccessSearchDiagnostics Diagnostics { get; }
         public AccessV2RouteData? V2Route { get; }
+        /// <summary>
+        /// True only when the search completed with an empty frontier, including
+        /// when V2 could not seed a feasible start inside the current bounds.
+        /// Budget and user interruptions are inconclusive and must not drive a
+        /// policy retry over a larger domain.
+        /// </summary>
+        internal bool SearchSpaceExhausted
+            => !Success
+                && (string.Equals(
+                        FailureReason, "NoPath", StringComparison.Ordinal)
+                    || string.Equals(
+                        FailureReason, "V2NoFeasibleStart",
+                        StringComparison.Ordinal));
 
         public AccessSearchResult(bool success, string failureReason, Tile2i startOrigin,
             IReadOnlyList<AccessSearchNode> path, float cost, int visitedNodes,
@@ -2271,11 +2525,28 @@ namespace AutoTerrainDesignations.Access
         public long PropCleanupTicks;
         public int V2GroundExpansions;
         public int V2BandExpansions;
+        public int V2PotentialGeneratedNodes;
+        public int V2PotentialFixedNodes;
+        public int V2PotentialGroundComponents;
+        public long V2PotentialBuildTicks;
         public int V2StartTiersAttempted;
         public int V2RedundantStartTiersSkipped;
         public int V2RedundantStartSeedsSkipped;
         public int V2EarlyLabelDominancePrunes;
         public int V2ExactLabelDominancePrunes;
+        public int V2LabelFirstExpansions;
+        public int V2LabelReexpansions;
+        public long V2ExpansionQueueAgeTotal;
+        public int V2ExpansionQueueAgeMax;
+        public int V2UniqueExpansionCenters;
+        public int V2CenterAliasedFirstExpansions;
+        public int V2InitialVExpansions;
+        public int V2GroundRelaunchedVExpansions;
+        public int V2ShallowVExpansions;
+        public int V2ShallowVReexpansions;
+        public int V2ShallowGroundRelaunchedVExpansions;
+        public long V2ShallowVQueueAgeTotal;
+        public int V2ShallowVQueueAgeMax;
         public int V2GroundSuffixAttempts;
         public int V2GroundSuffixSuccesses;
         public int V2GroundSuffixFallbacks;
@@ -2305,6 +2576,12 @@ namespace AutoTerrainDesignations.Access
         public int V2CorridorAttempts;
         public int V2CorridorCenterChecks;
         public int V2CorridorBfsPops;
+        public long V2RayOverlayCacheHits;
+        public long V2RayOverlayCacheMisses;
+        public long V2RayOverlayParentSteps;
+        public long V2RayOverlayCacheEntries;
+        public int V2RayOverlayMaxRawConstraints;
+        public int V2RayOverlayMaxCollapsedEntries;
         public long V2GroundExpansionTicks;
         public long V2BandExpansionTicks;
         public long V2GroundSuffixTicks;

@@ -1,7 +1,12 @@
 # Sparse V-Type Route Potential
 
-Status: approved first implementation. The stronger component-conditioned
-commitment idea is explicitly deferred.
+Status: foundation implemented on 2026-08-01. The active V2 A* route field is
+now sparse over generated origins and reusable FV nodes, with paid-origin edge
+charging, goal-connected G/FV suffix seeds, catalogued V-prime/FV contacts,
+and lazy component-local G escape fields. Broader catalog/missing-coverage
+diagnostics and benchmark coverage remain follow-up work. The transformed
+component-ownership graph was added on 2026-08-02; its stronger numeric field
+remains follow-up work.
 
 Drafted: 2026-07-29
 
@@ -77,8 +82,9 @@ movement to canonical G-to-V launch positions. A seed adds the shared minimum
 center spoke and adds `F` only if its contact enters generated V rather than
 reusable FV.
 
-The field guides G labels only; it does not introduce ownership, alter exact
-feasibility, or restrict V-to-G returns. Cache it for the immutable request.
+The field guides G labels only. The later potential-owner foundation restricts
+only a dominated pre-commit return to the source G component; it does not
+change these component-local values. Cache it for the immutable request.
 Missing or ambiguous coverage returns zero and records one diagnostic per
 search.
 
@@ -107,9 +113,32 @@ projected-history changes, tied continuations, FV octagonal navigation,
 V-prime adapters, paid-current-origin indexing, V2 two-origin straights,
 missing catalog coverage, and exact A*/Dijkstra comparisons with `P` on/off.
 
+## Implemented foundation (2026-08-01)
+
+The dense canonical-center array has been removed from production search.
+`AccessV2PotentialField` now hides a sparse reverse graph behind the existing
+`GetPotential(V state)` lookup seam:
+
+* generated nodes are actual eligible 4x4 origins inside request bounds;
+* a lookup treats each origin already present in the band as paid and takes the
+  minimum continuation of its two lanes;
+* reverse generated propagation charges `4 + F` when the forward route enters
+  the next generated origin;
+* reusable FV nodes retain their exact axis-aware cardinal, diagonal, and
+  orientation-connector costs;
+* goal-connected generated contacts pay the shared minimum center spoke and
+  exact G suffix, while goal-connected FV seeds use the exact suffix directly;
+* catalogued V-prime origins form relaxed generated/FV contacts; and
+* disconnected G escape values are constructed and cached only when a label
+  first queries that static ground component.
+
+The field reports generated/FV node counts, lazy component builds, and build
+time in V2 diagnostics. Interface-level fixtures cover paid-origin costs,
+sparse zero coverage, FV suffixes, lazy component construction, and a nonzero
+sparse-P A*/Dijkstra route-and-cost equivalence case.
+
 ## Deferred refinement
 
 [Component-Conditioned V Commitment](accessway-pathfinding-component-conditioned-v-commitment.md)
-is deliberately separate. Do not add `PotentialOwner`, restrict V-to-G
-returns, or change the exact V2 state graph as part of the first `P`
-implementation.
+is deliberately separate. Its transformed ownership graph is now implemented;
+the stronger component-conditioned numeric lookup remains follow-up work.

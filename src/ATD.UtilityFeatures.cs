@@ -13,6 +13,7 @@ using Mafi;
 using Mafi.Core.Terrain;
 using UnityEngine;
 using AutoTerrainDesignations.Access;
+using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations;
 
@@ -22,6 +23,8 @@ partial class AutoDepthDesignation
     internal static bool ShowCursorOverlay;
     // Whether the experimental access search shows recently explored nodes.
     internal static bool ShowExperimentalAccessSearchOverlay;
+    // Whether the experimental access search shows its persistent P trace.
+    internal static bool ShowExperimentalAccessPotentialOverlay;
     // Whether the latest V2 handoff candidates show their captured Mega-ground
     // connectivity. This is a session-only diagnostic overlay.
     internal static bool ShowV2PathabilityOverlay;
@@ -33,8 +36,13 @@ partial class AutoDepthDesignation
     private const int MAX_ACCESS_SEARCH_OVERLAY_POINTS = 3000;
     private const float ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS = 3f;
     private const float ACCESS_SEARCH_OVERLAY_HEIGHT_RANGE = 5f;
-    private static readonly List<AccessSearchOverlayPoint> s_accessSearchOverlayPoints =
-        new List<AccessSearchOverlayPoint>();
+    private static readonly Queue<AccessSearchOverlayPoint>
+        s_accessSearchOverlayPoints =
+            new Queue<AccessSearchOverlayPoint>(
+                MAX_ACCESS_SEARCH_OVERLAY_POINTS);
+    private static readonly List<AccessPotentialOverlayPoint>
+        s_accessPotentialOverlayPoints =
+            new List<AccessPotentialOverlayPoint>();
     private static Texture2D? s_accessSearchOverlayCircleTexture;
     private static readonly List<V2PathabilityOverlayPoint> s_v2PathabilityOverlayPoints =
         new List<V2PathabilityOverlayPoint>();
@@ -78,6 +86,18 @@ partial class AutoDepthDesignation
         }
     }
 
+    private sealed class AccessPotentialOverlayPoint
+    {
+        public Tile2i Center { get; }
+        public float? GeneratedCost { get; set; }
+        public float? FixedXCost { get; set; }
+        public float? FixedYCost { get; set; }
+        public AccessPotentialOverlayPoint(Tile2i center)
+        {
+            Center = center;
+        }
+    }
+
     // Returns the terrain tile currently under the mouse cursor.
     internal static bool TryGetCursorTile(out Tile3f tile)
     {
@@ -88,12 +108,14 @@ partial class AutoDepthDesignation
 
     private static GUIStyle? s_tileOverlayStyle;
     private static GUIStyle? s_clusterOverlayStyle;
+    private static GUIStyle? s_potentialOverlayStyle;
 
     internal static void DrawCursorOverlay(bool tickerActive, int worldGeneration)
     {
         if (!tickerActive || !IsWorldGenerationActive(worldGeneration)) return;
 
         DrawExperimentalAccessSearchOverlay();
+        DrawExperimentalAccessPotentialOverlay();
         DrawV2PathabilityOverlay();
         DrawAccessClusterOverlay();
         if (!ShowCursorOverlay || !TryGetCursorTile(out Tile3f pos)) return;
@@ -114,6 +136,35 @@ partial class AutoDepthDesignation
     internal static void BeginExperimentalAccessSearchOverlay()
     {
         s_accessSearchOverlayPoints.Clear();
+        s_accessPotentialOverlayPoints.Clear();
+    }
+
+    internal static void RecordExperimentalAccessPotential(
+        IReadOnlyList<AccessV2PotentialSample> samples)
+    {
+        if (!ShowExperimentalAccessPotentialOverlay || samples.Count == 0)
+            return;
+        var byCenter = new Dictionary<Tile2i, AccessPotentialOverlayPoint>();
+        for (int index = 0; index < samples.Count; index++)
+        {
+            AccessV2PotentialSample sample = samples[index];
+            if (!byCenter.TryGetValue(
+                    sample.Center, out AccessPotentialOverlayPoint point))
+            {
+                if (s_accessPotentialOverlayPoints.Count
+                    >= MAX_ACCESS_SEARCH_OVERLAY_POINTS)
+                    continue;
+                point = new AccessPotentialOverlayPoint(sample.Center);
+                byCenter.Add(sample.Center, point);
+                s_accessPotentialOverlayPoints.Add(point);
+            }
+            if (sample.IsGenerated)
+                point.GeneratedCost = sample.Cost;
+            else if (sample.Axis == AccessV2TravelAxis.X)
+                point.FixedXCost = sample.Cost;
+            else
+                point.FixedYCost = sample.Cost;
+        }
     }
 
     internal static void RecordExperimentalAccessSearchNode(
@@ -121,14 +172,19 @@ partial class AutoDepthDesignation
     {
         if (!ShowExperimentalAccessSearchOverlay) return;
         if (s_accessSearchOverlayPoints.Count >= MAX_ACCESS_SEARCH_OVERLAY_POINTS)
-            s_accessSearchOverlayPoints.RemoveAt(0);
-        s_accessSearchOverlayPoints.Add(new AccessSearchOverlayPoint(
+            s_accessSearchOverlayPoints.Dequeue();
+        s_accessSearchOverlayPoints.Enqueue(new AccessSearchOverlayPoint(
             position, height2, isGround, groundHeight2, Time.realtimeSinceStartup));
     }
 
     internal static void ClearExperimentalAccessSearchOverlay()
     {
         s_accessSearchOverlayPoints.Clear();
+    }
+
+    internal static void ClearExperimentalAccessPotentialOverlay()
+    {
+        s_accessPotentialOverlayPoints.Clear();
     }
 
     internal static void RecordV2PathabilityOverlay(
@@ -178,29 +234,37 @@ partial class AutoDepthDesignation
             new List<AccessClusterOverlayRecord>();
     }
 
+    internal static void ClearDiagnosticOverlays()
+    {
+        ClearExperimentalAccessSearchOverlay();
+        ClearExperimentalAccessPotentialOverlay();
+        ClearV2PathabilityOverlay();
+        ClearAccessClusterOverlay();
+    }
+
     private static void DrawExperimentalAccessSearchOverlay()
     {
-        if (!ShowExperimentalAccessSearchOverlay || s_accessSearchOverlayPoints.Count == 0)
+        if (!ShowExperimentalAccessSearchOverlay)
             return;
 
         Camera? camera = Camera.main;
         if (camera == null) return;
         float now = Time.realtimeSinceStartup;
-        for (int index = s_accessSearchOverlayPoints.Count - 1; index >= 0; index--)
-        {
-            AccessSearchOverlayPoint point = s_accessSearchOverlayPoints[index];
-            float age = now - point.RecordedAt;
-            if (age >= ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS)
-            {
-                s_accessSearchOverlayPoints.RemoveAt(index);
-                continue;
-            }
+        while (s_accessSearchOverlayPoints.Count > 0
+            && now - s_accessSearchOverlayPoints.Peek().RecordedAt
+                >= ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS)
+            s_accessSearchOverlayPoints.Dequeue();
 
+        foreach (AccessSearchOverlayPoint point
+            in s_accessSearchOverlayPoints)
+        {
+            float age = now - point.RecordedAt;
             Vector3 screen = camera.WorldToScreenPoint(new Vector3(
                 (point.Position.X + 2f) * 2f, point.Height2 + 0.3f,
                 (point.Position.Y + 2f) * 2f));
             if (screen.z <= 0f) continue;
-            float alpha = 1f - age / ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS;
+            float alpha = 1f
+                - age / ACCESS_SEARCH_OVERLAY_LIFETIME_SECONDS;
             Color previousColor = GUI.color;
             GUI.color = GetAccessSearchOverlayColor(point, alpha);
             Texture2D texture = point.IsGround
@@ -209,6 +273,72 @@ partial class AutoDepthDesignation
             GUI.DrawTexture(new Rect(screen.x - 3f, Screen.height - screen.y - 3f, 6f, 6f), texture);
             GUI.color = previousColor;
         }
+    }
+
+    private static void DrawExperimentalAccessPotentialOverlay()
+    {
+        if (!ShowExperimentalAccessPotentialOverlay
+            || s_accessPotentialOverlayPoints.Count == 0)
+            return;
+        Camera? camera = Camera.main;
+        TerrainManager? terrain = s_desigManager?.TerrainManager;
+        if (camera == null || terrain == null)
+            return;
+        s_potentialOverlayStyle ??= new GUIStyle(GUI.skin.box)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = 10,
+            normal = { textColor = Color.white },
+        };
+        var occupiedLabels = new HashSet<long>();
+        for (int index = s_accessPotentialOverlayPoints.Count - 1;
+            index >= 0; index--)
+        {
+            AccessPotentialOverlayPoint point =
+                s_accessPotentialOverlayPoints[index];
+            if (!terrain.IsValidCoord(point.Center))
+                continue;
+            float height = terrain.GetHeight(point.Center).Value.ToFloat();
+            Vector3 screen = camera.WorldToScreenPoint(new Vector3(
+                point.Center.X * 2f, height + 0.8f,
+                point.Center.Y * 2f));
+            if (screen.z <= 0f)
+                continue;
+            Color previousColor = GUI.color;
+            GUI.color = new Color(1f, 0.75f, 0.1f, 1f);
+            GUI.DrawTexture(new Rect(
+                screen.x - 2f, Screen.height - screen.y - 2f,
+                4f, 4f), Texture2D.whiteTexture);
+
+            int bucketX = Mathf.FloorToInt(screen.x / 42f);
+            int bucketY = Mathf.FloorToInt(screen.y / 18f);
+            long bucket = ((long)bucketX << 32) ^ (uint)bucketY;
+            if (occupiedLabels.Add(bucket))
+            {
+                string label = FormatPotentialOverlayLabel(point);
+                Vector2 size = s_potentialOverlayStyle.CalcSize(
+                    new GUIContent(label));
+                GUI.Box(new Rect(
+                        screen.x + 4f,
+                        Screen.height - screen.y - size.y / 2f,
+                        size.x + 6f, size.y),
+                    label, s_potentialOverlayStyle);
+            }
+            GUI.color = previousColor;
+        }
+    }
+
+    private static string FormatPotentialOverlayLabel(
+        AccessPotentialOverlayPoint point)
+    {
+        var values = new List<string>(3);
+        if (point.GeneratedCost.HasValue)
+            values.Add($"P={point.GeneratedCost.Value:0.#}");
+        if (point.FixedXCost.HasValue)
+            values.Add($"FX={point.FixedXCost.Value:0.#}");
+        if (point.FixedYCost.HasValue)
+            values.Add($"FY={point.FixedYCost.Value:0.#}");
+        return string.Join(" ", values);
     }
 
     private static void DrawV2PathabilityOverlay()

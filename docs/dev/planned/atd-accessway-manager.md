@@ -1,6 +1,8 @@
 # ATD Accessway Manager
 
-Status: design draft; no implementation yet.
+Status: approved design; no implementation yet.
+
+Decision record: [Coordinate accessway work through one cooperative manager](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
 
 ## Problem
 
@@ -35,6 +37,14 @@ The proposed `ATDAccesswayManager` is a runtime-only request coordinator. It
 does not replace the access graph, search session, materializer, reachability
 analysis, farming session, or Construction Assist placement-intent queue.
 
+The motivating tester trace used ATD v0.5.6 and recorded 2,550 failed cluster
+searches for one tower in 63 synchronous bursts over 13 minutes 33 seconds. The
+median burst held one simulation step for 4.93 seconds and the longest for 8.67
+seconds. One unchanged cluster was searched as many as nine times in one step.
+The immediate cause was the farmland fixpoint loop draining several complete
+searches and placement passes synchronously; warning stack traces amplified the
+log volume but were not exceptions and were not the primary stall.
+
 ## Goals
 
 1. No access search may monopolize a frame or simulation tick.
@@ -50,6 +60,9 @@ analysis, farming session, or Construction Assist placement-intent queue.
    placed.
 7. Manager state remains transient and re-derivable so ATD stays safe to remove
    from a save.
+8. Direct player work takes precedence over derived farming, Construction
+   Assist, maintenance, and retry work without allowing unrelated interactive
+   owners to cancel each other.
 
 ## Non-goals
 
@@ -62,6 +75,8 @@ analysis, farming session, or Construction Assist placement-intent queue.
 - Do not change route scoring, V1/V2 graph behavior, or designation-plan
   semantics as part of this refactor.
 - Do not use timeout as a substitute for bounding the cost of one `Step` call.
+- Do not fall back to synchronously draining a search when manager preparation,
+  scheduling, or enqueueing fails.
 
 ## Core model
 
@@ -84,11 +99,17 @@ Suggested fields:
 | `Completion` | Delivers a request-scoped terminal result to the owner. |
 | `Policy` | Queue TTL, active timeout, retry limit, and progress visibility. |
 
-`OwnerKey` should identify the obligation, not an individual attempt. A useful
-shape is `(kind, towerEntityId, phase, logicalWorkKey)`. Enqueuing the same key
-and fingerprint returns the existing handle. Enqueuing the same key with a new
-fingerprint supersedes the old attempt. Different towers and different farming
-phases remain independent.
+`OwnerKey` identifies the stable access obligation, not an individual attempt
+or mutable work key. Its useful shape is `(kind, owningWorkflowId,
+towerEntityId, phase)`, omitting components that change merely because terrain
+work progressed. Enqueuing the same key and fingerprint returns the existing
+handle. Enqueuing the same key with a new fingerprint supersedes or dirties the
+old attempt; it never creates a second live request for the same obligation.
+Different towers and different farming phases remain independent.
+
+The owning workflow interprets progress, terminal results, and user
+cancellation. A request ending does not itself end its continuing access
+obligation.
 
 ### Handle and result
 
@@ -142,17 +163,38 @@ Start conservatively with one active search session and a bounded pending queue.
 That avoids interleaving code that still uses shared access caches or scratch
 state. Multiple requests can be pending without being simultaneously executed.
 
-Suggested initial policy:
+Approved initial policy:
 
-- one configurable unscaled-time budget per frame, initially about 2 ms;
+- exactly one active access request; other requests remain queued rather than
+  round-robin interleaving live search sessions;
+- automated normal-play work receives up to 2 ms per rendered frame;
+- direct interactive normal-play work receives up to 8 ms per rendered frame;
+- while paused, measured spare capacity may be used adaptively up to 15 ms per
+  rendered frame, backing down when frame timing deteriorates;
 - a node quantum larger than the current `Step(1)`, adjusted downward/upward
   from measured slice time;
-- interactive Create Designations requests have highest priority;
-- Construction/Farm Assist requests have normal priority;
+- direct interactive Create Designations, Mining Designations, and accessway
+  requests have strict highest priority;
+- farming and Construction Assist are derived work and have normal priority,
+  even when Construction Assist originated from a player placement;
 - maintenance/retry work has low priority;
-- aging raises a waiting request gradually so continuous clicks cannot starve
-  automation forever;
+- aging orders requests only within one priority class and never raises derived
+  work above newly submitted direct interactive work;
+- a new interactive request preempts active derived work at the next slice
+  boundary; the cancelled derived obligation becomes immediately eligible after
+  interactive work ends;
+- equal-priority interactive requests from different owners queue FIFO and do
+  not cancel one another;
+- after one derived request commits one accessway or otherwise terminates, its
+  continuing obligation rejoins the back of the eligible queue;
 - at most one commit transaction per frame.
+
+The legacy `accessSearchFrameBudgetMs` setting is deprecated rather than mapped
+from its unsafe 30 ms default. Three expert settings replace it: automated
+normal-play budget (2 ms), interactive normal-play budget (8 ms), and paused
+maximum budget (15 ms). They have safe bounds and temporary diagnostic console
+overrides. Existing installations receive the safe new defaults and a concise
+migration log.
 
 The time budget must be checked between bounded node quanta. A stopwatch around
 an unbounded operation cannot prevent a spike that already occurred. Snapshot
@@ -169,11 +211,19 @@ The manager should expose three separately measured phases:
 3. **Validate and commit**: materialize/revalidate, then place or clean up the
    complete accepted plan transactionally.
 
-The first manager version may keep snapshot capture synchronous if necessary,
-but it must log its duration and rate-limit captures. If captures still exceed
-the frame budget, the next refactor should make the expensive collectors
-incremental. Search work should not be moved to a worker thread merely to hide
-an unsliced main-thread capture.
+Preparation, search, validation, and dry-run materialization must be resumable
+or demonstrated to be bounded. The final world mutation remains one small
+atomic transaction: cancellation is accepted through validation, but once the
+request enters `Committing`, it finishes or rolls back. If a supposedly bounded
+operation exceeds 15 ms during stress testing, it is a release blocker and must
+be split or optimized. Search work must not move to a worker thread merely to
+hide an unsliced main-thread phase.
+
+Paused frames may advance preparation, search, and validation with the higher
+adaptive budget. A completed plan is revalidated and its single atomic mutation
+is dispatched through the simulation-safe command-processing boundary, at most
+one commit per callback. Farming phase progression itself may wait for normal
+simulation updates.
 
 ## Coalescing, supersession, and backpressure
 
@@ -184,8 +234,23 @@ an unsliced main-thread capture.
   enqueue the new request.
 - A farming tick that sees an already queued or active request records
   `Pending`; it does not start another ramp search.
-- A completed failure may be negatively cached until its retry trigger changes
-  (terrain/designation fingerprint, phase, settings, or a short backoff).
+- `NoCandidate` is negatively cached under a bounded event-assisted retry
+  policy. No automated retry is eligible for 10 seconds of unscaled real time.
+  From 10 through 60 seconds, a known relevant event may reopen the obligation.
+  At 60 seconds one retry is allowed even without a detected event. Another
+  failure restarts the window; explicit direct player work may bypass it.
+- Known world events are spatially filtered through a retry watch region
+  covering the tower area, source clusters, providers, and configured search
+  margin. Initial triggers are terrain-height changes; designation add, remove,
+  replacement, fulfillment, and reachability changes; relevant entity
+  construction/removal; manager commits; and owner phase, tower area, access
+  mode, clearance, or relevant setting changes. Tree/prop events participate
+  where reliable hooks exist; the 60-second retry covers undetectable changes
+  and other-mod mutations.
+- Hard identity changes cancel an active attempt at the next slice boundary.
+  Environmental changes in the watch region mark its snapshot potentially
+  stale; search may finish, but live validation is authoritative before commit.
+  `NoCandidate` from a dirtied snapshot is not trusted as a stable negative.
 
 ### Queue bounds
 
@@ -196,17 +261,19 @@ The queue should have both a global limit and a per-owner limit. On overflow:
 3. drop the oldest low-priority derived request;
 4. never silently drop the newest interactive request.
 
-Dropping a derived farming request is safe only because the farming obligation
-remains live and will enqueue again after backoff. The terminal reason must still
-be logged.
+Dropping a derived request is safe only because its obligation remains live and
+will enqueue again through the bounded retry policy. Every dropped request gets
+a diagnostic terminal result. Queue size, toast delay, adaptive ramp rate,
+stall-quantum count, and warning thresholds are conservative tuning parameters,
+not architectural policy.
 
 ### User cancellation
 
-The progress toast's cancel action should call `Cancel(requestId)`. Cancelling a
-Create Designations access request should cancel its owning Create Designations
-operation, but must not cancel farming, another tower, or a future Construction
-Assist request. Automated requests normally have no global toast; their state is
-reported through their owning panel/session and diagnostics.
+Progress cancellation delegates to the request owner rather than cancelling one
+attempt that would immediately requeue. Create Designations cancels its owning
+operation; future Construction Assist cancels its placement intent; current
+farming suppresses automatic access attempts until the user explicitly
+reactivates the obligation. Cancellation never affects another owner.
 
 ## Timeout and stall policy
 
@@ -218,21 +285,34 @@ Track these clocks separately:
 - **last progress**: last change in visited nodes, pending nodes, phase, or
   terminal state.
 
-Recommended terminal rules:
+Approved terminal rules:
 
 - expire queued work whose owner/fingerprint is no longer current;
-- time out an active attempt using request policy and processing time;
+- interpret `accessSearchTimeoutSeconds` as cumulative processing time rather
+  than wall time; the default remains 60 processing seconds even when low-
+  priority slicing spreads them across several wall-clock minutes;
 - classify it as stalled when several scheduled quanta make no observable
   progress;
 - cancel every request on world-generation reset;
 - use a small, bounded retry count only for explicitly retryable stale-input or
   transient failures.
 
+A healthy request may remain active for multiple wall-clock minutes. Queue age,
+active wall time, processing time, and last progress remain distinct metrics;
+slow CPU allocation alone is not failure. The visited-node limit remains an
+independent deterministic work cap.
+
 A request cannot be forcibly killed in the middle of one synchronous method
 call. "Kill stalled requests" therefore requires every heavy phase to yield at
 safe boundaries. If one node expansion, snapshot collector, or materialization
 step can itself take hundreds of milliseconds, that operation needs its own
 incremental API.
+
+Interactive preemption and fingerprint supersession permit immediate
+replacement and do not incur failure backoff. `NoCandidate`, node/processing
+limit, stall, queue overflow, and exhausted stale validation enter the bounded
+retry policy. User cancellation suppresses its owner; owner completion and
+world reset terminate without retry.
 
 ## World consistency and mutation boundary
 
@@ -279,10 +359,13 @@ completes and the next live check confirms access. Preparation and filling use
 different owner keys because their work protos, reservations, and readiness
 rules differ.
 
-Do not search every inaccessible cluster to completion in one farming pass. The
-request may contain the current cluster set, but scheduling and commits are
-bounded. After a successful commit, farming re-evaluates live reachability and
-submits only the remaining obligation.
+Do not search every inaccessible cluster to completion in one farming pass. One
+request represents the stable tower-and-phase obligation and may cooperatively
+test several clusters and both required route backends, but it commits at most
+one newly generated accessway. It then terminates; farming re-evaluates live
+reachability and submits only the remaining obligation. This preserves the
+ability to try a farther cluster when a nearer one cannot yet connect without
+mutating through several fixpoint passes in one request.
 
 ### Farm Placement Assist and Construction Assist
 
@@ -314,6 +397,12 @@ through the existing config-backed state path. On load, farming/construction
 state re-derives whether access is needed and enqueues fresh requests. No
 manager-owned type, request, snapshot, or result enters the vanilla save.
 
+Before an in-place save, manager advancement is suspended and transient
+progress UI is purged. After save, the same runtime restores owner-derived UI,
+revalidates, and resumes. Loading or unloading a world cancels all old-world
+work with diagnostics; live automated owners derive fresh obligations in the
+new runtime.
+
 ## Diagnostics
 
 Use one concise lifecycle log shape, guarded at the appropriate verbosity:
@@ -324,6 +413,26 @@ Use one concise lifecycle log shape, guarded at the appropriate verbosity:
 [ATD Access Manager] id=42 state=stale reason=designation-fingerprint-changed retry=1/2
 [ATD Access Manager] id=43 state=succeeded searchMs=84 prepareMs=6 commitMs=2 placed=7
 ```
+
+Every terminal cancellation records request/owner identity, work type, tower or
+placement context, reason, lifecycle phase, queue age, active wall time,
+processing time, visited/pending nodes, and retry eligibility. Expected
+cancellation (preemption, supersession, owner completion, world reset) logs once
+at `Info`; unexpected termination (stall, limits, retry exhaustion, invariant
+failure) logs once at `Warning`; ordinary cancellation has no stack trace.
+
+Cluster failures are aggregated into one terminal request warning with attempted,
+succeeded, and blocked counts, top reasons, timings, and retry eligibility.
+Individual cluster outcomes belong at `Debug` and are not repeated across
+passes. A request that committed one accessway while other clusters remain logs
+`Info`, because the remaining obligation will be re-evaluated.
+
+Progress UI is an owner-facing generic toast contract, not tower-owned farming
+UI. After a short anti-flicker delay it identifies the work type and owner,
+shows state, accumulated processing time versus its limit, visited nodes versus
+the node limit, and explains queue/wall time and current budget in secondary
+detail. It never presents processing time as a wall-clock countdown. Direct
+interactive work and derived work use owner-specific cancellation labels.
 
 Aggregate periodic health output should include queue depth, oldest queue age,
 active request, per-phase time, cancellations, timeouts, stale retries, and
@@ -358,6 +467,12 @@ Useful console diagnostics:
 8. Only after a purity/thread-safety audit, consider a worker-thread search
    backend behind the same manager interface.
 
+Implementation may land in several commits, but no production release may
+route only farming through the manager while direct interactive callers retain
+global cancellation and result state. The first release must make the manager
+the sole coordinator for every current access-search caller and must fail closed
+rather than invoking the old synchronous drain.
+
 ## Acceptance criteria
 
 - Farming can enqueue a large V1 or V2 access search without completing it in
@@ -377,15 +492,32 @@ Useful console diagnostics:
 - Save/load reconstructs access demand from live/runtime-derived workflow state;
   no manager state is serialized.
 - Existing access-search fixtures still choose the same routes and costs.
+- Interactive normal-play work stays within its 8 ms slice policy; automated
+  normal-play work stays within 2 ms; paused work adapts no higher than 15 ms,
+  apart from a separately measured small atomic commit.
+- Legacy straight and experimental V1/V2 backends retain existing candidate
+  comparison and route-selection semantics; expensive legacy enumeration is
+  made resumable when measurement shows it can exceed the approved bounds.
+- Direct interactive work strictly outranks farming and Construction Assist;
+  unrelated equal-priority interactive owners queue rather than cancel each
+  other.
+- Deterministic fixtures cover budgeting, coalescing, preemption, fairness,
+  bounded event-assisted retry, staleness, cancellation, save/world reset, and
+  backpressure.
+- A live multi-cluster farming save reproduces the former multi-pass workload
+  and demonstrates that no automated dry-run phase monopolizes a frame. The
+  reporter's `(2312, 1737)` save is preferred when available.
 
-## Open questions for implementation review
+## Remaining implementation measurements
 
-1. Which snapshot collectors can exceed the frame budget and need incremental
-   cursors before farming is migrated?
-2. Can all `AccessSearchSnapshot` delegates be made pure data lookups, or must
-   search remain permanently main-thread-only?
-3. Should normal-priority requests be strictly single-active, or can later
-   profiling prove that round-robin sessions are safe and beneficial?
-4. What initial frame budget is acceptable at each game speed and while paused?
-5. Which failures are genuinely retryable without a changed work fingerprint?
-
+1. Which snapshot collectors, legacy-generator phases, materialization steps,
+   or individual node expansions exceed their approved slice bounds and need
+   incremental cursors?
+2. What conservative initial values should be used for queue capacity, toast
+   delay, adaptive paused-budget ramp rate, stall-quanta detection, and warning
+   thresholds?
+3. Which reliable tree/prop/entity events can augment the required spatial
+   retry triggers without global invalidation churn?
+4. Can a later purity/thread-safety audit prove that immutable graph search is
+   safe on a worker thread? Worker-thread execution remains out of scope for
+   this fix regardless of that future answer.

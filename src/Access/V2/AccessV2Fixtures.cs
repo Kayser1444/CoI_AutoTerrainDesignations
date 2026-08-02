@@ -861,6 +861,37 @@ namespace AutoTerrainDesignations.Access.V2
                 openGround,
                 new[] { new Tile2i(2, 2) },
                 new Dictionary<Tile2i, AccessPropCleanupInfo>());
+
+            var shortcutGround = new AccessV2GroundGraph(
+                new[]
+                {
+                    new Tile2i(0, 0), new Tile2i(1, 0),
+                    new Tile2i(2, 0), new Tile2i(2, 1),
+                    new Tile2i(3, 1), new Tile2i(4, 1),
+                    new Tile2i(4, 0), new Tile2i(10, 0),
+                },
+                Array.Empty<Tile2i>(),
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            AccessV2PotentialOwner shortcutOwner =
+                AccessV2PotentialOwner.FromGround(
+                    shortcutGround, new Tile2i(0, 0));
+            AccessV2PotentialOwner stillCommitted = shortcutOwner.Advance(
+                shortcutGround, new Tile2i(0, 0), new Tile2i(2, 0));
+            AccessV2PotentialOwner afterShortcut = stillCommitted.Advance(
+                shortcutGround, new Tile2i(2, 0), new Tile2i(4, 0));
+            if (shortcutOwner.IsGlobal
+                || stillCommitted.IsGlobal
+                || stillCommitted.CanReturnTo(
+                    shortcutGround, new Tile2i(4, 0))
+                || !stillCommitted.CanReturnTo(
+                    shortcutGround, new Tile2i(10, 0))
+                || !afterShortcut.IsGlobal
+                || !afterShortcut.CanReturnTo(
+                    shortcutGround, new Tile2i(4, 0)))
+            {
+                failure = "V commitment must suppress only a pre-shortcut return to its source G component and must restore a same-component return after crossing a non-G-equivalent center edge";
+                return false;
+            }
             if (!diagonalGraph.CanTraverse(
                     new Tile2i(0, 0), new Tile2i(1, 1))
                 || !diagonalGraph.TryGetGoalDistance(
@@ -1277,32 +1308,59 @@ namespace AutoTerrainDesignations.Access.V2
             };
             var disconnectedGraph = new AccessV2GroundGraph(
                 disconnectedGround,
-                new[] { new Tile2i(11, 0) },
+                new[] { new Tile2i(10, 0) },
                 new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            var sparseOrigins = new[]
+            {
+                new Tile2i(0, 0),
+                new Tile2i(4, 0),
+                new Tile2i(8, 0),
+            };
             var disconnectedVPotential = new AccessV2PotentialField(
-                Tile2i.Zero, new Tile2i(11, 0),
+                Tile2i.Zero, new Tile2i(8, 0),
+                sparseOrigins,
+                Array.Empty<Tile2i>(),
                 disconnectedGraph,
-                minimumVTravelCostPerTile: 2.25f);
+                fixedNavigation: null,
+                generatedFixedCost: 5f,
+                centerSpokeCost: 4f);
             var disconnectedEscapePotential =
                 new AccessV2GroundEscapePotentialField(
-                    disconnectedGraph, disconnectedVPotential,
-                    minimumGeneratedEntryCost: 10f);
-            var boundaryEscapePotential =
+                    disconnectedGraph, disconnectedVPotential);
+            var blockedEscapePotential =
                 new AccessV2GroundEscapePotentialField(
                     disconnectedGraph, disconnectedVPotential,
-                    minimumGeneratedEntryCost: 10f,
                     canExitToGeneratedV:
                         tile => tile == new Tile2i(0, 0));
+            IReadOnlyList<AccessV2PotentialSample> potentialSamples =
+                disconnectedVPotential.GetDiagnosticSamples();
             if (disconnectedGraph.TryGetGoalDistance(
                     new Tile2i(0, 0), out _)
+                || disconnectedVPotential.NodeCount != 3
+                || potentialSamples.Count != 3
+                || potentialSamples.Any(sample => !sample.IsGenerated)
+                || !potentialSamples.Any(sample =>
+                    sample.Center == new Tile2i(2, 2)
+                    && Math.Abs(sample.Cost - 22f) < 0.0001f)
                 || Math.Abs(disconnectedVPotential.GetPotential(
-                    new Tile2i(0, 0)) - 23.5f) > 0.0001f
+                    new Tile2i(8, 0)) - 4f) > 0.0001f
+                || Math.Abs(disconnectedVPotential.GetPotential(
+                    new Tile2i(4, 0)) - 13f) > 0.0001f
+                || Math.Abs(disconnectedVPotential.GetPotential(
+                    new Tile2i(0, 0)) - 22f) > 0.0001f
+                || disconnectedVPotential.GetPotential(
+                    new Tile2i(1, 0)) != 0f
+                || disconnectedEscapePotential.BuiltComponentCount != 0
                 || Math.Abs(disconnectedEscapePotential.GetPotential(
-                    new Tile2i(0, 0)) - 31f) > 0.0001f
-                || Math.Abs(boundaryEscapePotential.GetPotential(
-                    new Tile2i(0, 0)) - 33.5f) > 0.0001f)
+                    new Tile2i(0, 0)) - 33f) > 0.0001f
+                || disconnectedEscapePotential.BuiltComponentCount != 1
+                || Math.Abs(disconnectedEscapePotential.GetPotential(
+                    new Tile2i(1, 0)) - 32f) > 0.0001f
+                || disconnectedEscapePotential.BuiltComponentCount != 1
+                || blockedEscapePotential.GetPotential(
+                    new Tile2i(0, 0)) != 0f)
             {
-                failure = "Disconnected V2 G components must retain a component-aware V escape heuristic and ignore statically ineligible interior exits";
+                failure = "Sparse V2 P must charge generated origins on the 4x4 lattice and build disconnected G escape fields lazily per component";
                 return false;
             }
             IReadOnlyCollection<string> keys = graph.CollectUnchargedCleanupKeys(
@@ -1406,6 +1464,40 @@ namespace AutoTerrainDesignations.Access.V2
                 || fvPath.Last() != goal)
             {
                 failure = "FV flat-interior connectivity or exact shortest cost diverged from the vehicle-center graph";
+                return false;
+            }
+
+            var goalExact = new AccessV2GroundGraph(
+                projectedCenters,
+                new[] { goal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>(),
+                projectedCenters);
+            var goalFv = new AccessV2FixedNavigationGraph(
+                fixedProfiles, goalExact);
+            var fvPotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(12, 12),
+                Array.Empty<Tile2i>(),
+                Array.Empty<Tile2i>(),
+                goalExact, goalFv,
+                generatedFixedCost: 5f,
+                centerSpokeCost: 4f);
+            if (!TryCreateUniformState(
+                    Tile2i.Zero,
+                    AccessV2TravelAxis.X,
+                    new Tile2i(4, 0),
+                    AccessSearchMode.Flat,
+                    0,
+                    out AccessV2BandState fvStartState,
+                    out string fvPotentialFailure)
+                || fvPotential.GeneratedNodeCount != 0
+                || fvPotential.FixedNodeCount != 24
+                || Math.Abs(fvPotential.GetPotential(fvStartState)
+                    - exactCost) > 0.0001f
+                || Math.Abs(fvPotential.GetGroundLaunchPotential(start)
+                    - exactCost) > 0.0001f)
+            {
+                failure = "Sparse P must index reusable FV nodes by axis and preserve their exact goal-connected suffix: "
+                    + fvPotentialFailure;
                 return false;
             }
 
@@ -2874,13 +2966,148 @@ namespace AutoTerrainDesignations.Access.V2
                     secondStep.Next.Band.Lane0,
                     out AccessSideRayOperation ownedBlock)
                 || ownedBlock != AccessSideRayOperation.Fill
-                || ownedRayHistory.IsProfileBlockedByRayEnvelope(
+                || !ownedRayHistory.IsProfileBlockedByRayEnvelope(
                     secondStep.Next.GetLaneOrigin(0),
                     secondStep.Next.Band.Lane0,
                     new[] { ownedRayOrigin },
                     out _))
             {
-                failure = "V2 direct continuation must supersede only the predecessor-owned ray envelope";
+                failure = "V2 predecessor clearance waivers must retain the predecessor work surface";
+                return false;
+            }
+            Tile2i collapsedRayTile = new Tile2i(18, 18);
+            Tile2i olderRayOwner = new Tile2i(4, 4);
+            Tile2i strongerRayOwner = new Tile2i(8, 8);
+            AccessV2History collapsedRayHistory =
+                AccessV2History.Empty.ApplyValidated(
+                    Array.Empty<AccessV2OriginProfile>(),
+                    new[]
+                    {
+                        new AccessRayHeightConstraint(
+                            collapsedRayTile,
+                            AccessSideRayOperation.Cut, 4f,
+                            olderRayOwner),
+                        new AccessRayHeightConstraint(
+                            collapsedRayTile,
+                            AccessSideRayOperation.Cut, 3f,
+                            olderRayOwner),
+                        new AccessRayHeightConstraint(
+                            collapsedRayTile,
+                            AccessSideRayOperation.Cut, 1f,
+                            strongerRayOwner),
+                    },
+                    Array.Empty<string>());
+            var rayOverlayDiagnostics = new AccessSearchDiagnostics();
+            if (collapsedRayHistory.RayConstraintCount != 3
+                || collapsedRayHistory.CollapsedRayEntryCount != 2
+                || !collapsedRayHistory.IsProfileBlockedByRayEnvelope(
+                    new Tile2i(16, 16),
+                    new AccessHeightProfile(4, 4, 4, 4),
+                    out AccessSideRayOperation collapsedBlock)
+                || collapsedBlock != AccessSideRayOperation.Cut
+                || !collapsedRayHistory.IsProfileBlockedByRayEnvelope(
+                    new Tile2i(16, 16),
+                    new AccessHeightProfile(4, 4, 4, 4),
+                    new[] { strongerRayOwner }, out _)
+                || !collapsedRayHistory.HasRayAt(
+                    collapsedRayTile, AccessSideRayOperation.Cut,
+                    new[] { strongerRayOwner }, rayOverlayDiagnostics)
+                || !collapsedRayHistory.HasRayAt(
+                    collapsedRayTile, AccessSideRayOperation.Cut,
+                    new[] { strongerRayOwner }, rayOverlayDiagnostics)
+                || rayOverlayDiagnostics.V2RayOverlayCacheHits == 0
+                || !collapsedRayHistory.HasRayAt(
+                    collapsedRayTile, AccessSideRayOperation.Cut,
+                    new[] { olderRayOwner, strongerRayOwner }))
+            {
+                failure = "V2 ray overlay must collapse owner extrema, retain work across safety waivers, and memoize repeated tile queries";
+                return false;
+            }
+            Tile2i safetyTile = new Tile2i(22, 22);
+            var eastScopeTransition = new AccessV2Transition(
+                AccessV2TransitionKind.SourceLaunch,
+                first,
+                new[] { first.GetLane(0) },
+                Array.Empty<Tile2i>());
+            AccessV2History directionScopeHistory =
+                AccessV2History.Empty.ApplyValidated(
+                    eastScopeTransition,
+                    new[]
+                    {
+                        new AccessRayHeightConstraint(
+                            safetyTile,
+                            AccessSideRayOperation.Cut,
+                            0f,
+                            first.GetLaneOrigin(0),
+                            isSafetyOnly: true),
+                    },
+                    Array.Empty<string>());
+            AccessProjectedTerrainEffect safetyEffect =
+                directionScopeHistory.GetProjectedTerrainEffect(safetyTile);
+            AccessProjectedTerrainEffect waivedSafetyEffect =
+                directionScopeHistory.GetProjectedTerrainEffect(
+                    safetyTile, includeSafety: false);
+            if (!safetyEffect.HasCutSafety
+                || safetyEffect.HasCutWork
+                || waivedSafetyEffect.HasCutSafety
+                || directionScopeHistory.HasRayAt(
+                    safetyTile, AccessSideRayOperation.Cut)
+                || !directionScopeHistory.HasGeneratedProfileAt(
+                    first.GetLaneOrigin(0) + new RelTile2i(2, 2))
+                || directionScopeHistory.HasGeneratedProfileAt(
+                    first.GetLaneOrigin(0) + new RelTile2i(2, 2),
+                    new[] { first.GetLaneOrigin(0) })
+                || directionScopeHistory.RequiresStrictSelfDisruptionChecks)
+            {
+                failure = "V2 safety-only overlay cells must carry no height and remain waived inside the initial direction scope";
+                return false;
+            }
+            if (!TryCreateUniformState(
+                    new Tile2i(20, 20), AccessV2TravelAxis.Y,
+                    new Tile2i(0, 4), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState northScopeState,
+                    out failure)
+                || !TryCreateUniformState(
+                    new Tile2i(20, 20), AccessV2TravelAxis.X,
+                    new Tile2i(-4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState westScopeState,
+                    out failure))
+                return false;
+            directionScopeHistory = directionScopeHistory.ApplyValidated(
+                new AccessV2Transition(
+                    AccessV2TransitionKind.Turn,
+                    northScopeState,
+                    Array.Empty<AccessV2OriginProfile>(),
+                    Array.Empty<Tile2i>()),
+                Array.Empty<AccessRayHeightConstraint>(),
+                Array.Empty<string>());
+            if (directionScopeHistory.RequiresStrictSelfDisruptionChecks)
+            {
+                failure = "V2 self-disruption must remain waived through two longitudinal directions";
+                return false;
+            }
+            directionScopeHistory = directionScopeHistory.ApplyValidated(
+                new AccessV2Transition(
+                    AccessV2TransitionKind.Turn,
+                    westScopeState,
+                    Array.Empty<AccessV2OriginProfile>(),
+                    Array.Empty<Tile2i>()),
+                Array.Empty<AccessRayHeightConstraint>(),
+                Array.Empty<string>());
+            if (!directionScopeHistory.RequiresStrictSelfDisruptionChecks)
+            {
+                failure = "V2 self-disruption checks must become strict only after a third longitudinal direction";
+                return false;
+            }
+            AccessV2History resetScopeHistory =
+                directionScopeHistory.ResetDirectionScope();
+            if (resetScopeHistory.RequiresStrictSelfDisruptionChecks
+                || !resetScopeHistory.GetProjectedTerrainEffect(
+                    safetyTile).HasCutSafety
+                || !resetScopeHistory.HasGeneratedProfileAt(
+                    first.GetLaneOrigin(0) + new RelTile2i(2, 2)))
+            {
+                failure = "V2 G/FV scope reset must clear travel directions without discarding route-wide projected terrain";
                 return false;
             }
             IReadOnlyList<AccessV2HandoffCandidate> ownedRayQuick =
@@ -3372,7 +3599,110 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             }
 
-            Tile2i sparseGoal = new Tile2i(28, 10);
+            if (!TryCreateUniformState(
+                    new Tile2i(8, 4), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState sharedGroundLaunch,
+                    out failure))
+                return false;
+            Tile2i expensiveGround = new Tile2i(8, 6);
+            Tile2i cheapGround = new Tile2i(8, 7);
+            Tile2i relaunchGoal = new Tile2i(24, 24);
+            var relaunchGroundGraph = new AccessV2GroundGraph(
+                new[] { expensiveGround, cheapGround, relaunchGoal },
+                new[] { relaunchGoal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            AccessV2HandoffCandidate RelaunchHandoff(
+                AccessV2BandState state,
+                Tile2i entry,
+                AccessHandoffOperation operation,
+                float cleanupCost)
+            {
+                var lane0 = new AccessGroundHandoff(
+                    state.GetLaneOrigin(0), operation);
+                var lane1 = new AccessGroundHandoff(
+                    state.GetLaneOrigin(1), operation);
+                return new AccessV2HandoffCandidate(
+                    state.EntryDirection, 1,
+                    lane0, lane1,
+                    new[] { state.GetLaneOrigin(0) },
+                    new[] { state.GetLaneOrigin(1) },
+                    new[] { entry }, new[] { entry },
+                    Array.Empty<string>(), cleanupCost,
+                    centerSpokeCost: 2f);
+            }
+            var cheaperRelaunchSession = new AccessV2SearchSession(
+                endpoints, Tile2i.Zero, new Tile2i(32, 32),
+                (current, transition, history, connectedFixedOrigin) =>
+                    current.HasValue
+                        ? AccessV2TransitionEvaluation.Reject(
+                            "FixtureRequiresGroundRelaunch")
+                        : new AccessV2TransitionEvaluation(
+                            true, string.Empty, 0f,
+                            transition.Delta.Count, 0f),
+                10000, float.MaxValue,
+                (states, history, requiredGroundEntry) =>
+                {
+                    AccessV2BandState terminal = states[0];
+                    if (terminal.Equals(first))
+                        return new[]
+                        {
+                            RelaunchHandoff(
+                                terminal, expensiveGround,
+                                AccessHandoffOperation.Leveling, 0f),
+                        };
+                    if (terminal.Equals(sharedGroundLaunch))
+                        return new[]
+                        {
+                            RelaunchHandoff(
+                                terminal, relaunchGoal,
+                                AccessHandoffOperation.Leveling, 0f),
+                        };
+                    return Array.Empty<AccessV2HandoffCandidate>();
+                },
+                groundGraph: relaunchGroundGraph,
+                terrainCenterHeightProvider: _ => 0,
+                preciseTerrainHeightProvider: _ => 0.25f,
+                generatedOriginValidator: _ => true,
+                groundToVHandoffEvaluator:
+                    (state, groundEntry, operation, history) =>
+                    {
+                        if (!state.Equals(sharedGroundLaunch))
+                            return null;
+                        float cleanupCost = groundEntry == expensiveGround
+                            ? 50f
+                            : groundEntry == cheapGround ? 0f : 100f;
+                        return RelaunchHandoff(
+                            state, groundEntry, operation, cleanupCost);
+                    });
+            while (!cheaperRelaunchSession.IsComplete)
+                cheaperRelaunchSession.Step(7);
+            if (!cheaperRelaunchSession.Result.Success
+                || cheaperRelaunchSession.Result.Cost >= 20f
+                || !cheaperRelaunchSession.Result.GroundPath.Contains(
+                    cheapGround))
+            {
+                failure =
+                    "V2 G-to-V dominance must allow a later cheaper ground arrival to replace an earlier expensive arrival at the same concrete V state"
+                    + $": success={cheaperRelaunchSession.Result.Success}"
+                    + $" reason={cheaperRelaunchSession.Result.FailureReason}"
+                    + $" cost={cheaperRelaunchSession.Result.Cost}"
+                    + $" ground=[{string.Join(",", cheaperRelaunchSession.Result.GroundPath)}]";
+                return false;
+            }
+
+            var sparsePotentialOrigins = new List<Tile2i>();
+            for (int y = 0; y <= 32; y += 4)
+                for (int x = 0; x <= 32; x += 4)
+                    sparsePotentialOrigins.Add(new Tile2i(x, y));
+            var sparseRoutePotential = new AccessV2PotentialField(
+                Tile2i.Zero, new Tile2i(32, 32),
+                sparsePotentialOrigins,
+                Array.Empty<Tile2i>(),
+                graph,
+                fixedNavigation: null,
+                generatedFixedCost: 0f,
+                centerSpokeCost: 0f);
             var aStarDiagnostics = new AccessSearchDiagnostics();
             var aStarSession = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
@@ -3381,27 +3711,37 @@ namespace AutoTerrainDesignations.Access.V2
                     states[0].Anchor == first.Anchor
                     ? new[] { forward }
                     : Array.Empty<AccessV2HandoffCandidate>(),
-                state => Math.Abs(
-                        AccessPathSearch.GetV2CanonicalCenter(state).X
-                        - sparseGoal.X)
-                    + Math.Abs(
-                        AccessPathSearch.GetV2CanonicalCenter(state).Y
-                        - sparseGoal.Y),
-                graph,
+                heuristicEvaluator: null,
+                groundGraph: graph,
+                potentialField: sparseRoutePotential,
                 diagnostics: aStarDiagnostics);
             while (!aStarSession.IsComplete) aStarSession.Step(7);
-            if (!aStarSession.Result.Success
+            if (sparseRoutePotential.GetPotential(first) <= 0f
+                || !aStarSession.Result.Success
                 || !aStarSession.Result.UsedAStar
                 || Math.Abs(aStarSession.Result.Cost
                     - session.Result.Cost) > 0.0001f
                 || !aStarSession.Result.States.SequenceEqual(
                     session.Result.States)
+                || aStarDiagnostics.V2LabelFirstExpansions
+                    + aStarDiagnostics.V2LabelReexpansions
+                        != aStarSession.Result.Visited
+                || aStarDiagnostics.V2InitialVExpansions
+                    + aStarDiagnostics.V2GroundRelaunchedVExpansions
+                        != aStarDiagnostics.V2BandExpansions
+                || aStarDiagnostics.V2UniqueExpansionCenters <= 0
                 || aStarDiagnostics.V2GroundSuffixSuccesses == 0
                 || aStarDiagnostics.V2GroundSuffixSteps == 0)
             {
                 failure = "V2 A* must retain the exact Dijkstra result while completing a validated potential-field G suffix"
                     + $": suffix={aStarDiagnostics.V2GroundSuffixSuccesses}/"
-                    + $"{aStarDiagnostics.V2GroundSuffixSteps}";
+                    + $"{aStarDiagnostics.V2GroundSuffixSteps} "
+                    + $"labels={aStarDiagnostics.V2LabelFirstExpansions}+"
+                    + $"{aStarDiagnostics.V2LabelReexpansions}/"
+                    + $"{aStarSession.Result.Visited} "
+                    + $"vSources={aStarDiagnostics.V2InitialVExpansions}+"
+                    + $"{aStarDiagnostics.V2GroundRelaunchedVExpansions}/"
+                    + $"{aStarDiagnostics.V2BandExpansions}";
                 return false;
             }
 
@@ -3792,7 +4132,12 @@ namespace AutoTerrainDesignations.Access.V2
                 IDictionary<Tile2i, AccessHeightProfile>? fixedProfiles = null,
                 IEnumerable<Tile2i>? projectedFillTiles = null,
                 IDictionary<Tile2i, HashSet<Tile2i>>?
-                    projectedFillSources = null)
+                    projectedFillSources = null,
+                IDictionary<Tile2i, float>? projectedFillFloors = null,
+                IEnumerable<Tile2i>? projectedCutTiles = null,
+                IDictionary<Tile2i, HashSet<Tile2i>>?
+                    projectedCutSources = null,
+                float replayDumpingSlope = 1f)
                 => new AccessSearchSnapshot(
                     Tile2i.Zero, new Tile2i(32, 32),
                     new Tile2i(28, 10),
@@ -3819,15 +4164,162 @@ namespace AutoTerrainDesignations.Access.V2
                     physicalTerrainMin: Tile2i.Zero,
                     physicalTerrainMax: new Tile2i(32, 32),
                     rayLevelingDesignationOrigins: levelingRayOrigins,
+                    projectedCutDisturbedTiles: projectedCutTiles,
                     projectedFillDisturbedTiles: projectedFillTiles,
+                    projectedFillSurfaceFloors: projectedFillFloors,
+                    projectedCutSourcesByTile: projectedCutSources,
                     projectedFillSourcesByTile: projectedFillSources,
                     vehicleWidth: 5,
+                    dumpingMaterialSlope: replayDumpingSlope,
                     v2WorkableHandoffs: UniformSingle,
                     v2WorkableHandoffSpans: Span);
             AccessSearchSnapshot replaySnapshot = CreateReplaySnapshot();
+            AccessHeightProfile.TryForMode(
+                AccessSearchMode.Flat, 2,
+                out AccessHeightProfile singleRaisedSourceProfile);
+            Tile2i singleRaisedSourceOrigin = new Tile2i(12, 12);
+            var singleRaisedProfiles =
+                new Dictionary<Tile2i, AccessHeightProfile>
+                {
+                    [singleRaisedSourceOrigin] = singleRaisedSourceProfile,
+                };
+            AccessV2EndpointSet singleRaisedEndpoints =
+                AccessV2FrontageDiscovery.Build(
+                    Tile2i.Zero, new Tile2i(32, 32),
+                    singleRaisedProfiles,
+                    new[] { singleRaisedSourceOrigin });
+            var singleRaisedFillFloors =
+                new Dictionary<Tile2i, float>();
+            var singleRaisedFillSources =
+                new Dictionary<Tile2i, HashSet<Tile2i>>();
+            for (int y = 0; y <= 32; y++)
+            {
+                for (int x = 0; x <= 32; x++)
+                {
+                    int outsideX = x < singleRaisedSourceOrigin.X
+                        ? singleRaisedSourceOrigin.X - x
+                        : x > singleRaisedSourceOrigin.X + 4
+                            ? x - (singleRaisedSourceOrigin.X + 4)
+                            : 0;
+                    int outsideY = y < singleRaisedSourceOrigin.Y
+                        ? singleRaisedSourceOrigin.Y - y
+                        : y > singleRaisedSourceOrigin.Y + 4
+                            ? y - (singleRaisedSourceOrigin.Y + 4)
+                            : 0;
+                    int distance = Math.Max(outsideX, outsideY);
+                    if (distance < 1 || distance > 2)
+                        continue;
+                    float projectedHeight = 1f - distance * 0.34f;
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            Tile2i blocked = new Tile2i(x + dx, y + dy);
+                            if (blocked.X < 0 || blocked.X > 32
+                                || blocked.Y < 0 || blocked.Y > 32)
+                                continue;
+                            if (!singleRaisedFillFloors.TryGetValue(
+                                    blocked, out float existingFloor)
+                                || projectedHeight > existingFloor)
+                                singleRaisedFillFloors[blocked] =
+                                    projectedHeight;
+                            if (!singleRaisedFillSources.TryGetValue(
+                                    blocked, out HashSet<Tile2i> sources))
+                            {
+                                sources = new HashSet<Tile2i>();
+                                singleRaisedFillSources[blocked] = sources;
+                            }
+                            sources.Add(singleRaisedSourceOrigin);
+                        }
+                    }
+                }
+            }
+            AccessV2StartFrontage singleRaisedLaunch =
+                singleRaisedEndpoints.Starts.First(candidate =>
+                    candidate.InitialTransition != null
+                    && candidate.LaunchSuccessor != null
+                    && candidate.State.EntryDirection == new Tile2i(4, 0)
+                    && candidate.LaunchSuccessor.Next.Band.Lane0.Center2 == 1
+                    && candidate.LaunchSuccessor.Next.Band.Lane1.Center2 == 1);
+            AccessSearchSnapshot singleRaisedSnapshot =
+                CreateReplaySnapshot(
+                    levelingRayOrigins: Array.Empty<Tile2i>(),
+                    fixedProfiles: singleRaisedProfiles,
+                    projectedFillTiles: singleRaisedFillFloors.Keys,
+                    projectedFillSources: singleRaisedFillSources,
+                    projectedFillFloors: singleRaisedFillFloors,
+                    replayDumpingSlope: 0.34f);
+            AccessV2TransitionEvaluation singleRaisedInitialEvaluation =
+                AccessPathSearch.EvaluateV2Transition(
+                    singleRaisedSnapshot, null,
+                    singleRaisedLaunch.InitialTransition!,
+                    AccessV2History.Empty,
+                    singleRaisedSourceOrigin);
+            if (!singleRaisedInitialEvaluation.IsValid)
+            {
+                failure = "V2 raised single-origin fixture initial launch failed: "
+                    + singleRaisedInitialEvaluation.RejectionReason;
+                return false;
+            }
+            AccessV2History singleRaisedInitialHistory =
+                AccessV2History.Empty.ApplyValidated(
+                    singleRaisedLaunch.InitialTransition!,
+                    singleRaisedInitialEvaluation.RayConstraints,
+                    singleRaisedInitialEvaluation.CleanupKeys);
+            AccessV2TransitionEvaluation singleRaisedSuccessorEvaluation =
+                AccessPathSearch.EvaluateV2Transition(
+                    singleRaisedSnapshot, singleRaisedLaunch.State,
+                    singleRaisedLaunch.LaunchSuccessor!,
+                    singleRaisedInitialHistory,
+                    singleRaisedSourceOrigin);
+            if (!singleRaisedSuccessorEvaluation.IsValid)
+            {
+                failure = "V2 raised single-origin fixture launch successor failed: "
+                    + singleRaisedSuccessorEvaluation.RejectionReason;
+                return false;
+            }
+            AccessV2History singleRaisedSuccessorHistory =
+                singleRaisedInitialHistory.ApplyValidated(
+                    singleRaisedLaunch.LaunchSuccessor!,
+                    singleRaisedSuccessorEvaluation.RayConstraints,
+                    singleRaisedSuccessorEvaluation.CleanupKeys);
+            AccessV2Transition singleRaisedSuccessor =
+                singleRaisedLaunch.LaunchSuccessor!;
+            bool hasNonRisingContinuation = false;
+            string singleRaisedContinuationReasons = string.Empty;
+            foreach (AccessV2Transition continuation
+                in AccessV2Geometry.EnumerateStraight(
+                    singleRaisedSuccessor.Next))
+            {
+                if (continuation.Next.Band.Lane0.Center2 > 1
+                    || continuation.Next.Band.Lane1.Center2 > 1)
+                    continue;
+                AccessV2TransitionEvaluation continuationEvaluation =
+                    AccessPathSearch.EvaluateV2Transition(
+                        singleRaisedSnapshot,
+                        singleRaisedSuccessor.Next,
+                        continuation,
+                        singleRaisedSuccessorHistory, null);
+                if (continuationEvaluation.IsValid)
+                {
+                    hasNonRisingContinuation = true;
+                    break;
+                }
+                singleRaisedContinuationReasons +=
+                    (singleRaisedContinuationReasons.Length == 0 ? "" : ",")
+                    + continuationEvaluation.RejectionReason;
+            }
+            if (!hasNonRisingContinuation)
+            {
+                failure = "V2 raised single-origin downhill launch must retain a flat or descending continuation: "
+                    + singleRaisedContinuationReasons;
+                return false;
+            }
             Tile2i sameSortOrigin = new Tile2i(16, 16);
             Tile2i sameSortTile = new Tile2i(18, 18);
             var sameSortProfile = new AccessHeightProfile(4, 4, 4, 4);
+            var deeperCutProfile = new AccessHeightProfile(2, 2, 2, 2);
+            var higherFillProfile = new AccessHeightProfile(6, 6, 6, 6);
             if (!AccessV2History.Empty.TryApply(
                     new[]
                     {
@@ -3862,7 +4354,7 @@ namespace AutoTerrainDesignations.Access.V2
             };
             if (sameSortCutHistory.IsProfileBlockedByRayEnvelope(
                     CreateReplaySnapshot(preciseTerrain: sameSortCutTerrain),
-                    sameSortOrigin, sameSortProfile, null, out _)
+                    sameSortOrigin, deeperCutProfile, null, out _)
                 || !sameSortCutHistory.HasRayAt(
                     sameSortTile, AccessSideRayOperation.Cut)
                 || sameSortCutHistory.HasRayAt(
@@ -3903,7 +4395,7 @@ namespace AutoTerrainDesignations.Access.V2
             }
             if (sameSortFillHistory.IsProfileBlockedByRayEnvelope(
                     CreateReplaySnapshot(preciseTerrain: opposingFillTerrain),
-                    sameSortOrigin, sameSortProfile, null, out _)
+                    sameSortOrigin, higherFillProfile, null, out _)
                 || !sameSortFillHistory.IsProfileBlockedByRayEnvelope(
                     CreateReplaySnapshot(preciseTerrain: sameSortCutTerrain),
                     sameSortOrigin, sameSortProfile, null,
@@ -3945,6 +4437,205 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 failure = "V2 fixed-pair frontage must exempt its own source lanes on the first straight transition: "
                     + fixedPairFirstStraight.RejectionReason;
+                return false;
+            }
+            Tile2i connectedPairSafetyTile =
+                secondStep.Next.GetLaneOrigin(0)
+                    + new RelTile2i(2, 2);
+            AccessV2TransitionEvaluation connectedPairSafety =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins: Array.Empty<Tile2i>(),
+                        preciseTerrain: sourcePairTerrain,
+                        fixedProfiles: sourcePairProfiles,
+                        projectedFillTiles:
+                            new[] { connectedPairSafetyTile },
+                        projectedFillSources:
+                            new Dictionary<Tile2i, HashSet<Tile2i>>
+                            {
+                                [connectedPairSafetyTile] =
+                                    new HashSet<Tile2i> { lane1Source },
+                            }),
+                    first, secondStep,
+                    AccessV2History.Empty,
+                    lane0Source);
+            if (!connectedPairSafety.IsValid)
+            {
+                failure = "V2 generated source exits must waive immutable safety from the complete connected predecessor band: "
+                    + connectedPairSafety.RejectionReason;
+                return false;
+            }
+            AccessV2History retainedPredecessorHistory =
+                AccessV2History.Empty.ApplyValidated(
+                    secondStep,
+                    connectedPairSafety.RayConstraints,
+                    connectedPairSafety.CleanupKeys,
+                    new[] { lane0Source, lane1Source });
+            Tile2i retainedPairSafetyTile =
+                thirdStep.Next.GetLaneOrigin(0)
+                    + new RelTile2i(2, 2);
+            AccessV2TransitionEvaluation retainedPairSafety =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins: Array.Empty<Tile2i>(),
+                        preciseTerrain: sourcePairTerrain,
+                        fixedProfiles: sourcePairProfiles,
+                        projectedFillTiles:
+                            new[] { retainedPairSafetyTile },
+                        projectedFillSources:
+                            new Dictionary<Tile2i, HashSet<Tile2i>>
+                            {
+                                [retainedPairSafetyTile] =
+                                    new HashSet<Tile2i> { lane1Source },
+                            }),
+                    secondStep.Next, thirdStep,
+                    retainedPredecessorHistory, null);
+            if (!retainedPairSafety.IsValid)
+            {
+                failure = "V2 generated fringe continuation must retain immutable safety ownership from its fixed predecessor band: "
+                    + retainedPairSafety.RejectionReason;
+                return false;
+            }
+            AccessSearchSnapshot retainedPairSnapshot =
+                CreateReplaySnapshot(
+                    levelingRayOrigins: Array.Empty<Tile2i>(),
+                    preciseTerrain: sourcePairTerrain,
+                    fixedProfiles: sourcePairProfiles,
+                    projectedFillTiles:
+                        new[] { retainedPairSafetyTile },
+                    projectedFillSources:
+                        new Dictionary<Tile2i, HashSet<Tile2i>>
+                        {
+                            [retainedPairSafetyTile] =
+                                new HashSet<Tile2i> { lane1Source },
+                        });
+            var retainedGeneratedProfiles = secondStep.Delta
+                .Concat(thirdStep.Delta)
+                .ToDictionary(item => item.Origin, item => item.Profile);
+            var retainedPairRoute = new AccessV2RouteData(
+                new[] { first, secondStep.Next, thirdStep.Next },
+                retainedGeneratedProfiles,
+                null,
+                Array.Empty<Tile2i>(),
+                new[]
+                {
+                    new AccessV2RouteStep(first, null, null, null),
+                    new AccessV2RouteStep(
+                        secondStep.Next, secondStep, null, null),
+                    new AccessV2RouteStep(
+                        thirdStep.Next, thirdStep, null, null),
+                });
+            var retainedPairResult = new AccessSearchResult(
+                true, string.Empty, lane0Source,
+                Array.Empty<AccessSearchNode>(),
+                10f, 1,
+                new Dictionary<string, int>(),
+                10f, 0f, 0f, 0f, 0f,
+                reachedGoalKind: AccessReachedGoalKind.FixedNetwork,
+                diagnostics: new AccessSearchDiagnostics(),
+                v2Route: retainedPairRoute);
+            AccessDesignationPlan retainedPairPlan =
+                AccessPathMaterializer.Materialize(
+                    retainedPairSnapshot, retainedPairResult);
+            if (!retainedPairPlan.IsValid)
+            {
+                failure = "V2 materialization replay must retain fixed predecessor safety ownership exactly as search does: "
+                    + retainedPairPlan.FailureReason;
+                return false;
+            }
+            Tile2i connectedFixedNeighbor = AccessV2Geometry.Add(
+                lane1Source,
+                AccessV2BandProfile.GetLaneDirection(first.Axis));
+            var connectedStructureProfiles =
+                new Dictionary<Tile2i, AccessHeightProfile>(sourcePairProfiles)
+                {
+                    [connectedFixedNeighbor] = first.GetLane(1).Profile,
+                };
+            AccessV2TransitionEvaluation connectedStructureSafety =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins: Array.Empty<Tile2i>(),
+                        preciseTerrain: sourcePairTerrain,
+                        fixedProfiles: connectedStructureProfiles,
+                        projectedFillTiles:
+                            new[] { retainedPairSafetyTile },
+                        projectedFillSources:
+                            new Dictionary<Tile2i, HashSet<Tile2i>>
+                            {
+                                [retainedPairSafetyTile] =
+                                    new HashSet<Tile2i>
+                                    {
+                                        connectedFixedNeighbor,
+                                    },
+                            }),
+                    secondStep.Next, thirdStep,
+                    retainedPredecessorHistory, null);
+            if (!connectedStructureSafety.IsValid)
+            {
+                failure = "V2 generated fringe continuation must waive safety from the connected fixed predecessor structure, not only its first two origins: "
+                    + connectedStructureSafety.RejectionReason;
+                return false;
+            }
+            Tile2i disconnectedFixedOrigin = new Tile2i(28, 28);
+            var disconnectedStructureProfiles =
+                new Dictionary<Tile2i, AccessHeightProfile>(sourcePairProfiles)
+                {
+                    [disconnectedFixedOrigin] = first.GetLane(1).Profile,
+                };
+            AccessV2TransitionEvaluation disconnectedStructureSafety =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins: Array.Empty<Tile2i>(),
+                        preciseTerrain: sourcePairTerrain,
+                        fixedProfiles: disconnectedStructureProfiles,
+                        projectedFillTiles:
+                            new[] { retainedPairSafetyTile },
+                        projectedFillSources:
+                            new Dictionary<Tile2i, HashSet<Tile2i>>
+                            {
+                                [retainedPairSafetyTile] =
+                                    new HashSet<Tile2i>
+                                    {
+                                        disconnectedFixedOrigin,
+                                    },
+                            }),
+                    secondStep.Next, thirdStep,
+                    retainedPredecessorHistory, null);
+            if (disconnectedStructureSafety.IsValid
+                || disconnectedStructureSafety.RejectionReason
+                    != "ProjectedTerrainSafety")
+            {
+                failure = "V2 predecessor safety ownership must not waive projections from disconnected fixed structures";
+                return false;
+            }
+            var undercutTerrain =
+                new Dictionary<Tile2i, float>(sourcePairTerrain)
+                {
+                    [retainedPairSafetyTile] = 4f,
+                };
+            AccessV2TransitionEvaluation undercutCutSafety =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins: Array.Empty<Tile2i>(),
+                        preciseTerrain: undercutTerrain,
+                        fixedProfiles: sourcePairProfiles,
+                        projectedCutTiles:
+                            new[] { retainedPairSafetyTile },
+                        projectedCutSources:
+                            new Dictionary<Tile2i, HashSet<Tile2i>>
+                            {
+                                [retainedPairSafetyTile] =
+                                    new HashSet<Tile2i>
+                                    {
+                                        disconnectedFixedOrigin,
+                                    },
+                            }),
+                    secondStep.Next, thirdStep,
+                    retainedPredecessorHistory, null);
+            if (!undercutCutSafety.IsValid)
+            {
+                failure = "V2 profiles performing a deeper cut must be able to enter a cut ray's safety tail: "
+                    + undercutCutSafety.RejectionReason;
                 return false;
             }
             AccessV2TransitionEvaluation ownedExactInternalBand =
@@ -4032,6 +4723,193 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 failure =
                     "V2 strafe must retain its complete exact-terrain swept delta as owned designations";
+                return false;
+            }
+            if (!TryCreateUniformState(
+                    new Tile2i(12, 12), AccessV2TravelAxis.X,
+                    new Tile2i(4, 0), AccessSearchMode.Flat, 0,
+                    out AccessV2BandState rearClearanceState,
+                    out failure)
+                || !AccessV2Geometry.TryStrafe(
+                    rearClearanceState, 1,
+                    out AccessV2Transition rearClearanceStrafe,
+                    out failure))
+                return false;
+            var rearClearanceTerrain =
+                new Dictionary<Tile2i, float>(preciseByTile)
+                {
+                    // The newly introduced predecessor-outer origin is
+                    // (8,20). Its rear face is x=8 and must launch toward -X.
+                    [new Tile2i(8, 20)] = 4f,
+                    [new Tile2i(8, 24)] = 4f,
+                };
+            AccessV2TransitionEvaluation rearBlockedStrafe =
+                AccessPathSearch.EvaluateV2Transition(
+                    CreateReplaySnapshot(
+                        levelingRayOrigins:
+                            new[] { new Tile2i(4, 20) },
+                        preciseTerrain: rearClearanceTerrain),
+                    rearClearanceState, rearClearanceStrafe,
+                    AccessV2History.Empty, null);
+            if (rearBlockedStrafe.IsValid
+                || rearBlockedStrafe.RejectionReason
+                    != "SideRayDesignation")
+            {
+                failure = "V2 strafe must validate the exposed rear face of its newly introduced predecessor-outer origin: "
+                    + rearBlockedStrafe.RejectionReason;
+                return false;
+            }
+            if (!AccessV2Geometry.TryStrafe(
+                    rearClearanceStrafe.Next, 1,
+                    out AccessV2Transition adjacentStrafe,
+                    out failure))
+                return false;
+            var adjacentStrafeTerrain =
+                new Dictionary<Tile2i, float>(preciseByTile);
+            for (int y = 8; y <= 32; y++)
+                for (int x = 4; x <= 24; x++)
+                    adjacentStrafeTerrain[new Tile2i(x, y)] = 20f;
+            AccessSearchSnapshot adjacentStrafeSnapshot =
+                CreateReplaySnapshot(
+                    levelingRayOrigins: Array.Empty<Tile2i>(),
+                    preciseTerrain: adjacentStrafeTerrain,
+                    fixedProfiles:
+                        new Dictionary<Tile2i, AccessHeightProfile>());
+            AccessV2TransitionEvaluation firstAdjacentStrafe =
+                AccessPathSearch.EvaluateV2Transition(
+                    adjacentStrafeSnapshot,
+                    rearClearanceState, rearClearanceStrafe,
+                    AccessV2History.Empty, null);
+            if (!firstAdjacentStrafe.IsValid)
+            {
+                failure = "V2 adjacent-strafe cost fixture first move failed: "
+                    + firstAdjacentStrafe.RejectionReason;
+                return false;
+            }
+            var adjacentProjectedWork =
+                new Dictionary<Tile2i, AccessProjectedTerrainEffect>();
+            for (int index = 0;
+                index < firstAdjacentStrafe.RayConstraints.Count;
+                index++)
+            {
+                AccessRayHeightConstraint constraint =
+                    firstAdjacentStrafe.RayConstraints[index];
+                if (constraint.IsSafetyOnly)
+                    continue;
+                adjacentProjectedWork.TryGetValue(
+                    constraint.Tile,
+                    out AccessProjectedTerrainEffect effect);
+                if (constraint.Operation == AccessSideRayOperation.Cut
+                    && (!effect.HasCutWork
+                        || constraint.Height < effect.CutCeiling))
+                {
+                    effect.HasCutWork = true;
+                    effect.CutCeiling = constraint.Height;
+                }
+                else if (constraint.Operation
+                        == AccessSideRayOperation.Fill
+                    && (!effect.HasFillWork
+                        || constraint.Height > effect.FillFloor))
+                {
+                    effect.HasFillWork = true;
+                    effect.FillFloor = constraint.Height;
+                }
+                adjacentProjectedWork[constraint.Tile] = effect;
+            }
+            float adjacentProjectedVolume = 0f;
+            foreach (KeyValuePair<Tile2i, AccessProjectedTerrainEffect> pair
+                in adjacentProjectedWork)
+            {
+                if (!adjacentStrafeSnapshot.TryGetPreciseTerrainHeight(
+                        pair.Key, out float projectedTerrainHeight))
+                    continue;
+                if (pair.Value.HasCutWork)
+                    adjacentProjectedVolume += Math.Max(
+                        0f, projectedTerrainHeight - pair.Value.CutCeiling);
+                if (pair.Value.HasFillWork)
+                    adjacentProjectedVolume += Math.Max(
+                        0f, pair.Value.FillFloor - projectedTerrainHeight);
+            }
+            if (adjacentProjectedVolume
+                > firstAdjacentStrafe.ExteriorRayCost + 0.0001f)
+            {
+                failure = "V2 ray charge must cover the unique projected work volume made creditable to later profiles: ray="
+                    + firstAdjacentStrafe.ExteriorRayCost
+                    + ", projected=" + adjacentProjectedVolume;
+                return false;
+            }
+            AccessV2History adjacentHistoryWithoutRays =
+                AccessV2History.Empty.ApplyValidated(
+                    rearClearanceStrafe,
+                    Array.Empty<AccessRayHeightConstraint>(),
+                    firstAdjacentStrafe.CleanupKeys);
+            AccessV2History adjacentHistoryWithRays =
+                AccessV2History.Empty.ApplyValidated(
+                    rearClearanceStrafe,
+                    firstAdjacentStrafe.RayConstraints,
+                    firstAdjacentStrafe.CleanupKeys);
+            AccessV2TransitionEvaluation secondAdjacentWithoutCredit =
+                AccessPathSearch.EvaluateV2Transition(
+                    adjacentStrafeSnapshot,
+                    rearClearanceStrafe.Next, adjacentStrafe,
+                    adjacentHistoryWithoutRays, null);
+            AccessV2TransitionEvaluation secondAdjacentWithCredit =
+                AccessPathSearch.EvaluateV2Transition(
+                    adjacentStrafeSnapshot,
+                    rearClearanceStrafe.Next, adjacentStrafe,
+                    adjacentHistoryWithRays, null);
+            if (!secondAdjacentWithoutCredit.IsValid
+                || !secondAdjacentWithCredit.IsValid)
+            {
+                failure = "V2 adjacent-strafe cost fixture second move failed: "
+                    + secondAdjacentWithoutCredit.RejectionReason + "/"
+                    + secondAdjacentWithCredit.RejectionReason;
+                return false;
+            }
+            if (!AccessV2Geometry.TryStrafe(
+                    adjacentStrafe.Next, 1,
+                    out AccessV2Transition thirdAdjacentStrafe,
+                    out failure))
+                return false;
+            AccessV2History secondAdjacentHistoryWithoutRays =
+                adjacentHistoryWithoutRays.ApplyValidated(
+                    adjacentStrafe,
+                    Array.Empty<AccessRayHeightConstraint>(),
+                    secondAdjacentWithoutCredit.CleanupKeys);
+            AccessV2History secondAdjacentHistoryWithFirstRays =
+                adjacentHistoryWithRays.ApplyValidated(
+                    adjacentStrafe,
+                    Array.Empty<AccessRayHeightConstraint>(),
+                    secondAdjacentWithCredit.CleanupKeys);
+            AccessV2TransitionEvaluation thirdAdjacentWithoutCredit =
+                AccessPathSearch.EvaluateV2Transition(
+                    adjacentStrafeSnapshot,
+                    adjacentStrafe.Next, thirdAdjacentStrafe,
+                    secondAdjacentHistoryWithoutRays, null);
+            AccessV2TransitionEvaluation thirdAdjacentWithCredit =
+                AccessPathSearch.EvaluateV2Transition(
+                    adjacentStrafeSnapshot,
+                    adjacentStrafe.Next, thirdAdjacentStrafe,
+                    secondAdjacentHistoryWithFirstRays, null);
+            if (!thirdAdjacentWithoutCredit.IsValid
+                || !thirdAdjacentWithCredit.IsValid)
+            {
+                failure = "V2 adjacent-strafe cost fixture third move failed: "
+                    + thirdAdjacentWithoutCredit.RejectionReason + "/"
+                    + thirdAdjacentWithCredit.RejectionReason;
+                return false;
+            }
+            float adjacentCredit =
+                secondAdjacentWithoutCredit.DirectWorkCost
+                - secondAdjacentWithCredit.DirectWorkCost
+                + thirdAdjacentWithoutCredit.DirectWorkCost
+                - thirdAdjacentWithCredit.DirectWorkCost;
+            if (adjacentCredit
+                > firstAdjacentStrafe.ExteriorRayCost + 0.0001f)
+            {
+                failure = "V2 projected ray work must not credit a following adjacent strafe more than the ray work was charged: ray="
+                    + firstAdjacentStrafe.ExteriorRayCost
+                    + ", credit=" + adjacentCredit;
                 return false;
             }
             var syntheticTransition = new AccessV2Transition(

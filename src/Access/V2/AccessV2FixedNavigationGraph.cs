@@ -112,6 +112,8 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly AccessV2GroundGraph m_exactGround;
 
         public int NodeCount => m_nodes.Count;
+        internal IEnumerable<AccessV2FixedNavigationNode> Nodes
+            => m_nodes.Values;
 
         public AccessV2FixedNavigationGraph(
             IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,

@@ -485,14 +485,23 @@ namespace AutoTerrainDesignations.Access.V2
                 reason = evaluation.RejectionReason;
                 return false;
             }
-            if (!history.TryApply(
-                    transition,
-                    evaluation.RayConstraints,
-                    evaluation.CleanupKeys,
-                    out AccessV2History next,
-                    out reason))
-                return false;
-            history = next;
+            var snapshotSafetyExemptOrigins = new HashSet<Tile2i>();
+            if (connectedFixed.HasValue)
+                snapshotSafetyExemptOrigins.Add(connectedFixed.Value);
+            if (current.HasValue)
+            {
+                for (int lane = 0; lane < 2; lane++)
+                {
+                    Tile2i origin = current.Value.GetLaneOrigin(lane);
+                    if (snapshot.TryGetFixedProfile(origin, out _))
+                        snapshotSafetyExemptOrigins.Add(origin);
+                }
+            }
+            history = history.ApplyValidated(
+                transition,
+                evaluation.RayConstraints,
+                evaluation.CleanupKeys,
+                snapshotSafetyExemptOrigins);
             for (int index = 0; index < transition.Delta.Count; index++)
                 ordered.Add(transition.Delta[index]);
             return true;

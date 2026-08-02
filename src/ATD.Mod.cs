@@ -442,7 +442,7 @@ public static string Tt(string text) => text;
 
     /// <summary>
     /// Allows a bounded experimental accessway retry beyond the tower area
-    /// after the normal in-area search fails.
+    /// after the normal in-area search exhausts its available routes.
     /// </summary>
     public static bool AllowRampsOutsideTowerAreas { get; private set; } = true;
 

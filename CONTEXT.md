@@ -5,6 +5,154 @@ Captain of Industry structures accessible.
 
 ## Accessway pathfinding
 
+**Access obligation**:
+A workflow-owned need to connect current terrain work to reachable ground. It
+remains the same obligation while world state changes and successive route
+attempts are superseded, cancelled, blocked, or completed.
+_Avoid_: Access request, pathfinding attempt, work key
+
+**Access request**:
+One transient attempt to satisfy an access obligation against a captured view
+of the world. Ending a request does not by itself end its access obligation.
+_Avoid_: Access obligation, permanent access job
+
+**Access request owner**:
+The workflow responsible for an access obligation and for interpreting its
+progress, result, and user cancellation.
+_Avoid_: Tower owner, pathfinder owner
+
+**Modeled-rule preservation**:
+The promise that making accessway search faster does not exclude a route that
+the active physical accessway model permits. Deliberate player-relevance
+pruning is a separate experimental policy, not an implicit feasibility rule.
+_Avoid_: Absolute search completeness, silent futile-route pruning
+
+**Active ray envelope**:
+The combined terrain effect currently imposed by a candidate accessway's side
+rays. Overlapping contributions with no distinct physical effect collapse;
+their chronological generation is not part of the modeled state.
+_Avoid_: Ray event history, ray audit trail
+
+**Path-local projected-terrain overlay**:
+The approximate terrain effects planned by one candidate accessway, layered
+over the shared captured terrain without changing it. A disrupted overlay tile
+is unavailable to physical-ground navigation, while its projected cut or fill
+surface constrains later generated work.
+_Avoid_: Mutated search snapshot, chronological ray constraints
+
+**Immediate-successor clearance waiver**:
+The one-step permission for an immediately connected continuation to pass through the
+predecessor fringe's projected terrain effect. The effect remains persistent,
+new work is still costed, and no later continuation inherits the waiver.
+_Avoid_: Deleted predecessor rays, replaceable fringe terrain
+
+**Height-aware same-sort contact**:
+A cut ray resolves when its incoming slope reaches or rises above an earlier
+projected cut surface; a deeper cut pays only the remaining gap and continues.
+A fill ray mirrors this rule, resolving at or below an earlier fill surface and
+continuing above it. Static blockers remain authoritative until resolution.
+_Avoid_: Presence-only ray termination, same-sort blocking
+
+**Projected-contact safety boundary**:
+The ordinary post-termination safety margin applied after a ray resolves
+against projected terrain. It adds no landscaping work but must remain clear
+of hazards, including non-exempt designation footprints that emitted earlier
+rays.
+_Avoid_: Immediate projected-ray stop, duplicate work charge
+
+**Projected-work span**:
+The active portion of a ray where positive cut or fill work remains. Its
+projected heights participate in later ray resolution and projected-work
+credit.
+_Avoid_: Complete disturbed span, safety buffer
+
+**Ray safety-only span**:
+The precautionary area after ray termination. It is disrupted and unavailable
+to G but supplies neither projected height nor landscaping credit. A later
+same-sort ray may cross it, while opposing ray work and any non-exempt V
+footprint are fatal.
+_Avoid_: Projected ground, free work span
+
+**Connected-predecessor disturbance guarantee**:
+The game-mechanical protection enjoyed by the immediately connected
+predecessor across the guaranteed single lateral-band gap. Ray clearance and
+safety-buffer checks exempt that predecessor, but not older nearby origins.
+_Avoid_: General history exemption, predecessor safety scan
+
+**Connected-convex disturbance safety**:
+The physical principle that a connected convex terrain-work area is safe from
+its own projected disruption because no terrain material runs farther than the
+artificial slope joining it. It justifies simple local exemptions but does not
+require the search to prove arbitrary convex regions.
+_Avoid_: Convex-region search rule, universal connected-work exemption
+
+**Two-direction self-disruption safety**:
+A connected V path whose longitudinal travel uses no more than two cardinal
+directions is safe from its own projected disruption. Lateral strafes preserve
+the current travel direction and do not introduce another direction; exterior
+rays in such a path cannot reach an earlier origin footprint.
+_Avoid_: Two-axis rule, turn-count limit
+
+**Uninterrupted V segment**:
+One connected run of generated V work. Entering physical or projected fixed
+ground ends the segment and a later V launch starts a new direction-safety
+scope, while all projected terrain effects remain part of the complete route.
+_Avoid_: Complete accessway route, global V direction set
+
+**Incremental self-disruption validation**:
+An extension validates its new profiles against the established projected
+terrain and its new rays against established non-exempt origins. Previously
+accepted profiles and rays remain established and require no retroactive audit.
+_Avoid_: Whole-history revalidation, final-shape safety proof
+
+**Direction-introducing turn safety**:
+A turn that introduces a third travel direction emits its outer ray in the old
+direction, so that ray retains the established prefix's self-disruption safety.
+Stricter origin checks begin with later rays emitted in the new direction.
+_Avoid_: Third-direction turn audit, retroactive turn rejection
+
+**Opposing-work conflict**:
+A later generated cut or fill that would fight the persistent projected effect
+of the opposite operation. The conflict is fatal even when it occurs far from
+the segment that created the earlier effect.
+_Avoid_: Ray crossing, same-sort overlap
+
+**Generated-profile ray-envelope contact**:
+The comparison of a later generated profile corner with an earlier projected
+ray surface. A corner that continues the same terrain operation or reaches
+captured terrain without opposing work is compatible even when its target does
+not extend the earlier projected height. A corner that actually performs the
+opposite operation is fatal, and an accepted corner may emit a new ray of its
+own.
+_Avoid_: Leveling ray, automatic ray continuation
+
+**Projected-work credit**:
+The landscaping work already represented by a compatible projected terrain
+effect. Later work pays only the additional cut or fill beyond that projected
+surface rather than paying again from captured physical terrain, regardless of
+whether existing designations or the current candidate projected the effect.
+_Avoid_: Free additional work, duplicate landscaping charge
+
+**Projected-envelope work charge**:
+The marginal landscaping charge for the complete clearance-dilated terrain
+effect contributed by a generated ray. It uses the same projected cut ceiling
+or fill floor that later profiles can credit, collapses overlap with captured
+designation work, earlier path-local rays, and other rays in the same
+transition, and retains the configured per-ray cap and unresolved penalty.
+_Avoid_: Centerline-only ray charge, duplicate envelope charge
+
+**Ambiguous opposing projection**:
+A tile onto which existing terrain work projects both cut and fill effects.
+Because its eventual surface is execution-order dependent, it is disrupted for
+G and a hard blocker for newly generated accessway work.
+_Avoid_: Blended projected height, selectable projection order
+
+**T3 accessway model**:
+The current two-lane accessway model for T3/Mega vehicle clearance. It is the
+immediate refinement target and may later supply rules shared with the
+single-lane T1/T2 models without requiring premature unification.
+_Avoid_: Universal accessway model, permanently T3-only model
+
 **V2 source launch**:
 A feasible two-slice, 2×2-origin prefix whose initial slice contains a source
 obligation and whose successor slice proves the first longitudinal Mega move.
@@ -144,24 +292,31 @@ the sole feasibility authority.
 _Avoid_: Resolved transition, heuristic construction work
 
 **Component-conditioned V commitment potential**:
-A deferred replacement route potential for a V label launched from one
-non-goal G component. It inherits complete global-potential values at that
-component's useful V merge fringe and flood-fills backward through its sparse V
-shadow at one cardinal-origin traversal plus fixed overhead per step. The
-source component is carried as potential ownership; the field replaces rather
-than augments the global route potential while that commitment remains active.
-It is not part of the initial global-potential implementation because its
-commitment semantics require a separate dominance proof.
+A replacement route potential for a V label launched from one non-goal G
+component. It inherits complete global-potential values at that component's
+useful V merge fringe and flood-fills backward through its sparse V shadow at
+one cardinal-origin traversal plus fixed overhead per step. The source
+component is carried as potential ownership; the field replaces rather than
+augments the global route potential while that commitment remains active.
+Returning to the source component remains legal after the uninterrupted V
+segment has reached the useful merge fringe.
 _Avoid_: Additive V surcharge, component-independent V potential
 
 **Potential-owner state**:
-The deferred identity selecting either the global mixed route potential or the
+The identity selecting either the global mixed route potential or the
 component-conditioned field belonging to the G component from which the
 current uninterrupted V route launched. One physical origin may have values
 for several component owners; reaching the owner's useful V merge fringe
-returns ownership to the global field. It is absent from the initial exact
-search state.
+returns ownership to the global field.
 _Avoid_: Physical-origin partition, generated history
+
+**Useful V merge fringe**:
+The first P-owned continuation at which an uninterrupted V segment launched
+from a G component has paid for non-G-equivalent progress. Before this fringe,
+returning to the source component is dominated by remaining on G and avoiding
+the V overhead. After this fringe, returning to that same component is legal
+because the V segment may represent a genuine shortcut through it.
+_Avoid_: Any origin catalogued by P, permanent same-component-return ban
 
 **Resolved V2 move**:
 A generated-band movement whose newly encountered origins are resolved as

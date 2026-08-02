@@ -97,6 +97,13 @@ namespace AutoTerrainDesignations.Access.V2
             => m_componentByTile.TryGetValue(tile, out int component)
                 && m_goalComponents.Contains(component);
 
+        internal bool TryGetComponentId(Tile2i tile, out int component)
+            => m_componentByTile.TryGetValue(tile, out component);
+
+        internal bool IsInComponent(Tile2i tile, int component)
+            => m_componentByTile.TryGetValue(tile, out int found)
+                && found == component;
+
         internal HashSet<int> CollectGoalOrExitComponents(
             Func<Tile2i, bool> canExitToGeneratedV)
         {

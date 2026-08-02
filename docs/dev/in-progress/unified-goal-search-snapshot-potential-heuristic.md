@@ -2,7 +2,12 @@
 
 ## Status
 
-**Implemented in V2; V1 sharing remains future work**
+**Superseded in V2 on 2026-08-01 by the sparse V-type route-potential
+foundation; V1 sharing remains future work.**
+
+The dense canonical-center formulation below is retained as implementation
+history. Production V2 now uses the sparse generated-origin/FV field described
+in [Sparse V-Type Route Potential](../planned/accessway-pathfinding-sparse-v-route-potential.md).
 
 ## Accepted V2 formulation
 
