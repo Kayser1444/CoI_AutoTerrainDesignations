@@ -1,6 +1,6 @@
 {
   "id": "AutoTerrainDesignations",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "display_name": "Kayser's Automatic Terrain Designations",
   "description_short": "Designate mine deposits, plan accessways, inspect ore composition, excavate debris, and prepare farmland.",
   "description_long": "<b>Auto Terrain Designations</b>\n\nCreate mining designations for a Mine Control Tower from the ore deposit beneath it — without manually painting every tile.\n\n<b>Features</b>\n- <b>Create Designations</b>: Scans the tower area and places mining designations at the appropriate depth for the selected product.\n- <b>Accessways</b>: Optionally creates ramps and experimental turning accessways so vehicles can reach deeper work areas.\n- <b>Ore composition</b>: Shows the products contained in the current mining designations.\n- <b>Farmland preparation</b>: Helps prepare uneven terrain for farm placement.\n- <b>Corner designations</b>: Adds manual inner and outer corner designations to the terrain designation tools.\n\n<b>How to use</b>\n1. Select a <b>Mine Control Tower</b>.\n2. Optionally choose an <i>ore filter</i> and adjust the tower settings.\n3. Click <b>Create Designations</b> to scan the area and place mining designations.\n4. Use the trash button to clear the tower's mining designations when needed.\n\n<b>Note:</b> Mining designation tools operate within the selected tower's managed area.\n\n<i>Compatible with vanilla saves — the mod can be added to or removed from existing saves safely.</i>",

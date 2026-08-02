@@ -1,3 +1,5 @@
+v0.5.8 [unreleased]
+
 v0.5.7 [released]
 
 * Fixed: ATD notification messages now refresh after the game applies the selected mod translation, including the excavator-completed notification.
