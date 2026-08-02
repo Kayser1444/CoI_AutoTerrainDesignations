@@ -1,3 +1,12 @@
+v0.5.7 | 2026-08-02
+* Fixed: ATD notification messages now refresh after the selected mod translation is applied, including excavator completion notifications
+* Changed: Removed queued debris-cleanup notifications; removal designations now provide progress feedback
+* Fixed: Shift-Alt-clicking a tower vehicle-order button no longer enqueues both a pre-assigned truck and a second free truck
+* Improved: Added an enabled-by-default setting that allows access ramps outside tower areas when an in-area search cannot find a feasible route
+* Improved: Added independent controls for access-search diagnostics and a command to clear all diagnostic overlays
+* Fixed: V2 accessway pathfinding no longer rejects valid routes around generated terrain, clearance boundaries, and same-operation landscaping rays
+* Fixed: Clear designations now cancels pending accessway Quick remove requests and removes their temporary previews
+
 v0.5.6 | 2026-08-01
 * Improved: While paused, prop removal advances pending cleanup far enough to show temporary terrain designations
 * Changed: Pending Quick remove requests display a temporary mining preview when unassigned, spending Unity only after unpausing
