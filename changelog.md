@@ -1,5 +1,7 @@
 v0.5.8 [unreleased]
 
+* Fixed: Restricted vehicle pre-allocation UI updates to MineTower inspectors and registered pending orders for save/load persistence, preventing cross-mod display overwrites and lost ATD orders after reload.
+
 v0.5.7 [released]
 
 * Fixed: ATD notification messages now refresh after the game applies the selected mod translation, including the excavator-completed notification.
