@@ -141,6 +141,7 @@ namespace AutoTerrainDesignations
         {
             try
             {
+                if (parent.GetType().Name != "MineTowerInspector") return;
                 if (!(proto is ExcavatorProto) && !(proto is TruckProto)) return;
 
                 // Find the column inside row
