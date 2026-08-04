@@ -649,6 +649,9 @@ namespace AutoTerrainDesignations
                 ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
                 ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
                 ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
+                ApplyInt("accessManagerAutomatedFrameBudgetMs", 10, AutoTerrainDesignationsMod.SetAccessManagerAutomatedFrameBudgetMs);
+                ApplyInt("accessManagerInteractiveFrameBudgetMs", 15, AutoTerrainDesignationsMod.SetAccessManagerInteractiveFrameBudgetMs);
+                ApplyInt("accessManagerPausedMaxFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessManagerPausedMaxFrameBudgetMs);
 
                 void ApplyFloat(string key, float defaultValue, Action<float> setter)
                 {
@@ -1093,6 +1096,15 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessSearchFrameBudgetMs\": \"Time budget in milliseconds per frame allocated to sliced background access search. Default: 30.\",");
             sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessManagerAutomatedFrameBudgetMs\": \"Managed farming and Construction Assist search budget per rendered frame during normal play. Default: 10.\",");
+            sb.AppendLine($"  \"accessManagerAutomatedFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessManagerAutomatedFrameBudgetMs},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessManagerInteractiveFrameBudgetMs\": \"Managed direct-interaction search budget per rendered frame during normal play. Reserved for interactive migration. Default: 15.\",");
+            sb.AppendLine($"  \"accessManagerInteractiveFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessManagerInteractiveFrameBudgetMs},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessManagerPausedMaxFrameBudgetMs\": \"Maximum managed access-search budget per rendered frame while paused. Default: 30.\",");
+            sb.AppendLine($"  \"accessManagerPausedMaxFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessManagerPausedMaxFrameBudgetMs},");
             sb.AppendLine();
             sb.AppendLine("  \"purityLevels\": {");
             sb.AppendLine("    \"_comment\": \"Thresholds applied at each Ore Purity Level. Arrays have 5 entries: [Off, Low, Med, High, Max]. Off (index 0) should always be 0 / no filtering. These define what each level means \u2014 edit if you want to retune the purity steps.\",");

@@ -8,8 +8,11 @@ All current access-search callers will use one transient, single-active,
 cooperative `ATDAccesswayManager`. Direct interactive work has strict priority
 over derived farming and Construction Assist work; equal-priority requests from
 different owners queue rather than cancel one another. Search remains on the
-game-owned threads, preserves legacy and V1/V2 route-selection semantics, and
-advances within separate automated, interactive, and paused frame budgets.
+game-owned threads, uses the new access planner without importing legacy ramp
+generation or candidate comparison, and advances within separate automated,
+interactive, and paused frame budgets. Existing callers may retain the legacy
+path temporarily until they migrate; every caller uses only the new planner
+after migration.
 
 This replaces distributed caller-owned scheduling because farming synchronously
 drained a multi-cluster fixpoint and held one simulation step for up to 8.67
@@ -26,6 +29,15 @@ state is runtime-only and re-derived across world loads so save removability is
 unchanged.
 
 Production fails closed with request-scoped status and diagnostics when the
-manager cannot proceed; it never falls back to the old synchronous drain. The
-first release must migrate both interactive and derived callers, retain existing
-route choices, and clear the multi-cluster freeze in a live save.
+manager cannot proceed; it never falls back to the old synchronous drain.
+Migration starts with farming because that is the observed severe freeze. While
+interactive callers remain outside the manager, their active-operation gate
+suspends managed farming work so searches cannot compete. Interactive callers
+then migrate to the same manager before the legacy generator is removed.
+
+A releaseable mitigation may precede the manager. It stops a farming fixpoint
+at its first failed search, negatively caches that failed obligation for a
+10-to-60-second event-assisted grace period, and aggregates expected failure
+diagnostics without warning stack traces. This bounds recurrence but does not
+make the remaining individual synchronous search cooperative, so one isolated
+hitch can still occur until farming migrates to the manager.

@@ -1453,11 +1453,6 @@ namespace AutoTerrainDesignations
                 v2Endpoints);
         }
 
-        private sealed class ExperimentalAccessDryRunResult
-        {
-            public AccessSearchResult? Result;
-        }
-
         internal static void SetUiRoot(UiRoot uiRoot)
         {
             s_uiRoot = uiRoot;
@@ -1480,7 +1475,8 @@ namespace AutoTerrainDesignations
             AccessOriginCluster cluster,
             int clusterIndex,
             int clusterCount,
-            ExperimentalAccessDryRunResult output)
+            ExperimentalAccessDryRunResult output,
+            ExperimentalAccessSliceControl? sliceControl = null)
         {
             AccessSearchSnapshot snapshot = request.Snapshot;
             Stopwatch searchTimer = Stopwatch.StartNew();
@@ -1490,6 +1486,7 @@ namespace AutoTerrainDesignations
             Stopwatch createSessionTimer = Stopwatch.StartNew();
             var session = AccessPathSearch.CreateSession(request);
             createSessionTimer.Stop();
+            TimeSpan managedProcessingElapsed = createSessionTimer.Elapsed;
             if (ShowExperimentalAccessSearchOverlay
                 || ShowExperimentalAccessPotentialOverlay)
             {
@@ -1510,7 +1507,11 @@ namespace AutoTerrainDesignations
             int lastToastSecond = -1;
             int slowStepLogCount = 0;
 
-            while (!session.IsComplete && !s_cancelExperimentalAccessSearch)
+            bool IsCancellationRequested()
+                => sliceControl?.CancellationRequested
+                    ?? s_cancelExperimentalAccessSearch;
+
+            while (!session.IsComplete && !IsCancellationRequested())
             {
                 Stopwatch sliceTimer = Stopwatch.StartNew();
                 do
@@ -1525,32 +1526,48 @@ namespace AutoTerrainDesignations
                             $"[ATD Experimental Access Search SlowStep] request={request.RequestId} " +
                             $"cluster={cluster.ClusterId} stepMs={stepTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                             $"visited={session.VisitedNodes} pending={session.PendingNodes} " +
-                            $"elapsedMs={searchTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)}");
+                            $"elapsedMs={(sliceControl == null
+                                ? searchTimer.Elapsed
+                                : managedProcessingElapsed + sliceTimer.Elapsed).TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)}");
                     }
                 }
                 while (!session.IsComplete
-                    && !s_cancelExperimentalAccessSearch
-                    && sliceTimer.ElapsedMilliseconds < AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs
-                    && searchTimer.Elapsed.TotalSeconds < AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds);
+                    && !IsCancellationRequested()
+                    && sliceTimer.ElapsedMilliseconds < (sliceControl?.SliceBudgetMilliseconds
+                        ?? AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs)
+                    && (sliceControl == null
+                        ? searchTimer.Elapsed.TotalSeconds
+                        : (managedProcessingElapsed + sliceTimer.Elapsed).TotalSeconds)
+                        < AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds);
                 sliceTimer.Stop();
+                if (sliceControl != null)
+                    managedProcessingElapsed += sliceTimer.Elapsed;
                 if (sliceTimer.Elapsed > maxSlice) maxSlice = sliceTimer.Elapsed;
                 frames++;
+                TimeSpan elapsed = sliceControl == null
+                    ? searchTimer.Elapsed
+                    : managedProcessingElapsed;
                 int elapsedSeconds = Math.Min(
                     AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds,
-                    (int)Math.Floor(searchTimer.Elapsed.TotalSeconds));
+                    (int)Math.Floor(elapsed.TotalSeconds));
+                sliceControl?.ReportProgress(
+                    session.VisitedNodes,
+                    session.PendingNodes);
                 if (elapsedSeconds != lastToastSecond)
                 {
-                    ShowTerrainAnalysisProgressToast(
-                        clusterIndex,
-                        clusterCount,
-                        elapsedSeconds,
-                        session.VisitedNodes,
-                        session.PendingNodes);
+                    if (sliceControl == null)
+                        ShowTerrainAnalysisProgressToast(
+                            clusterIndex,
+                            clusterCount,
+                            elapsedSeconds,
+                            session.VisitedNodes,
+                            session.PendingNodes);
                     lastToastSecond = elapsedSeconds;
                 }
                 if (!session.IsComplete)
                     yield return null;
-                if (searchTimer.Elapsed.TotalSeconds >= AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds
+                if (elapsed.TotalSeconds
+                        >= AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds
                     && !session.IsComplete)
                 {
                     break;
@@ -1558,7 +1575,7 @@ namespace AutoTerrainDesignations
             }
 
             searchTimer.Stop();
-            AccessSearchResult result = s_cancelExperimentalAccessSearch
+            AccessSearchResult result = IsCancellationRequested()
                 ? new AccessSearchResult(
                     false,
                     "SearchCancelled",
@@ -1579,9 +1596,15 @@ namespace AutoTerrainDesignations
                     session.VisitedNodes,
                     session.Rejections,
                     session.Diagnostics);
-            output.Result = result;
-            HideTerrainAnalysisProgressToast();
-            RecordExperimentalAccessDryRun(request, cluster, snapshot, result, searchTimer.Elapsed, frames, maxSlice);
+            if (sliceControl == null)
+                HideTerrainAnalysisProgressToast();
+            TimeSpan recordedElapsed = sliceControl == null
+                ? searchTimer.Elapsed
+                : managedProcessingElapsed;
+            AccessDesignationPlan? plan = RecordExperimentalAccessDryRun(
+                request, cluster, snapshot, result, recordedElapsed,
+                frames, maxSlice);
+            output.Complete(result, plan);
         }
 
         private static void ShowTerrainAnalysisProgressToast(
@@ -1628,7 +1651,7 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private static void RecordExperimentalAccessDryRun(
+        private static AccessDesignationPlan? RecordExperimentalAccessDryRun(
             AccessPathRequest request,
             AccessOriginCluster cluster,
             AccessSearchSnapshot snapshot,
@@ -1771,6 +1794,7 @@ namespace AutoTerrainDesignations
                 LogExperimentalAccessTrace(
                     $"[ATD V2 Search Path] cluster={cluster.ClusterId} " +
                     diag.V2DryRunPath);
+            AccessDesignationPlan? completedPlan = null;
             if (result.Success)
             {
                 if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
@@ -1779,6 +1803,7 @@ namespace AutoTerrainDesignations
                 LogExperimentalSelectedVToGHandoffDiagnostics(snapshot, result, cluster.ClusterId);
                 long materializeStart = AtdDiagnostics.Timestamp();
                 AccessDesignationPlan plan = AccessPathMaterializer.Materialize(snapshot, result);
+                completedPlan = plan;
                 LastExperimentalAccessPlan = plan;
                 if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
                 {
@@ -1826,6 +1851,7 @@ namespace AutoTerrainDesignations
                     if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
                         LogExperimentalAccessTrace($"[ATD Experimental Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
+            return completedPlan;
         }
 
         private static void LogExperimentalNonGoalGroundDiagnostics(

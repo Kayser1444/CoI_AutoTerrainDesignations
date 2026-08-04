@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using AutoTerrainDesignations.Access;
 using Mafi;
 using Mafi.Core;
 using Mafi.Core.Buildings.Mine;
@@ -78,6 +79,14 @@ namespace AutoTerrainDesignations
             public string LastAccessCheckDetail { get; set; } = string.Empty;
             public bool LastAccessCheckReady { get; set; } = true;
             public int LastAccessCheckTick { get; set; } = int.MinValue;
+            public AccessFailureRetryState PreparationAccessRetry { get; } =
+                new AccessFailureRetryState();
+            public AccessFailureRetryState FillingAccessRetry { get; } =
+                new AccessFailureRetryState();
+            public ATDAccesswayRequestHandle? PreparationAccessRequest { get; set; }
+            public ATDAccesswayRequestHandle? FillingAccessRequest { get; set; }
+            public bool PreparationAccessSuppressedByUser { get; set; }
+            public bool FillingAccessSuppressedByUser { get; set; }
             public float? FillingAllDoneSinceRealtime { get; set; }
             public bool FillingVehicleClearOutPending { get; set; }
             public bool FillingVehicleClearOutHasMovementCheck { get; set; }
@@ -281,6 +290,8 @@ namespace AutoTerrainDesignations
             session.Tower = tower;
             session.Enabled = true;
             session.AutoStartFilling = autoStartFilling;
+            session.PreparationAccessSuppressedByUser = false;
+            session.FillingAccessSuppressedByUser = false;
             if (session.Active)
             {
                 return session.LastReport;
@@ -331,6 +342,7 @@ namespace AutoTerrainDesignations
             session.Enabled = false;
             session.Active = false;
             session.Tower = tower;
+            CancelAllFarmingAccessRequests(session, "FarmingDisabled");
             session.LastAccessRampRequestKey = string.Empty;
             session.FillingAllDoneSinceRealtime = null;
             ClearPendingFillingAreaCache(session);
@@ -399,6 +411,7 @@ namespace AutoTerrainDesignations
             session.Tower = tower;
             session.Enabled = true;
             session.AutoStartFilling = true;
+            session.FillingAccessSuppressedByUser = false;
             if (session.Active)
                 return FarmingTr(
                     "session_already_active",
@@ -531,6 +544,7 @@ namespace AutoTerrainDesignations
             session.Enabled = false;
             session.Active = false;
             session.Tower = null;
+            CancelAllFarmingAccessRequests(session, "TowerRemoved");
             session.LastAccessRampRequestKey = string.Empty;
             session.FillingAllDoneSinceRealtime = null;
             ClearPendingFillingAreaCache(session);
@@ -816,6 +830,7 @@ namespace AutoTerrainDesignations
 
             foreach (FarmingPreparationSession session in s_farmingPreparationSessions.Values.ToList())
             {
+                CancelAllFarmingAccessRequests(session, "SaveBoundary");
                 IAreaManagingTower? tower = session.Tower;
                 if (tower != null)
                 {
@@ -911,6 +926,8 @@ namespace AutoTerrainDesignations
 
             // Clean up preparation-phase artifacts and place rim alignment designations before
             // the access-ramp check so the ramp avoids tiles already covered by a rim designation.
+            CancelFarmingAccessRequest(
+                session, isFilling: false, "FarmingPhaseChanged");
             RemoveOwnedFarmingPreparationShoulders(session);
             RemoveOwnedFarmingFutureRimDebrisCleanup(session);
             RemoveOwnedFarmingAccessRamps(session, isFilling: false);

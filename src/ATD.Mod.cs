@@ -162,6 +162,9 @@ public static string Tt(string text) => text;
         SetAccessMaxVisitedNodes(250000);
         SetAccessSearchTimeoutSeconds(60);
         SetAccessSearchFrameBudgetMs(30);
+        SetAccessManagerAutomatedFrameBudgetMs(10);
+        SetAccessManagerInteractiveFrameBudgetMs(15);
+        SetAccessManagerPausedMaxFrameBudgetMs(30);
         SetCornerDesignationMode(FromPrimaryKeys(KeyCode.K));
     }
 
@@ -585,6 +588,15 @@ public static string Tt(string text) => text;
     public static void SetAccessSearchTimeoutSeconds(int value) => AccessSearchTimeoutSeconds = Math.Max(5, Math.Min(600, value));
     public static int AccessSearchFrameBudgetMs { get; private set; } = 30;
     public static void SetAccessSearchFrameBudgetMs(int value) => AccessSearchFrameBudgetMs = Math.Max(1, Math.Min(100, value));
+    public static int AccessManagerAutomatedFrameBudgetMs { get; private set; } = 10;
+    public static void SetAccessManagerAutomatedFrameBudgetMs(int value)
+        => AccessManagerAutomatedFrameBudgetMs = Math.Max(1, Math.Min(15, value));
+    public static int AccessManagerInteractiveFrameBudgetMs { get; private set; } = 15;
+    public static void SetAccessManagerInteractiveFrameBudgetMs(int value)
+        => AccessManagerInteractiveFrameBudgetMs = Math.Max(1, Math.Min(30, value));
+    public static int AccessManagerPausedMaxFrameBudgetMs { get; private set; } = 30;
+    public static void SetAccessManagerPausedMaxFrameBudgetMs(int value)
+        => AccessManagerPausedMaxFrameBudgetMs = Math.Max(1, Math.Min(30, value));
 
     /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
     [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
@@ -663,7 +675,10 @@ public static string Tt(string text) => text;
             INotificationsManager notificationsManager = resolver.Resolve<INotificationsManager>();
             IInputScheduler inputScheduler = resolver.Resolve<IInputScheduler>();
             ConfigSerializationContext configSerializationContext = resolver.Resolve<ConfigSerializationContext>();
-            AutoTerrainDesignationsTicker ticker = AutoTerrainDesignationsTicker.CreateForWorld(AutoDepthDesignation.CurrentWorldGeneration + 1);
+            AutoTerrainDesignationsTicker ticker =
+                AutoTerrainDesignationsTicker.CreateForWorld(
+                    AutoDepthDesignation.CurrentWorldGeneration + 1,
+                    () => m_simLoopEvents?.IsSimPaused ?? false);
             AutoDepthDesignation.SetModRootDirectoryPath(Manifest.RootDirectoryPath);
             m_entitiesManager = entitiesManager;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
@@ -730,6 +745,7 @@ public static string Tt(string text) => text;
 
     private void beforeSave()
     {
+        AutoDepthDesignation.PrepareAccesswayManagerForSave();
         AutoDepthDesignation.PropRemovalManager?.PrepareForSave();
         IModStateJsonStore store = m_towerSettingsStateStore
             ?? ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
@@ -748,6 +764,7 @@ public static string Tt(string text) => text;
 
     private void onSaveDone(SaveResult result)
     {
+        AutoDepthDesignation.ResumeAccesswayManagerAfterSave();
         AutoDepthDesignation.PropRemovalManager?.ResumeAfterSave();
         AutoDepthDesignation.ResumeFarmingRuntimeAfterSave();
         AutoDepthDesignation.RestoreTransientNotificationsAfterSave();

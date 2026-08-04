@@ -509,6 +509,24 @@ namespace AutoTerrainDesignations
                 s_generatedDesignationOriginsByTowerEntityId);
             RemoveOwnership(
                 s_generatedAccesswayOriginsByTowerEntityId);
+            foreach (FarmingPreparationSession session
+                in s_farmingPreparationSessions.Values)
+            {
+                bool preparationRemoved =
+                    session.PreparationAccessRampOrigins.Remove(origin);
+                bool fillingRemoved =
+                    session.FillingAccessRampOrigins.Remove(origin);
+                if (!preparationRemoved && !fillingRemoved)
+                    continue;
+                session.LastAccessRampRequestKey = string.Empty;
+                ClearFarmingAccessCache(session);
+                LogExperimentalAccessDebug(
+                    $"[ATD Farming Access] ownership revoked at "
+                    + $"({origin.X},{origin.Y}) after designation removal "
+                    + $"phases={(preparationRemoved ? "preparation" : string.Empty)}"
+                    + $"{(preparationRemoved && fillingRemoved ? "+" : string.Empty)}"
+                    + $"{(fillingRemoved ? "filling" : string.Empty)}");
+            }
             foreach (EntityId towerId in affectedTowers)
                 if (s_towerSettingsByEntityId.TryGetValue(
                         towerId, out ATDTowerSettings settings))
@@ -554,6 +572,10 @@ namespace AutoTerrainDesignations
                 new HashSet<Tile2i> { origin };
             s_generatedAccesswayOriginsByTowerEntityId[towerId] =
                 new HashSet<Tile2i> { origin };
+            var farmingSession = new FarmingPreparationSession();
+            farmingSession.PreparationAccessRampOrigins.Add(origin);
+            farmingSession.FillingAccessRampOrigins.Add(origin);
+            s_farmingPreparationSessions[towerId] = farmingSession;
             try
             {
                 OnTerrainDesignationRemoved(origin);
@@ -570,8 +592,12 @@ namespace AutoTerrainDesignations
                             towerId,
                             out HashSet<Tile2i> accesswayOrigins)
                     && accesswayOrigins.Contains(origin);
+                bool farmingOwned =
+                    farmingSession.PreparationAccessRampOrigins.Contains(origin)
+                    || farmingSession.FillingAccessRampOrigins.Contains(origin);
                 if (designationOwned
                     || accesswayOwned
+                    || farmingOwned
                     || !settings.MiningPlanDirty
                     || unrelatedSettings.MiningPlanDirty)
                 {
@@ -579,6 +605,7 @@ namespace AutoTerrainDesignations
                         "Removing a generated terrain designation must clear ordinary/accessway ownership and dirty its tower plan: "
                         + $"designationOwned={designationOwned} "
                         + $"accesswayOwned={accesswayOwned} "
+                        + $"farmingOwned={farmingOwned} "
                         + $"dirty={settings.MiningPlanDirty} "
                         + "unrelatedDirty="
                         + unrelatedSettings.MiningPlanDirty;
@@ -596,6 +623,7 @@ namespace AutoTerrainDesignations
                     towerId);
                 s_generatedAccesswayOriginsByTowerEntityId.Remove(
                     towerId);
+                s_farmingPreparationSessions.Remove(towerId);
             }
         }
 
@@ -808,6 +836,7 @@ namespace AutoTerrainDesignations
 
         internal static void ResetWorldRuntimeState()
         {
+            ResetAccesswayManagerRuntime("WorldReset");
             s_propRemovalManager?.Dispose(restoreOriginals: true);
             s_propRemovalManager = null;
             s_worldGeneration++;
@@ -891,6 +920,7 @@ namespace AutoTerrainDesignations
             s_parkAndWaitJobFactory = parkAndWaitJobFactory;
             s_inputScheduler = inputScheduler;
             s_configSerializationContext = configSerializationContext;
+            InitializeAccesswayManagerRuntime();
             s_excavatorPathFindingParams = FindExcavatorPathFindingParams(protosDb);
             s_standardVehiclePathFindingParams = s_excavatorPathFindingParams;
 

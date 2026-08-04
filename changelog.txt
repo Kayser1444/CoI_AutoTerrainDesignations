@@ -1,3 +1,12 @@
+v0.5.8 | 2026-08-04
+* Fixed: Farming access searches no longer synchronously monopolize a simulation tick, preventing severe freezes during large farmland preparation jobs
+* Fixed: Repeated farming access failures now use a bounded retry window instead of immediately repeating the same search
+* Improved: Farming access searches now show their preparation or filling progress, can be stopped by the player, and use additional CPU capacity while the game is paused
+* Improved: Farming access generation now reuses compatible unfinished accessway work and avoids competing with interactive accessway searches
+* Fixed: Accessway designations committed while paused remain correctly owned by farming automation through save, disable, and phase transitions
+* Fixed: Manually removed or replaced farming accessway designations are no longer deleted by a later farming cleanup
+* Fixed: V2 accessway routing validates generated terrain and existing designations more reliably around T3 accessway transitions
+
 v0.5.7 | 2026-08-02
 * Fixed: ATD notification messages now refresh after the selected mod translation is applied, including excavator completion notifications
 * Changed: Removed queued debris-cleanup notifications; removal designations now provide progress feedback

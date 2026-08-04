@@ -70,7 +70,87 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     "Generated designation removal fixtures: "
                     + $"success={removalSuccess} "
                     + $"failure={removalFailure}");
-                return removalSuccess ? 0 : 1;
+                if (!removalSuccess) return 1;
+
+                Type retryFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.AccessFailureRetryPolicyFixtures",
+                    true);
+                MethodInfo validateRetry = retryFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        retryFixtures.FullName,
+                        "ValidateAll");
+                object[] retryArgs = { string.Empty };
+                bool retrySuccess = (bool)(
+                    validateRetry.Invoke(null, retryArgs) ?? false);
+                string retryFailure = retryArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Access failure retry fixtures: "
+                    + $"success={retrySuccess} "
+                    + $"failure={retryFailure}");
+                if (!retrySuccess) return 1;
+
+                Type dryRunFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.ExperimentalAccessDryRunResultFixtures",
+                    true);
+                MethodInfo validateDryRun = dryRunFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        dryRunFixtures.FullName,
+                        "ValidateAll");
+                object[] dryRunArgs = { string.Empty };
+                bool dryRunSuccess = (bool)(
+                    validateDryRun.Invoke(null, dryRunArgs) ?? false);
+                string dryRunFailure =
+                    dryRunArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Request-scoped dry-run result fixtures: "
+                    + $"success={dryRunSuccess} "
+                    + $"failure={dryRunFailure}");
+                if (!dryRunSuccess) return 1;
+
+                MethodInfo validateFarmingOwnership = state.GetMethod(
+                    "ValidateFarmingAccesswayOwnershipFixtures",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        state.FullName,
+                        "ValidateFarmingAccesswayOwnershipFixtures");
+                object[] farmingOwnershipArgs = { string.Empty };
+                bool farmingOwnershipSuccess = (bool)(
+                    validateFarmingOwnership.Invoke(
+                        null, farmingOwnershipArgs) ?? false);
+                string farmingOwnershipFailure =
+                    farmingOwnershipArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Farming accessway ownership fixtures: "
+                    + $"success={farmingOwnershipSuccess} "
+                    + $"failure={farmingOwnershipFailure}");
+                if (!farmingOwnershipSuccess) return 1;
+
+                Type managerFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.ATDAccesswayManagerFixtures",
+                    true);
+                MethodInfo validateManager = managerFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        managerFixtures.FullName,
+                        "ValidateAll");
+                object[] managerArgs = { string.Empty };
+                bool managerSuccess = (bool)(
+                    validateManager.Invoke(null, managerArgs) ?? false);
+                string managerFailure = managerArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Accessway manager fixtures: "
+                    + $"success={managerSuccess} "
+                    + $"failure={managerFailure}");
+                return managerSuccess ? 0 : 1;
             }
             catch (TargetInvocationException ex)
             {

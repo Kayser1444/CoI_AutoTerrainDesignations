@@ -1,6 +1,18 @@
 v0.5.8 [unreleased]
 
 * Fixed: Restricted vehicle pre-allocation UI updates to MineTower inspectors and registered pending orders for save/load persistence, preventing cross-mod display overwrites and lost ATD orders after reload.
+* Fixed: Farming access generation now stops its synchronous fixpoint at the first failed search and suppresses unchanged retries for at least 10 seconds. Relevant work/settings changes may reopen the obligation after that grace period, while a 60-second maximum retry covers undetected terrain or other-mod changes.
+* Changed: Farming access failures now emit one informational attempt summary without the per-cluster warning stack traces.
+* Fixed: Live G-to-V validation now preserves the direct-leveling quick-bridge representation while independently rechecking the full T3 post-work corridor. Valid direct leveling accessways are no longer rejected because the rough replay includes one additional V-face center.
+* Changed: Sliced access searches now deliver each caller its own terminal search-result and designation-plan pair. Farming and planned-tower dry runs no longer recover that pair from the shared global last-result slots, and cancelled requests retain their search diagnostics without exposing a stale plan.
+* Fixed: Farming no longer treats a valid unfinished accessway as terrain damage merely because its projected route is not traversable before excavation or filling occurs. Compatible accessway designations remain one pending obligation without repeated searches; if the complete plan disappears while work is still inaccessible, replanning uses the bounded retry policy.
+* Fixed: Farming access generation now runs through one runtime-only cooperative manager instead of synchronously draining a complete search inside a farming tick. One new-planner-only request advances per rendered frame, unchanged obligations coalesce, and each request may place at most one accessway before farming re-evaluates live reachability.
+* Improved: Managed farming access uses a 10 ms normal-play budget and up to 30 ms while paused, reports preparation or filling progress in a cancellable toast, and suspends while the legacy interactive Create Designations operation is active so the searches do not compete.
+* Changed: Stopping a farming access search from its progress toast suppresses further automatic access attempts for that tower phase until farming automation is disabled and re-enabled. Save and world boundaries discard all manager requests and reconstruct demand from live farming state.
+* Fixed: Managed access searches now use the simulation's authoritative pause state, so an already-running search switches from its normal 10 ms frame budget to the configured paused budget immediately. The active budget is shown in the progress toast and logged when it changes.
+* Fixed: The managed farming progress toast now retains one stable button for the lifetime of a request and updates only its text. Rebuilding the complete toast every rendered frame previously prevented the Stop button from completing a mouse click.
+* Fixed: Disabling farming, removing its tower, changing farming phase, or crossing a save boundary now adopts origins from an already-committed terminal access request before lifecycle cleanup. Accessway cells committed while paused can no longer escape farming ownership merely because the next simulation poll had not yet consumed the manager result.
+* Fixed: Manually removing or replacing a farming-owned accessway designation now revokes the farming session's ownership as well as ATD's general generated-origin ownership. A later farming-off cleanup no longer deletes the player's replacement at that origin.
 
 v0.5.7 [released]
 

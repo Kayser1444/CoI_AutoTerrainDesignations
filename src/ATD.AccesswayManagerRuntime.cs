@@ -1,0 +1,201 @@
+// Auto Terrain Designations
+// Copyright (c) 2026 Kayser
+// Licensed under the MIT License.
+using System;
+using AutoTerrainDesignations.Access;
+using Mafi;
+using Mafi.Localization;
+using Mafi.Unity.UiToolkit;
+using Mafi.Unity.UiToolkit.Component;
+using Mafi.Unity.UiToolkit.Library;
+
+namespace AutoTerrainDesignations
+{
+    public static partial class AutoDepthDesignation
+    {
+        private static ATDAccesswayManager? s_accesswayManager;
+        private static bool s_accesswayManagerSuspendedForSave;
+        private static bool s_accesswayManagerGamePaused;
+        private static int s_accesswayManagerLastLoggedBudget = -1;
+        private static bool s_accesswayManagerToastVisible;
+        private static long s_accesswayManagerToastRequestId;
+        private static Label? s_accesswayManagerProgressLabel;
+
+        private static void InitializeAccesswayManagerRuntime()
+        {
+            s_accesswayManager?.Reset("WorldReinitialized");
+            s_accesswayManager = new ATDAccesswayManager();
+            s_accesswayManagerSuspendedForSave = false;
+            s_accesswayManagerGamePaused = false;
+            s_accesswayManagerLastLoggedBudget = -1;
+            s_accesswayManagerToastVisible = false;
+            s_accesswayManagerToastRequestId = 0;
+            s_accesswayManagerProgressLabel = null;
+        }
+
+        internal static ATDAccesswayRequestHandle EnqueueAccesswayRequest(
+            ATDAccesswayRequest request)
+        {
+            if (s_accesswayManager == null)
+                throw new InvalidOperationException(
+                    "Accessway manager is unavailable for this world.");
+            ATDAccesswayRequestHandle handle =
+                s_accesswayManager.Enqueue(request);
+            LogExperimentalAccessDebug(
+                $"[ATD Access Manager] id={handle.RequestId} "
+                + $"owner={handle.OwnerKey} state=queued "
+                + $"priority={handle.Priority} kind={handle.Kind}");
+            return handle;
+        }
+
+        internal static ATDAccesswayHandleSnapshot ReadAccesswayRequest(
+            ATDAccesswayRequestHandle handle)
+            => s_accesswayManager?.Read(handle)
+                ?? new ATDAccesswayHandleSnapshot(
+                    ATDAccesswayRequestState.Cancelled,
+                    ATDAccesswayRequestResult.Cancelled("WorldUnavailable"),
+                    0,
+                    0,
+                    0d);
+
+        internal static void CancelAccesswayRequest(
+            ATDAccesswayRequestHandle? handle,
+            string reason)
+        {
+            if (handle != null)
+                s_accesswayManager?.Cancel(handle, reason);
+        }
+
+        internal static void TickAccesswayManager(bool gamePaused)
+        {
+            s_accesswayManagerGamePaused = gamePaused;
+            ATDAccesswayManager? manager = s_accesswayManager;
+            if (manager == null || s_accesswayManagerSuspendedForSave)
+                return;
+
+            bool suspendedForInteractive = s_createDesignationsOperationActive;
+            manager.Tick(suspendedForInteractive);
+            int budget = GetManagedAccesswaySliceBudgetMilliseconds();
+            if (budget != s_accesswayManagerLastLoggedBudget
+                && manager.TryReadActive(out _, out _))
+            {
+                s_accesswayManagerLastLoggedBudget = budget;
+                LogExperimentalAccessDebug(
+                    $"[ATD Access Manager] pause={gamePaused} "
+                    + $"sliceBudgetMs={budget}");
+            }
+            UpdateAccesswayManagerToast(manager, suspendedForInteractive);
+        }
+
+        internal static int GetManagedAccesswaySliceBudgetMilliseconds()
+            => s_accesswayManagerGamePaused
+                ? AutoTerrainDesignationsMod.AccessManagerPausedMaxFrameBudgetMs
+                : AutoTerrainDesignationsMod.AccessManagerAutomatedFrameBudgetMs;
+
+        internal static void PrepareAccesswayManagerForSave()
+        {
+            s_accesswayManagerSuspendedForSave = true;
+            s_accesswayManager?.Reset("SaveBoundary");
+            HideAccesswayManagerToast();
+        }
+
+        internal static void ResumeAccesswayManagerAfterSave()
+            => s_accesswayManagerSuspendedForSave = false;
+
+        private static void ResetAccesswayManagerRuntime(string reason)
+        {
+            s_accesswayManager?.Reset(reason);
+            s_accesswayManager = null;
+            s_accesswayManagerSuspendedForSave = false;
+            s_accesswayManagerGamePaused = false;
+            s_accesswayManagerLastLoggedBudget = -1;
+            HideAccesswayManagerToast();
+        }
+
+        private static void UpdateAccesswayManagerToast(
+            ATDAccesswayManager manager,
+            bool suspendedForInteractive)
+        {
+            if (suspendedForInteractive)
+            {
+                HideAccesswayManagerToast();
+                return;
+            }
+            if (!manager.TryReadActive(
+                    out ATDAccesswayRequestHandle? handle,
+                    out ATDAccesswayHandleSnapshot snapshot)
+                || handle == null
+                || snapshot.ProcessingMilliseconds < 250d
+                || s_uiRoot == null)
+            {
+                if (handle == null)
+                    HideAccesswayManagerToast();
+                return;
+            }
+
+            try
+            {
+                string workType = handle.Kind ==
+                        ATDAccesswayRequestKind.FarmingFilling
+                    ? "farming filling access"
+                    : "farming preparation access";
+                var progressText = new LocStrFormatted(
+                    $"[ATD] Finding {workType}; "
+                    + $"visited {snapshot.VisitedNodes:N0}/"
+                    + $"{AutoTerrainDesignationsMod.AccessMaxVisitedNodes:N0} · "
+                    + $"queue {snapshot.PendingNodes:N0} · "
+                    + $"budget {GetManagedAccesswaySliceBudgetMilliseconds()} ms/frame · "
+                    + $"processing {snapshot.ProcessingMilliseconds / 1000d:0.0}/"
+                    + $"{AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds}s");
+                var notification = s_uiRoot.ToastNotifProvider.m_notification;
+                if (!s_accesswayManagerToastVisible
+                    || s_accesswayManagerToastRequestId != handle.RequestId
+                    || s_accesswayManagerProgressLabel == null)
+                {
+                    notification.ShowGeneral(
+                        new LocStrFormatted(
+                            "[ATD] Terrain analysis in progress"),
+                        showForever: true);
+                    s_accesswayManagerProgressLabel =
+                        new Label(progressText).FontSize(16);
+                    notification.Body.SetChildren(
+                        s_accesswayManagerProgressLabel,
+                        new ButtonText(
+                            Button.General,
+                            new LocStrFormatted(
+                                "Stop automatic farming access"),
+                            () => manager.Cancel(handle, "UserCancelled"))
+                            .MarginLeft(8.pt()));
+                    s_accesswayManagerToastRequestId = handle.RequestId;
+                    s_accesswayManagerToastVisible = true;
+                }
+                else
+                {
+                    s_accesswayManagerProgressLabel.Value(progressText);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogExperimentalAccessDebug(
+                    "[ATD Access Manager] progress toast failed: "
+                    + ex.GetType().Name + ": " + ex.Message);
+            }
+        }
+
+        private static void HideAccesswayManagerToast()
+        {
+            if (!s_accesswayManagerToastVisible)
+                return;
+            try
+            {
+                s_uiRoot?.ToastNotifProvider.m_notification.Hide();
+            }
+            catch
+            {
+            }
+            s_accesswayManagerToastVisible = false;
+            s_accesswayManagerToastRequestId = 0;
+            s_accesswayManagerProgressLabel = null;
+        }
+    }
+}

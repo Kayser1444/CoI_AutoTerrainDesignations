@@ -368,40 +368,154 @@ namespace AutoTerrainDesignations.Access.V2
                 reason = "GroundToVMixedOperations";
                 return false;
             }
+
+            var sampledPostWorkHeights =
+                new Dictionary<Tile2i, string>();
+            var blockedDumpingProps = new HashSet<Tile2i>();
+            bool CapturePostWorkHeight(Tile2i tile, out float height)
+            {
+                bool found = postWorkHeight(tile, out height);
+                sampledPostWorkHeights[tile] = found
+                    ? height.ToString("R", System.Globalization.CultureInfo.InvariantCulture)
+                    : "missing";
+                return found;
+            }
+            bool CaptureDumpingPropBlocker(Tile2i tile)
+            {
+                bool blocked = dumpingPropBlocker(tile);
+                if (blocked)
+                    blockedDumpingProps.Add(tile);
+                return blocked;
+            }
+
             if (!TryCreateDeterministicGroundToVBridge(
                     state,
                     recorded.GroundEntryCenters[0],
                     recorded.Lane0Operation,
                     vehicleWidth,
                     recorded.CenterSpokeCost,
-                    postWorkHeight,
-                    dumpingPropBlocker,
-                    out AccessV2HandoffCandidate replayed))
+                    CapturePostWorkHeight,
+                    CaptureDumpingPropBlocker,
+                    out AccessV2HandoffCandidate liveReplayed))
             {
-                reason = "GroundToVDeterministicBridgeInvalid";
+                reason = "GroundToVDeterministicBridgeInvalid[" +
+                    $"state={state}; vehicleWidth={vehicleWidth}; " +
+                    $"recorded={recorded}; " +
+                    "postWorkHeights=" +
+                    FormatGroundToVHeightSamples(sampledPostWorkHeights) + "; " +
+                    "dumpingPropBlocks=" +
+                    FormatGroundToVTiles(blockedDumpingProps) + "]";
                 return false;
             }
-            if (replayed.ExitDirection != recorded.ExitDirection
-                || replayed.SpanLength != recorded.SpanLength
-                || replayed.Lane0Operation != recorded.Lane0Operation
-                || replayed.Lane1Operation != recorded.Lane1Operation
-                || replayed.Lane0Contact != recorded.Lane0Contact
-                || replayed.Lane1Contact != recorded.Lane1Contact
-                || !replayed.Lane0TerminalOrigins.SequenceEqual(
-                    recorded.Lane0TerminalOrigins)
-                || !replayed.Lane1TerminalOrigins.SequenceEqual(
-                    recorded.Lane1TerminalOrigins)
-                || !replayed.EscapeCenters.SequenceEqual(
-                    recorded.EscapeCenters)
-                || !replayed.GroundEntryCenters.SequenceEqual(
-                    recorded.GroundEntryCenters))
+
+            AccessV2HandoffCandidate replayed = liveReplayed;
+            bool isDirectLevelingBridge = recorded.IsQuickPath
+                && recorded.SpanLength == 1
+                && recorded.Lane0Operation
+                    == AccessHandoffOperation.Leveling
+                && recorded.Lane1Operation
+                    == AccessHandoffOperation.Leveling
+                && recorded.CleanupKeys.Count == 0;
+            if (isDirectLevelingBridge
+                && !TryCreateDirectLevelingBridge(
+                    state,
+                    recorded.GroundEntryCenters[0],
+                    recorded.CenterSpokeCost,
+                    out replayed))
             {
-                reason = "GroundToVDeterministicBridgeMismatch";
+                reason = "GroundToVDirectLevelingReplayInvalid[" +
+                    $"state={state}; vehicleWidth={vehicleWidth}; " +
+                    $"recorded={recorded}]";
+                return false;
+            }
+
+            var mismatches = new List<string>();
+            if (replayed.ExitDirection != recorded.ExitDirection)
+                mismatches.Add(
+                    "exitDirection recorded=" +
+                    FormatGroundToVTile(recorded.ExitDirection) +
+                    " replayed=" +
+                    FormatGroundToVTile(replayed.ExitDirection));
+            if (replayed.SpanLength != recorded.SpanLength)
+                mismatches.Add(
+                    $"spanLength recorded={recorded.SpanLength} " +
+                    $"replayed={replayed.SpanLength}");
+            if (replayed.Lane0Operation != recorded.Lane0Operation)
+                mismatches.Add(
+                    $"lane0Operation recorded={recorded.Lane0Operation} " +
+                    $"replayed={replayed.Lane0Operation}");
+            if (replayed.Lane1Operation != recorded.Lane1Operation)
+                mismatches.Add(
+                    $"lane1Operation recorded={recorded.Lane1Operation} " +
+                    $"replayed={replayed.Lane1Operation}");
+            if (replayed.Lane0Contact != recorded.Lane0Contact)
+                mismatches.Add(
+                    "lane0Contact recorded=" +
+                    FormatGroundToVTile(recorded.Lane0Contact) +
+                    " replayed=" +
+                    FormatGroundToVTile(replayed.Lane0Contact));
+            if (replayed.Lane1Contact != recorded.Lane1Contact)
+                mismatches.Add(
+                    "lane1Contact recorded=" +
+                    FormatGroundToVTile(recorded.Lane1Contact) +
+                    " replayed=" +
+                    FormatGroundToVTile(replayed.Lane1Contact));
+            if (!replayed.Lane0TerminalOrigins.SequenceEqual(
+                    recorded.Lane0TerminalOrigins))
+                mismatches.Add(
+                    "lane0TerminalOrigins recorded=" +
+                    FormatGroundToVTiles(recorded.Lane0TerminalOrigins) +
+                    " replayed=" +
+                    FormatGroundToVTiles(replayed.Lane0TerminalOrigins));
+            if (!replayed.Lane1TerminalOrigins.SequenceEqual(
+                    recorded.Lane1TerminalOrigins))
+                mismatches.Add(
+                    "lane1TerminalOrigins recorded=" +
+                    FormatGroundToVTiles(recorded.Lane1TerminalOrigins) +
+                    " replayed=" +
+                    FormatGroundToVTiles(replayed.Lane1TerminalOrigins));
+            if (!replayed.EscapeCenters.SequenceEqual(
+                    recorded.EscapeCenters))
+                mismatches.Add(
+                    "escapeCenters recorded=" +
+                    FormatGroundToVTiles(recorded.EscapeCenters) +
+                    " replayed=" +
+                    FormatGroundToVTiles(replayed.EscapeCenters));
+            if (!replayed.GroundEntryCenters.SequenceEqual(
+                    recorded.GroundEntryCenters))
+                mismatches.Add(
+                    "groundEntryCenters recorded=" +
+                    FormatGroundToVTiles(recorded.GroundEntryCenters) +
+                    " replayed=" +
+                    FormatGroundToVTiles(replayed.GroundEntryCenters));
+            if (mismatches.Count > 0)
+            {
+                reason = "GroundToVDeterministicBridgeMismatch[" +
+                    "fields=" + string.Join("; ", mismatches) + "; " +
+                    $"state={state}; vehicleWidth={vehicleWidth}; " +
+                    "postWorkHeights=" +
+                    FormatGroundToVHeightSamples(sampledPostWorkHeights) + "; " +
+                    "dumpingPropBlocks=" +
+                    FormatGroundToVTiles(blockedDumpingProps) + "]";
                 return false;
             }
             reason = string.Empty;
             return true;
         }
+
+        private static string FormatGroundToVTile(Tile2i tile)
+            => $"({tile.X},{tile.Y})";
+
+        private static string FormatGroundToVTiles(IEnumerable<Tile2i> tiles)
+            => "[" + string.Join(",", tiles.Select(FormatGroundToVTile)) + "]";
+
+        private static string FormatGroundToVHeightSamples(
+            IReadOnlyDictionary<Tile2i, string> samples)
+            => "[" + string.Join(",", samples
+                .OrderBy(pair => pair.Key.X)
+                .ThenBy(pair => pair.Key.Y)
+                .Select(pair =>
+                    FormatGroundToVTile(pair.Key) + "=" + pair.Value)) + "]";
 
         internal static bool TryResolvePlacedGroundToVPostWorkHeight(
             AccessV2BandState state,

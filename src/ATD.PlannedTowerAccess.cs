@@ -200,8 +200,8 @@ namespace AutoTerrainDesignations
             if (s_cancelExperimentalAccessSearch)
                 yield break;
 
-            AccessSearchResult? searchResult = dryRun.Result;
-            AccessDesignationPlan? plan = LastExperimentalAccessPlan;
+            AccessSearchResult? searchResult = dryRun.SearchResult;
+            AccessDesignationPlan? plan = dryRun.Plan;
             PlannedTowerApproach? selectedSourceApproach = searchResult == null
                 ? null
                 : approaches.FirstOrDefault(item =>

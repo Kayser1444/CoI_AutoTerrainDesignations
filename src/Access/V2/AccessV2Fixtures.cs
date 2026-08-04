@@ -3976,6 +3976,21 @@ namespace AutoTerrainDesignations.Access.V2
             float FlatBridge(Tile2i _) => 3f;
             float MiningBridge(Tile2i tile)
                 => tile.X == 760 ? 3.25f : 3f;
+            if (!AccessV2Handoffs.TryValidatePlacedGroundToVBridge(
+                    bridgeState, directBridge, 5,
+                    (Tile2i tile, out float value) =>
+                    {
+                        value = FlatBridge(tile);
+                        return true;
+                    },
+                    _ => false,
+                    out string directBridgeValidationFailure))
+            {
+                failure =
+                    "Placed direct-leveling G-to-V validation must preserve the quick bridge representation while rechecking live continuity: "
+                    + directBridgeValidationFailure;
+                return false;
+            }
             if (!TryRoughBridge(
                     FlatBridge,
                     AccessHandoffOperation.Leveling, null, out _)
@@ -4055,6 +4070,44 @@ namespace AutoTerrainDesignations.Access.V2
                 failure =
                     "Placed G-to-V validation must resolve the fixed designation's projected target outside the new adapter instead of raw terrain: "
                     + placedBridgeFailure;
+                return false;
+            }
+            var mismatchedBridge = new AccessV2HandoffCandidate(
+                new Tile2i(-miningBridge.ExitDirection.X,
+                    -miningBridge.ExitDirection.Y),
+                miningBridge.SpanLength,
+                new AccessGroundHandoff(
+                    miningBridge.Lane0Contact,
+                    miningBridge.Lane0Operation),
+                new AccessGroundHandoff(
+                    miningBridge.Lane1Contact,
+                    miningBridge.Lane1Operation),
+                miningBridge.Lane0TerminalOrigins,
+                miningBridge.Lane1TerminalOrigins,
+                miningBridge.EscapeCenters,
+                miningBridge.GroundEntryCenters,
+                miningBridge.CleanupKeys,
+                miningBridge.CleanupCost,
+                miningBridge.IsQuickPath,
+                miningBridge.CenterSpokeCost,
+                miningBridge.IsStaggeredExtension,
+                miningBridge.NonCrestLane);
+            if (AccessV2Handoffs.TryValidatePlacedGroundToVBridge(
+                    bridgeState, mismatchedBridge, 5,
+                    TryResolveProjectedBridgeHeight,
+                    _ => false,
+                    out string mismatchDiagnostic)
+                || !mismatchDiagnostic.StartsWith(
+                    "GroundToVDeterministicBridgeMismatch[",
+                    StringComparison.Ordinal)
+                || mismatchDiagnostic.IndexOf(
+                    "exitDirection recorded=", StringComparison.Ordinal) < 0
+                || mismatchDiagnostic.IndexOf(
+                    " replayed=", StringComparison.Ordinal) < 0)
+            {
+                failure =
+                    "Placed G-to-V deterministic mismatch diagnostics must identify the differing field and both values: "
+                    + mismatchDiagnostic;
                 return false;
             }
             Tile2i propTile = new Tile2i(759, mirroredGround.Y);

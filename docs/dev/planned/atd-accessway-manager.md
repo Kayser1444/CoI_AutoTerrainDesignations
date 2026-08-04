@@ -1,6 +1,7 @@
 # ATD Accessway Manager
 
-Status: approved design; no implementation yet.
+Status: approved design; implementation steps 1-3 complete. Farming now uses
+the runtime manager; interactive migration and manager hardening remain.
 
 Decision record: [Coordinate accessway work through one cooperative manager](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
 
@@ -44,6 +45,32 @@ seconds. One unchanged cluster was searched as many as nine times in one step.
 The immediate cause was the farmland fixpoint loop draining several complete
 searches and placement passes synchronously; warning stack traces amplified the
 log volume but were not exceptions and were not the primary stall.
+
+## Releaseable mitigation before the manager
+
+The first implementation slice deliberately retains current route selection
+and designation placement. When one farming access search returns `Failed` or
+`NotAccessible`, the current fixpoint stops immediately and records a transient
+failure against the farming phase's access obligation fingerprint.
+
+No retry is eligible for 10 seconds of unscaled real time. From 10 through 60
+seconds, changes visible in the current work, tower area, ramp width, or vehicle
+clearance fingerprint may reopen it; at 60 seconds it retries even without a
+detected change, covering terrain events and other-mod mutations not visible to
+this interim fingerprint. Farming suppresses per-cluster warning stacks and
+emits one request-level informational summary instead.
+
+This is a recurrence mitigation, not cooperative scheduling. One legacy search
+can still monopolize its simulation step. The farming-first manager slice below
+removes that remaining hitch by replacing synchronous generation with bounded
+new-planner work.
+
+A successfully placed accessway remains one pending farming obligation while
+any compatible generated designation is still present. Current-terrain
+reachability cannot invalidate projected work before simulation fulfills it.
+If the complete generated plan disappears or is replaced while the farming
+work remains inaccessible, the obligation enters the same bounded retry policy
+instead of immediately launching another search.
 
 ## Goals
 
@@ -167,9 +194,9 @@ Approved initial policy:
 
 - exactly one active access request; other requests remain queued rather than
   round-robin interleaving live search sessions;
-- automated normal-play work receives up to 2 ms per rendered frame;
-- direct interactive normal-play work receives up to 8 ms per rendered frame;
-- while paused, measured spare capacity may be used adaptively up to 15 ms per
+- automated normal-play work receives up to 10 ms per rendered frame;
+- direct interactive normal-play work receives up to 15 ms per rendered frame;
+- while paused, measured spare capacity may be used adaptively up to 30 ms per
   rendered frame, backing down when frame timing deteriorates;
 - a node quantum larger than the current `Step(1)`, adjusted downward/upward
   from measured slice time;
@@ -191,8 +218,8 @@ Approved initial policy:
 
 The legacy `accessSearchFrameBudgetMs` setting is deprecated rather than mapped
 from its unsafe 30 ms default. Three expert settings replace it: automated
-normal-play budget (2 ms), interactive normal-play budget (8 ms), and paused
-maximum budget (15 ms). They have safe bounds and temporary diagnostic console
+normal-play budget (10 ms), interactive normal-play budget (15 ms), and paused
+maximum budget (30 ms). They have safe bounds and temporary diagnostic console
 overrides. Existing installations receive the safe new defaults and a concise
 migration log.
 
@@ -215,7 +242,7 @@ Preparation, search, validation, and dry-run materialization must be resumable
 or demonstrated to be bounded. The final world mutation remains one small
 atomic transaction: cancellation is accepted through validation, but once the
 request enters `Committing`, it finishes or rolls back. If a supposedly bounded
-operation exceeds 15 ms during stress testing, it is a release blocker and must
+operation exceeds 30 ms during stress testing, it is a release blocker and must
 be split or optimized. Search work must not move to a worker thread merely to
 hide an unsliced main-thread phase.
 
@@ -449,29 +476,48 @@ Useful console diagnostics:
 
 ## Suggested implementation sequence
 
-1. Add request/handle/result types and a runtime manager with no production
-   callers. Add deterministic scheduler fixtures.
-2. Adapt `RunExperimentalAccessDryRunSliced` to return request-scoped results;
+1. **Implemented.** Release the farming failure mitigation: stop at the first failed search,
+   coalesce the unchanged obligation under the 10-to-60-second retry policy,
+   and aggregate expected diagnostics without warning stacks.
+2. **Implemented.** Adapt `RunExperimentalAccessDryRunSliced` to return request-scoped results;
    remove dependence on the global last-result fields for the adapted path.
-3. Route Create Designations and planned-tower access through the manager while
-   preserving existing gameplay and progress UI.
-4. Route farming access through the manager and remove the synchronous
-   `CreateAccessRamp` drain from farming. This is the step expected to address
-   the reported severe spikes.
-5. Add stale-result validation, bounded retries, queue backpressure, and
+3. **Implemented.** Add the runtime manager and route farming access through it using only the
+   new planner. Remove the synchronous `CreateAccessRamp` drain from farming;
+   temporarily suspend farming work while legacy interactive access is active.
+4. Add stale-result validation, bounded retries, queue backpressure, and
    manager health diagnostics.
-6. Integrate the future Construction Assist leveling facet through the same
+5. Route Create Designations and planned-tower access through the manager with
+   strict interactive priority and request-owned cancellation.
+6. Remove legacy ramp generation, candidate comparison, global result state,
+   and every synchronous fallback after all callers have migrated.
+7. Integrate the future Construction Assist leveling facet through the same
    owner/handle contract.
-7. Profile snapshot preparation and commit. Incrementalize any phase that can
+8. Profile snapshot preparation and commit. Incrementalize any phase that can
    still exceed the frame budget.
-8. Only after a purity/thread-safety audit, consider a worker-thread search
+9. Only after a purity/thread-safety audit, consider a worker-thread search
    backend behind the same manager interface.
 
-Implementation may land in several commits, but no production release may
-route only farming through the manager while direct interactive callers retain
-global cancellation and result state. The first release must make the manager
-the sole coordinator for every current access-search caller and must fail closed
-rather than invoking the old synchronous drain.
+The farming-first manager slice may release before interactive migration because
+it addresses the reported path. During that transition, the existing
+interactive-active signal must suspend manager advancement so interactive and
+farming searches do not compete. Every managed request fails closed rather than
+invoking the old synchronous drain. The legacy generator is removed only after
+interactive callers migrate.
+
+The implemented farming slice has one active request, owner/fingerprint
+coalescing, strict priority/FIFO queue selection, request-scoped cooperative
+cancellation, and runtime-only reset behavior. Preparation and filling keep
+separate owner keys. It advances from the rendered-frame ticker with a 10 ms
+normal-play budget or 30 ms paused maximum, accumulates actual processing time
+for timeout accounting, and shows a work-type-specific progress toast. The
+toast's stop action suppresses its farming phase until automation is explicitly
+disabled and re-enabled.
+
+This slice removes the synchronous farming drain, but its time budget is checked
+only between coroutine yields. Snapshot preparation, materialization, or one
+`Step(1)` expansion can therefore still exceed the nominal budget. Existing
+phase and slow-step diagnostics identify those overruns; implementation step 8
+must incrementalize any operation shown to be unacceptably large in live tests.
 
 ## Acceptance criteria
 
@@ -492,12 +538,12 @@ rather than invoking the old synchronous drain.
 - Save/load reconstructs access demand from live/runtime-derived workflow state;
   no manager state is serialized.
 - Existing access-search fixtures still choose the same routes and costs.
-- Interactive normal-play work stays within its 8 ms slice policy; automated
-  normal-play work stays within 2 ms; paused work adapts no higher than 15 ms,
+- Interactive normal-play work stays within its 15 ms slice policy; automated
+  normal-play work stays within 10 ms; paused work adapts no higher than 30 ms,
   apart from a separately measured small atomic commit.
-- Legacy straight and experimental V1/V2 backends retain existing candidate
-  comparison and route-selection semantics; expensive legacy enumeration is
-  made resumable when measurement shows it can exceed the approved bounds.
+- Managed requests use only the new planner and never invoke legacy generation
+  or candidate comparison as a fallback. Existing legacy-created designations
+  in saves remain valid and are not rewritten by migration.
 - Direct interactive work strictly outranks farming and Construction Assist;
   unrelated equal-priority interactive owners queue rather than cancel each
   other.

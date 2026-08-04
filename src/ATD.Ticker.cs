@@ -17,16 +17,20 @@ public sealed class AutoTerrainDesignationsTicker : MonoBehaviour
     private float _prioritySyncTimer;
     private int _worldGeneration;
     private bool _active;
+    private System.Func<bool>? _isSimulationPaused;
     private const float ACTIVE_SYNC_INTERVAL_SECONDS = 1f;
     private const float PAUSED_SYNC_INTERVAL_SECONDS = 0.1f;
 
-    internal static AutoTerrainDesignationsTicker CreateForWorld(int worldGeneration)
+    internal static AutoTerrainDesignationsTicker CreateForWorld(
+        int worldGeneration,
+        System.Func<bool> isSimulationPaused)
     {
         DestroyActive();
 
         AutoTerrainDesignationsTicker ticker = new GameObject("AutoTerrainDesignationsTicker").AddComponent<AutoTerrainDesignationsTicker>();
         ticker._worldGeneration = worldGeneration;
         ticker._active = true;
+        ticker._isSimulationPaused = isSimulationPaused;
         s_activeTicker = ticker;
         Object.DontDestroyOnLoad(ticker.gameObject);
         return ticker;
@@ -57,7 +61,21 @@ public sealed class AutoTerrainDesignationsTicker : MonoBehaviour
         }
         catch { }
 
-        bool gamePaused = Time.timeScale <= 0.001f;
+        bool gamePaused;
+        try
+        {
+            gamePaused = _isSimulationPaused?.Invoke()
+                ?? Time.timeScale <= 0.001f;
+        }
+        catch
+        {
+            gamePaused = Time.timeScale <= 0.001f;
+        }
+        try
+        {
+            AutoDepthDesignation.TickAccesswayManager(gamePaused);
+        }
+        catch { }
         float syncInterval = gamePaused ? PAUSED_SYNC_INTERVAL_SECONDS : ACTIVE_SYNC_INTERVAL_SECONDS;
         _prioritySyncTimer += Time.unscaledDeltaTime;
         if (_prioritySyncTimer >= syncInterval)
