@@ -1,4 +1,4 @@
-v0.5.8 [unreleased]
+v0.5.8 [packaged]
 
 * Fixed: Restricted vehicle pre-allocation UI updates to MineTower inspectors and registered pending orders for save/load persistence, preventing cross-mod display overwrites and lost ATD orders after reload.
 * Fixed: Farming access generation now stops its synchronous fixpoint at the first failed search and suppresses unchanged retries for at least 10 seconds. Relevant work/settings changes may reopen the obligation after that grace period, while a 60-second maximum retry covers undetected terrain or other-mod changes.
