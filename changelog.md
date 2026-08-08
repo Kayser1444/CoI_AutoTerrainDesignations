@@ -1,4 +1,4 @@
-v0.5.10 [unreleased]
+v0.5.10 [packaged]
 
 * Added: Manual Planar corner designations with four rotations, preview/drag support, a dedicated diagonal-plane toolbar icon, and K-key cycling alongside outer and inner corners.
 * Changed: Ordered the corner toolbar buttons and K-cycle as Outer, Inner, Planar; the Planar icon is now an embedded SVG rendered as a tintable runtime icon.
