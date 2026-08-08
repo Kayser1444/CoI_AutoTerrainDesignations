@@ -1,4 +1,4 @@
-v0.5.9 [unreleased]
+v0.5.9 [packaged]
 
 * Improved: The accessway manager now validates farming ownership, work, tower area, and access settings before every cooperative slice. Stale work terminates before placement and enters the existing bounded retry policy; completed owners cancel without retry.
 * Improved: The accessway manager now bounds its pending queue at 32 requests, preserves interactive priority under pressure, returns retryable diagnostics for evicted work, and periodically reports active timing, queue age, coalescing, stale, dropped, and completion health counters at Debug level.
