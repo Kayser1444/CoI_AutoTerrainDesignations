@@ -1,6 +1,6 @@
 v0.5.10 | 2026-08-08
 * Added: Manual Planar corner designations with four rotations, preview and drag support, and a dedicated toolbar button
-* Changed: Corner designation toolbar buttons and K cycling now follow the Outer, Inner, Planar order
+* Changed: Corner designation toolbar buttons and K cycling now follow the Outer, Inner, Planar order, and the Planar button uses a dedicated diagonal-plane icon
 
 v0.5.9 | 2026-08-08
 * Improved: Farming access searches now validate live tower, settings, and designation changes before continuing, bound their pending queue, and retain detailed cancellation diagnostics

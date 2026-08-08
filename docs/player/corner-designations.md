@@ -49,7 +49,7 @@ Corner mode supports three shape families:
 - **Inner** corners lower one corner below the other three.
 - **Planar** corners keep two diagonal corners at the baseline, raise one of the other diagonal corners by one level, and lower the opposite corner by one level.
 
-Press `K` again while already in corner mode to cycle between them. The toolbar buttons select the corresponding family directly; the buttons are ordered Outer, Inner, Planar, with the Planar button using `Assets/Unity/UserInterface/General/MapBounds.svg`.
+Press `K` again while already in corner mode to cycle between them. The toolbar buttons select the corresponding family directly; the buttons are ordered Outer, Inner, Planar, with the Planar button using a dedicated diagonal-plane icon.
 
 ### Planar shape
 

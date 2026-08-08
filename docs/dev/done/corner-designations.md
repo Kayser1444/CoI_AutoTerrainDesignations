@@ -239,7 +239,7 @@ Corner mode depends on Harmony patches to hook into the vanilla designation flow
 
 ### Toolbox integration
 
-- `AreaToolbox` patching injects the ATD outer, inner, and Planar corner buttons into the designation toolbox; the Planar button uses `Assets/Unity/UserInterface/General/MapBounds.svg`
+- `AreaToolbox` patching injects the ATD outer, inner, and Planar corner buttons into the designation toolbox; the Planar button uses embedded SVG markup rasterized into a tintable runtime icon
 - `AreaToolbox.SetMode` patching lets ATD track the current vanilla mode index so it can restore the selected mode button when corner mode exits
 
 ### Placement protection

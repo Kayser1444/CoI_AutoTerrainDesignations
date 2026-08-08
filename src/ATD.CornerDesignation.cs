@@ -91,7 +91,7 @@ namespace AutoTerrainDesignations
         private static ShortcutsManager? s_shortcutsManager;
 
         // Toolbar buttons injected into the game's designation toolboxes (one per ToolType).
-        private static ToolboxItem? s_cornerModeButtonPlanar; // MapBounds.svg
+        private static ToolboxItem? s_cornerModeButtonPlanar; // Embedded vector icon
         private static ToolboxItem? s_cornerModeButtonOuter;  // ExpandScreen as-is
         private static ToolboxItem? s_cornerModeButtonInner;  // ExpandScreen rotated 180°
         private static AreaToolbox? s_activeAreaToolbox;
@@ -940,14 +940,18 @@ namespace AutoTerrainDesignations
                 if (body != null)
                 {
                     var capturedToolType = toolType;
-                    const string planarIconPath = "Assets/Unity/UserInterface/General/MapBounds.svg";
                     const string cornerIconPath = "Assets/Unity/UserInterface/General/ExpandScreen.svg";
 
-                    // Planar button — MapBounds.svg, keybind K.
+                    // Planar button — embedded diagonal-plane icon, keybind K.
+                    // Use no source asset: Icon loads its source asynchronously, which
+                    // would otherwise remain underneath the embedded drawing.
                     var planarItem = new ToolboxItem(
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
-                        planarIconPath,
+                        (string)null!,
                         () => SelectCornerButton(CornerVariant.OriginHighPlusXyLow));
+
+                    if (planarItem.m_btn is ButtonIcon planarBtnIcon)
+                        PlanarCornerIcon.Install(planarBtnIcon.Icon.Element);
 
                     // Outer corner button — ExpandScreen as-is, keybind K.
                     var outerItem = new ToolboxItem(

@@ -1,7 +1,7 @@
 v0.5.10 [unreleased]
 
-* Added: Manual Planar corner designations with four rotations, preview/drag support, a MapBounds.svg toolbar button, and K-key cycling alongside outer and inner corners.
-* Changed: Ordered the corner toolbar buttons and K-cycle as Outer, Inner, Planar; resolved the Planar icon through the cataloged MapBounds.svg asset.
+* Added: Manual Planar corner designations with four rotations, preview/drag support, a dedicated diagonal-plane toolbar icon, and K-key cycling alongside outer and inner corners.
+* Changed: Ordered the corner toolbar buttons and K-cycle as Outer, Inner, Planar; the Planar icon is now an embedded SVG rendered as a tintable runtime icon.
 
 v0.5.9 [released]
 
