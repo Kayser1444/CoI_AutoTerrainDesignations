@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -25,8 +26,45 @@ namespace AutoTerrainDesignations.Access
         Active,
         Succeeded,
         Failed,
+        Stale,
         Cancelled,
         Superseded
+    }
+
+    internal enum ATDAccesswayValidationDisposition
+    {
+        Current,
+        Stale,
+        OwnerGone
+    }
+
+    internal readonly struct ATDAccesswayValidationResult
+    {
+        public ATDAccesswayValidationDisposition Disposition { get; }
+        public string Reason { get; }
+
+        private ATDAccesswayValidationResult(
+            ATDAccesswayValidationDisposition disposition,
+            string reason)
+        {
+            Disposition = disposition;
+            Reason = reason ?? string.Empty;
+        }
+
+        public static ATDAccesswayValidationResult Current()
+            => new ATDAccesswayValidationResult(
+                ATDAccesswayValidationDisposition.Current,
+                string.Empty);
+
+        public static ATDAccesswayValidationResult Stale(string reason)
+            => new ATDAccesswayValidationResult(
+                ATDAccesswayValidationDisposition.Stale,
+                reason);
+
+        public static ATDAccesswayValidationResult OwnerGone(string reason)
+            => new ATDAccesswayValidationResult(
+                ATDAccesswayValidationDisposition.OwnerGone,
+                reason);
     }
 
     internal sealed class ATDAccesswayRequestResult
@@ -34,30 +72,57 @@ namespace AutoTerrainDesignations.Access
         public ATDAccesswayRequestState State { get; }
         public string Reason { get; }
         public object? Payload { get; }
+        public bool RetryEligible { get; }
 
         private ATDAccesswayRequestResult(
             ATDAccesswayRequestState state,
             string reason,
-            object? payload)
+            object? payload,
+            bool retryEligible)
         {
             State = state;
             Reason = reason ?? string.Empty;
             Payload = payload;
+            RetryEligible = retryEligible;
         }
 
         public static ATDAccesswayRequestResult Succeeded(object? payload = null)
             => new ATDAccesswayRequestResult(
-                ATDAccesswayRequestState.Succeeded, string.Empty, payload);
+                ATDAccesswayRequestState.Succeeded,
+                string.Empty,
+                payload,
+                retryEligible: false);
 
         public static ATDAccesswayRequestResult Failed(
             string reason,
-            object? payload = null)
+            object? payload = null,
+            bool retryEligible = true)
             => new ATDAccesswayRequestResult(
-                ATDAccesswayRequestState.Failed, reason, payload);
+                ATDAccesswayRequestState.Failed,
+                reason,
+                payload,
+                retryEligible);
+
+        public static ATDAccesswayRequestResult Stale(string reason)
+            => new ATDAccesswayRequestResult(
+                ATDAccesswayRequestState.Stale,
+                reason,
+                null,
+                retryEligible: true);
 
         public static ATDAccesswayRequestResult Cancelled(string reason)
             => new ATDAccesswayRequestResult(
-                ATDAccesswayRequestState.Cancelled, reason, null);
+                ATDAccesswayRequestState.Cancelled,
+                reason,
+                null,
+                retryEligible: false);
+
+        public static ATDAccesswayRequestResult Superseded()
+            => new ATDAccesswayRequestResult(
+                ATDAccesswayRequestState.Superseded,
+                "Superseded",
+                null,
+                retryEligible: false);
     }
 
     internal interface IATDAccesswayManagedWork : IDisposable
@@ -77,13 +142,15 @@ namespace AutoTerrainDesignations.Access
         public ATDAccesswayRequestKind Kind { get; }
         public ATDAccesswayPriority Priority { get; }
         public Func<IATDAccesswayManagedWork> WorkFactory { get; }
+        public Func<ATDAccesswayValidationResult>? Validation { get; }
 
         public ATDAccesswayRequest(
             string ownerKey,
             string workFingerprint,
             ATDAccesswayRequestKind kind,
             ATDAccesswayPriority priority,
-            Func<IATDAccesswayManagedWork> workFactory)
+            Func<IATDAccesswayManagedWork> workFactory,
+            Func<ATDAccesswayValidationResult>? validation = null)
         {
             OwnerKey = string.IsNullOrWhiteSpace(ownerKey)
                 ? throw new ArgumentException("Owner key is required.", nameof(ownerKey))
@@ -93,6 +160,7 @@ namespace AutoTerrainDesignations.Access
             Priority = priority;
             WorkFactory = workFactory
                 ?? throw new ArgumentNullException(nameof(workFactory));
+            Validation = validation;
         }
     }
 
@@ -132,6 +200,7 @@ namespace AutoTerrainDesignations.Access
         public bool IsTerminal
             => State == ATDAccesswayRequestState.Succeeded
                 || State == ATDAccesswayRequestState.Failed
+                || State == ATDAccesswayRequestState.Stale
                 || State == ATDAccesswayRequestState.Cancelled
                 || State == ATDAccesswayRequestState.Superseded;
 
@@ -150,6 +219,91 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    internal readonly struct ATDAccesswayManagerHealthSnapshot
+    {
+        public int QueueDepth { get; }
+        public long ActiveRequestId { get; }
+        public double ActiveWallSeconds { get; }
+        public double ActiveProcessingMilliseconds { get; }
+        public int ActiveVisitedNodes { get; }
+        public int ActivePendingNodes { get; }
+        public double OldestQueueAgeSeconds { get; }
+        public long CoalescedRequests { get; }
+        public long SupersededRequests { get; }
+        public long StaleRequests { get; }
+        public long DroppedRequests { get; }
+        public long CompletedRequests { get; }
+
+        public ATDAccesswayManagerHealthSnapshot(
+            int queueDepth,
+            long activeRequestId,
+            double activeWallSeconds,
+            double activeProcessingMilliseconds,
+            int activeVisitedNodes,
+            int activePendingNodes,
+            double oldestQueueAgeSeconds,
+            long coalescedRequests,
+            long supersededRequests,
+            long staleRequests,
+            long droppedRequests,
+            long completedRequests)
+        {
+            QueueDepth = queueDepth;
+            ActiveRequestId = activeRequestId;
+            ActiveWallSeconds = activeWallSeconds;
+            ActiveProcessingMilliseconds = activeProcessingMilliseconds;
+            ActiveVisitedNodes = activeVisitedNodes;
+            ActivePendingNodes = activePendingNodes;
+            OldestQueueAgeSeconds = oldestQueueAgeSeconds;
+            CoalescedRequests = coalescedRequests;
+            SupersededRequests = supersededRequests;
+            StaleRequests = staleRequests;
+            DroppedRequests = droppedRequests;
+            CompletedRequests = completedRequests;
+        }
+    }
+
+    internal readonly struct ATDAccesswayTerminalDiagnostic
+    {
+        public long RequestId { get; }
+        public string OwnerKey { get; }
+        public string WorkFingerprint { get; }
+        public ATDAccesswayRequestKind Kind { get; }
+        public ATDAccesswayPriority Priority { get; }
+        public ATDAccesswayRequestState PreviousState { get; }
+        public ATDAccesswayRequestState State { get; }
+        public string Reason { get; }
+        public bool RetryEligible { get; }
+        public double QueueAgeSeconds { get; }
+        public double ActiveWallSeconds { get; }
+        public double ProcessingMilliseconds { get; }
+        public int VisitedNodes { get; }
+        public int PendingNodes { get; }
+
+        public ATDAccesswayTerminalDiagnostic(
+            ATDAccesswayRequestHandle handle,
+            ATDAccesswayRequestState previousState,
+            ATDAccesswayRequestResult result,
+            double queueAgeSeconds,
+            double activeWallSeconds)
+        {
+            RequestId = handle.RequestId;
+            OwnerKey = handle.OwnerKey;
+            WorkFingerprint = handle.WorkFingerprint;
+            Kind = handle.Kind;
+            Priority = handle.Priority;
+            PreviousState = previousState;
+            State = result.State;
+            Reason = result.Reason;
+            RetryEligible = result.RetryEligible;
+            QueueAgeSeconds = Math.Max(0d, queueAgeSeconds);
+            ActiveWallSeconds = Math.Max(0d, activeWallSeconds);
+            ProcessingMilliseconds = handle.LastProcessingMilliseconds;
+            VisitedNodes = handle.LastVisitedNodes;
+            PendingNodes = handle.LastPendingNodes;
+        }
+    }
+
     /// <summary>
     /// Runtime-only coordinator for access requests. Exactly one request may be active.
     /// </summary>
@@ -160,15 +314,19 @@ namespace AutoTerrainDesignations.Access
             public ATDAccesswayRequest Request { get; }
             public ATDAccesswayRequestHandle Handle { get; }
             public long Sequence { get; }
+            public double EnqueuedAtSeconds { get; }
+            public double ActivatedAtSeconds { get; set; }
 
             public Entry(
                 ATDAccesswayRequest request,
                 ATDAccesswayRequestHandle handle,
-                long sequence)
+                long sequence,
+                double enqueuedAtSeconds)
             {
                 Request = request;
                 Handle = handle;
                 Sequence = sequence;
+                EnqueuedAtSeconds = enqueuedAtSeconds;
             }
         }
 
@@ -176,9 +334,30 @@ namespace AutoTerrainDesignations.Access
         private readonly List<Entry> m_queue = new List<Entry>();
         private readonly Dictionary<string, Entry> m_liveByOwner =
             new Dictionary<string, Entry>(StringComparer.Ordinal);
+        private readonly int m_maxPendingRequests;
+        private readonly Func<double> m_realtimeSeconds;
+        private readonly Action<ATDAccesswayTerminalDiagnostic>?
+            m_terminalObserver;
         private long m_nextRequestId;
         private long m_nextSequence;
         private Entry? m_active;
+        private long m_coalescedRequests;
+        private long m_supersededRequests;
+        private long m_staleRequests;
+        private long m_droppedRequests;
+        private long m_completedRequests;
+
+        public ATDAccesswayManager(
+            int maxPendingRequests = 32,
+            Func<double>? realtimeSeconds = null,
+            Action<ATDAccesswayTerminalDiagnostic>? terminalObserver = null)
+        {
+            m_maxPendingRequests = Math.Max(1, maxPendingRequests);
+            m_realtimeSeconds = realtimeSeconds
+                ?? (() => Stopwatch.GetTimestamp()
+                    / (double)Stopwatch.Frequency);
+            m_terminalObserver = terminalObserver;
+        }
 
         public ATDAccesswayRequestHandle Enqueue(ATDAccesswayRequest request)
         {
@@ -188,16 +367,34 @@ namespace AutoTerrainDesignations.Access
                 if (m_liveByOwner.TryGetValue(request.OwnerKey, out Entry existing))
                 {
                     if (string.Equals(
-                            existing.Request.WorkFingerprint,
-                            request.WorkFingerprint,
-                            StringComparison.Ordinal))
+                        existing.Request.WorkFingerprint,
+                        request.WorkFingerprint,
+                        StringComparison.Ordinal))
+                    {
+                        m_coalescedRequests++;
                         return existing.Handle;
+                    }
                     Supersede(existing);
                 }
 
                 var handle = new ATDAccesswayRequestHandle(
                     ++m_nextRequestId, request);
-                var entry = new Entry(request, handle, ++m_nextSequence);
+                double enqueuedAtSeconds = m_realtimeSeconds();
+                var entry = new Entry(
+                    request,
+                    handle,
+                    ++m_nextSequence,
+                    enqueuedAtSeconds);
+                if (!MakeQueueRoom(request.Priority))
+                {
+                    Complete(
+                        entry,
+                        ATDAccesswayRequestResult.Failed(
+                            "QueueOverflow",
+                            retryEligible: true));
+                    m_droppedRequests++;
+                    return handle;
+                }
                 m_queue.Add(entry);
                 m_liveByOwner.Add(request.OwnerKey, entry);
                 return handle;
@@ -245,21 +442,59 @@ namespace AutoTerrainDesignations.Access
             }
         }
 
-        public void Tick(bool suspended)
+        public ATDAccesswayManagerHealthSnapshot ReadHealth()
         {
-            if (suspended) return;
             lock (m_sync)
             {
+                double now = m_realtimeSeconds();
+                double oldestQueueAge = 0d;
+                foreach (Entry entry in m_queue)
+                    oldestQueueAge = Math.Max(
+                        oldestQueueAge,
+                        now - entry.EnqueuedAtSeconds);
+                IATDAccesswayManagedWork? activeWork =
+                    m_active?.Handle.Work;
+                return new ATDAccesswayManagerHealthSnapshot(
+                    m_queue.Count,
+                    m_active?.Handle.RequestId ?? 0L,
+                    m_active == null
+                        ? 0d
+                        : Math.Max(
+                            0d,
+                            now - m_active.ActivatedAtSeconds),
+                    activeWork?.ProcessingMilliseconds ?? 0d,
+                    activeWork?.VisitedNodes ?? 0,
+                    activeWork?.PendingNodes ?? 0,
+                    Math.Max(0d, oldestQueueAge),
+                    m_coalescedRequests,
+                    m_supersededRequests,
+                    m_staleRequests,
+                    m_droppedRequests,
+                    m_completedRequests);
+            }
+        }
+
+        public bool Tick(bool suspended)
+        {
+            if (suspended) return false;
+            lock (m_sync)
+            {
+                bool managerWorkPerformed = false;
                 if (m_active == null)
-                    ActivateNext();
+                    managerWorkPerformed = ActivateNext();
                 if (m_active == null)
-                    return;
+                    return managerWorkPerformed;
 
                 Entry active = m_active;
+                if (!TryValidate(active, out ATDAccesswayRequestResult? invalid))
+                {
+                    Complete(active, invalid!);
+                    return true;
+                }
                 try
                 {
                     if (active.Handle.Work!.Advance())
-                        return;
+                        return true;
                     Complete(active, active.Handle.Work.GetTerminalResult());
                 }
                 catch (Exception ex)
@@ -269,6 +504,7 @@ namespace AutoTerrainDesignations.Access
                         ATDAccesswayRequestResult.Failed(
                             "UnhandledWorkException:" + ex.GetType().Name));
                 }
+                return true;
             }
         }
 
@@ -305,60 +541,206 @@ namespace AutoTerrainDesignations.Access
             }
         }
 
-        private void ActivateNext()
+        private bool ActivateNext()
         {
-            if (m_queue.Count == 0) return;
-            int bestIndex = 0;
-            for (int index = 1; index < m_queue.Count; index++)
+            bool managerWorkPerformed = false;
+            while (m_queue.Count > 0)
             {
-                Entry candidate = m_queue[index];
-                Entry best = m_queue[bestIndex];
-                if (candidate.Request.Priority > best.Request.Priority
-                    || (candidate.Request.Priority == best.Request.Priority
-                        && candidate.Sequence < best.Sequence))
-                    bestIndex = index;
+                int bestIndex = 0;
+                for (int index = 1; index < m_queue.Count; index++)
+                {
+                    Entry candidate = m_queue[index];
+                    Entry best = m_queue[bestIndex];
+                    if (candidate.Request.Priority > best.Request.Priority
+                        || (candidate.Request.Priority == best.Request.Priority
+                            && candidate.Sequence < best.Sequence))
+                        bestIndex = index;
+                }
+                Entry entry = m_queue[bestIndex];
+                managerWorkPerformed = true;
+                if (!TryValidate(
+                        entry,
+                        out ATDAccesswayRequestResult? invalid))
+                {
+                    Complete(entry, invalid!);
+                    continue;
+                }
+                m_queue.RemoveAt(bestIndex);
+                try
+                {
+                    entry.Handle.Work = entry.Request.WorkFactory();
+                }
+                catch (Exception ex)
+                {
+                    Complete(
+                        entry,
+                        ATDAccesswayRequestResult.Failed(
+                            "WorkFactoryException:"
+                                + ex.GetType().Name));
+                    continue;
+                }
+                entry.ActivatedAtSeconds = m_realtimeSeconds();
+                entry.Handle.State = ATDAccesswayRequestState.Active;
+                m_active = entry;
+                return true;
             }
-            Entry entry = m_queue[bestIndex];
-            m_queue.RemoveAt(bestIndex);
-            entry.Handle.Work = entry.Request.WorkFactory();
-            entry.Handle.State = ATDAccesswayRequestState.Active;
-            m_active = entry;
+            return managerWorkPerformed;
         }
 
         private void Supersede(Entry entry)
         {
+            ATDAccesswayRequestState previousState = entry.Handle.State;
             entry.Handle.Work?.RequestCancellation("Superseded");
             if (ReferenceEquals(m_active, entry))
                 m_active = null;
             else
                 m_queue.Remove(entry);
+            CaptureTerminalWork(entry.Handle);
             entry.Handle.Work?.Dispose();
             entry.Handle.Work = null;
             entry.Handle.State = ATDAccesswayRequestState.Superseded;
-            entry.Handle.Result = ATDAccesswayRequestResult.Cancelled("Superseded");
+            entry.Handle.Result = ATDAccesswayRequestResult.Superseded();
             m_liveByOwner.Remove(entry.Request.OwnerKey);
+            NotifyTerminal(
+                entry,
+                previousState,
+                entry.Handle.Result);
+            m_supersededRequests++;
+            m_completedRequests++;
         }
 
         private void Complete(Entry entry, ATDAccesswayRequestResult result)
         {
+            ATDAccesswayRequestState previousState = entry.Handle.State;
             if (ReferenceEquals(m_active, entry))
                 m_active = null;
             else
                 m_queue.Remove(entry);
-            if (entry.Handle.Work != null)
-            {
-                entry.Handle.LastVisitedNodes =
-                    entry.Handle.Work.VisitedNodes;
-                entry.Handle.LastPendingNodes =
-                    entry.Handle.Work.PendingNodes;
-                entry.Handle.LastProcessingMilliseconds =
-                    entry.Handle.Work.ProcessingMilliseconds;
-                entry.Handle.Work.Dispose();
-            }
+            CaptureTerminalWork(entry.Handle);
+            entry.Handle.Work?.Dispose();
             entry.Handle.Work = null;
             entry.Handle.Result = result;
             entry.Handle.State = result.State;
             m_liveByOwner.Remove(entry.Request.OwnerKey);
+            NotifyTerminal(entry, previousState, result);
+            if (result.State == ATDAccesswayRequestState.Stale)
+                m_staleRequests++;
+            m_completedRequests++;
+        }
+
+        private static void CaptureTerminalWork(
+            ATDAccesswayRequestHandle handle)
+        {
+            if (handle.Work == null)
+                return;
+            handle.LastVisitedNodes = handle.Work.VisitedNodes;
+            handle.LastPendingNodes = handle.Work.PendingNodes;
+            handle.LastProcessingMilliseconds =
+                handle.Work.ProcessingMilliseconds;
+        }
+
+        private void NotifyTerminal(
+            Entry entry,
+            ATDAccesswayRequestState previousState,
+            ATDAccesswayRequestResult result)
+        {
+            if (m_terminalObserver == null)
+                return;
+            double now = m_realtimeSeconds();
+            double queueEnd = entry.ActivatedAtSeconds > 0d
+                ? entry.ActivatedAtSeconds
+                : now;
+            var diagnostic = new ATDAccesswayTerminalDiagnostic(
+                entry.Handle,
+                previousState,
+                result,
+                queueEnd - entry.EnqueuedAtSeconds,
+                entry.ActivatedAtSeconds > 0d
+                    ? now - entry.ActivatedAtSeconds
+                    : 0d);
+            try
+            {
+                m_terminalObserver(diagnostic);
+            }
+            catch
+            {
+                // Diagnostics must never disrupt request completion.
+            }
+        }
+
+        private bool MakeQueueRoom(ATDAccesswayPriority incomingPriority)
+        {
+            if (m_queue.Count < m_maxPendingRequests)
+                return true;
+
+            int dropIndex = -1;
+            for (int index = 0; index < m_queue.Count; index++)
+            {
+                Entry candidate = m_queue[index];
+                if (candidate.Request.Priority > incomingPriority)
+                    continue;
+                if (dropIndex < 0
+                    || candidate.Request.Priority
+                        < m_queue[dropIndex].Request.Priority
+                    || (candidate.Request.Priority
+                            == m_queue[dropIndex].Request.Priority
+                        && candidate.Sequence
+                            < m_queue[dropIndex].Sequence))
+                    dropIndex = index;
+            }
+            if (dropIndex < 0)
+                return false;
+
+            Entry dropped = m_queue[dropIndex];
+            Complete(
+                dropped,
+                ATDAccesswayRequestResult.Failed(
+                    "QueueOverflow",
+                    retryEligible: true));
+            m_droppedRequests++;
+            return true;
+        }
+
+        private static bool TryValidate(
+            Entry entry,
+            out ATDAccesswayRequestResult? invalidResult)
+        {
+            invalidResult = null;
+            Func<ATDAccesswayValidationResult>? validation =
+                entry.Request.Validation;
+            if (validation == null)
+                return true;
+
+            ATDAccesswayValidationResult validationResult;
+            try
+            {
+                validationResult = validation();
+            }
+            catch (Exception ex)
+            {
+                invalidResult = ATDAccesswayRequestResult.Failed(
+                    "ValidationException:" + ex.GetType().Name,
+                    retryEligible: true);
+                return false;
+            }
+
+            switch (validationResult.Disposition)
+            {
+                case ATDAccesswayValidationDisposition.Current:
+                    return true;
+                case ATDAccesswayValidationDisposition.Stale:
+                    invalidResult = ATDAccesswayRequestResult.Stale(
+                        string.IsNullOrEmpty(validationResult.Reason)
+                            ? "LiveInputChanged"
+                            : validationResult.Reason);
+                    return false;
+                default:
+                    invalidResult = ATDAccesswayRequestResult.Cancelled(
+                        string.IsNullOrEmpty(validationResult.Reason)
+                            ? "OwnerGone"
+                            : validationResult.Reason);
+                    return false;
+            }
         }
 
         private Entry? FindLiveEntry(ATDAccesswayRequestHandle handle)

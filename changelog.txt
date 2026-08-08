@@ -1,3 +1,11 @@
+v0.5.9 | 2026-08-08
+* Improved: Farming access searches now validate live tower, settings, and designation changes before continuing, bound their pending queue, and retain detailed cancellation diagnostics
+* Fixed: Farming-generated accessway leveling cells remain accessway work instead of being reinterpreted as new farmland-preparation intents
+* Fixed: Multiple inaccessible farming clusters are processed sequentially and can reuse pending projected accessways instead of creating unnecessary separate ramps
+* Fixed: Directly replacing an ATD-generated terrain designation transfers ownership to the player's replacement so later farming cleanup leaves it intact
+* Fixed: Holding Left Alt while adding a tower vehicle now checks availability in the default logistics zone, matching the vanilla assignment override
+* Fixed: Added missing translations for the Allow ramps outside tower areas world-setting label
+
 v0.5.8 | 2026-08-04
 * Fixed: Farming access searches no longer synchronously monopolize a simulation tick, preventing severe freezes during large farmland preparation jobs
 * Fixed: Repeated farming access failures now use a bounded retry window instead of immediately repeating the same search

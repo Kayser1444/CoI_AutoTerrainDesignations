@@ -71,6 +71,26 @@ namespace AutoTerrainDesignations.Access.V2
             m_goalDistanceByTile = BuildGoalDistances();
         }
 
+        private AccessV2GroundGraph(
+            AccessV2GroundGraph source,
+            IEnumerable<Tile2i> additionalGoals)
+        {
+            m_groundNodes = source.m_groundNodes;
+            m_projectedFixedNodes = source.m_projectedFixedNodes;
+            m_cleanupByTile = source.m_cleanupByTile;
+            m_generatedClearableByTile = source.m_generatedClearableByTile;
+            m_goals = new HashSet<Tile2i>(source.m_goals);
+            foreach (Tile2i goal in additionalGoals)
+                if (IsTraversable(goal))
+                    m_goals.Add(goal);
+            BuildComponents(out m_componentByTile, out m_goalComponents);
+            m_goalDistanceByTile = BuildGoalDistances();
+        }
+
+        internal AccessV2GroundGraph WithAdditionalGoals(
+            IEnumerable<Tile2i> additionalGoals)
+            => new AccessV2GroundGraph(this, additionalGoals);
+
         public bool IsGround(Tile2i tile) => m_groundNodes.Contains(tile);
 
         internal bool IsProjectedFixedGround(Tile2i tile)

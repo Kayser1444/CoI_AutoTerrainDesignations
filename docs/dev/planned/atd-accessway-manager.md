@@ -1,7 +1,8 @@
 # ATD Accessway Manager
 
-Status: approved design; implementation steps 1-3 complete. Farming now uses
-the runtime manager; interactive migration and manager hardening remain.
+Status: approved design; implementation steps 1-4 complete. Adaptive budgeting
+has a preserved prototype but is intentionally unwired until step 10. Interactive
+migration and the remaining heavy-phase incrementalization remain.
 
 Decision record: [Coordinate accessway work through one cooperative manager](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
 
@@ -194,10 +195,10 @@ Approved initial policy:
 
 - exactly one active access request; other requests remain queued rather than
   round-robin interleaving live search sessions;
-- automated normal-play work receives up to 10 ms per rendered frame;
-- direct interactive normal-play work receives up to 15 ms per rendered frame;
-- while paused, measured spare capacity may be used adaptively up to 30 ms per
-  rendered frame, backing down when frame timing deteriorates;
+- managed work adapts within a 1-15 ms range while simulation is running and a
+  1-30 ms range while paused, backing down when frame timing deteriorates;
+- direct interactive work retains strict scheduling priority when it migrates
+  to the manager, but uses the same adaptive envelope once selected;
 - a node quantum larger than the current `Step(1)`, adjusted downward/upward
   from measured slice time;
 - direct interactive Create Designations, Mining Designations, and accessway
@@ -217,16 +218,53 @@ Approved initial policy:
 - at most one commit transaction per frame.
 
 The legacy `accessSearchFrameBudgetMs` setting is deprecated rather than mapped
-from its unsafe 30 ms default. Three expert settings replace it: automated
-normal-play budget (10 ms), interactive normal-play budget (15 ms), and paused
-maximum budget (30 ms). They have safe bounds and temporary diagnostic console
-overrides. Existing installations receive the safe new defaults and a concise
-migration log.
+from its unsafe 30 ms default. Until adaptive scheduling is revisited in step
+10, the automated manager retains its fixed 10 ms running budget and 30 ms
+paused budget. The interactive 15 ms setting is retained for compatibility
+while interactive migration is pending.
 
 The time budget must be checked between bounded node quanta. A stopwatch around
 an unbounded operation cannot prevent a spike that already occurred. Snapshot
 capture and materialization must be measured separately because search slicing
 does not make those phases cheap.
+
+### Adaptive frame-budget policy (prototype parked)
+
+The intended controller observes
+rendered-frame cadence, measures ATD's own elapsed work separately, and keeps a
+slow-biased estimate of non-ATD time. Healthy frames gradually probe for spare
+capacity; slow frames, high external cost, and ATD slice overruns cut the next
+allowance immediately. Future request kinds inherit this policy when they
+migrate to the manager. Its prototype and deterministic tests are preserved,
+but the runtime path remains on fixed budgets until the controller learns a
+real baseline instead of treating 60 FPS as universal headroom.
+
+Approved operating envelope:
+
+- never allocate less than 1 ms to an eligible active request; continued slow
+  progress under load is intentional;
+- cap unpaused work at 15 ms per rendered frame;
+- cap paused work at 30 ms per rendered frame, accepting approximately 30 FPS
+  UI responsiveness while long paths run and using otherwise idle CPU;
+- reduce the budget quickly after frame-time deterioration or an ATD overrun,
+  but restore it gradually and with hysteresis when sustained headroom returns;
+- keep independent running and paused estimates, and reseed or strongly
+  discount stale measurements after pause transitions, speed changes, world
+  loads, long callback gaps, or other discontinuities;
+- priority remains a queue-selection rule: interactive work runs before farming
+  and Construction Assist, but all managed work uses the available adaptive
+  envelope once selected;
+- the hard caps remain configurable expert limits, while diagnostics report the
+  selected budget, observed ATD time, estimated non-ATD time, reductions,
+  recoveries, and cap/floor hits.
+
+The controller must not infer headroom from instantaneous FPS alone. Frame
+limiting, intentional engine sleep, simulation speed, and paused updates can all
+make callback intervals look cheap or expensive for different reasons. Its
+rolling estimate should favor recent slow frames, react asymmetrically (fast
+decrease, slow increase), and be verified against fixed-budget mode. The exact
+filter, safety margin, increase rate, and decrease factor remain tuning details;
+the 1/15/30 ms envelope and prompt backoff under stress are policy.
 
 ### Preparation and commit budgets
 
@@ -294,6 +332,13 @@ a diagnostic terminal result. Queue size, toast delay, adaptive ramp rate,
 stall-quantum count, and warning thresholds are conservative tuning parameters,
 not architectural policy.
 
+The implemented manager permits 32 pending requests plus the single active
+request. Owner-key coalescing enforces one live request per owner. At capacity,
+the oldest queued request in the lowest priority class no higher than the
+incoming request is completed as retryable `QueueOverflow`; a lower-priority
+arrival cannot evict interactive work, and the newest interactive request is
+never silently discarded.
+
 ### User cancellation
 
 Progress cancellation delegates to the request owner rather than cancelling one
@@ -357,6 +402,20 @@ If validation fails, discard the plan without mutation. Requeue only when the
 owner is still live and the retry policy allows it. Placement should remain one
 transaction with the existing rollback behavior; cancellation is observed
 before commit, not halfway through it.
+
+For managed farming, the manager invokes a cheap live-validation callback before
+activation and before every cooperative slice. World generation, owner/session
+identity, tower area, tower access settings, and the global access-planning
+settings fingerprint are checked directly. A bounded transient designation
+mutation journal spatially filters additions, replacements, removals, and
+fulfillment against the tower/search watch region; overflow fails
+conservatively. Only a relevant mutation rebuilds the full farming-work
+fingerprint. Changed work or nearby provider work completes as retryable
+`Stale`; completed or removed ownership completes as non-retrying cancellation.
+Because world mutation cannot interleave on the same game thread after this
+check and before the slice returns, the final search slice reaches placement
+under the validation performed at its start. Placement retains its existing
+live terrain/conflict checks and rollback.
 
 ## Integration by caller
 
@@ -466,6 +525,13 @@ active request, per-phase time, cancellations, timeouts, stale retries, and
 coalesced request count. Farming performance rows should report access-manager
 status instead of charging an entire synchronous search to one farming pass.
 
+The implemented ten-second Debug health row reports active ID, active wall and
+processing time, visited/pending nodes, queue depth and oldest age, plus
+coalesced, superseded, stale, dropped, and completed totals. Health sampling is
+disabled below Debug level. A central terminal observer records every
+non-success result, including reset, supersession, validation, cancellation,
+and queue-overflow paths, with the complete request-owned context above.
+
 Useful console diagnostics:
 
 - dump queued/active/recent requests;
@@ -484,8 +550,10 @@ Useful console diagnostics:
 3. **Implemented.** Add the runtime manager and route farming access through it using only the
    new planner. Remove the synchronous `CreateAccessRamp` drain from farming;
    temporarily suspend farming work while legacy interactive access is active.
-4. Add stale-result validation, bounded retries, queue backpressure, and
-   manager health diagnostics.
+4. **Implemented.** Add stale-result validation, bounded retries, queue
+   backpressure, and manager health diagnostics. Farming stale/overflow results
+   feed its existing 10-to-60-second owner retry policy; owner completion and
+   explicit cancellation remain non-retrying.
 5. Route Create Designations and planned-tower access through the manager with
    strict interactive priority and request-owned cancellation.
 6. Remove legacy ramp generation, candidate comparison, global result state,
@@ -496,6 +564,12 @@ Useful console diagnostics:
    still exceed the frame budget.
 9. Only after a purity/thread-safety audit, consider a worker-thread search
    backend behind the same manager interface.
+10. Replace fixed frame budgets with the preserved adaptive-controller prototype:
+    1 ms minimum, 15 ms unpaused cap, 30 ms paused cap, fast stress backoff,
+    gradual recovery, diagnostics, configuration migration, and deterministic
+    timing tests. The prototype and its deterministic tests are preserved but
+    intentionally unwired after the initial implementation exposed an incorrect
+    fixed-60-FPS baseline assumption.
 
 The farming-first manager slice may release before interactive migration because
 it addresses the reported path. During that transition, the existing
@@ -507,11 +581,11 @@ interactive callers migrate.
 The implemented farming slice has one active request, owner/fingerprint
 coalescing, strict priority/FIFO queue selection, request-scoped cooperative
 cancellation, and runtime-only reset behavior. Preparation and filling keep
-separate owner keys. It advances from the rendered-frame ticker with a 10 ms
-normal-play budget or 30 ms paused maximum, accumulates actual processing time
-for timeout accounting, and shows a work-type-specific progress toast. The
-toast's stop action suppresses its farming phase until automation is explicitly
-disabled and re-enabled.
+separate owner keys. It advances from the rendered-frame ticker under the
+fixed 10/30 ms running/paused scheduling envelope, accumulates actual processing time for
+timeout accounting, and shows the selected budget in a work-type-specific
+progress toast. The toast's stop action suppresses its farming phase until
+automation is explicitly disabled and re-enabled.
 
 This slice removes the synchronous farming drain, but its time budget is checked
 only between coroutine yields. Snapshot preparation, materialization, or one
@@ -538,9 +612,9 @@ must incrementalize any operation shown to be unacceptably large in live tests.
 - Save/load reconstructs access demand from live/runtime-derived workflow state;
   no manager state is serialized.
 - Existing access-search fixtures still choose the same routes and costs.
-- Interactive normal-play work stays within its 15 ms slice policy; automated
-  normal-play work stays within 10 ms; paused work adapts no higher than 30 ms,
-  apart from a separately measured small atomic commit.
+- Eligible managed work receives at least 1 ms, adapts no higher than 15 ms
+  unpaused or 30 ms paused, and backs down promptly when non-ATD frame cost or
+  ATD overruns rise, apart from a separately measured small atomic commit.
 - Managed requests use only the new planner and never invoke legacy generation
   or candidate comparison as a fallback. Existing legacy-created designations
   in saves remain valid and are not rewritten by migration.
@@ -559,9 +633,9 @@ must incrementalize any operation shown to be unacceptably large in live tests.
 1. Which snapshot collectors, legacy-generator phases, materialization steps,
    or individual node expansions exceed their approved slice bounds and need
    incremental cursors?
-2. What conservative initial values should be used for queue capacity, toast
-   delay, adaptive paused-budget ramp rate, stall-quanta detection, and warning
-   thresholds?
+2. What initial values should be used for queue capacity, toast delay, adaptive
+   budget safety margin/filter/increase/decrease rates, stall-quanta detection,
+   and warning thresholds within the approved 1/15/30 ms envelope?
 3. Which reliable tree/prop/entity events can augment the required spatial
    retry triggers without global invalidation churn?
 4. Can a later purity/thread-safety audit prove that immutable graph search is

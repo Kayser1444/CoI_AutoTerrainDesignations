@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Kayser
 // Licensed under the MIT License.
 using System;
+using System.Diagnostics;
 using AutoTerrainDesignations.Access;
 using Mafi;
 using Mafi.Localization;
@@ -17,6 +18,7 @@ namespace AutoTerrainDesignations
         private static bool s_accesswayManagerSuspendedForSave;
         private static bool s_accesswayManagerGamePaused;
         private static int s_accesswayManagerLastLoggedBudget = -1;
+        private static double s_accesswayManagerNextHealthLogSeconds;
         private static bool s_accesswayManagerToastVisible;
         private static long s_accesswayManagerToastRequestId;
         private static Label? s_accesswayManagerProgressLabel;
@@ -24,10 +26,12 @@ namespace AutoTerrainDesignations
         private static void InitializeAccesswayManagerRuntime()
         {
             s_accesswayManager?.Reset("WorldReinitialized");
-            s_accesswayManager = new ATDAccesswayManager();
+            s_accesswayManager = new ATDAccesswayManager(
+                terminalObserver: LogAccesswayTerminalDiagnostic);
             s_accesswayManagerSuspendedForSave = false;
             s_accesswayManagerGamePaused = false;
             s_accesswayManagerLastLoggedBudget = -1;
+            s_accesswayManagerNextHealthLogSeconds = 0d;
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
             s_accesswayManagerProgressLabel = null;
@@ -41,10 +45,16 @@ namespace AutoTerrainDesignations
                     "Accessway manager is unavailable for this world.");
             ATDAccesswayRequestHandle handle =
                 s_accesswayManager.Enqueue(request);
+            ATDAccesswayHandleSnapshot snapshot =
+                s_accesswayManager.Read(handle);
             LogExperimentalAccessDebug(
                 $"[ATD Access Manager] id={handle.RequestId} "
-                + $"owner={handle.OwnerKey} state=queued "
-                + $"priority={handle.Priority} kind={handle.Kind}");
+                + $"owner={handle.OwnerKey} state={snapshot.State} "
+                + $"priority={handle.Priority} kind={handle.Kind}"
+                + (snapshot.Result == null
+                    ? string.Empty
+                    : $" reason={snapshot.Result.Reason} "
+                        + $"retryEligible={snapshot.Result.RetryEligible}"));
             return handle;
         }
 
@@ -75,19 +85,76 @@ namespace AutoTerrainDesignations
 
             bool suspendedForInteractive = s_createDesignationsOperationActive;
             manager.Tick(suspendedForInteractive);
-            int budget = GetManagedAccesswaySliceBudgetMilliseconds();
-            if (budget != s_accesswayManagerLastLoggedBudget
-                && manager.TryReadActive(out _, out _))
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
             {
-                s_accesswayManagerLastLoggedBudget = budget;
-                LogExperimentalAccessDebug(
-                    $"[ATD Access Manager] pause={gamePaused} "
-                    + $"sliceBudgetMs={budget}");
+                int budget = GetManagedAccesswaySliceBudgetMilliseconds();
+                if (budget != s_accesswayManagerLastLoggedBudget
+                    && manager.TryReadActive(out _, out _))
+                {
+                    s_accesswayManagerLastLoggedBudget = budget;
+                    LogExperimentalAccessDebug(
+                        $"[ATD Access Manager] pause={gamePaused} "
+                        + $"sliceBudgetMs={budget} scheduling=fixed");
+                }
+                double nowSeconds = Stopwatch.GetTimestamp()
+                    / (double)Stopwatch.Frequency;
+                if (nowSeconds >= s_accesswayManagerNextHealthLogSeconds)
+                {
+                    s_accesswayManagerNextHealthLogSeconds =
+                        nowSeconds + 10d;
+                    ATDAccesswayManagerHealthSnapshot health =
+                        manager.ReadHealth();
+                    if (health.ActiveRequestId != 0 || health.QueueDepth > 0)
+                    {
+                        LogExperimentalAccessDebug(
+                            "[ATD Access Manager Health] "
+                            + $"active={health.ActiveRequestId} "
+                            + $"activeWallSeconds={health.ActiveWallSeconds:0.##} "
+                            + $"processingMs={health.ActiveProcessingMilliseconds:0.##} "
+                            + $"visited={health.ActiveVisitedNodes} "
+                            + $"pending={health.ActivePendingNodes} "
+                            + $"queued={health.QueueDepth} "
+                            + $"oldestQueueSeconds={health.OldestQueueAgeSeconds:0.##} "
+                            + $"coalesced={health.CoalescedRequests} "
+                            + $"superseded={health.SupersededRequests} "
+                            + $"stale={health.StaleRequests} "
+                            + $"dropped={health.DroppedRequests} "
+                            + $"completed={health.CompletedRequests}");
+                    }
+                }
             }
             UpdateAccesswayManagerToast(manager, suspendedForInteractive);
         }
 
+        private static void LogAccesswayTerminalDiagnostic(
+            ATDAccesswayTerminalDiagnostic diagnostic)
+        {
+            if (diagnostic.State == ATDAccesswayRequestState.Succeeded)
+                return;
+            string work = diagnostic.WorkFingerprint.Length <= 160
+                ? diagnostic.WorkFingerprint
+                : diagnostic.WorkFingerprint.Substring(0, 160)
+                    + $"...({diagnostic.WorkFingerprint.Length} chars)";
+            LogInfo(
+                "[ATD Access Manager Terminal] "
+                + $"id={diagnostic.RequestId} "
+                + $"owner={diagnostic.OwnerKey} "
+                + $"kind={diagnostic.Kind} "
+                + $"priority={diagnostic.Priority} "
+                + $"phase={diagnostic.PreviousState} "
+                + $"state={diagnostic.State} "
+                + $"reason={diagnostic.Reason} "
+                + $"queueAgeSeconds={diagnostic.QueueAgeSeconds:0.##} "
+                + $"activeWallSeconds={diagnostic.ActiveWallSeconds:0.##} "
+                + $"processingMs={diagnostic.ProcessingMilliseconds:0.##} "
+                + $"visited={diagnostic.VisitedNodes} "
+                + $"pending={diagnostic.PendingNodes} "
+                + $"retryEligible={diagnostic.RetryEligible} "
+                + $"work={work}");
+        }
+
         internal static int GetManagedAccesswaySliceBudgetMilliseconds()
+            // The adaptive controller is intentionally parked until ticket 10.
             => s_accesswayManagerGamePaused
                 ? AutoTerrainDesignationsMod.AccessManagerPausedMaxFrameBudgetMs
                 : AutoTerrainDesignationsMod.AccessManagerAutomatedFrameBudgetMs;
@@ -109,6 +176,7 @@ namespace AutoTerrainDesignations
             s_accesswayManagerSuspendedForSave = false;
             s_accesswayManagerGamePaused = false;
             s_accesswayManagerLastLoggedBudget = -1;
+            s_accesswayManagerNextHealthLogSeconds = 0d;
             HideAccesswayManagerToast();
         }
 

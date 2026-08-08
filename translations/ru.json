@@ -281,7 +281,7 @@
   ],
   [
     "settings.world.allow_ramps_outside_tower_areas.label",
-    "Allow ramps outside tower areas"
+    "Разрешить пандусы за пределами башен"
   ],
   [
     "settings.world.allow_ramps_outside_tower_areas.tooltip",

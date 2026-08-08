@@ -1066,12 +1066,10 @@ namespace AutoTerrainDesignations
                     continue;
 
                 Tile2i origin = designation.OriginTileCoord;
-                if (session.Origins.ContainsKey(origin))
-                    continue;
-
-                // Rim alignment designations are flat dumping designations placed just outside
-                // the farmed area during filling. Skip them so they are not captured as new work.
-                if (session.RimAlignmentOrigins.Contains(origin))
+                if (!ShouldCaptureFlatFarmingDesignation(
+                        session.Origins.ContainsKey(origin),
+                        session.RimAlignmentOrigins.Contains(origin),
+                        IsRegisteredGeneratedAccesswayOrigin(tower, origin)))
                     continue;
 
                 if (s_farmingDebugStoredDesignations.TryGetValue(origin, out FarmingDebugStoredDesignation stored))
@@ -1094,6 +1092,18 @@ namespace AutoTerrainDesignations
 
             return captured;
         }
+
+        private static bool ShouldCaptureFlatFarmingDesignation(
+            bool alreadyTracked,
+            bool rimAlignmentOwned,
+            bool accesswayOwned)
+            // Generated accessway leveling is infrastructure for farming work,
+            // not a new farming intent. Global accessway ownership is assigned
+            // during materialization and bridges the frame before the farming
+            // session consumes the manager's successful terminal result.
+            => !alreadyTracked
+                && !rimAlignmentOwned
+                && !accesswayOwned;
 
         private static FarmingAdvanceStats AdvanceCapturedFarmingOrigins(FarmingPreparationSession session, TerrainManager terrMgr)
         {

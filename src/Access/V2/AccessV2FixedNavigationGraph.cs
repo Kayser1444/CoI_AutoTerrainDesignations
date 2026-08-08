@@ -142,6 +142,22 @@ namespace AutoTerrainDesignations.Access.V2
             return result;
         }
 
+        internal HashSet<Tile2i> CollectCentersForFixedOrigins(
+            ISet<Tile2i> fixedOrigins)
+        {
+            var result = new HashSet<Tile2i>();
+            foreach (AccessV2FixedNavigationNode node in m_nodes.Values)
+            {
+                Tile2i companion = AccessV2Geometry.Add(
+                    node.Anchor,
+                    AccessV2BandProfile.GetLaneDirection(node.Axis));
+                if (fixedOrigins.Contains(node.Anchor)
+                    && fixedOrigins.Contains(companion))
+                    result.Add(node.Center);
+            }
+            return result;
+        }
+
         public IReadOnlyList<AccessV2FixedNavigationMove> EnumerateMoves(
             AccessV2TravelAxis axis,
             Tile2i center)

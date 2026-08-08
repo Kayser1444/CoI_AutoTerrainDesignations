@@ -214,6 +214,7 @@ namespace AutoTerrainDesignations.Access.V2
         public AccessV2HandoffCandidate? Handoff { get; }
         public IReadOnlyList<Tile2i> GroundPath { get; }
         public IReadOnlyList<AccessV2RouteStep> RouteSteps { get; }
+        public IReadOnlyCollection<Tile2i> TerminalGoalCenters { get; }
         public int VehicleWidth { get; }
 
         public AccessV2RouteData(
@@ -222,7 +223,8 @@ namespace AutoTerrainDesignations.Access.V2
             AccessV2HandoffCandidate? handoff,
             IReadOnlyList<Tile2i> groundPath,
             IReadOnlyList<AccessV2RouteStep>? routeSteps = null,
-            int vehicleWidth = 5)
+            int vehicleWidth = 5,
+            IReadOnlyCollection<Tile2i>? terminalGoalCenters = null)
         {
             States = states;
             GeneratedProfiles = generatedProfiles;
@@ -230,6 +232,8 @@ namespace AutoTerrainDesignations.Access.V2
             GroundPath = groundPath;
             RouteSteps = routeSteps ?? Array.Empty<AccessV2RouteStep>();
             VehicleWidth = Math.Max(1, vehicleWidth);
+            TerminalGoalCenters = terminalGoalCenters
+                ?? Array.Empty<Tile2i>();
         }
     }
 

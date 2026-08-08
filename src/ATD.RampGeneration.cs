@@ -310,7 +310,8 @@ namespace AutoTerrainDesignations
         private static HashSet<Tile2i> AddExistingTerrainWorkEndpoints(
             IAreaManagingTower tower,
             Dict<Tile2i, int> accessWorkDepths,
-            Dict<Tile2i, int> cornerHeights)
+            Dict<Tile2i, int> cornerHeights,
+            ISet<Tile2i>? contextOnlyTerrainWorkOrigins)
         {
             var added = new HashSet<Tile2i>();
             int miningEndpoints = 0;
@@ -320,11 +321,15 @@ namespace AutoTerrainDesignations
                 tower.Area.BoundingBoxMin, tower.Area.BoundingBoxMax))
             {
                 Tile2i origin = designation.OriginTileCoord;
-                if (accessWorkDepths.ContainsKey(origin)
-                    || IsRegisteredGeneratedAccesswayOrigin(tower, origin)
-                    || designation.IsFulfilled
-                    || !IsOriginInsideTower(tower, origin)
-                    || !IsTerrainWorkDesignationProto(designation.Prototype))
+                if (!ShouldAddExistingTerrainWorkEndpoint(
+                        accessWorkDepths.ContainsKey(origin),
+                        contextOnlyTerrainWorkOrigins?.Contains(origin)
+                            ?? false,
+                        IsRegisteredGeneratedAccesswayOrigin(tower, origin),
+                        designation.IsFulfilled,
+                        IsOriginInsideTower(tower, origin),
+                        IsTerrainWorkDesignationProto(
+                            designation.Prototype)))
                     continue;
 
                 int nw = GetDesignationTargetHeightRounded(designation, 0, 0);
@@ -352,6 +357,20 @@ namespace AutoTerrainDesignations
             }
             return added;
         }
+
+        private static bool ShouldAddExistingTerrainWorkEndpoint(
+            bool alreadyRequested,
+            bool contextOnly,
+            bool generatedAccesswayOwned,
+            bool fulfilled,
+            bool insideTower,
+            bool terrainWorkPrototype)
+            => !alreadyRequested
+                && !contextOnly
+                && !generatedAccesswayOwned
+                && !fulfilled
+                && insideTower
+                && terrainWorkPrototype;
 
         private static bool HasExistingTerrainWorkEndpoint(IAreaManagingTower tower)
             => CollectExistingTerrainWorkEndpointOrigins(tower).Count > 0;
@@ -465,6 +484,8 @@ namespace AutoTerrainDesignations
             bool allowExistingPlannedRampShortcut,
             RampGenerationResult result,
             HashSet<Tile2i>? forbiddenApproachClusterOrigins = null,
+            ISet<Tile2i>? contextOnlyTerrainWorkOrigins = null,
+            IReadOnlyCollection<Tile2i>? projectedProviderGoalOrigins = null,
             IReadOnlyList<Tile2i>? groundGoalOverride = null,
             bool emitNoCandidateWarnings = true,
             bool newPlannerOnly = false,
@@ -502,7 +523,10 @@ namespace AutoTerrainDesignations
             foreach (var pair in tileDepths)
                 accessWorkDepths[pair.Key] = pair.Value;
             HashSet<Tile2i> existingEndpointOrigins = AddExistingTerrainWorkEndpoints(
-                tower, accessWorkDepths, cornerHeights);
+                tower,
+                accessWorkDepths,
+                cornerHeights,
+                contextOnlyTerrainWorkOrigins);
             if (accessWorkDepths.Count == 0)
             {
                 result.Outcome = RampPlacementOutcome.Failed;
@@ -702,6 +726,15 @@ namespace AutoTerrainDesignations
                 {
                     List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
                         originClusters, states, cluster);
+                    if (projectedProviderGoalOrigins != null)
+                    {
+                        foreach (Tile2i providerGoal
+                            in projectedProviderGoalOrigins)
+                        {
+                            if (!accessibleFixedGoals.Contains(providerGoal))
+                                accessibleFixedGoals.Add(providerGoal);
+                        }
+                    }
                     if (usesGroundGoalOverride)
                         accessibleFixedGoals.Clear();
                     if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,

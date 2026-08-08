@@ -1446,6 +1446,27 @@ namespace AutoTerrainDesignations.Access.V2
             var fv = new AccessV2FixedNavigationGraph(
                 fixedProfiles, exact);
 
+            var providerOrigins = new HashSet<Tile2i>
+            {
+                new Tile2i(0, 0),
+                new Tile2i(0, 4),
+            };
+            AccessV2GroundGraph providerGoalGraph =
+                AccessPathSearch.BuildV2RequestGroundGraph(
+                    exact,
+                    fv,
+                    providerOrigins,
+                    out HashSet<Tile2i> providerGoalCenters);
+            Tile2i providerCenter = new Tile2i(2, 4);
+            if (!providerGoalCenters.Contains(providerCenter)
+                || !providerGoalGraph.IsGoal(providerCenter)
+                || exact.IsGoal(providerCenter))
+            {
+                failure =
+                    "A request-scoped fixed provider band did not become a V2 terminal ground center.";
+                return false;
+            }
+
             Tile2i start = new Tile2i(2, 4);
             Tile2i goal = new Tile2i(14, 12);
             if (fv.NodeCount != 24

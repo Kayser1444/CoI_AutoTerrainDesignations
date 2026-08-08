@@ -74,7 +74,27 @@ namespace AutoTerrainDesignations
         internal static VehiclePathFindingParams? s_standardVehiclePathFindingParams;
         private static string? s_modRootDirectoryPath;
         private static int s_worldGeneration;
+        private static long s_terrainDesignationRevision;
+        private const int TERRAIN_DESIGNATION_MUTATION_JOURNAL_CAPACITY = 1024;
+        private static readonly TerrainDesignationMutation[]
+            s_terrainDesignationMutationJournal =
+                new TerrainDesignationMutation[
+                    TERRAIN_DESIGNATION_MUTATION_JOURNAL_CAPACITY];
+        private static int s_terrainDesignationMutationJournalCount;
+        private static int s_terrainDesignationMutationJournalNext;
         internal static readonly ModLogger s_log = new ModLogger("ATD");
+
+        private readonly struct TerrainDesignationMutation
+        {
+            public long Revision { get; }
+            public Tile2i Origin { get; }
+
+            public TerrainDesignationMutation(long revision, Tile2i origin)
+            {
+                Revision = revision;
+                Origin = origin;
+            }
+        }
 
         private const int BATCH_SIZE = 30;
         private const int MAX_BATCH_SIZE = 200;
@@ -502,8 +522,14 @@ namespace AutoTerrainDesignations
         }
 
         internal static void OnTerrainDesignationRemoved(Tile2i origin)
+            => RevokeGeneratedDesignationOwnership(origin, "removal");
+
+        private static void RevokeGeneratedDesignationOwnership(
+            Tile2i origin,
+            string changeKind)
         {
             origin = TerrainDesignation.GetOrigin(origin);
+            RecordTerrainDesignationMutation(origin);
             var affectedTowers = new HashSet<EntityId>();
             RemoveOwnership(
                 s_generatedDesignationOriginsByTowerEntityId);
@@ -522,7 +548,7 @@ namespace AutoTerrainDesignations
                 ClearFarmingAccessCache(session);
                 LogExperimentalAccessDebug(
                     $"[ATD Farming Access] ownership revoked at "
-                    + $"({origin.X},{origin.Y}) after designation removal "
+                    + $"({origin.X},{origin.Y}) after designation {changeKind} "
                     + $"phases={(preparationRemoved ? "preparation" : string.Empty)}"
                     + $"{(preparationRemoved && fillingRemoved ? "+" : string.Empty)}"
                     + $"{(fillingRemoved ? "filling" : string.Empty)}");
@@ -552,12 +578,29 @@ namespace AutoTerrainDesignations
         public static void RemoveDesignationPostfix(Tile2i __0)
             => OnTerrainDesignationRemoved(__0);
 
+        public static void AddOrReplaceDesignationPostfix(
+            DesignationData data,
+            bool __result)
+        {
+            if (__result)
+                RevokeGeneratedDesignationOwnership(
+                    data.OriginTile, "replacement");
+        }
+
         internal static bool ValidateGeneratedDesignationRemovalFixtures(
             out string failure)
         {
+            long savedDesignationRevision = s_terrainDesignationRevision;
+            int savedJournalCount =
+                s_terrainDesignationMutationJournalCount;
+            int savedJournalNext =
+                s_terrainDesignationMutationJournalNext;
+            var savedJournal = (TerrainDesignationMutation[])
+                s_terrainDesignationMutationJournal.Clone();
             EntityId towerId = EntityId.Invalid;
             var unrelatedTowerId = new EntityId(987654321);
             var origin = new Tile2i(124, 456);
+            var replacementOrigin = new Tile2i(128, 456);
             var settings = new ATDTowerSettings(
                 1, 2, 1, null, 0, 1);
             settings.MarkMiningPlanClean("fixture-clean");
@@ -569,15 +612,41 @@ namespace AutoTerrainDesignations
             s_towerSettingsByEntityId[unrelatedTowerId] =
                 unrelatedSettings;
             s_generatedDesignationOriginsByTowerEntityId[towerId] =
-                new HashSet<Tile2i> { origin };
+                new HashSet<Tile2i> { origin, replacementOrigin };
             s_generatedAccesswayOriginsByTowerEntityId[towerId] =
-                new HashSet<Tile2i> { origin };
+                new HashSet<Tile2i> { origin, replacementOrigin };
             var farmingSession = new FarmingPreparationSession();
             farmingSession.PreparationAccessRampOrigins.Add(origin);
             farmingSession.FillingAccessRampOrigins.Add(origin);
+            farmingSession.PreparationAccessRampOrigins.Add(
+                replacementOrigin);
+            farmingSession.FillingAccessRampOrigins.Add(
+                replacementOrigin);
             s_farmingPreparationSessions[towerId] = farmingSession;
             try
             {
+                AddOrReplaceDesignationPostfix(
+                    new DesignationData(
+                        replacementOrigin, new HeightTilesI(0)),
+                    __result: true);
+                bool replacementStillOwned =
+                    s_generatedDesignationOriginsByTowerEntityId[towerId]
+                        .Contains(replacementOrigin)
+                    || s_generatedAccesswayOriginsByTowerEntityId[towerId]
+                        .Contains(replacementOrigin)
+                    || farmingSession.PreparationAccessRampOrigins.Contains(
+                        replacementOrigin)
+                    || farmingSession.FillingAccessRampOrigins.Contains(
+                        replacementOrigin);
+                if (replacementStillOwned || !settings.MiningPlanDirty)
+                {
+                    failure =
+                        "Successfully replacing a generated terrain designation must revoke ordinary, accessway, and farming ownership at that origin.";
+                    return false;
+                }
+
+                long revisionBeforeRemoval =
+                    CurrentTerrainDesignationRevision;
                 OnTerrainDesignationRemoved(origin);
                 OnTerrainDesignationRemoved(origin);
                 bool designationOwned =
@@ -611,6 +680,19 @@ namespace AutoTerrainDesignations
                         + unrelatedSettings.MiningPlanDirty;
                     return false;
                 }
+                if (!HasTerrainDesignationMutationSince(
+                        revisionBeforeRemoval,
+                        new Tile2i(100, 400),
+                        new Tile2i(200, 500))
+                    || HasTerrainDesignationMutationSince(
+                        revisionBeforeRemoval,
+                        new Tile2i(1000, 1000),
+                        new Tile2i(1100, 1100)))
+                {
+                    failure =
+                        "The designation mutation journal did not spatially filter relevant and unrelated watch regions.";
+                    return false;
+                }
                 failure = string.Empty;
                 return true;
             }
@@ -624,6 +706,16 @@ namespace AutoTerrainDesignations
                 s_generatedAccesswayOriginsByTowerEntityId.Remove(
                     towerId);
                 s_farmingPreparationSessions.Remove(towerId);
+                s_terrainDesignationRevision =
+                    savedDesignationRevision;
+                s_terrainDesignationMutationJournalCount =
+                    savedJournalCount;
+                s_terrainDesignationMutationJournalNext =
+                    savedJournalNext;
+                Array.Copy(
+                    savedJournal,
+                    s_terrainDesignationMutationJournal,
+                    savedJournal.Length);
             }
         }
 
@@ -829,6 +921,51 @@ namespace AutoTerrainDesignations
 
         internal static int CurrentWorldGeneration => s_worldGeneration;
 
+        internal static long CurrentTerrainDesignationRevision
+            => s_terrainDesignationRevision;
+
+        internal static bool HasTerrainDesignationMutationSince(
+            long revision,
+            Tile2i watchMin,
+            Tile2i watchMax)
+        {
+            if (revision >= s_terrainDesignationRevision)
+                return false;
+            long oldestRetainedRevision = s_terrainDesignationRevision
+                - s_terrainDesignationMutationJournalCount + 1;
+            if (revision < oldestRetainedRevision - 1)
+                return true;
+
+            for (int index = 0;
+                index < s_terrainDesignationMutationJournalCount;
+                index++)
+            {
+                TerrainDesignationMutation mutation =
+                    s_terrainDesignationMutationJournal[index];
+                if (mutation.Revision <= revision)
+                    continue;
+                Tile2i origin = mutation.Origin;
+                if (origin.X >= watchMin.X && origin.X <= watchMax.X
+                    && origin.Y >= watchMin.Y && origin.Y <= watchMax.Y)
+                    return true;
+            }
+            return false;
+        }
+
+        private static void RecordTerrainDesignationMutation(Tile2i origin)
+        {
+            long revision = ++s_terrainDesignationRevision;
+            s_terrainDesignationMutationJournal[
+                s_terrainDesignationMutationJournalNext] =
+                    new TerrainDesignationMutation(revision, origin);
+            s_terrainDesignationMutationJournalNext =
+                (s_terrainDesignationMutationJournalNext + 1)
+                    % TERRAIN_DESIGNATION_MUTATION_JOURNAL_CAPACITY;
+            if (s_terrainDesignationMutationJournalCount
+                < TERRAIN_DESIGNATION_MUTATION_JOURNAL_CAPACITY)
+                s_terrainDesignationMutationJournalCount++;
+        }
+
         internal static bool IsWorldGenerationActive(int worldGeneration)
         {
             return worldGeneration == s_worldGeneration && s_desigManager != null;
@@ -840,6 +977,9 @@ namespace AutoTerrainDesignations
             s_propRemovalManager?.Dispose(restoreOriginals: true);
             s_propRemovalManager = null;
             s_worldGeneration++;
+            s_terrainDesignationRevision = 0;
+            s_terrainDesignationMutationJournalCount = 0;
+            s_terrainDesignationMutationJournalNext = 0;
             s_latestCreateDesignationsRequestId++;
             s_cancelExperimentalAccessSearch = true;
             s_createDesignationsOperationActive = false;

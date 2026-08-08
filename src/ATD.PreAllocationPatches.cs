@@ -164,7 +164,7 @@ namespace AutoTerrainDesignations
                 plusBtn.OnClick(() =>
                 {
                     var entity = entityProvider();
-                    var stats = context.VehiclesManager.GetStats(proto, entity.ZoneMask);
+                    var stats = context.VehiclesManager.GetStats(proto, GetAssignmentZoneMask(entity));
                     if (stats.Assignable > 0)
                     {
                         originalOnClick?.Invoke();
@@ -226,7 +226,7 @@ namespace AutoTerrainDesignations
                     // assigner row creates a visibility cycle: once the row is hidden, its
                     // observer may no longer run to make the row visible again.
                     parent.ObserveIndexable(() => entityProvider().AllVehiclesWithProto(proto))
-                        .Observe(() => context.VehiclesManager.GetStats(proto, entityProvider().ZoneMask))
+                        .Observe(() => context.VehiclesManager.GetStats(proto, GetAssignmentZoneMask(entityProvider())))
                         .Observe(() => entityProvider().CanVehicleBeAssigned(proto))
                         .Observe(() => context.UnlockedProtosDbForUi.IsUnlocked(proto))
                         .Observe(() => PendingVehicleAllocations.GetQueuedCountForTower(entityProvider().Id, proto.Id))
@@ -258,6 +258,13 @@ namespace AutoTerrainDesignations
                 Log.Error("[ATD] Error in VehicleProtoAssignerUi constructor postfix: " + ex);
             }
         }
+
+        /// <summary>
+        /// Matches the vanilla assigner's Alt override: while Left Alt is held, vehicles are
+        /// assigned from the default logistics zone instead of the inspected entity's zone.
+        /// </summary>
+        private static ulong GetAssignmentZoneMask(IEntityAssignedWithVehicles entity)
+            => Input.GetKey(KeyCode.LeftAlt) ? LogisticsZone.DEFAULT_ZONE_MASK : entity.ZoneMask;
 
         private static void TryAppendOrderShortcutHint(
             ButtonIcon plusBtn,

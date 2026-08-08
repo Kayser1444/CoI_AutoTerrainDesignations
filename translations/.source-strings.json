@@ -149,6 +149,8 @@
   "settings.tab.world_settings": "World settings",
   "settings.world.allow_dig_to_remove_debris.label": "Landscape to remove debris",
   "settings.world.allow_dig_to_remove_debris.tooltip": "Allow debris removal to make the smallest workable terrain change when a prop cannot be excavated without landscaping. When disabled, the removal request fails and the requesting workflow is notified.",
+  "settings.world.allow_ramps_outside_tower_areas.label": "Allow ramps outside tower areas",
+  "settings.world.allow_ramps_outside_tower_areas.tooltip": "If an experimental ramp search exhausts the available routes inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, does not run after a timeout or other search interruption, and may trigger the game's normal outside-area alarm. Default: enabled.",
   "settings.world.avoid_buildings.label": "Avoid buildings",
   "settings.world.avoid_buildings.tooltip": "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided.",
   "settings.world.avoid_ocean.label": "Avoid ocean",

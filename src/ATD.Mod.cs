@@ -598,6 +598,43 @@ public static string Tt(string text) => text;
     public static void SetAccessManagerPausedMaxFrameBudgetMs(int value)
         => AccessManagerPausedMaxFrameBudgetMs = Math.Max(1, Math.Min(30, value));
 
+    internal static int AccessPlanningSettingsFingerprint
+    {
+        get
+        {
+            unchecked
+            {
+                int hash = 17;
+                void Add(int value) => hash = hash * 31 + value;
+                Add(TurningRampsExperimental ? 1 : 0);
+                Add(ExperimentalAccessUseAStar ? 1 : 0);
+                Add(ExperimentalAccessUsefulHeightEnvelope ? 1 : 0);
+                Add(ExperimentalAccessV1HeightEnvelopeLowerAllowance32);
+                Add(ExperimentalAccessV2HeightEnvelopeLowerAllowance32);
+                Add(ExperimentalAccessV1HeightEnvelopeUpperAllowance32);
+                Add(ExperimentalAccessV2HeightEnvelopeUpperAllowance32);
+                Add(AccessAvoidOcean ? 1 : 0);
+                Add(AccessAvoidBuildings ? 1 : 0);
+                Add(AllowRampsOutsideTowerAreas ? 1 : 0);
+                Add(AccessHarvestDisruptedTrees ? 1 : 0);
+                Add(AccessAllowDigToRemoveDebris ? 1 : 0);
+                Add((int)AccessQuickRemoveDebrisPolicy);
+                Add(AccessLandscapingCostDistanceScale.GetHashCode());
+                Add(AccessPropCleanupLandscapingCost.GetHashCode());
+                Add(AccessLandslideRunPerHeight.GetHashCode());
+                Add(AccessGeneratedVFixedCost.GetHashCode());
+                Add(AccessDirectWorkWeight.GetHashCode());
+                Add(AccessSideRayWeight.GetHashCode());
+                Add(AccessRaySlopeConservatism.GetHashCode());
+                Add(AccessRayEndBuffer);
+                Add(AccessCandidateRayMaxDistance);
+                Add(AccessRayMaxCost.GetHashCode());
+                Add(AccessRayUnresolvedPenalty.GetHashCode());
+                return hash;
+            }
+        }
+    }
+
     /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
     [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
     public static KeyBindings CornerDesignationMode { get; set; } = FromPrimaryKeys(KeyCode.K);

@@ -1699,13 +1699,23 @@ namespace AutoTerrainDesignations.Access
                         request.Start.FixedProfileNodes.Concat(
                             request.Goal.FixedProfileNodes),
                         useV2: true);
+                AccessV2GroundGraph v2GroundGraph =
+                    BuildV2RequestGroundGraph(
+                        request.Snapshot.V2GroundGraph!,
+                        request.Snapshot.V2FixedNavigationGraph!,
+                        new HashSet<Tile2i>(
+                            request.Goal.FixedProfileNodes),
+                        out HashSet<Tile2i> v2FixedGoalCenters);
                 bool useV2AStar = ShouldUseV2AStar(request);
                 long potentialBuildStart = AtdDiagnostics.Timestamp();
                 AccessV2PotentialField? v2Potential = useV2AStar
                     ? new AccessV2PotentialField(
-                        request.Snapshot,
                         request.BoundsMin,
                         request.BoundsMax,
+                        request.Snapshot.V2PotentialGeneratedOrigins,
+                        request.Snapshot.V2PotentialVPrimeOrigins,
+                        v2GroundGraph,
+                        request.Snapshot.V2FixedNavigationGraph,
                         GeneratedVFixedOverhead,
                         AccessV2CostModel.GetCenterSpokeCost(
                             GeneratedVFixedOverhead))
@@ -1764,7 +1774,7 @@ namespace AutoTerrainDesignations.Access
                                 extensionLane, operation, history,
                                 diagnostics),
                     heuristicEvaluator: null,
-                    groundGraph: request.Snapshot.V2GroundGraph,
+                    groundGraph: v2GroundGraph,
                     groundValidator: request.Snapshot.IsProjectedV2CenterPathable,
                     cleanupCostScale:
                         request.Snapshot.LandscapingCostDistanceScale,
@@ -1794,7 +1804,8 @@ namespace AutoTerrainDesignations.Access
                         request.Snapshot.IsGeneratedVPrimeOriginEligible,
                     vehicleWidth: request.Snapshot.VehicleWidth);
                 return new AccessPathSearchSession(
-                    v2Session, start, diagnostics);
+                    v2Session, start, diagnostics,
+                    v2FixedGoalCenters);
             }
             if (request.RequiredWidth != 1)
                 return AccessPathSearchSession.Completed(Failed("UnsupportedWidth", start, 0, rejections));
@@ -1814,6 +1825,20 @@ namespace AutoTerrainDesignations.Access
             return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
                 includeGroundGoals, useAStarHeuristic: request.Snapshot.UseAStar,
                 maxCostLimit: request.MaxCostLimit);
+        }
+
+        internal static AccessV2GroundGraph BuildV2RequestGroundGraph(
+            AccessV2GroundGraph baseGroundGraph,
+            AccessV2FixedNavigationGraph fixedNavigationGraph,
+            ISet<Tile2i> fixedGoalOrigins,
+            out HashSet<Tile2i> fixedGoalCenters)
+        {
+            fixedGoalCenters =
+                fixedNavigationGraph.CollectCentersForFixedOrigins(
+                    fixedGoalOrigins);
+            return fixedGoalCenters.Count == 0
+                ? baseGroundGraph
+                : baseGroundGraph.WithAdditionalGoals(fixedGoalCenters);
         }
 
         private static AccessSearchResult FindPath(
@@ -1941,6 +1966,7 @@ namespace AutoTerrainDesignations.Access
         public sealed class AccessPathSearchSession
         {
             private readonly AccessV2SearchSession? m_v2Session;
+            private readonly HashSet<Tile2i> m_v2FixedGoalCenters;
             private readonly AccessSearchSnapshot m_snapshot;
             private readonly AccessUsefulHeightEnvelope? m_usefulHeightEnvelope;
             private readonly Tile2i m_startOrigin;
@@ -1998,6 +2024,7 @@ namespace AutoTerrainDesignations.Access
             private AccessPathSearchSession(AccessSearchResult result)
             {
                 m_v2Session = null;
+                m_v2FixedGoalCenters = new HashSet<Tile2i>();
                 m_snapshot = null!;
                 m_usefulHeightEnvelope = null;
                 m_startOrigin = result.StartOrigin;
@@ -2045,6 +2072,7 @@ namespace AutoTerrainDesignations.Access
                 AccessV1HandoffDominanceCache handoffDominance)
             {
                 m_v2Session = null;
+                m_v2FixedGoalCenters = new HashSet<Tile2i>();
                 m_snapshot = snapshot;
                 m_usefulHeightEnvelope = usefulHeightEnvelope;
                 m_startOrigin = startOrigin;
@@ -2387,7 +2415,17 @@ namespace AutoTerrainDesignations.Access
                     v2Result.Handoff,
                     v2Result.GroundPath,
                     v2Result.RouteSteps,
-                    m_v2Session!.VehicleWidth);
+                    m_v2Session!.VehicleWidth,
+                    m_v2FixedGoalCenters);
+                Tile2i? terminalGroundCenter = v2Result.GroundPath.Count > 0
+                    ? v2Result.GroundPath[v2Result.GroundPath.Count - 1]
+                    : (Tile2i?)null;
+                AccessReachedGoalKind reachedGoalKind =
+                    terminalGroundCenter.HasValue
+                    && m_v2FixedGoalCenters.Contains(
+                        terminalGroundCenter.Value)
+                        ? AccessReachedGoalKind.FixedNetwork
+                        : AccessReachedGoalKind.TowerGround;
                 return new AccessSearchResult(
                     true, string.Empty, m_startOrigin,
                     Array.Empty<AccessSearchNode>(),
@@ -2398,9 +2436,7 @@ namespace AutoTerrainDesignations.Access
                     v2Result.GeneratedFixedCost,
                     0f,
                     v2Result.CleanupCost,
-                    v2Result.Handoff != null
-                        ? AccessReachedGoalKind.TowerGround
-                        : AccessReachedGoalKind.FixedNetwork,
+                    reachedGoalKind,
                     v2Result.DirectWorkCost,
                     0f,
                     v2Result.ExteriorRayCost,
@@ -2433,9 +2469,12 @@ namespace AutoTerrainDesignations.Access
             internal AccessPathSearchSession(
                 AccessV2SearchSession v2Session,
                 Tile2i startOrigin,
-                AccessSearchDiagnostics diagnostics)
+                AccessSearchDiagnostics diagnostics,
+                HashSet<Tile2i>? v2FixedGoalCenters = null)
             {
                 m_v2Session = v2Session;
+                m_v2FixedGoalCenters = v2FixedGoalCenters
+                    ?? new HashSet<Tile2i>();
                 m_snapshot = null!;
                 m_usefulHeightEnvelope = null;
                 m_startOrigin = startOrigin;

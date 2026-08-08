@@ -285,7 +285,7 @@
   ],
   [
     "settings.world.allow_ramps_outside_tower_areas.tooltip",
-    "If no experimental ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, runs only after the in-area search fails, and may trigger the game's normal outside-area alarm. Default: enabled."
+    "If an experimental ramp search exhausts the available routes inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, does not run after a timeout or other search interruption, and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
     "settings.world.safety_policy.tooltip",

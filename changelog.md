@@ -1,4 +1,17 @@
-v0.5.8 [packaged]
+v0.5.9 [unreleased]
+
+* Improved: The accessway manager now validates farming ownership, work, tower area, and access settings before every cooperative slice. Stale work terminates before placement and enters the existing bounded retry policy; completed owners cancel without retry.
+* Improved: The accessway manager now bounds its pending queue at 32 requests, preserves interactive priority under pressure, returns retryable diagnostics for evicted work, and periodically reports active timing, queue age, coalescing, stale, dropped, and completion health counters at Debug level.
+* Improved: Non-success accessway terminals now report request owner, work context, prior phase, queue and active age, processing time, visited/pending work, reason, and retry eligibility. Debug manager health sampling is skipped entirely below Debug diagnostic level.
+* Fixed: Flat leveling cells generated as part of a farming accessway no longer enter the farming-preparation lifecycle as new player farming intents. Their accessway targets and ownership now remain intact until normal accessway cleanup.
+* Fixed: Directly replacing an ATD-generated terrain designation now revokes its ordinary, accessway, and farming ownership before the replacement is adopted. Farming cleanup no longer treats the player's replacement as ATD-owned.
+* Fixed: A pending accessway for one farming cluster no longer blocks searches for other inaccessible clusters. Farming skips only clusters that already have a pending owned provider, keeps non-selected farming work as fixed provider context rather than rediscovering it as another access obligation, and lets later clusters plan through that projected terrain.
+* Fixed: After placing one farming-cluster provider, the manager now re-evaluates and queues the next cluster immediately instead of waiting for the next 10-second farming poll. Previously served clusters are also exposed as projected provider goals, allowing later searches to terminate through their still-pending accessways instead of unnecessarily cutting a separate route to tower ground.
+* Fixed: Width-two V2 searches now translate projected fixed-provider origins into request-scoped vehicle-center goals used by both A* and replay validation. Previously the request advertised those goals, and the frontier could traverse them, but V2 only stopped at the snapshot's tower-ground goals.
+* Fixed: Holding Left Alt while adding a tower vehicle now checks assignable vehicles in the default logistics zone, matching the vanilla assigner's Alt override.
+* Fixed: Added the missing translations for the **Allow ramps outside tower areas** world-setting label across all supported non-English languages.
+
+v0.5.8 [released]
 
 * Fixed: Restricted vehicle pre-allocation UI updates to MineTower inspectors and registered pending orders for save/load persistence, preventing cross-mod display overwrites and lost ATD orders after reload.
 * Fixed: Farming access generation now stops its synchronous fixpoint at the first failed search and suppresses unchanged retries for at least 10 seconds. Relevant work/settings changes may reopen the obligation after that grace period, while a 60-second maximum retry covers undetected terrain or other-mod changes.

@@ -1039,7 +1039,8 @@ namespace AutoTerrainDesignations
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (desigMgrMethod != null)
                     harmony.Patch(desigMgrMethod,
-                        prefix: new HarmonyMethod(typeof(AutoDepthDesignation), nameof(AddOrReplaceDesignationPrefix)));
+                        prefix: new HarmonyMethod(typeof(AutoDepthDesignation), nameof(AddOrReplaceDesignationPrefix)),
+                        postfix: new HarmonyMethod(typeof(AutoDepthDesignation), nameof(AddOrReplaceDesignationPostfix)));
                 else
                     Log.Warning("[AutoDepth] AddOrReplaceDesignation method not found");
             }

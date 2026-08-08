@@ -132,7 +132,8 @@ namespace AutoTerrainDesignations.Access.V2
                 }
                 if (!ReplayGroundPath(
                         snapshot, route.GroundPath,
-                        route.Handoff, history, out reason))
+                        route.Handoff, history,
+                        route.TerminalGoalCenters, out reason))
                     return false;
             }
 
@@ -371,8 +372,10 @@ namespace AutoTerrainDesignations.Access.V2
                 route.RouteSteps.Count - 1];
             if (last.IsGround
                 && (snapshot.V2GroundGraph == null
-                    || !snapshot.V2GroundGraph.IsGoal(
-                        last.GroundCenter!.Value)))
+                    || (!snapshot.V2GroundGraph.IsGoal(
+                            last.GroundCenter!.Value)
+                        && !route.TerminalGoalCenters.Contains(
+                            last.GroundCenter.Value))))
             {
                 reason = "V2ReplayGroundGoal";
                 return false;
@@ -422,6 +425,7 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyList<Tile2i> groundPath,
             AccessV2HandoffCandidate handoff,
             AccessV2History history,
+            IReadOnlyCollection<Tile2i> terminalGoalCenters,
             out string reason)
         {
             AccessV2GroundGraph? graph = snapshot.V2GroundGraph;
@@ -455,7 +459,9 @@ namespace AutoTerrainDesignations.Access.V2
                     return false;
                 }
             }
-            if (!graph.IsGoal(groundPath[groundPath.Count - 1]))
+            if (!graph.IsGoal(groundPath[groundPath.Count - 1])
+                && !terminalGoalCenters.Contains(
+                    groundPath[groundPath.Count - 1]))
             {
                 reason = "V2ReplayGroundGoal";
                 return false;
