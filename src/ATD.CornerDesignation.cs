@@ -32,8 +32,9 @@ namespace AutoTerrainDesignations
 {
     public static partial class AutoDepthDesignation
     {
-        // One corner of the 4x4 tile raised (+1) or lowered (-1) relative to the other three.
-        // Rotation index (0-3) encodes which corner: 0=Origin(NW), 1=PlusX(NE), 2=PlusXY(SE), 3=PlusY(SW).
+        // Corner-family rotation index (0-3) encodes NW, NE, SE, SW.
+        // Outer and inner variants offset one corner from a level baseline;
+        // saddle variants offset opposite diagonal corners in opposite directions.
         internal enum CornerVariant
         {
             // Outer: one corner at base+1
@@ -46,6 +47,11 @@ namespace AutoTerrainDesignations
             PlusXLow    = 5,
             PlusXyLow   = 6,
             PlusYLow    = 7,
+            // Saddle: one corner at base+1, the opposite corner at base-1.
+            OriginHighPlusXyLow = 8,
+            PlusXHighPlusYLow   = 9,
+            PlusXyHighOriginLow = 10,
+            PlusYHighPlusXLow   = 11,
         }
 
         private static bool s_cornerModeActive;
@@ -85,16 +91,17 @@ namespace AutoTerrainDesignations
         private static ShortcutsManager? s_shortcutsManager;
 
         // Toolbar buttons injected into the game's designation toolboxes (one per ToolType).
-        private static ToolboxItem? s_cornerModeButtonOuter; // ExpandScreen as-is
-        private static ToolboxItem? s_cornerModeButtonInner; // ExpandScreen rotated 180°
+        private static ToolboxItem? s_cornerModeButtonSaddle; // MapBound
+        private static ToolboxItem? s_cornerModeButtonOuter;  // ExpandScreen as-is
+        private static ToolboxItem? s_cornerModeButtonInner;  // ExpandScreen rotated 180°
         private static AreaToolbox? s_activeAreaToolbox;
         private static int s_currentAreaMode;
         private static FieldInfo? s_areaToolboxButtonsField;
         // The designation proto to use when placing corners (switches per active tool).
         private static TerrainDesignationProto? s_activeCornerProto;
         // Per-toolbox state keyed by ToolType int (0=Ramp/Mining, 1=Flat/Dumping, 2=Leveling).
-        private static readonly Dictionary<int, (AreaToolbox toolbox, ToolboxItem outerBtn, ToolboxItem innerBtn, FieldInfo? buttonsField)>
-            s_toolboxes = new Dictionary<int, (AreaToolbox, ToolboxItem, ToolboxItem, FieldInfo?)>();
+        private static readonly Dictionary<int, (AreaToolbox toolbox, ToolboxItem saddleBtn, ToolboxItem outerBtn, ToolboxItem innerBtn, FieldInfo? buttonsField)>
+            s_toolboxes = new Dictionary<int, (AreaToolbox, ToolboxItem, ToolboxItem, ToolboxItem, FieldInfo?)>();
         private static readonly Dictionary<string, int> s_controllerToToolType = new Dictionary<string, int>
         {
             { "MiningDesignationController",       (int)AreaToolbox.ToolType.Mining },
@@ -128,7 +135,7 @@ namespace AutoTerrainDesignations
             {
                 if (s_cornerModeActive)
                 {
-                    s_activeCornerVariant = ToggleCornerType(s_activeCornerVariant);
+                    s_activeCornerVariant = CycleCornerVariantFamily(s_activeCornerVariant);
                     UpdateCornerButtonSelection();
                     PlaySwitchSound();
                 }
@@ -206,8 +213,9 @@ namespace AutoTerrainDesignations
                 s_toolboxes.TryGetValue(toolTypeInt, out var entry))
             {
                 s_activeAreaToolbox       = entry.toolbox;
-                s_cornerModeButtonOuter   = entry.outerBtn;
-                s_cornerModeButtonInner   = entry.innerBtn;
+                s_cornerModeButtonSaddle = entry.saddleBtn;
+                s_cornerModeButtonOuter  = entry.outerBtn;
+                s_cornerModeButtonInner  = entry.innerBtn;
                 s_areaToolboxButtonsField = entry.buttonsField;
                 s_currentAreaMode         = 0;
             }
@@ -261,6 +269,7 @@ namespace AutoTerrainDesignations
             if (s_cornerModeActive)
                 ExitCornerMode();
             s_activeAreaToolbox       = null;
+            s_cornerModeButtonSaddle = null;
             s_cornerModeButtonOuter   = null;
             s_cornerModeButtonInner   = null;
             s_activeCornerProto       = null;
@@ -325,23 +334,15 @@ namespace AutoTerrainDesignations
         // -- Shape helpers --
 
         /// <summary>
-        /// Builds DesignationData for a corner shape. All 4 corners are at <paramref name="baseHeight"/>
-        /// except the one corner indicated by <paramref name="variant"/>, which is ±1.
+        /// Builds DesignationData for an outer, inner, or saddle shape.
         /// </summary>
         internal static DesignationData BuildCornerDesignationData(
             Tile2i origin, int baseHeight, CornerVariant variant)
         {
-            int nw = baseHeight, ne = baseHeight, se = baseHeight, sw = baseHeight;
-            int delta = IsOuterVariant(variant) ? +1 : -1;
-
-            // Rotation index: 0=Origin(NW), 1=PlusX(NE), 2=PlusXY(SE), 3=PlusY(SW)
-            switch ((int)variant % 4)
-            {
-                case 0: nw += delta; break;
-                case 1: ne += delta; break;
-                case 2: se += delta; break;
-                case 3: sw += delta; break;
-            }
+            int nw = baseHeight + GetCornerHeightOffset(variant, 0);
+            int ne = baseHeight + GetCornerHeightOffset(variant, 1);
+            int se = baseHeight + GetCornerHeightOffset(variant, 2);
+            int sw = baseHeight + GetCornerHeightOffset(variant, 3);
 
             // Constructor order: (origin, NW/origin, NE/plusX, SE/plusXy, SW/plusY)
             return new DesignationData(origin,
@@ -351,10 +352,10 @@ namespace AutoTerrainDesignations
 
         // -- Private helpers --
 
-        private static void EnterCornerMode(bool preferOuter = true)
+        private static void EnterCornerMode(CornerVariant initialVariant = CornerVariant.OriginHigh)
         {
             s_cornerModeActive = true;
-            s_activeCornerVariant = preferOuter ? CornerVariant.OriginHigh : ToggleCornerType(CornerVariant.OriginHigh);
+            s_activeCornerVariant = initialVariant;
             UpdateCornerButtonSelection();
             PlaySwitchSound();
             // Deselect game mode buttons so K and F don't appear simultaneously active.
@@ -379,13 +380,14 @@ namespace AutoTerrainDesignations
         }
 
         /// <summary>
-        /// Syncs the selected state of the two corner mode buttons to the current active variant.
+        /// Syncs the selected state of the three corner mode buttons to the current active variant.
         /// </summary>
         private static void UpdateCornerButtonSelection()
         {
-            bool isOuter = IsOuterVariant(s_activeCornerVariant);
-            s_cornerModeButtonOuter?.Selected(s_cornerModeActive && isOuter);
-            s_cornerModeButtonInner?.Selected(s_cornerModeActive && !isOuter);
+            int family = GetCornerVariantFamily(s_activeCornerVariant);
+            s_cornerModeButtonSaddle?.Selected(s_cornerModeActive && family == 2);
+            s_cornerModeButtonOuter?.Selected(s_cornerModeActive && family == 0);
+            s_cornerModeButtonInner?.Selected(s_cornerModeActive && family == 1);
         }
 
         /// <summary>Plays TabSwitch sound via reflection (same as F-mode flip).</summary>
@@ -561,9 +563,12 @@ namespace AutoTerrainDesignations
             int originGridY = start.Y / 4;
             int originParity = ((originGridX + originGridY) % 2 + 2) % 2;
 
+            bool isSaddle = IsSaddleVariant(effectiveVariant);
             CornerVariant complement = CheckerboardComplement(effectiveVariant);
             int rot = (int)effectiveVariant % 4;
-            int outerRot = IsOuterVariant(effectiveVariant) ? rot : (rot + 2) % 4;
+            int outerRot = isSaddle
+                ? rot
+                : (IsOuterVariant(effectiveVariant) ? rot : (rot + 2) % 4);
 
             var result = new List<(Tile2i, CornerVariant, int)>();
 
@@ -576,7 +581,12 @@ namespace AutoTerrainDesignations
                     int parity = ((gridX + gridY) % 2 + 2) % 2;
                     bool isSameParity = (parity == originParity);
 
-                    CornerVariant v = isSameParity ? effectiveVariant : complement;
+                    // A saddle is a continuous tilted plane, so every tile keeps
+                    // the same orientation and only its baseline changes. The
+                    // outer/inner families retain their existing checkerboard fill.
+                    CornerVariant v = isSaddle
+                        ? effectiveVariant
+                        : (isSameParity ? effectiveVariant : complement);
 
                     int deltaGridX = gridX - originGridX;
                     int deltaGridY = gridY - originGridY;
@@ -591,7 +601,9 @@ namespace AutoTerrainDesignations
                     }
 
                     int zOffset;
-                    if (isSameParity)
+                    if (isSaddle)
+                        zOffset = -slopeSum;
+                    else if (isSameParity)
                         zOffset = -(slopeSum / 2);
                     else if (IsOuterVariant(effectiveVariant))
                         zOffset = -(slopeSum - 1) / 2;
@@ -721,12 +733,11 @@ namespace AutoTerrainDesignations
             int bestGroundScore = -1;
             bool bestIsUserVariant = false;
 
-            // Enumerate all 8 variants × all base heights implied by each constrained corner.
+            // Enumerate all 12 variants × all base heights implied by each constrained corner.
             // Both cardinal (c) and diagonal (d) constraints are used as candidate sources.
-            for (int vi = 0; vi < 8; vi++)
+            for (int vi = 0; vi < 12; vi++)
             {
-                int specialCorner = vi % 4;    // corner index that carries the ±1 offset
-                int delta = vi < 4 ? +1 : -1; // outer=+1, inner=-1
+                CornerVariant candidateVariant = (CornerVariant)vi;
 
                 for (int pass = 0; pass < 2; pass++) // pass 0 = cardinal, pass 1 = diagonal
                 {
@@ -736,14 +747,14 @@ namespace AutoTerrainDesignations
                         if (!src[ci].HasValue) continue;
 
                         // Derive baseHeight from this corner's constraint.
-                        int b = (ci == specialCorner) ? src[ci]!.Value - delta : src[ci]!.Value;
+                        int b = src[ci]!.Value - GetCornerHeightOffset(candidateVariant, ci);
 
                         // Score against cardinal constraints (highest priority).
                         int edgeScore = 0;
                         for (int cj = 0; cj < 4; cj++)
                         {
                             if (!c[cj].HasValue) continue;
-                            int expected = (cj == specialCorner) ? b + delta : b;
+                            int expected = b + GetCornerHeightOffset(candidateVariant, cj);
                             if (c[cj]!.Value == expected) edgeScore++;
                         }
 
@@ -752,7 +763,7 @@ namespace AutoTerrainDesignations
                         for (int cj = 0; cj < 4; cj++)
                         {
                             if (!d[cj].HasValue) continue;
-                            int expected = (cj == specialCorner) ? b + delta : b;
+                            int expected = b + GetCornerHeightOffset(candidateVariant, cj);
                             if (d[cj]!.Value == expected) diagScore++;
                         }
 
@@ -760,11 +771,11 @@ namespace AutoTerrainDesignations
                         int groundScore = 0;
                         for (int cj = 0; cj < 4; cj++)
                         {
-                            int h = (cj == specialCorner) ? b + delta : b;
+                            int h = b + GetCornerHeightOffset(candidateVariant, cj);
                             if (h == terrain[cj]) groundScore++;
                         }
 
-                        bool isUserVariant = ((CornerVariant)vi == s_activeCornerVariant);
+                        bool isUserVariant = candidateVariant == s_activeCornerVariant;
 
                         // Prefer by: (1) edge matches, (2) diagonal matches, (3) ground contact, (4) user variant.
                         bool better = edgeScore > bestEdgeScore
@@ -778,7 +789,7 @@ namespace AutoTerrainDesignations
                             bestDiagScore = diagScore;
                             bestGroundScore = groundScore;
                             bestIsUserVariant = isUserVariant;
-                            bestVariant = (CornerVariant)vi;
+                            bestVariant = candidateVariant;
                             bestBase = b;
                         }
                     }
@@ -794,6 +805,9 @@ namespace AutoTerrainDesignations
         /// </summary>
         private static CornerVariant CheckerboardComplement(CornerVariant v)
         {
+            if (IsSaddleVariant(v))
+                return v;
+
             int rot        = (int)v % 4;
             int typeOffset = (int)v >= 4 ? 0 : 4; // flip outer↔inner
             int newRot     = (rot + 2) % 4;        // rotate 180°
@@ -825,19 +839,67 @@ namespace AutoTerrainDesignations
 
         private static CornerVariant RotateCornerVariant(CornerVariant v)
         {
-            int typeOffset = (int)v / 4 * 4; // 0 for outer, 4 for inner
+            int typeOffset = (int)v / 4 * 4; // 0 outer, 4 inner, 8 saddle
             int rot        = (int)v % 4;
             return (CornerVariant)(typeOffset + (rot + 3) % 4);
         }
 
-        private static CornerVariant ToggleCornerType(CornerVariant v)
+        private static CornerVariant CycleCornerVariantFamily(CornerVariant v)
         {
             int rot        = (int)v % 4;
-            int typeOffset = (int)v >= 4 ? 0 : 4; // flip outer↔inner
-            return (CornerVariant)(typeOffset + rot);
+            int family = GetCornerVariantFamily(v) switch
+            {
+                0 => 2, // outer -> Saddle
+                2 => 1, // Saddle -> inner
+                _ => 0, // inner -> outer
+            };
+            return (CornerVariant)(family * 4 + rot);
         }
 
         private static bool IsOuterVariant(CornerVariant v) => (int)v < 4;
+
+        private static bool IsSaddleVariant(CornerVariant v) => (int)v >= 8;
+
+        private static int GetCornerVariantFamily(CornerVariant v) => (int)v / 4;
+
+        private static int GetCornerHeightOffset(CornerVariant variant, int cornerIndex)
+        {
+            int rotation = (int)variant % 4;
+            if (IsSaddleVariant(variant))
+            {
+                if (cornerIndex == rotation) return +1;
+                if (cornerIndex == (rotation + 2) % 4) return -1;
+                return 0;
+            }
+
+            if (cornerIndex != rotation) return 0;
+            return IsOuterVariant(variant) ? +1 : -1;
+        }
+
+        private static void SelectCornerButton(CornerVariant requestedVariant)
+        {
+            if (!s_designationToolActive) return;
+
+            if (!s_cornerModeActive)
+            {
+                EnterCornerMode(requestedVariant);
+                return;
+            }
+
+            int requestedFamily = GetCornerVariantFamily(requestedVariant);
+            if (GetCornerVariantFamily(s_activeCornerVariant) == requestedFamily)
+            {
+                ExitCornerMode();
+                return;
+            }
+
+            // The family buttons do not choose a rotation; preserve the current
+            // orientation when switching family from the toolbar.
+            int rotation = (int)s_activeCornerVariant % 4;
+            s_activeCornerVariant = (CornerVariant)(requestedFamily * 4 + rotation);
+            UpdateCornerButtonSelection();
+            PlaySwitchSound();
+        }
 
         private static string GetCornerRotationLabel(CornerVariant v)
         {
@@ -878,45 +940,26 @@ namespace AutoTerrainDesignations
                 if (body != null)
                 {
                     var capturedToolType = toolType;
-                    const string iconPath = "Assets/Unity/UserInterface/General/ExpandScreen.svg";
+                    const string saddleIconPath = "Assets/Unity/UserInterface/General/MapBound.svg";
+                    const string cornerIconPath = "Assets/Unity/UserInterface/General/ExpandScreen.svg";
+
+                    // Saddle button — MapBound, keybind K.
+                    var saddleItem = new ToolboxItem(
+                        _ => AutoTerrainDesignationsMod.CornerDesignationMode,
+                        saddleIconPath,
+                        () => SelectCornerButton(CornerVariant.OriginHighPlusXyLow));
 
                     // Outer corner button — ExpandScreen as-is, keybind K.
                     var outerItem = new ToolboxItem(
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
-                        iconPath,
-                        () =>
-                        {
-                            if (!s_designationToolActive) return;
-                            if (!s_cornerModeActive)
-                                EnterCornerMode(preferOuter: true);
-                            else if (IsOuterVariant(s_activeCornerVariant))
-                                ExitCornerMode();
-                            else
-                            {
-                                s_activeCornerVariant = ToggleCornerType(s_activeCornerVariant);
-                                UpdateCornerButtonSelection();
-                                PlaySwitchSound();
-                            }
-                        });
+                        cornerIconPath,
+                        () => SelectCornerButton(CornerVariant.OriginHigh));
 
                     // Inner corner button — ExpandScreen rotated 180°, keybind K (label only).
                     var innerItem = new ToolboxItem(
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
-                        iconPath,
-                        () =>
-                        {
-                            if (!s_designationToolActive) return;
-                            if (!s_cornerModeActive)
-                                EnterCornerMode(preferOuter: false);
-                            else if (!IsOuterVariant(s_activeCornerVariant))
-                                ExitCornerMode();
-                            else
-                            {
-                                s_activeCornerVariant = ToggleCornerType(s_activeCornerVariant);
-                                UpdateCornerButtonSelection();
-                                PlaySwitchSound();
-                            }
-                        });
+                        cornerIconPath,
+                        () => SelectCornerButton(CornerVariant.OriginLow));
 
                     // Rotate the inner icon 180° so the arrow points inward.
                     if (innerItem.m_btn is ButtonIcon innerBtnIcon)
@@ -924,15 +967,17 @@ namespace AutoTerrainDesignations
 
                     outerItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerOuterTip));
                     innerItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerInnerTip));
+                    saddleItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerSaddleTip));
 
                     var divider = new VerticalDivider().AlignSelfStretch().MarginTopBottom(2.pt());
-                    body.InsertAt(0, outerItem);
-                    body.InsertAt(1, innerItem);
-                    body.InsertAt(2, divider);
-                    if (sm != null) { outerItem.Update(sm); innerItem.Update(sm); }
+                    body.InsertAt(0, saddleItem);
+                    body.InsertAt(1, outerItem);
+                    body.InsertAt(2, innerItem);
+                    body.InsertAt(3, divider);
+                    if (sm != null) { saddleItem.Update(sm); outerItem.Update(sm); innerItem.Update(sm); }
 
-                    s_toolboxes[(int)capturedToolType] = (toolbox, outerItem, innerItem, buttonsField);
-                    LogDebug($"K-mode buttons (outer+inner) injected into {capturedToolType} toolbox.");
+                    s_toolboxes[(int)capturedToolType] = (toolbox, saddleItem, outerItem, innerItem, buttonsField);
+                    LogDebug($"K-mode buttons (saddle+outer+inner) injected into {capturedToolType} toolbox.");
                 }
                 else
                 {

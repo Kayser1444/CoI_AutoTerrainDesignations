@@ -1,3 +1,7 @@
+v0.5.10 [unreleased]
+
+* Added: Manual Saddle corner designations with four rotations, preview/drag support, a MapBound toolbar button, and K-key cycling alongside outer and inner corners.
+
 v0.5.9 [released]
 
 * Improved: The accessway manager now validates farming ownership, work, tower area, and access settings before every cooperative slice. Stale work terminates before placement and enters the existing bounded retry policy; completed owners cancel without retry.

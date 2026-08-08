@@ -403,6 +403,8 @@ namespace AutoTerrainDesignations
             Loc.Str("toolbox.corner_outer.tooltip", "Corner (outer): place convex corner ramps.", "Tooltip on the outer corner toolbox item.");
         public static LocStr CornerInnerTip =
             Loc.Str("toolbox.corner_inner.tooltip", "Corner (inner): place concave corner ramps.", "Tooltip on the inner corner toolbox item.");
+        public static LocStr CornerSaddleTip =
+            Loc.Str("toolbox.corner_saddle.tooltip", "Corner (saddle): place a sharp diagonal corner ramp.", "Tooltip on the saddle corner toolbox item.");
 
         // ------------------------------------------------------------------ //
         // Notifications

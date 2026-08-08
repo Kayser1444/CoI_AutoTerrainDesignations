@@ -680,6 +680,10 @@
     "Corner (inner): place concave corner ramps."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Corner (saddle): place a sharp diagonal corner ramp."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} could not start an access ramp"
   ],

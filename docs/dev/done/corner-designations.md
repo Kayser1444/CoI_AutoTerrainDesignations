@@ -20,7 +20,7 @@ The key design constraint is that corner mode must coexist with vanilla terrain 
 
 ## Core model
 
-A corner designation is still a normal 4×4 `DesignationData` object. The only difference is that one corner is offset by `+1` or `-1` relative to the other three.
+A corner designation is still a normal 4×4 `DesignationData` object. Outer and inner shapes offset one corner by `+1` or `-1` relative to the other three. Saddle shapes keep one diagonal pair at the baseline and offset the other diagonal pair by `+1` and `-1`.
 
 ### `CornerVariant`
 
@@ -37,6 +37,10 @@ internal enum CornerVariant
     PlusXLow = 5,
     PlusXyLow = 6,
     PlusYLow = 7,
+    OriginHighPlusXyLow = 8,
+    PlusXHighPlusYLow = 9,
+    PlusXyHighOriginLow = 10,
+    PlusYHighPlusXLow = 11,
 }
 ```
 
@@ -44,11 +48,16 @@ Interpretation:
 
 - variants `0..3` are **outer** shapes: one corner at `baseHeight + 1`
 - variants `4..7` are **inner** shapes: one corner at `baseHeight - 1`
+- variants `8..11` are **Saddle** shapes: one corner at `baseHeight + 1`, the opposite corner at `baseHeight - 1`, and the other two at `baseHeight`
 - the orientation index is `variant % 4`
   - `0` = origin / NW
   - `1` = plusX / NE
   - `2` = plusXY / SE
   - `3` = plusY / SW
+
+For Saddle variants, the orientation identifies the high corner and the opposite
+corner is the low corner. The default profile is `[2 1; 1 0]` when the baseline
+is `1`.
 
 ## Building the designation
 
@@ -90,7 +99,7 @@ Important runtime fields:
 | Field | Purpose |
 |---|---|
 | `s_cornerModeActive` | Whether ATD corner mode is currently active |
-| `s_activeCornerVariant` | Current outer/inner orientation |
+| `s_activeCornerVariant` | Current outer/inner/Saddle family and orientation |
 | `s_designationToolActive` | Whether any supported terrain designation tool is active |
 | `s_activeCornerProto` | Current mining/dumping/leveling designation proto |
 | `s_dragging` | Whether a corner drag operation is in progress |
@@ -109,7 +118,7 @@ These fields are runtime-only scaffolding and are not persisted.
 ### Activation
 
 - `K` enters corner mode if a supported designation tool is active.
-- Pressing `K` again while already in corner mode toggles outer ↔ inner.
+- Pressing `K` again while already in corner mode cycles outer → Saddle → inner → outer.
 - `F` exits corner mode.
 - `R` rotates the current corner orientation.
 
@@ -166,7 +175,7 @@ High-level idea:
 - tiles with the opposite parity use `CheckerboardComplement(variant)`
 - each grid step shifts the absolute height so adjacent designations keep compatible shared-edge heights
 
-This is what allows broad drag placement of stepped ramps or sloped transitions without creating edge discontinuities between adjacent 4×4 cells.
+This is what allows broad drag placement of stepped ramps or sloped transitions without creating edge discontinuities between adjacent 4×4 cells. Saddle drags use the same orientation on every cell and change the baseline along the corresponding tilted plane.
 
 ## Placement and overwrite protection
 
@@ -230,7 +239,7 @@ Corner mode depends on Harmony patches to hook into the vanilla designation flow
 
 ### Toolbox integration
 
-- `AreaToolbox` patching injects the ATD outer and inner corner buttons into the designation toolbox
+- `AreaToolbox` patching injects the ATD Saddle, outer, and inner corner buttons into the designation toolbox; the Saddle button uses `Assets/Unity/UserInterface/General/MapBound.svg`
 - `AreaToolbox.SetMode` patching lets ATD track the current vanilla mode index so it can restore the selected mode button when corner mode exits
 
 ### Placement protection
@@ -242,7 +251,7 @@ Corner mode depends on Harmony patches to hook into the vanilla designation flow
 ### `EnterCornerMode()`
 
 - marks corner mode active
-- selects default variant (`OriginHigh` or its inner counterpart)
+- selects the requested default variant (`OriginHigh`, a Saddle variant, or its inner counterpart)
 - updates button selection
 - plays the switch sound
 - deselects the vanilla mode buttons so the UI does not show both K-mode and flat/ramp mode as active at once
