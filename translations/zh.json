@@ -680,8 +680,8 @@
     "转角(内侧): 放置凹进的转角坡道。"
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "拐角（鞍座）：放置一个尖锐的对角坡道。"
+    "toolbox.corner_planar.tooltip",
+    "平面拐角：放置对角平面坡道。"
   ],
   [
     "notification.ramp_access_failed",

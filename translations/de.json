@@ -405,7 +405,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "Wenn diese Option aktiviert ist, kann ATD experimentelle V1-Abbiege- oder Serpentinenzufahrten unter Verwendung von Vanilla-Flach- und Gefällebezeichnungen auswählen und platzieren. Erfordert die Einstellung der Rampenbreite des Turms auf 1. Der Korridorabstand ist unabhängig. Breitere Rampen sowie Eck- oder Sattelbezeichnungen sind nicht enthalten."
+    "Wenn diese Option aktiviert ist, kann ATD geroutete Abbiege- oder Serpentinenzufahrten mithilfe von Vanilla-Flach- und Gefällebezeichnungen auswählen und platzieren. AUTO und T1-T3 nutzen geroutete Zufahrten; Legacy 3–5 verwenden nur den Straight-Ramp-Generator. Eck- und Sattelbezeichnungen sind nicht enthalten."
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -680,8 +680,8 @@
     "Ecke (innen): konkave Eckrampen platzieren."
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "Ecke (Sattel): Platzieren Sie eine scharfe diagonale Eckrampe."
+    "toolbox.corner_planar.tooltip",
+    "Planare Ecke: Platzieren Sie eine diagonale Ebenenrampe."
   ],
   [
     "notification.ramp_access_failed",

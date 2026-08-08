@@ -405,7 +405,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "Cuando está habilitado, ATD puede seleccionar y colocar vías de acceso experimentales de giro o curvatura V1 utilizando designaciones planas y inclinadas. Requiere que el ancho de la rampa de la torre se establezca en 1. El espacio libre del corredor es independiente. No se incluyen rampas más anchas ni designaciones de esquinas o monturas."
+    "Cuando está habilitado, ATD puede seleccionar y colocar vías de acceso enrutadas para giros o curvas utilizando designaciones planas y con pendientes. AUTO y T1-T3 utilizan vías de acceso enrutadas; Legacy 3-5 utiliza sólo el generador de rampa recta. No se incluyen designaciones de esquinas ni de monturas."
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -680,8 +680,8 @@
     "Esquina (interior): coloca rampas de esquina cóncavas."
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "Esquina (silla de montar): colocar una rampa de esquina diagonal afilada."
+    "toolbox.corner_planar.tooltip",
+    "Esquina plana: coloque una rampa de plano diagonal."
   ],
   [
     "notification.ramp_access_failed",

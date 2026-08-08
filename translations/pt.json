@@ -405,7 +405,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "Quando ativado, o ATD pode selecionar e posicionar vias de acesso experimentais V1 ou em ziguezague usando designações simples de plano e inclinação. Requer que a largura da rampa da torre seja definida como 1. A folga do corredor é independente. Rampas mais largas e designações de canto ou sela não estão incluídas."
+    "Quando ativado, o ATD pode selecionar e posicionar vias de acesso roteadas ou em ziguezague usando designações planas e inclinadas. AUTO e T1-T3 utilizam vias de acesso roteadas; O Legacy 3-5 usa apenas o gerador de rampa direta. As designações de canto e sela não estão incluídas."
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -680,8 +680,8 @@
     "Quina (interna): colocar rampas de quina côncavas."
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "Canto (sela): coloque uma rampa de canto diagonal acentuada."
+    "toolbox.corner_planar.tooltip",
+    "Canto plano: coloque uma rampa de plano diagonal."
   ],
   [
     "notification.ramp_access_failed",

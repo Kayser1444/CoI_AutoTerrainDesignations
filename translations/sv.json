@@ -680,8 +680,8 @@
     "Hörn (inre): placera konkava hörnramper."
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "Hörn (sadel): placera en skarp diagonal hörnramp."
+    "toolbox.corner_planar.tooltip",
+    "Planar hörna: placera en diagonal planramp."
   ],
   [
     "notification.ramp_access_failed",

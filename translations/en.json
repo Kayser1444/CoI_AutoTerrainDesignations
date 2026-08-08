@@ -680,8 +680,8 @@
     "Corner (inner): place concave corner ramps."
   ],
   [
-    "toolbox.corner_saddle.tooltip",
-    "Corner (saddle): place a sharp diagonal corner ramp."
+    "toolbox.corner_planar.tooltip",
+    "Planar corner: place a diagonal plane ramp."
   ],
   [
     "notification.ramp_access_failed",

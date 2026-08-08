@@ -18,7 +18,7 @@ The access framework, V2-style accessway search, and bounded out-of-area ramp fa
 
 - Cut/copy/paste or blueprint-style designation workflows.
 - Rail incline (12.5%) designation support.
-- Saddle designation support.
+- True saddle designation support (`[0 1; 1 0]` corner heights); the current diagonal-plane shape is documented as Planar.
 - Demand-weighted accessway travel cost, where permanent driving distance
   matters more for clusters with larger expected mining or filling workloads.
 - A useful-material rebate for accessway excavation cost. Its implementation
