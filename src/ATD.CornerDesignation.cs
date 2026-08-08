@@ -73,7 +73,7 @@ namespace AutoTerrainDesignations
         private static object? s_applySound;
         private static System.Reflection.FieldInfo? s_applySoundField;
         private static System.Reflection.MethodInfo? s_audioPlayMethod;
-        // The tab-switch sound (F-mode flip) — played when entering K-mode or toggling inner/outer.
+        // The tab-switch sound (F-mode flip) — played when entering K-mode or cycling shape families.
         private static object? s_switchSound;
         private static System.Reflection.FieldInfo? s_switchSoundField;
 
@@ -91,7 +91,7 @@ namespace AutoTerrainDesignations
         private static ShortcutsManager? s_shortcutsManager;
 
         // Toolbar buttons injected into the game's designation toolboxes (one per ToolType).
-        private static ToolboxItem? s_cornerModeButtonSaddle; // MapBound
+        private static ToolboxItem? s_cornerModeButtonSaddle; // MapBounds.svg
         private static ToolboxItem? s_cornerModeButtonOuter;  // ExpandScreen as-is
         private static ToolboxItem? s_cornerModeButtonInner;  // ExpandScreen rotated 180°
         private static AreaToolbox? s_activeAreaToolbox;
@@ -849,9 +849,9 @@ namespace AutoTerrainDesignations
             int rot        = (int)v % 4;
             int family = GetCornerVariantFamily(v) switch
             {
-                0 => 2, // outer -> Saddle
-                2 => 1, // Saddle -> inner
-                _ => 0, // inner -> outer
+                0 => 1, // outer -> inner
+                1 => 2, // inner -> Saddle
+                _ => 0, // Saddle -> outer
             };
             return (CornerVariant)(family * 4 + rot);
         }
@@ -940,10 +940,10 @@ namespace AutoTerrainDesignations
                 if (body != null)
                 {
                     var capturedToolType = toolType;
-                    const string saddleIconPath = "Assets/Unity/UserInterface/General/MapBound.svg";
+                    const string saddleIconPath = "Assets/Unity/UserInterface/General/MapBounds.svg";
                     const string cornerIconPath = "Assets/Unity/UserInterface/General/ExpandScreen.svg";
 
-                    // Saddle button — MapBound, keybind K.
+                    // Saddle button — MapBounds.svg, keybind K.
                     var saddleItem = new ToolboxItem(
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
                         saddleIconPath,
@@ -970,14 +970,14 @@ namespace AutoTerrainDesignations
                     saddleItem.Tooltip(AtdLocalization.Tip(AtdLocalization.CornerSaddleTip));
 
                     var divider = new VerticalDivider().AlignSelfStretch().MarginTopBottom(2.pt());
-                    body.InsertAt(0, saddleItem);
-                    body.InsertAt(1, outerItem);
-                    body.InsertAt(2, innerItem);
+                    body.InsertAt(0, outerItem);
+                    body.InsertAt(1, innerItem);
+                    body.InsertAt(2, saddleItem);
                     body.InsertAt(3, divider);
                     if (sm != null) { saddleItem.Update(sm); outerItem.Update(sm); innerItem.Update(sm); }
 
                     s_toolboxes[(int)capturedToolType] = (toolbox, saddleItem, outerItem, innerItem, buttonsField);
-                    LogDebug($"K-mode buttons (saddle+outer+inner) injected into {capturedToolType} toolbox.");
+                    LogDebug($"K-mode buttons (outer+inner+saddle) injected into {capturedToolType} toolbox.");
                 }
                 else
                 {

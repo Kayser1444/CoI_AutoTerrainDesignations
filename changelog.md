@@ -1,6 +1,7 @@
 v0.5.10 [unreleased]
 
-* Added: Manual Saddle corner designations with four rotations, preview/drag support, a MapBound toolbar button, and K-key cycling alongside outer and inner corners.
+* Added: Manual Saddle corner designations with four rotations, preview/drag support, a MapBounds.svg toolbar button, and K-key cycling alongside outer and inner corners.
+* Changed: Ordered the corner toolbar buttons and K-cycle as Outer, Inner, Saddle; resolved the Saddle icon through the cataloged MapBounds.svg asset.
 
 v0.5.9 [released]
 

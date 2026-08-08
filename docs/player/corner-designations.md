@@ -30,7 +30,7 @@ ATD uses the currently active tool's normal designation type, so a corner placed
 ### Entering and leaving corner mode
 
 - `K` enters corner mode while a terrain designation tool is active.
-- Press `K` again to cycle through outer, Saddle, and inner corner shapes.
+- Press `K` again to cycle through outer, inner, and Saddle corner shapes.
 - `F` exits corner mode.
 
 Corner mode also exits automatically if you switch back to one of the vanilla flat/ramp modes or deactivate the terrain designation tool.
@@ -49,7 +49,7 @@ Corner mode supports three shape families:
 - **Inner** corners lower one corner below the other three.
 - **Saddle** corners keep two diagonal corners at the baseline, raise one of the other diagonal corners by one level, and lower the opposite corner by one level.
 
-Press `K` again while already in corner mode to cycle between them. The toolbar buttons select the corresponding family directly; the Saddle button uses the map-bound icon and is placed to the left of the outer and inner buttons.
+Press `K` again while already in corner mode to cycle between them. The toolbar buttons select the corresponding family directly; the buttons are ordered Outer, Inner, Saddle, with the Saddle button using `Assets/Unity/UserInterface/General/MapBounds.svg`.
 
 ### Saddle shape
 

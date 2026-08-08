@@ -680,6 +680,10 @@
     "Quina (interna): colocar rampas de quina côncavas."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Canto (sela): coloque uma rampa de canto diagonal acentuada."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} não pôde iniciar uma rampa de acesso"
   ],

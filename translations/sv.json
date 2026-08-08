@@ -680,6 +680,10 @@
     "Hörn (inre): placera konkava hörnramper."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Hörn (sadel): placera en skarp diagonal hörnramp."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} kunde inte påbörja en åtkomstramp"
   ],

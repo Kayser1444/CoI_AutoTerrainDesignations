@@ -680,6 +680,10 @@
     "Angolo (interno): posizionare rampe angolari concave."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Angolo (sella): posizionare una rampa angolare diagonale affilata."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} non è riuscita ad avviare una rampa di accesso"
   ],

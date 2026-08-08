@@ -186,6 +186,78 @@ foreach ($name in $dlls) {
 }
 
 # ---------------------------------------------------------------------------
+# 4.5. Asset catalog cache
+# ---------------------------------------------------------------------------
+# Assets.cs is generated from the game's asset database and contains the
+# loadable Unity asset paths as string constants. Keep a small, deterministic
+# index beside the decompiled source so mods can look up asset names without
+# repeatedly searching the generated source or guessing extensions.
+$assetCatalogPath = Join-Path $outputRoot 'asset-catalog.json'
+$assetEntriesByPath = @{}
+$assetSourceFiles = @()
+$assetCatalogChanged = $false
+$assetSourcePattern = '"(?<path>Assets/[^"\r\n]+)"'
+$assetConstantPattern = 'public\s+const\s+string\s+(?<identifier>[A-Za-z0-9_]+)\s*=\s*"(?<path>Assets/[^"\r\n]+)"'
+
+$assetSourceFiles = @(Get-ChildItem -LiteralPath $outputRoot -Recurse -File -Filter '*.cs' -ErrorAction SilentlyContinue | Sort-Object FullName)
+foreach ($sourceFile in $assetSourceFiles) {
+    $sourceContent = Get-Content -LiteralPath $sourceFile.FullName -Raw
+    $relativeSource = $sourceFile.FullName.Substring($outputRoot.Length).TrimStart('\', '/')
+
+    $constantMatches = [regex]::Matches($sourceContent, $assetConstantPattern)
+    foreach ($match in $constantMatches) {
+        $path = $match.Groups['path'].Value
+        if (-not $assetEntriesByPath.ContainsKey($path)) {
+            $assetEntriesByPath[$path] = [ordered]@{
+                identifier = $match.Groups['identifier'].Value
+                path = $path
+                source = $relativeSource
+            }
+        }
+    }
+
+    $pathMatches = [regex]::Matches($sourceContent, $assetSourcePattern)
+    foreach ($match in $pathMatches) {
+        $path = $match.Groups['path'].Value
+        if (-not $assetEntriesByPath.ContainsKey($path)) {
+            $assetEntriesByPath[$path] = [ordered]@{
+                identifier = $null
+                path = $path
+                source = $relativeSource
+            }
+        }
+    }
+}
+
+if ($assetEntriesByPath.Count -gt 0) {
+    $assetCatalog = [ordered]@{
+        schemaVersion = 1
+        gameVersion = $gameVersion
+        buildNumber = $buildNumber
+        assets = @($assetEntriesByPath.Values | Sort-Object path)
+    }
+    $assetCatalogJson = $assetCatalog | ConvertTo-Json -Depth 4
+    $existingAssetCatalogJson = if (Test-Path -LiteralPath $assetCatalogPath) {
+        Get-Content -LiteralPath $assetCatalogPath -Raw
+    }
+    else {
+        $null
+    }
+
+    if ($existingAssetCatalogJson -ne $assetCatalogJson) {
+        Set-Content -LiteralPath $assetCatalogPath -Value $assetCatalogJson -Encoding UTF8 -NoNewline
+        $assetCatalogChanged = $true
+        Write-Host "[assets] Wrote $($assetEntriesByPath.Count) asset paths to $assetCatalogPath"
+    }
+    else {
+        Write-Host "[assets] Catalog up to date ($($assetEntriesByPath.Count) asset paths)"
+    }
+}
+else {
+    Write-Warning "No asset paths found in decompiled source; preserving any existing catalog at $assetCatalogPath"
+}
+
+# ---------------------------------------------------------------------------
 # 5. Summary
 # ---------------------------------------------------------------------------
 Write-Host ''
@@ -201,7 +273,7 @@ if ($skipped.Count -gt 0) {
 # ---------------------------------------------------------------------------
 # 5.5. Git commit — record new decompiled state and show diff
 # ---------------------------------------------------------------------------
-if ($useGit -and $decompiled.Count -gt 0) {
+if ($useGit -and ($decompiled.Count -gt 0 -or $assetCatalogChanged)) {
     Push-Location $outputRoot
     # Re-read build number from the freshly decompiled GameVersion.cs
     if (Test-Path -LiteralPath $gameVersionCsPath) {
@@ -212,9 +284,17 @@ if ($useGit -and $decompiled.Count -gt 0) {
     git add -A | Out-Null
     git diff --cached --quiet 2>$null
     if ($LASTEXITCODE -ne 0) {
-        $commitMsg = if ($versionLabel) { "CoI $versionLabel" } else { 'decompiled update' }
+        $commitMsg = if ($decompiled.Count -gt 0 -and $versionLabel) {
+            "CoI $versionLabel"
+        }
+        elseif ($decompiled.Count -gt 0) {
+            'decompiled update'
+        }
+        else {
+            'Update asset catalog'
+        }
         git commit -m $commitMsg --quiet
-        if ($versionLabel) { git tag -f "v$versionLabel" }
+        if ($decompiled.Count -gt 0 -and $versionLabel) { git tag -f "v$versionLabel" }
         $commitCount = [int](git rev-list --count HEAD 2>$null)
         Write-Host ''
         Write-Host "[git] Committed: $commitMsg  (tag: v$versionLabel)"

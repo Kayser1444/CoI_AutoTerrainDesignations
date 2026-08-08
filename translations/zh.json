@@ -680,6 +680,10 @@
     "转角(内侧): 放置凹进的转角坡道。"
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "拐角（鞍座）：放置一个尖锐的对角坡道。"
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity}无法生成斜坡"
   ],

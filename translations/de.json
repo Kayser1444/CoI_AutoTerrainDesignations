@@ -680,6 +680,10 @@
     "Ecke (innen): konkave Eckrampen platzieren."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Ecke (Sattel): Platzieren Sie eine scharfe diagonale Eckrampe."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} konnte keine Zugangsrampe beginnen"
   ],

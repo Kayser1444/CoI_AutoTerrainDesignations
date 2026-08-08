@@ -118,7 +118,7 @@ These fields are runtime-only scaffolding and are not persisted.
 ### Activation
 
 - `K` enters corner mode if a supported designation tool is active.
-- Pressing `K` again while already in corner mode cycles outer → Saddle → inner → outer.
+- Pressing `K` again while already in corner mode cycles outer → inner → Saddle → outer.
 - `F` exits corner mode.
 - `R` rotates the current corner orientation.
 
@@ -239,7 +239,7 @@ Corner mode depends on Harmony patches to hook into the vanilla designation flow
 
 ### Toolbox integration
 
-- `AreaToolbox` patching injects the ATD Saddle, outer, and inner corner buttons into the designation toolbox; the Saddle button uses `Assets/Unity/UserInterface/General/MapBound.svg`
+- `AreaToolbox` patching injects the ATD outer, inner, and Saddle corner buttons into the designation toolbox; the Saddle button uses `Assets/Unity/UserInterface/General/MapBounds.svg`
 - `AreaToolbox.SetMode` patching lets ATD track the current vanilla mode index so it can restore the selected mode button when corner mode exits
 
 ### Placement protection

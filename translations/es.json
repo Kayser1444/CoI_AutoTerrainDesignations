@@ -680,6 +680,10 @@
     "Esquina (interior): coloca rampas de esquina cóncavas."
   ],
   [
+    "toolbox.corner_saddle.tooltip",
+    "Esquina (silla de montar): colocar una rampa de esquina diagonal afilada."
+  ],
+  [
     "notification.ramp_access_failed",
     "[ATD] {entity} no pudo iniciar una rampa de acceso"
   ],
