@@ -26,6 +26,10 @@ namespace AutoTerrainDesignations
         private static int[] s_minComponentSizeByLevel = Array.Empty<int>();
         private const string SETTINGS_FILE_NAME = "ATDsettings.json";
         private const string LEGACY_SETTINGS_FILE_NAME = "settings.json";
+        // Increment when a built-in setting default changes in a way that must
+        // migrate an older generated settings file. This is separate from the
+        // mod version because packages can be rebuilt without changing it.
+        private const int SETTINGS_DEFAULTS_REVISION = 2;
 
         private static bool s_settingsLoadAttempted;
         private static string? s_loadedSettingsPath;
@@ -188,6 +192,8 @@ namespace AutoTerrainDesignations
                 }
 
                 string json = File.ReadAllText(settingsPath);
+                int fileDefaultsRevision = ParseInt(
+                    json, "settingsDefaultsRevision") ?? 0;
                 string? fileVersion = ParseSettingsJson(json, isLegacySettingsPath);
                 s_loadedSettingsPath = isLegacySettingsPath
                     ? Path.Combine(Path.GetDirectoryName(settingsPath) ?? string.Empty, SETTINGS_FILE_NAME)
@@ -196,12 +202,18 @@ namespace AutoTerrainDesignations
                 // If the file predates the current version, or was read from the old
                 // settings.json name, rewrite it to the current documented ATDsettings.json
                 // format while preserving user values.
-                if (isLegacySettingsPath || fileVersion != AutoTerrainDesignationsMod.ModVersion)
+                if (isLegacySettingsPath
+                    || fileVersion != AutoTerrainDesignationsMod.ModVersion
+                    || fileDefaultsRevision < SETTINGS_DEFAULTS_REVISION)
                 {
                     if (TrySaveSettings(out string migratedPath))
                     {
                         string source = isLegacySettingsPath ? "legacy settings.json" : "ATDsettings.json";
-                        s_log.Warning($"{source} migrated to version {AutoTerrainDesignationsMod.ModVersion}: {migratedPath}");
+                        s_log.Warning(
+                            $"{source} migrated to version "
+                            + $"{AutoTerrainDesignationsMod.ModVersion} "
+                            + $"(defaults revision {SETTINGS_DEFAULTS_REVISION}): "
+                            + migratedPath);
                     }
                 }
             }
@@ -374,7 +386,11 @@ namespace AutoTerrainDesignations
         {
             // Simple JSON parser for our specific structure
             string? parsedVersion = ParseString(json, "settingsVersion");
-            bool migrateGeneratedDefaults = forceMigration || parsedVersion != AutoTerrainDesignationsMod.ModVersion;
+            int parsedDefaultsRevision = ParseInt(
+                json, "settingsDefaultsRevision") ?? 0;
+            bool migrateGeneratedDefaults = forceMigration
+                || parsedVersion != AutoTerrainDesignationsMod.ModVersion
+                || parsedDefaultsRevision < SETTINGS_DEFAULTS_REVISION;
             try
             {
                 // Extract purityLevels object
@@ -493,7 +509,15 @@ namespace AutoTerrainDesignations
                     AutoTerrainDesignationsMod.SetAutoReleaseTrucksWhenIdle(autoReleaseTrucksWhenIdle.Value);
 
                 bool? turningRampsExperimental = ParseBool(json, "turningRampsExperimental");
-                if (turningRampsExperimental.HasValue && ShouldPreserveBool(turningRampsExperimental.Value, migrateGeneratedDefaults, true))
+                if (turningRampsExperimental.HasValue && ShouldPreserveBool(
+                        turningRampsExperimental.Value,
+                        migrateGeneratedDefaults,
+                        // Revision 2 changed this built-in default from false
+                        // to true. Treat either value as generated during this
+                        // one-time migration; once the revision is current,
+                        // an explicit user value is preserved normally.
+                        false,
+                        true))
                     AutoTerrainDesignationsMod.SetTurningRampsExperimental(turningRampsExperimental.Value);
 
                 bool? suppressLegacyAccessRamps = ParseBool(json, "suppressLegacyAccessRamps");
@@ -962,6 +986,7 @@ namespace AutoTerrainDesignations
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("{");
             sb.AppendLine($"  \"settingsVersion\": \"{AutoTerrainDesignationsMod.ModVersion}\",");
+            sb.AppendLine($"  \"settingsDefaultsRevision\": {SETTINGS_DEFAULTS_REVISION},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_diagnosticLevel\": \"Controls ATD diagnostic output. Default selects Debug in Debug builds and Info in Release builds. Warning keeps only warnings/errors; Info adds concise operational messages; Debug adds search summaries and timings; Trace adds full paths, plan tiles, successors, and handoffs. The atd_diagnostic_level command overrides this for the current session. Allowed: Default, Warning, Info, Debug, Trace.\",");
             sb.AppendLine($"  \"diagnosticLevel\": \"{AtdDiagnostics.ConfiguredLevel}\",");

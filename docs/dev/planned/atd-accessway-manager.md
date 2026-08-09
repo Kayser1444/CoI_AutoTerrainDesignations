@@ -1,7 +1,7 @@
 # ATD Accessway Manager
 
 Status: approved design; implementation steps 1-4 complete. Adaptive budgeting
-has a preserved prototype but is intentionally unwired until step 10. Interactive
+has a preserved prototype but is intentionally unwired until step 11. Interactive
 migration and the remaining heavy-phase incrementalization remain.
 
 Decision record: [Coordinate accessway work through one cooperative manager](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
@@ -554,17 +554,31 @@ Useful console diagnostics:
    backpressure, and manager health diagnostics. Farming stale/overflow results
    feed its existing 10-to-60-second owner retry policy; owner completion and
    explicit cancellation remain non-retrying.
-5. Route Create Designations and planned-tower access through the manager with
+5. **Next.** Make farming snapshot and search-session preparation cooperative.
+   First stop running deterministic V1/V2 fixture suites for every live
+   snapshot: validate them once during initialization, cache the terminal
+   result, and fail closed if validation fails. Then move snapshot collection,
+   projected-designation analysis, pathability/reachability preprocessing,
+   immutable graph construction, and search-session initialization behind
+   manager-owned incremental work. The farming toast reports the active phase
+   (`Capturing terrain`, `Projecting designations`, `Building navigation`, or
+   `Preparing search`) and remains cancellable throughout. Capture records the
+   relevant world revisions before its first slice and validates them before
+   publishing the immutable snapshot; a changed capture is discarded and
+   enters the existing bounded retry policy. Finalization must transfer or
+   freeze builder-owned collections without one large defensive-copy step.
+6. Route Create Designations and planned-tower access through the manager with
    strict interactive priority and request-owned cancellation.
-6. Remove legacy ramp generation, candidate comparison, global result state,
+7. Remove legacy ramp generation, candidate comparison, global result state,
    and every synchronous fallback after all callers have migrated.
-7. Integrate the future Construction Assist leveling facet through the same
+8. Integrate the future Construction Assist leveling facet through the same
    owner/handle contract.
-8. Profile snapshot preparation and commit. Incrementalize any phase that can
-   still exceed the frame budget.
-9. Only after a purity/thread-safety audit, consider a worker-thread search
+9. Profile materialization and commit, and incrementalize any remaining phase
+   that can still exceed the frame budget. Keep the final designation mutation
+   transactional and atomic even if preparation for that mutation is sliced.
+10. Only after a purity/thread-safety audit, consider a worker-thread search
    backend behind the same manager interface.
-10. Replace fixed frame budgets with the preserved adaptive-controller prototype:
+11. Replace fixed frame budgets with the preserved adaptive-controller prototype:
     1 ms minimum, 15 ms unpaused cap, 30 ms paused cap, fast stress backoff,
     gradual recovery, diagnostics, configuration migration, and deterministic
     timing tests. The prototype and its deterministic tests are preserved but
@@ -589,14 +603,23 @@ automation is explicitly disabled and re-enabled.
 
 This slice removes the synchronous farming drain, but its time budget is checked
 only between coroutine yields. Snapshot preparation, materialization, or one
-`Step(1)` expansion can therefore still exceed the nominal budget. Existing
-phase and slow-step diagnostics identify those overruns; implementation step 8
-must incrementalize any operation shown to be unacceptably large in live tests.
+`Step(1)` expansion can therefore still exceed the nominal budget. Live farming
+tests measured snapshot preparation at 994-1390 ms and search-session creation
+at up to 251 ms before the first search yield, despite subsequent search slices
+remaining near 5 ms. Implementation step 5 must bring both phases under manager
+scheduling; step 9 handles any later materialization/commit overruns.
 
 ## Acceptance criteria
 
 - Farming can enqueue a large V1 or V2 access search without completing it in
   the same farming tick.
+- Deterministic V1/V2 fixture validation runs once during initialization, not
+  once per production snapshot.
+- Snapshot and search-session preparation expose bounded cooperative progress,
+  cancellation, and phase diagnostics; the measured 124,711-tile farming case
+  no longer produces a monolithic pre-search frame stall.
+- A world revision change during cooperative capture discards the partial
+  snapshot before it can be searched or materialized.
 - Measured manager work stays within the configured frame budget except for
   separately identified non-incremental operations.
 - Repeated farming ticks do not create duplicate searches for unchanged work.
