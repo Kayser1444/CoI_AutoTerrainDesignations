@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.4.0j*
+*Current as of: v0.5.11*
 
 ## What it does
 

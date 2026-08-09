@@ -130,6 +130,7 @@ namespace AutoTerrainDesignations.Access
         bool Advance();
         void RequestCancellation(string reason);
         ATDAccesswayRequestResult GetTerminalResult();
+        string Phase { get; }
         int VisitedNodes { get; }
         int PendingNodes { get; }
         double ProcessingMilliseconds { get; }
@@ -187,12 +188,14 @@ namespace AutoTerrainDesignations.Access
         internal int LastVisitedNodes { get; set; }
         internal int LastPendingNodes { get; set; }
         internal double LastProcessingMilliseconds { get; set; }
+        internal string LastPhase { get; set; } = "Queued";
     }
 
     internal readonly struct ATDAccesswayHandleSnapshot
     {
         public ATDAccesswayRequestState State { get; }
         public ATDAccesswayRequestResult? Result { get; }
+        public string Phase { get; }
         public int VisitedNodes { get; }
         public int PendingNodes { get; }
         public double ProcessingMilliseconds { get; }
@@ -209,10 +212,12 @@ namespace AutoTerrainDesignations.Access
             ATDAccesswayRequestResult? result,
             int visitedNodes,
             int pendingNodes,
-            double processingMilliseconds)
+            double processingMilliseconds,
+            string phase = "Preparing")
         {
             State = state;
             Result = result;
+            Phase = string.IsNullOrWhiteSpace(phase) ? "Preparing" : phase;
             VisitedNodes = visitedNodes;
             PendingNodes = pendingNodes;
             ProcessingMilliseconds = processingMilliseconds;
@@ -413,7 +418,8 @@ namespace AutoTerrainDesignations.Access
                     work?.VisitedNodes ?? handle.LastVisitedNodes,
                     work?.PendingNodes ?? handle.LastPendingNodes,
                     work?.ProcessingMilliseconds
-                        ?? handle.LastProcessingMilliseconds);
+                        ?? handle.LastProcessingMilliseconds,
+                    work?.Phase ?? handle.LastPhase);
             }
         }
 
@@ -437,7 +443,8 @@ namespace AutoTerrainDesignations.Access
                     work?.VisitedNodes ?? handle.LastVisitedNodes,
                     work?.PendingNodes ?? handle.LastPendingNodes,
                     work?.ProcessingMilliseconds
-                        ?? handle.LastProcessingMilliseconds);
+                        ?? handle.LastProcessingMilliseconds,
+                    work?.Phase ?? handle.LastPhase);
                 return true;
             }
         }
@@ -637,6 +644,7 @@ namespace AutoTerrainDesignations.Access
             handle.LastPendingNodes = handle.Work.PendingNodes;
             handle.LastProcessingMilliseconds =
                 handle.Work.ProcessingMilliseconds;
+            handle.LastPhase = handle.Work.Phase;
         }
 
         private void NotifyTerminal(

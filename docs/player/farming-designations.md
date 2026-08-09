@@ -1,6 +1,6 @@
 # Farmland preparation
 
-*Current as of: v0.4.0k*
+*Current as of: v0.5.11*
 
 ## What it does
 
@@ -13,6 +13,8 @@ The mod works in two steps:
 2. **Filling** — Once preparation is complete, restricts the tower's dump rules to farmable products (dirt, compost, and similar) so trucks fill the topsoil band with farmable material only. When all origins are done the dump rules are restored automatically.
 
 Vehicle access ramps are added automatically when excavators or trucks cannot reach a work area.
+
+While farming access is being prepared, ATD shows a progress toast with the current phase, visited and queued work, and processing time. Use **Stop automatic farming access** to cancel the active request, or **Hide** to suppress the toast for that request without cancelling it.
 
 ## How to use it
 

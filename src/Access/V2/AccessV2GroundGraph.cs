@@ -80,11 +80,21 @@ namespace AutoTerrainDesignations.Access.V2
             m_cleanupByTile = source.m_cleanupByTile;
             m_generatedClearableByTile = source.m_generatedClearableByTile;
             m_goals = new HashSet<Tile2i>(source.m_goals);
+            m_componentByTile = source.m_componentByTile;
+            m_goalComponents = new HashSet<int>(source.m_goalComponents);
+            var newGoals = new HashSet<Tile2i>();
             foreach (Tile2i goal in additionalGoals)
                 if (IsTraversable(goal))
+                {
                     m_goals.Add(goal);
-            BuildComponents(out m_componentByTile, out m_goalComponents);
-            m_goalDistanceByTile = BuildGoalDistances();
+                    if (!source.m_goals.Contains(goal))
+                        newGoals.Add(goal);
+                    if (m_componentByTile.TryGetValue(
+                            goal, out int component))
+                        m_goalComponents.Add(component);
+                }
+            m_goalDistanceByTile = BuildGoalDistancesWithAdditionalGoals(
+                source.m_goalDistanceByTile, newGoals);
         }
 
         internal AccessV2GroundGraph WithAdditionalGoals(
@@ -495,6 +505,59 @@ namespace AutoTerrainDesignations.Access.V2
                 distances.Add(goal, 0);
                 Enqueue(goal, 0f);
             }
+            while (queue.Count > 0)
+            {
+                KeyValuePair<float, Queue<Tile2i>> first = queue.First();
+                Tile2i current = first.Value.Dequeue();
+                if (first.Value.Count == 0) queue.Remove(first.Key);
+                if (!distances.TryGetValue(current, out float currentDistance)
+                    || Math.Abs(currentDistance - first.Key) > 0.0001f)
+                    continue;
+                for (int index = 0; index < s_allDirections.Length; index++)
+                {
+                    Tile2i next = current + s_allDirections[index];
+                    if (!CanTraverse(current, next))
+                        continue;
+                    float nextDistance = currentDistance
+                        + GetStepCost(current, next);
+                    if (distances.TryGetValue(next, out float old)
+                        && old <= nextDistance + 0.0001f)
+                        continue;
+                    distances[next] = nextDistance;
+                    Enqueue(next, nextDistance);
+                }
+            }
+            return distances;
+
+            void Enqueue(Tile2i tile, float cost)
+            {
+                if (!queue.TryGetValue(cost, out Queue<Tile2i> bucket))
+                {
+                    bucket = new Queue<Tile2i>();
+                    queue.Add(cost, bucket);
+                }
+                bucket.Enqueue(tile);
+            }
+        }
+
+        private Dictionary<Tile2i, float> BuildGoalDistancesWithAdditionalGoals(
+            IReadOnlyDictionary<Tile2i, float> sourceDistances,
+            IEnumerable<Tile2i> additionalGoals)
+        {
+            var distances = new Dictionary<Tile2i, float>();
+            foreach (KeyValuePair<Tile2i, float> pair in sourceDistances)
+                distances.Add(pair.Key, pair.Value);
+            var queue = new SortedDictionary<float, Queue<Tile2i>>();
+            foreach (Tile2i goal in additionalGoals)
+            {
+                if (!distances.TryGetValue(goal, out float existing)
+                    || existing > 0f)
+                {
+                    distances[goal] = 0f;
+                    Enqueue(goal, 0f);
+                }
+            }
+
             while (queue.Count > 0)
             {
                 KeyValuePair<float, Queue<Tile2i>> first = queue.First();

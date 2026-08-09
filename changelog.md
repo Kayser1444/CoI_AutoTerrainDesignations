@@ -1,6 +1,12 @@
 v0.5.11 [unreleased]
 
 * Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases.
+* Fixed: Settings migration now promotes legacy turning-ramp values to the enabled default without disabling users who already enabled experimental accessways; the revision-2 downgrade is repaired on the next launch.
+* Improved: Large farming accessway searches now capture terrain and advance cooperatively, reducing long synchronous pauses while access is being planned.
+* Changed: Access progress toasts now show the active phase and search progress for both interactive and managed searches; Hide suppresses the toast for the active request without cancelling it.
+* Fixed: Farming access searches can now finish through existing fixed provider networks and reuse served provider work without creating unnecessary duplicate routes.
+* Improved: Request-scoped fixed-provider ground graph preparation reuses immutable snapshot topology and incrementally updates goal distances, reducing preparation time for existing provider networks.
+* Added: Deterministic access fixtures run during world initialization and fail managed access preparation closed if a core access invariant regresses.
 
 v0.5.10 [packaged]
 

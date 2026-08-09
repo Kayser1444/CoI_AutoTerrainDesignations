@@ -72,6 +72,25 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     + $"failure={removalFailure}");
                 if (!removalSuccess) return 1;
 
+                MethodInfo validateSettingsMigration = state.GetMethod(
+                    "ValidateTurningRampsExperimentalMigrationFixtures",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        state.FullName,
+                        "ValidateTurningRampsExperimentalMigrationFixtures");
+                object[] settingsMigrationArgs = { string.Empty };
+                bool settingsMigrationSuccess = (bool)(
+                    validateSettingsMigration.Invoke(
+                        null, settingsMigrationArgs) ?? false);
+                string settingsMigrationFailure =
+                    settingsMigrationArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Settings migration fixtures: "
+                    + $"success={settingsMigrationSuccess} "
+                    + $"failure={settingsMigrationFailure}");
+                if (!settingsMigrationSuccess) return 1;
+
                 Type retryFixtures = assembly.GetType(
                     "AutoTerrainDesignations.Access.AccessFailureRetryPolicyFixtures",
                     true);

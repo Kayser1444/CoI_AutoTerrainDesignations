@@ -29,7 +29,8 @@ namespace AutoTerrainDesignations
         // Increment when a built-in setting default changes in a way that must
         // migrate an older generated settings file. This is separate from the
         // mod version because packages can be rebuilt without changing it.
-        private const int SETTINGS_DEFAULTS_REVISION = 2;
+        private const int SETTINGS_DEFAULTS_REVISION = 3;
+        private const int TURNING_RAMPS_DEFAULTS_REVISION = 3;
 
         private static bool s_settingsLoadAttempted;
         private static string? s_loadedSettingsPath;
@@ -509,16 +510,17 @@ namespace AutoTerrainDesignations
                     AutoTerrainDesignationsMod.SetAutoReleaseTrucksWhenIdle(autoReleaseTrucksWhenIdle.Value);
 
                 bool? turningRampsExperimental = ParseBool(json, "turningRampsExperimental");
-                if (turningRampsExperimental.HasValue && ShouldPreserveBool(
-                        turningRampsExperimental.Value,
-                        migrateGeneratedDefaults,
-                        // Revision 2 changed this built-in default from false
-                        // to true. Treat either value as generated during this
-                        // one-time migration; once the revision is current,
-                        // an explicit user value is preserved normally.
-                        false,
-                        true))
-                    AutoTerrainDesignationsMod.SetTurningRampsExperimental(turningRampsExperimental.Value);
+                if (turningRampsExperimental.HasValue)
+                {
+                    // The old file format cannot distinguish the generated
+                    // false from a user's explicit false. Promote both legacy
+                    // states to the new true default, but preserve the value
+                    // once the setting has passed this one-time migration.
+                    AutoTerrainDesignationsMod.SetTurningRampsExperimental(
+                        ResolveTurningRampsExperimentalValue(
+                            turningRampsExperimental.Value,
+                            parsedDefaultsRevision));
+                }
 
                 bool? suppressLegacyAccessRamps = ParseBool(json, "suppressLegacyAccessRamps");
                 if (suppressLegacyAccessRamps.HasValue && ShouldPreserveBool(suppressLegacyAccessRamps.Value, migrateGeneratedDefaults, false))
@@ -707,6 +709,45 @@ namespace AutoTerrainDesignations
 
         private static bool ShouldPreserveBool(bool value, bool migrateGeneratedDefaults, params bool[] knownDefaults)
             => !migrateGeneratedDefaults || Array.IndexOf(knownDefaults, value) < 0;
+
+        private static bool ResolveTurningRampsExperimentalValue(
+            bool value,
+            int parsedDefaultsRevision)
+            => parsedDefaultsRevision < TURNING_RAMPS_DEFAULTS_REVISION
+                ? true
+                : value;
+
+        internal static bool ValidateTurningRampsExperimentalMigrationFixtures(
+            out string failure)
+        {
+            if (!ResolveTurningRampsExperimentalValue(true, 0))
+            {
+                failure = "A legacy true turning-ramp value was not preserved.";
+                return false;
+            }
+
+            if (!ResolveTurningRampsExperimentalValue(false, 0))
+            {
+                failure = "A legacy generated false turning-ramp value was not promoted.";
+                return false;
+            }
+
+            if (!ResolveTurningRampsExperimentalValue(false, 2))
+            {
+                failure = "A revision-2 downgraded false turning-ramp value was not repaired.";
+                return false;
+            }
+
+            if (ResolveTurningRampsExperimentalValue(false, 3)
+                || !ResolveTurningRampsExperimentalValue(true, 3))
+            {
+                failure = "Current-revision turning-ramp values were not preserved.";
+                return false;
+            }
+
+            failure = string.Empty;
+            return true;
+        }
 
         private static bool ShouldPreserveFloat(float value, bool migrateGeneratedDefaults, params float[] knownDefaults)
             => !migrateGeneratedDefaults || Array.IndexOf(knownDefaults, value) < 0;

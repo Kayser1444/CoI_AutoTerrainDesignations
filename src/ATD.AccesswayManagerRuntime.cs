@@ -28,6 +28,14 @@ namespace AutoTerrainDesignations
             s_accesswayManager?.Reset("WorldReinitialized");
             s_accesswayManager = new ATDAccesswayManager(
                 terminalObserver: LogAccesswayTerminalDiagnostic);
+            if (!AccessSearchFixtureGate.EnsureInitialized(
+                    out string fixtureFailure))
+            {
+                s_log.Warning(
+                    "[ATD Access Manager] deterministic access fixtures failed; "
+                    + "managed access preparation will fail closed. reason="
+                    + fixtureFailure);
+            }
             s_accesswayManagerSuspendedForSave = false;
             s_accesswayManagerGamePaused = false;
             s_accesswayManagerLastLoggedBudget = -1;
@@ -208,13 +216,16 @@ namespace AutoTerrainDesignations
                     ? "farming filling access"
                     : "farming preparation access";
                 var progressText = new LocStrFormatted(
-                    $"[ATD] Finding {workType}; "
+                    $"[ATD] {snapshot.Phase}; finding {workType}; "
                     + $"visited {snapshot.VisitedNodes:N0}/"
                     + $"{AutoTerrainDesignationsMod.AccessMaxVisitedNodes:N0} · "
                     + $"queue {snapshot.PendingNodes:N0} · "
                     + $"budget {GetManagedAccesswaySliceBudgetMilliseconds()} ms/frame · "
                     + $"processing {snapshot.ProcessingMilliseconds / 1000d:0.0}/"
                     + $"{AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds}s");
+                if (s_terrainAnalysisToastHidden)
+                    return;
+
                 var notification = s_uiRoot.ToastNotifProvider.m_notification;
                 if (!s_accesswayManagerToastVisible
                     || s_accesswayManagerToastRequestId != handle.RequestId
@@ -233,6 +244,11 @@ namespace AutoTerrainDesignations
                             new LocStrFormatted(
                                 "Stop automatic farming access"),
                             () => manager.Cancel(handle, "UserCancelled"))
+                            .MarginLeft(8.pt()),
+                        new ButtonText(
+                            Button.General,
+                            new LocStrFormatted("Hide"),
+                            HideAccesswayManagerToastUntilComplete)
                             .MarginLeft(8.pt()));
                     s_accesswayManagerToastRequestId = handle.RequestId;
                     s_accesswayManagerToastVisible = true;
@@ -252,6 +268,7 @@ namespace AutoTerrainDesignations
 
         private static void HideAccesswayManagerToast()
         {
+            TryResetTerrainAnalysisToastHidden();
             if (!s_accesswayManagerToastVisible)
                 return;
             try
@@ -264,6 +281,18 @@ namespace AutoTerrainDesignations
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
             s_accesswayManagerProgressLabel = null;
+        }
+
+        private static void HideAccesswayManagerToastUntilComplete()
+        {
+            HideTerrainAnalysisToastForCurrentSearch();
+            try
+            {
+                s_uiRoot?.ToastNotifProvider.m_notification.Hide();
+            }
+            catch
+            {
+            }
         }
     }
 }

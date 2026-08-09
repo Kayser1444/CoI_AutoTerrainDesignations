@@ -322,8 +322,8 @@ public static string Tt(string text) => text;
         SetAutoReleaseTrucksWhenIdle(value);
     }
 
-    /// <summary>Enables the V1 turning-ramp search. Experimental and off by default.</summary>
-    public static bool TurningRampsExperimental { get; private set; }
+    /// <summary>Enables the V1 turning-ramp search. Experimental and on by default.</summary>
+    public static bool TurningRampsExperimental { get; private set; } = true;
 
     public static void SetTurningRampsExperimental(bool value)
     {

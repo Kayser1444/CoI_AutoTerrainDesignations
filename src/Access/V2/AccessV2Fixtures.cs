@@ -1460,7 +1460,12 @@ namespace AutoTerrainDesignations.Access.V2
             Tile2i providerCenter = new Tile2i(2, 4);
             if (!providerGoalCenters.Contains(providerCenter)
                 || !providerGoalGraph.IsGoal(providerCenter)
-                || exact.IsGoal(providerCenter))
+                || exact.IsGoal(providerCenter)
+                || !providerGoalGraph.IsGoalConnected(providerCenter)
+                || !providerGoalGraph.TryGetGoalDistance(
+                    providerCenter + new RelTile2i(1, 0),
+                    out float providerNeighborDistance)
+                || Math.Abs(providerNeighborDistance - 1f) > 0.0001f)
             {
                 failure =
                     "A request-scoped fixed provider band did not become a V2 terminal ground center.";
@@ -1469,6 +1474,27 @@ namespace AutoTerrainDesignations.Access.V2
 
             Tile2i start = new Tile2i(2, 4);
             Tile2i goal = new Tile2i(14, 12);
+            var existingGoalGraph = new AccessV2GroundGraph(
+                projectedCenters,
+                new[] { goal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>(),
+                projectedCenters);
+            AccessV2GroundGraph combinedGoalGraph =
+                existingGoalGraph.WithAdditionalGoals(new[] { providerCenter });
+            if (!combinedGoalGraph.IsGoal(providerCenter)
+                || !combinedGoalGraph.IsGoal(goal)
+                || !combinedGoalGraph.TryGetGoalDistance(
+                    providerCenter + new RelTile2i(1, 0),
+                    out float combinedNeighborDistance)
+                || Math.Abs(combinedNeighborDistance - 1f) > 0.0001f
+                || !combinedGoalGraph.TryGetGoalDistance(
+                    goal, out float combinedExistingGoalDistance)
+                || Math.Abs(combinedExistingGoalDistance) > 0.0001f)
+            {
+                failure =
+                    "A request-scoped goal overlay must preserve existing goal distances while adding the nearer fixed-provider distance.";
+                return false;
+            }
             if (fv.NodeCount != 24
                 || !fv.TryGetShortestPath(
                     AccessV2TravelAxis.X, start, goal,

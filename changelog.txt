@@ -1,3 +1,11 @@
+v0.5.11 | 2026-08-09
+* Improved: Large farming accessway searches now run cooperatively in small slices, keeping the game responsive while access is being planned
+* Changed: Access progress toasts now show the current phase and progress details for interactive and managed searches, with a Hide control that suppresses the toast without cancelling the active request
+* Fixed: Farming accessways can now finish through existing provider networks and reuse served provider work without creating unnecessary duplicate routes
+* Improved: Existing provider network preparation is faster, reducing pauses before accessway searches begin
+* Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases
+* Fixed: Updating ATD no longer disables experimental accessways that were already enabled.
+
 v0.5.10 | 2026-08-08
 * Added: Manual Planar corner designations with four rotations, preview and drag support, and a dedicated toolbar button
 * Changed: Corner designation toolbar buttons and K cycling now follow the Outer, Inner, Planar order, and the Planar button uses a dedicated diagonal-plane icon

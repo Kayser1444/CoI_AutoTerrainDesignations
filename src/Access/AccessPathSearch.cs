@@ -8,6 +8,17 @@ using AutoTerrainDesignations.Access.V2;
 
 namespace AutoTerrainDesignations.Access
 {
+    internal sealed class AccessSearchSessionBuildDiagnostics
+    {
+        public double TotalMilliseconds;
+        public double RequestHeightEnvelopeMilliseconds;
+        public double RequestGroundGraphMilliseconds;
+        public double PotentialFieldMilliseconds;
+        public double V2SessionMilliseconds;
+        public double V1GoalIndexMilliseconds;
+        public double V1InitialExpansionMilliseconds;
+    }
+
     internal static class AccessPathSearch
     {
         private static readonly Tile2i[] s_originDirections =
@@ -1681,6 +1692,24 @@ namespace AutoTerrainDesignations.Access
         }
 
         public static AccessPathSearchSession CreateSession(AccessPathRequest request)
+            => CreateSession(request, out _);
+
+        internal static AccessPathSearchSession CreateSession(
+            AccessPathRequest request,
+            out AccessSearchSessionBuildDiagnostics buildDiagnostics)
+        {
+            buildDiagnostics = new AccessSearchSessionBuildDiagnostics();
+            long sessionStart = AtdDiagnostics.Timestamp();
+            AccessPathSearchSession session = CreateSessionCore(
+                request, buildDiagnostics);
+            buildDiagnostics.TotalMilliseconds = AtdDiagnostics.ElapsedSince(
+                sessionStart) * 1000d / Stopwatch.Frequency;
+            return session;
+        }
+
+        private static AccessPathSearchSession CreateSessionCore(
+            AccessPathRequest request,
+            AccessSearchSessionBuildDiagnostics buildDiagnostics)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             var diagnostics = new AccessSearchDiagnostics();
@@ -1693,12 +1722,17 @@ namespace AutoTerrainDesignations.Access
                 if (request.V2Endpoints.Starts.Count == 0)
                     return AccessPathSearchSession.Completed(Failed(
                         "NoWidth2StartCompanion", start, 0, rejections));
+                long requestEnvelopeStart = AtdDiagnostics.Timestamp();
                 AccessUsefulHeightEnvelope? requestHeightEnvelope =
                     BuildRequestUsefulHeightEnvelope(
                         request.Snapshot,
                         request.Start.FixedProfileNodes.Concat(
                             request.Goal.FixedProfileNodes),
                         useV2: true);
+                buildDiagnostics.RequestHeightEnvelopeMilliseconds =
+                    AtdDiagnostics.ElapsedSince(requestEnvelopeStart)
+                    * 1000d / Stopwatch.Frequency;
+                long groundGraphStart = AtdDiagnostics.Timestamp();
                 AccessV2GroundGraph v2GroundGraph =
                     BuildV2RequestGroundGraph(
                         request.Snapshot.V2GroundGraph!,
@@ -1706,6 +1740,9 @@ namespace AutoTerrainDesignations.Access
                         new HashSet<Tile2i>(
                             request.Goal.FixedProfileNodes),
                         out HashSet<Tile2i> v2FixedGoalCenters);
+                buildDiagnostics.RequestGroundGraphMilliseconds =
+                    AtdDiagnostics.ElapsedSince(groundGraphStart)
+                    * 1000d / Stopwatch.Frequency;
                 bool useV2AStar = ShouldUseV2AStar(request);
                 long potentialBuildStart = AtdDiagnostics.Timestamp();
                 AccessV2PotentialField? v2Potential = useV2AStar
@@ -1720,6 +1757,9 @@ namespace AutoTerrainDesignations.Access
                         AccessV2CostModel.GetCenterSpokeCost(
                             GeneratedVFixedOverhead))
                     : null;
+                buildDiagnostics.PotentialFieldMilliseconds =
+                    AtdDiagnostics.ElapsedSince(potentialBuildStart)
+                    * 1000d / Stopwatch.Frequency;
                 diagnostics.V2PotentialBuildTicks = v2Potential != null
                     ? AtdDiagnostics.ElapsedSince(potentialBuildStart)
                     : 0;
@@ -1727,6 +1767,7 @@ namespace AutoTerrainDesignations.Access
                     v2Potential?.GeneratedNodeCount ?? 0;
                 diagnostics.V2PotentialFixedNodes =
                     v2Potential?.FixedNodeCount ?? 0;
+                long v2SessionStart = AtdDiagnostics.Timestamp();
                 var v2Session = new AccessV2SearchSession(
                     request.V2Endpoints,
                     request.BoundsMin,
@@ -1803,6 +1844,9 @@ namespace AutoTerrainDesignations.Access
                     generatedVPrimeOriginValidator:
                         request.Snapshot.IsGeneratedVPrimeOriginEligible,
                     vehicleWidth: request.Snapshot.VehicleWidth);
+                buildDiagnostics.V2SessionMilliseconds =
+                    AtdDiagnostics.ElapsedSince(v2SessionStart)
+                    * 1000d / Stopwatch.Frequency;
                 return new AccessPathSearchSession(
                     v2Session, start, diagnostics,
                     v2FixedGoalCenters);
@@ -1824,7 +1868,8 @@ namespace AutoTerrainDesignations.Access
             bool includeGroundGoals = request.Goal.GroundTileNodes.Count > 0;
             return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
                 includeGroundGoals, useAStarHeuristic: request.Snapshot.UseAStar,
-                maxCostLimit: request.MaxCostLimit);
+                maxCostLimit: request.MaxCostLimit,
+                buildDiagnostics: buildDiagnostics);
         }
 
         internal static AccessV2GroundGraph BuildV2RequestGroundGraph(
@@ -1864,7 +1909,8 @@ namespace AutoTerrainDesignations.Access
             HashSet<Tile2i>? fixedGoalOrigins,
             bool includeGroundGoals,
             bool useAStarHeuristic,
-            float maxCostLimit)
+            float maxCostLimit,
+            AccessSearchSessionBuildDiagnostics? buildDiagnostics = null)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             var diagnostics = new AccessSearchDiagnostics();
@@ -1879,6 +1925,7 @@ namespace AutoTerrainDesignations.Access
                 return AccessPathSearchSession.Completed(Failed("NoStartProfile", startOrigin, 0, rejections));
             if (snapshot.IsProfileOceanBlocked(startOrigin, startProfile))
                 return AccessPathSearchSession.Completed(Failed("OceanStartBelowMinimum", startOrigin, 0, rejections));
+            long requestEnvelopeStart = AtdDiagnostics.Timestamp();
             AccessUsefulHeightEnvelope? requestHeightEnvelope =
                 BuildRequestUsefulHeightEnvelope(
                     snapshot,
@@ -1886,6 +1933,10 @@ namespace AutoTerrainDesignations.Access
                         ? clusterOrigins
                         : clusterOrigins.Concat(fixedGoalOrigins),
                     useV2: false);
+            if (buildDiagnostics != null)
+                buildDiagnostics.RequestHeightEnvelopeMilliseconds =
+                    AtdDiagnostics.ElapsedSince(requestEnvelopeStart)
+                    * 1000d / Stopwatch.Frequency;
 
             var goalsByHeight2 = new Dictionary<int, List<Tile2i>>();
             if (includeGroundGoals)
@@ -1902,11 +1953,16 @@ namespace AutoTerrainDesignations.Access
                         AddGoal(profile.Center2, goal + new RelTile2i(2, 2));
                 }
             }
+            long goalIndexStart = AtdDiagnostics.Timestamp();
             HeightAwareGoalIndex goalIndex =
                 snapshot.UseAStar && useAStarHeuristic
                     ? HeightAwareGoalIndex.Build(
                         snapshot, goalsByHeight2, includeGroundGoals)
                     : HeightAwareGoalIndex.Empty;
+            if (buildDiagnostics != null)
+                buildDiagnostics.V1GoalIndexMilliseconds =
+                    AtdDiagnostics.ElapsedSince(goalIndexStart)
+                    * 1000d / Stopwatch.Frequency;
 
             void AddGoal(int height2, Tile2i goal)
             {
@@ -1930,10 +1986,15 @@ namespace AutoTerrainDesignations.Access
             string lastGoalRejectionReason = string.Empty;
             float lastRejectedGoalCost = 0f;
 
+            long initialExpansionStart = AtdDiagnostics.Timestamp();
             ExpandOrigin(snapshot, requestHeightEnvelope,
                 startNode, startProfile, 0f,
                 distance, previous, generatedHistory, queue, rejections,
                 useAStarHeuristic, goalIndex, diagnostics, handoffDominance);
+            if (buildDiagnostics != null)
+                buildDiagnostics.V1InitialExpansionMilliseconds =
+                    AtdDiagnostics.ElapsedSince(initialExpansionStart)
+                    * 1000d / Stopwatch.Frequency;
 
             if (queue.Count == 0)
                 return AccessPathSearchSession.Completed(Failed("NoInitialSuccessor", startOrigin, 0, rejections));

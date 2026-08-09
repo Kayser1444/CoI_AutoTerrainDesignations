@@ -6,6 +6,34 @@ namespace AutoTerrainDesignations.Access
     {
         internal static bool ValidateAll(out string failure)
         {
+            int fixtureRunsBefore = AccessSearchFixtureGate.ValidationRunCount;
+            if (!AccessSearchFixtureGate.EnsureInitialized(
+                    out string fixtureFailure))
+            {
+                failure = "Cached access fixture gate failed: " + fixtureFailure;
+                return false;
+            }
+            int fixtureRunsAfterFirst =
+                AccessSearchFixtureGate.ValidationRunCount;
+            if (!AccessSearchFixtureGate.EnsureInitialized(
+                    out string repeatedFixtureFailure))
+            {
+                failure =
+                    "Cached access fixture gate changed result on reuse: "
+                    + repeatedFixtureFailure;
+                return false;
+            }
+            int fixtureRunsAfterSecond =
+                AccessSearchFixtureGate.ValidationRunCount;
+            if (fixtureRunsAfterSecond != fixtureRunsAfterFirst
+                || fixtureRunsAfterFirst > fixtureRunsBefore + 1)
+            {
+                failure =
+                    "Deterministic access fixtures were not cached for the "
+                    + "lifetime of the runtime.";
+                return false;
+            }
+
             if (!ValidateAdaptiveBudget(out failure))
                 return false;
             if (!ValidateManagerHardening(out failure))
@@ -497,6 +525,7 @@ namespace AutoTerrainDesignations.Access
             public int AdvanceCount { get; private set; }
             public int VisitedNodes => AdvanceCount;
             public int PendingNodes => Math.Max(0, m_steps - AdvanceCount);
+            public string Phase => "Fixture";
             public double ProcessingMilliseconds => AdvanceCount;
 
             public bool Advance()

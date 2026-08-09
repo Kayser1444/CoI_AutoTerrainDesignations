@@ -459,7 +459,8 @@ namespace AutoTerrainDesignations.Access
             IDictionary<Tile2i, HashSet<Tile2i>>?
                 projectedCutSafetySourcesByTile = null,
             IDictionary<Tile2i, HashSet<Tile2i>>?
-                projectedFillSafetySourcesByTile = null)
+                projectedFillSafetySourcesByTile = null,
+            bool takeOwnership = false)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -477,32 +478,63 @@ namespace AutoTerrainDesignations.Access
             VehicleWidth = Math.Max(1, vehicleWidth);
             VehicleMaxSteepnessDelta = Math.Max(0f, vehicleMaxSteepnessDelta);
             UsefulHeightEnvelope = usefulHeightEnvelope;
-            m_groundHeight2 = new Dictionary<Tile2i, int>(groundHeight2);
-            m_preciseTerrainHeights = preciseTerrainHeights != null
-                ? new Dictionary<Tile2i, float>(preciseTerrainHeights)
-                : BuildPreciseTerrainHeights(groundHeight2);
-            m_terrainColumns = terrainColumns != null
-                ? new Dictionary<Tile2i, AccessTerrainColumn>(terrainColumns)
-                : new Dictionary<Tile2i, AccessTerrainColumn>();
+            m_groundHeight2 = takeOwnership
+                && groundHeight2 is Dictionary<Tile2i, int> ownedGroundHeight2
+                    ? ownedGroundHeight2
+                    : new Dictionary<Tile2i, int>(groundHeight2);
+            m_preciseTerrainHeights = preciseTerrainHeights == null
+                ? BuildPreciseTerrainHeights(groundHeight2)
+                : takeOwnership
+                    && preciseTerrainHeights
+                        is Dictionary<Tile2i, float> ownedPreciseTerrainHeights
+                        ? ownedPreciseTerrainHeights
+                        : new Dictionary<Tile2i, float>(preciseTerrainHeights);
+            m_terrainColumns = terrainColumns == null
+                ? new Dictionary<Tile2i, AccessTerrainColumn>()
+                : takeOwnership
+                    && terrainColumns
+                        is Dictionary<Tile2i, AccessTerrainColumn> ownedTerrainColumns
+                        ? ownedTerrainColumns
+                        : new Dictionary<Tile2i, AccessTerrainColumn>(terrainColumns);
             PhysicalTerrainMin = physicalTerrainMin ?? boundsMin;
             PhysicalTerrainMax = physicalTerrainMax ?? boundsMax;
             DumpingMaterialSlope = dumpingMaterialSlope;
             FallbackMiningSlope = fallbackMiningSlope;
             DumpingSlopeUsedFallback = dumpingSlopeUsedFallback;
             HasDumpingMaterial = hasDumpingMaterial;
-            m_terrainCenterHeight2 = new Dictionary<Tile2i, int>(terrainCenterHeight2);
-            m_fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>(fixedProfiles);
+            m_terrainCenterHeight2 = takeOwnership
+                && terrainCenterHeight2
+                    is Dictionary<Tile2i, int> ownedTerrainCenterHeight2
+                    ? ownedTerrainCenterHeight2
+                    : new Dictionary<Tile2i, int>(terrainCenterHeight2);
+            m_fixedProfiles = takeOwnership
+                && fixedProfiles
+                    is Dictionary<Tile2i, AccessHeightProfile> ownedFixedProfiles
+                    ? ownedFixedProfiles
+                    : new Dictionary<Tile2i, AccessHeightProfile>(fixedProfiles);
             m_fixedProfileComponentByOrigin =
                 BuildFixedProfileComponents(m_fixedProfiles);
-            m_workOrigins = new HashSet<Tile2i>(workOrigins);
-            m_groundNodes = new HashSet<Tile2i>(groundNodes);
-            m_goalGroundNodes = new HashSet<Tile2i>(goalGroundNodes);
+            m_workOrigins = takeOwnership
+                && workOrigins is HashSet<Tile2i> ownedWorkOrigins
+                    ? ownedWorkOrigins
+                    : new HashSet<Tile2i>(workOrigins);
+            m_groundNodes = takeOwnership
+                && groundNodes is HashSet<Tile2i> ownedGroundNodes
+                    ? ownedGroundNodes
+                    : new HashSet<Tile2i>(groundNodes);
+            m_goalGroundNodes = takeOwnership
+                && goalGroundNodes is HashSet<Tile2i> ownedGoalGroundNodes
+                    ? ownedGoalGroundNodes
+                    : new HashSet<Tile2i>(goalGroundNodes);
             m_occupiedTiles = new HashSet<Tile2i>(occupiedTiles);
             m_terrainPathableWithoutBlockers =
-                terrainPathableWithoutBlockers != null
-                    ? new HashSet<Tile2i>(
-                        terrainPathableWithoutBlockers)
-                    : new HashSet<Tile2i>();
+                terrainPathableWithoutBlockers == null
+                    ? new HashSet<Tile2i>()
+                    : takeOwnership
+                        && terrainPathableWithoutBlockers
+                            is HashSet<Tile2i> ownedTerrainPathableWithoutBlockers
+                        ? ownedTerrainPathableWithoutBlockers
+                        : new HashSet<Tile2i>(terrainPathableWithoutBlockers);
             m_expandedBuildingRayBlockers = BuildExpandedBuildingRayBlockers(
                 occupiedTiles, boundsMin, boundsMax);
             m_cutDesignationRayBlockers = BuildDesignationRayBlockers(
@@ -511,44 +543,81 @@ namespace AutoTerrainDesignations.Access
                 rayDumpingDesignationOrigins ?? Array.Empty<Tile2i>());
             m_hardDesignationRayBlockers = BuildDesignationRayBlockers(
                 rayLevelingDesignationOrigins ?? fixedProfiles.Keys);
-            m_projectedCutSupportCeilings = projectedCutSupportCeilings != null
-                ? new Dictionary<Tile2i, float>(projectedCutSupportCeilings)
-                : new Dictionary<Tile2i, float>();
-            m_projectedFillSurfaceFloors = projectedFillSurfaceFloors != null
-                ? new Dictionary<Tile2i, float>(projectedFillSurfaceFloors)
-                : new Dictionary<Tile2i, float>();
-            m_projectedCutRayBlockers = projectedCutDisturbedTiles != null
-                ? new HashSet<Tile2i>(projectedCutDisturbedTiles)
-                : new HashSet<Tile2i>();
-            m_projectedFillRayBlockers = projectedFillDisturbedTiles != null
-                ? new HashSet<Tile2i>(projectedFillDisturbedTiles)
-                : new HashSet<Tile2i>();
-            m_projectedCutSourcesByTile = CopySourceMap(projectedCutSourcesByTile);
-            m_projectedFillSourcesByTile = CopySourceMap(projectedFillSourcesByTile);
+            m_projectedCutSupportCeilings = projectedCutSupportCeilings == null
+                ? new Dictionary<Tile2i, float>()
+                : takeOwnership
+                    && projectedCutSupportCeilings
+                        is Dictionary<Tile2i, float> ownedProjectedCutSupportCeilings
+                    ? ownedProjectedCutSupportCeilings
+                    : new Dictionary<Tile2i, float>(projectedCutSupportCeilings);
+            m_projectedFillSurfaceFloors = projectedFillSurfaceFloors == null
+                ? new Dictionary<Tile2i, float>()
+                : takeOwnership
+                    && projectedFillSurfaceFloors
+                        is Dictionary<Tile2i, float> ownedProjectedFillSurfaceFloors
+                    ? ownedProjectedFillSurfaceFloors
+                    : new Dictionary<Tile2i, float>(projectedFillSurfaceFloors);
+            m_projectedCutRayBlockers = projectedCutDisturbedTiles == null
+                ? new HashSet<Tile2i>()
+                : takeOwnership
+                    && projectedCutDisturbedTiles is HashSet<Tile2i> ownedProjectedCutRayBlockers
+                    ? ownedProjectedCutRayBlockers
+                    : new HashSet<Tile2i>(projectedCutDisturbedTiles);
+            m_projectedFillRayBlockers = projectedFillDisturbedTiles == null
+                ? new HashSet<Tile2i>()
+                : takeOwnership
+                    && projectedFillDisturbedTiles is HashSet<Tile2i> ownedProjectedFillRayBlockers
+                    ? ownedProjectedFillRayBlockers
+                    : new HashSet<Tile2i>(projectedFillDisturbedTiles);
+            m_projectedCutSourcesByTile = CopySourceMap(
+                projectedCutSourcesByTile, takeOwnership);
+            m_projectedFillSourcesByTile = CopySourceMap(
+                projectedFillSourcesByTile, takeOwnership);
             m_hasProjectedCutSafetyClassification =
                 projectedCutSafetyTiles != null;
             m_hasProjectedFillSafetyClassification =
                 projectedFillSafetyTiles != null;
-            m_projectedCutSafetyTiles = projectedCutSafetyTiles != null
-                ? new HashSet<Tile2i>(projectedCutSafetyTiles)
-                : new HashSet<Tile2i>();
-            m_projectedFillSafetyTiles = projectedFillSafetyTiles != null
-                ? new HashSet<Tile2i>(projectedFillSafetyTiles)
-                : new HashSet<Tile2i>();
+            m_projectedCutSafetyTiles = projectedCutSafetyTiles == null
+                ? new HashSet<Tile2i>()
+                : takeOwnership
+                    && projectedCutSafetyTiles is HashSet<Tile2i> ownedProjectedCutSafetyTiles
+                    ? ownedProjectedCutSafetyTiles
+                    : new HashSet<Tile2i>(projectedCutSafetyTiles);
+            m_projectedFillSafetyTiles = projectedFillSafetyTiles == null
+                ? new HashSet<Tile2i>()
+                : takeOwnership
+                    && projectedFillSafetyTiles is HashSet<Tile2i> ownedProjectedFillSafetyTiles
+                    ? ownedProjectedFillSafetyTiles
+                    : new HashSet<Tile2i>(projectedFillSafetyTiles);
             m_projectedCutSafetySourcesByTile =
-                CopySourceMap(projectedCutSafetySourcesByTile);
+                CopySourceMap(projectedCutSafetySourcesByTile, takeOwnership);
             m_projectedFillSafetySourcesByTile =
-                CopySourceMap(projectedFillSafetySourcesByTile);
-            m_oceanTiles = new HashSet<Tile2i>(oceanTiles);
-            m_propCleanupByOrigin = propCleanupByOrigin != null
-                ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin)
-                : new Dictionary<Tile2i, AccessPropCleanupInfo>();
-            m_groundExclusionReasons = groundExclusionReasons != null
-                ? new Dictionary<Tile2i, string>(groundExclusionReasons)
-                : new Dictionary<Tile2i, string>();
-            m_propCleanupByTile = propCleanupByTile != null
-                ? new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByTile)
-                : BuildCleanupByTile(m_propCleanupByOrigin);
+                CopySourceMap(projectedFillSafetySourcesByTile, takeOwnership);
+            m_oceanTiles = takeOwnership
+                && oceanTiles is HashSet<Tile2i> ownedOceanTiles
+                    ? ownedOceanTiles
+                    : new HashSet<Tile2i>(oceanTiles);
+            m_propCleanupByOrigin = propCleanupByOrigin == null
+                ? new Dictionary<Tile2i, AccessPropCleanupInfo>()
+                : takeOwnership
+                    && propCleanupByOrigin
+                        is Dictionary<Tile2i, AccessPropCleanupInfo> ownedPropCleanupByOrigin
+                    ? ownedPropCleanupByOrigin
+                    : new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByOrigin);
+            m_groundExclusionReasons = groundExclusionReasons == null
+                ? new Dictionary<Tile2i, string>()
+                : takeOwnership
+                    && groundExclusionReasons
+                        is Dictionary<Tile2i, string> ownedGroundExclusionReasons
+                    ? ownedGroundExclusionReasons
+                    : new Dictionary<Tile2i, string>(groundExclusionReasons);
+            m_propCleanupByTile = propCleanupByTile == null
+                ? BuildCleanupByTile(m_propCleanupByOrigin)
+                : takeOwnership
+                    && propCleanupByTile
+                        is Dictionary<Tile2i, AccessPropCleanupInfo> ownedPropCleanupByTile
+                    ? ownedPropCleanupByTile
+                    : new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByTile);
             m_v1GroundGoalDistance = useAStar
                 ? new AccessV1GroundGoalDistance(
                     m_groundNodes, m_propCleanupByTile, m_goalGroundNodes)
@@ -622,7 +691,9 @@ namespace AutoTerrainDesignations.Access
             }
             m_minGoalHeight2 = minGoalHeight2 == int.MaxValue ? 0 : minGoalHeight2;
             m_maxGoalHeight2 = maxGoalHeight2 == int.MinValue ? 0 : maxGoalHeight2;
-            m_durabilityCorners = new List<AccessDurabilityCorner>(durabilityCorners).ToArray();
+            m_durabilityCorners = durabilityCorners is AccessDurabilityCorner[] ownedDurabilityCorners
+                ? ownedDurabilityCorners
+                : new List<AccessDurabilityCorner>(durabilityCorners).ToArray();
 
             int widthTiles = boundsMax.X - boundsMin.X + 1;
             int heightTiles = boundsMax.Y - boundsMin.Y + 1;
@@ -1989,10 +2060,14 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static Dictionary<Tile2i, HashSet<Tile2i>> CopySourceMap(
-            IDictionary<Tile2i, HashSet<Tile2i>>? source)
+            IDictionary<Tile2i, HashSet<Tile2i>>? source,
+            bool takeOwnership = false)
         {
             var copy = new Dictionary<Tile2i, HashSet<Tile2i>>();
             if (source == null) return copy;
+            if (takeOwnership
+                && source is Dictionary<Tile2i, HashSet<Tile2i>> owned)
+                return owned;
             foreach (KeyValuePair<Tile2i, HashSet<Tile2i>> pair in source)
                 copy.Add(pair.Key, new HashSet<Tile2i>(pair.Value));
             return copy;

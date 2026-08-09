@@ -737,12 +737,28 @@ namespace AutoTerrainDesignations
                     }
                     if (usesGroundGoalOverride)
                         accessibleFixedGoals.Clear();
-                    if (TryBuildExperimentalAccessSnapshot(tower, accessWorkDepths, cornerHeights, terrMgr,
-                        experimentalIsMining, accesswayAllowsMixedWork, accessibleFixedGoals,
-                        groundGoalOverride,
-                        generatedAreaMarginTiles: 0,
-                        out AccessSearchSnapshot refreshedSnapshot, out string refreshFailure))
+                    var snapshotBuild =
+                        new ExperimentalAccessSnapshotBuildResult();
+                    IEnumerator snapshotPreparation =
+                        BuildExperimentalAccessSnapshot(
+                            tower,
+                            accessWorkDepths,
+                            cornerHeights,
+                            terrMgr,
+                            experimentalIsMining,
+                            accesswayAllowsMixedWork,
+                            accessibleFixedGoals,
+                            groundGoalOverride,
+                            generatedAreaMarginTiles: 0,
+                            snapshotBuild,
+                            sliceControl);
+                    while (snapshotPreparation.MoveNext())
+                        yield return snapshotPreparation.Current;
+                    string refreshFailure = snapshotBuild.FailureReason;
+                    if (snapshotBuild.Snapshot != null)
                     {
+                        AccessSearchSnapshot refreshedSnapshot =
+                            snapshotBuild.Snapshot;
                         experimentalSnapshot = refreshedSnapshot;
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
@@ -752,16 +768,32 @@ namespace AutoTerrainDesignations
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
+                        sliceControl?.ReportPhase("Preparing search request");
+                        long requestBuildStart = AtdDiagnostics.Timestamp();
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
                             refreshedSnapshot, cluster, accessibleFixedGoals,
                             groundGoalOverride: groundGoalOverride);
+                        double requestBuildMilliseconds =
+                            AtdDiagnostics.ElapsedSince(requestBuildStart)
+                            * 1000d / System.Diagnostics.Stopwatch.Frequency;
+                        long designationStateStart = AtdDiagnostics.Timestamp();
+                        Dictionary<Tile2i, string> designationStateBeforeSearch =
+                            CaptureTerrainDesignationState(tower);
+                        double designationStateMilliseconds =
+                            AtdDiagnostics.ElapsedSince(designationStateStart)
+                            * 1000d / System.Diagnostics.Stopwatch.Frequency;
+                        LogExperimentalAccessTrace(
+                            $"[ATD Experimental Access Request Preparation] "
+                            + $"cluster={cluster.ClusterId} "
+                            + $"requestMs={requestBuildMilliseconds.ToString(
+                                "0.##", System.Globalization.CultureInfo.InvariantCulture)} "
+                            + $"designationStateMs={designationStateMilliseconds.ToString(
+                                "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
                         LogExperimentalAccessDebug(
                             $"[ATD Experimental Access Width] cluster={cluster.ClusterId} " +
                             $"legacyRampWidth={configuredRampWidth} " +
                             $"resolvedVehicleWidth={refreshedSnapshot.VehicleWidth} " +
                             $"requiredWidth={request.RequiredWidth}");
-                        Dictionary<Tile2i, string> designationStateBeforeSearch =
-                            CaptureTerrainDesignationState(tower);
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
                         IEnumerator mergedSearch = RunExperimentalAccessDryRunSliced(
                             request, cluster, currentClusterOrdinal, unreachableClusterCount,
@@ -780,18 +812,44 @@ namespace AutoTerrainDesignations
                                 $"width={request.RequiredWidth} " +
                                 $"phase=retry margin={OUTSIDE_TOWER_RAMP_FALLBACK_TILES} " +
                                 $"inAreaFailure={inAreaFailure}");
-                            if (TryBuildExperimentalAccessSnapshot(
-                                    tower, accessWorkDepths, cornerHeights, terrMgr,
-                                    experimentalIsMining, accesswayAllowsMixedWork,
-                                    accessibleFixedGoals, groundGoalOverride,
+                            var outsideSnapshotBuild =
+                                new ExperimentalAccessSnapshotBuildResult();
+                            IEnumerator outsideSnapshotPreparation =
+                                BuildExperimentalAccessSnapshot(
+                                    tower,
+                                    accessWorkDepths,
+                                    cornerHeights,
+                                    terrMgr,
+                                    experimentalIsMining,
+                                    accesswayAllowsMixedWork,
+                                    accessibleFixedGoals,
+                                    groundGoalOverride,
                                     OUTSIDE_TOWER_RAMP_FALLBACK_TILES,
-                                    out AccessSearchSnapshot outsideSnapshot,
-                                    out string outsideSnapshotFailure))
+                                    outsideSnapshotBuild,
+                                    sliceControl);
+                            while (outsideSnapshotPreparation.MoveNext())
+                                yield return outsideSnapshotPreparation.Current;
+                            string outsideSnapshotFailure =
+                                outsideSnapshotBuild.FailureReason;
+                            if (outsideSnapshotBuild.Snapshot != null)
                             {
+                                AccessSearchSnapshot outsideSnapshot =
+                                    outsideSnapshotBuild.Snapshot;
                                 experimentalSnapshot = outsideSnapshot;
+                                sliceControl?.ReportPhase("Preparing search request");
+                                long outsideRequestBuildStart =
+                                    AtdDiagnostics.Timestamp();
                                 request = BuildMergedGoalAccessRequest(
                                     outsideSnapshot, cluster, accessibleFixedGoals,
                                     groundGoalOverride: groundGoalOverride);
+                                double outsideRequestBuildMilliseconds =
+                                    AtdDiagnostics.ElapsedSince(outsideRequestBuildStart)
+                                    * 1000d / System.Diagnostics.Stopwatch.Frequency;
+                                LogExperimentalAccessTrace(
+                                    $"[ATD Experimental Access Request Preparation] "
+                                    + $"cluster={cluster.ClusterId} phase=outside "
+                                    + $"requestMs={outsideRequestBuildMilliseconds.ToString(
+                                        "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
                                 var outsideDryRun =
                                     new ExperimentalAccessDryRunResult();
                                 IEnumerator outsideSearch =

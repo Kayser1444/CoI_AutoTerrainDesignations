@@ -1,17 +1,40 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 
 namespace AutoTerrainDesignations.Access
 {
     internal sealed class ExperimentalAccessSliceControl
     {
+        private sealed class PhaseTiming
+        {
+            public int Advances;
+            public int Yields;
+            public double ProcessingMilliseconds;
+            public double MaxSliceMilliseconds;
+            public double WallMilliseconds;
+        }
+
         private int m_visitedNodes;
         private int m_pendingNodes;
+        private readonly Dictionary<string, PhaseTiming> m_phaseTimings =
+            new Dictionary<string, PhaseTiming>(StringComparer.Ordinal);
+        private readonly List<string> m_phaseOrder = new List<string>();
+        private string m_phase = "Preparing";
+        private long m_phaseStartedTimestamp = Stopwatch.GetTimestamp();
+        private int m_advanceCount;
+        private int m_yieldCount;
+        private double m_processingMilliseconds;
+        private double m_maxSliceMilliseconds;
+        private string m_maxSlicePhase = string.Empty;
 
         public int SliceBudgetMilliseconds { get; set; } = 2;
         public bool CancellationRequested { get; private set; }
         public string CancellationReason { get; private set; } = string.Empty;
+        public string Phase => m_phase;
         public int VisitedNodes => m_visitedNodes;
         public int PendingNodes => m_pendingNodes;
 
@@ -25,6 +48,114 @@ namespace AutoTerrainDesignations.Access
         {
             m_visitedNodes = visitedNodes;
             m_pendingNodes = pendingNodes;
+        }
+
+        public void ReportPhase(string phase)
+        {
+            string nextPhase = string.IsNullOrWhiteSpace(phase)
+                ? "Preparing"
+                : phase;
+            if (string.Equals(m_phase, nextPhase, StringComparison.Ordinal))
+                return;
+
+            long now = Stopwatch.GetTimestamp();
+            AccumulateCurrentPhaseWallTime(now);
+            m_phase = nextPhase;
+            m_phaseStartedTimestamp = now;
+        }
+
+        public void RecordAdvance(
+            string phase,
+            double elapsedMilliseconds,
+            bool yielded)
+        {
+            string recordedPhase = string.IsNullOrWhiteSpace(phase)
+                ? "Preparing"
+                : phase;
+            PhaseTiming timing = GetPhaseTiming(recordedPhase);
+            timing.Advances++;
+            if (yielded)
+                timing.Yields++;
+            timing.ProcessingMilliseconds += elapsedMilliseconds;
+            if (elapsedMilliseconds > timing.MaxSliceMilliseconds)
+                timing.MaxSliceMilliseconds = elapsedMilliseconds;
+
+            m_advanceCount++;
+            if (yielded)
+                m_yieldCount++;
+            m_processingMilliseconds += elapsedMilliseconds;
+            if (elapsedMilliseconds > m_maxSliceMilliseconds)
+            {
+                m_maxSliceMilliseconds = elapsedMilliseconds;
+                m_maxSlicePhase = recordedPhase;
+            }
+        }
+
+        public string FormatDiagnostics()
+        {
+            long now = Stopwatch.GetTimestamp();
+            var builder = new StringBuilder();
+            builder.Append("sliceStats=[advances=")
+                .Append(m_advanceCount)
+                .Append(" yields=")
+                .Append(m_yieldCount)
+                .Append(" processingMs=")
+                .Append(m_processingMilliseconds.ToString(
+                    "0.##", CultureInfo.InvariantCulture))
+                .Append(" maxSliceMs=")
+                .Append(m_maxSliceMilliseconds.ToString(
+                    "0.##", CultureInfo.InvariantCulture))
+                .Append(" maxSlicePhase=")
+                .Append(string.IsNullOrEmpty(m_maxSlicePhase)
+                    ? "none"
+                    : m_maxSlicePhase)
+                .Append(" phases=[");
+            for (int index = 0; index < m_phaseOrder.Count; index++)
+            {
+                if (index > 0)
+                    builder.Append(';');
+                string phase = m_phaseOrder[index];
+                PhaseTiming timing = m_phaseTimings[phase];
+                double wallMilliseconds = timing.WallMilliseconds;
+                if (string.Equals(phase, m_phase, StringComparison.Ordinal))
+                {
+                    wallMilliseconds += (now - m_phaseStartedTimestamp)
+                        * 1000d / Stopwatch.Frequency;
+                }
+                builder.Append(phase)
+                    .Append("{advances=")
+                    .Append(timing.Advances)
+                    .Append(",yields=")
+                    .Append(timing.Yields)
+                    .Append(",wallMs=")
+                    .Append(wallMilliseconds.ToString(
+                        "0.##", CultureInfo.InvariantCulture))
+                    .Append(",processingMs=")
+                    .Append(timing.ProcessingMilliseconds.ToString(
+                        "0.##", CultureInfo.InvariantCulture))
+                    .Append(",maxSliceMs=")
+                    .Append(timing.MaxSliceMilliseconds.ToString(
+                        "0.##", CultureInfo.InvariantCulture))
+                    .Append('}');
+            }
+            return builder.Append("]]").ToString();
+        }
+
+        private PhaseTiming GetPhaseTiming(string phase)
+        {
+            if (m_phaseTimings.TryGetValue(phase, out PhaseTiming timing))
+                return timing;
+            timing = new PhaseTiming();
+            m_phaseTimings.Add(phase, timing);
+            m_phaseOrder.Add(phase);
+            return timing;
+        }
+
+        private void AccumulateCurrentPhaseWallTime(long now)
+        {
+            PhaseTiming timing = GetPhaseTiming(m_phase);
+            timing.WallMilliseconds += (now - m_phaseStartedTimestamp)
+                * 1000d / Stopwatch.Frequency;
         }
     }
 
@@ -56,6 +187,7 @@ namespace AutoTerrainDesignations.Access
 
         public int VisitedNodes => m_sliceControl.VisitedNodes;
         public int PendingNodes => m_sliceControl.PendingNodes;
+        public string Phase => m_sliceControl.Phase;
         public double ProcessingMilliseconds => m_processingMilliseconds;
 
         public bool Advance()
@@ -67,6 +199,13 @@ namespace AutoTerrainDesignations.Access
             bool running = m_routine.MoveNext();
             timer.Stop();
             m_processingMilliseconds += timer.Elapsed.TotalMilliseconds;
+            // Report the phase after MoveNext: phase transitions happen before
+            // a coroutine yields, so the completed slice is attributed to the
+            // phase that produced that yield.
+            m_sliceControl.RecordAdvance(
+                m_sliceControl.Phase,
+                timer.Elapsed.TotalMilliseconds,
+                running);
             m_terminal = !running;
             return running;
         }
