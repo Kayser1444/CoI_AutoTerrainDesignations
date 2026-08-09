@@ -37,6 +37,7 @@ using Mafi.Unity.UiStatic;
 using Mafi.Unity.UiStatic.Cursors;
 using UnityEngine;
 using CoI.AutoHelpers.Localization;
+using CoI.AutoHelpers.InputControl;
 using CoI.AutoHelpers.Logging;
 using CoI.AutoHelpers.Persistence;
 using CoI.AutoHelpers.Settings;
@@ -659,12 +660,12 @@ public static string Tt(string text) => text;
             return false;
 
         KeyCode trigger = keys[keys.Length - 1];
-        if (!Input.GetKeyDown(trigger))
+        if (!CustomKeybindsInjector.IsLogicalKeyDownThisFrame(trigger))
             return false;
 
         for (int i = 0; i < keys.Length - 1; i++)
         {
-            if (!Input.GetKey(keys[i]))
+            if (!CustomKeybindsInjector.IsLogicalKeyDown(keys[i]))
                 return false;
         }
 
