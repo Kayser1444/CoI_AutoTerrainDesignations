@@ -1,4 +1,4 @@
-v0.5.11 [unreleased]
+v0.5.11 [packaged]
 
 * Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases.
 * Fixed: Settings migration now promotes legacy turning-ramp values to the enabled default without disabling users who already enabled experimental accessways; the revision-2 downgrade is repaired on the next launch.
