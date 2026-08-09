@@ -1,3 +1,7 @@
+v0.5.11 [unreleased]
+
+* Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases.
+
 v0.5.10 [packaged]
 
 * Added: Manual Planar corner designations with four rotations, preview/drag support, a dedicated diagonal-plane toolbar icon, and K-key cycling alongside outer and inner corners.
