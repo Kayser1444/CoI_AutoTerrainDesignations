@@ -1,3 +1,5 @@
+v0.5.13 [unreleased]
+
 v0.5.12 [released]
 
 * Added a three-option idle truck behavior dropdown for mine towers: **Park at tower**, **Stay put** (the new default), and **Soft release**. Stay put keeps trucks assigned without issuing vanilla return-to-tower parking jobs.
