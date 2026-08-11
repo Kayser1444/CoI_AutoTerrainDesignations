@@ -3,6 +3,69 @@
 AutoTerrainDesignations plans and evaluates terrain work needed to keep
 Captain of Industry structures accessible.
 
+## Farmland preparation
+
+**Farmland intent**:
+A standing player-authored desired state for flat, farmable ground at a target
+height. It remains after fulfillment until the player removes it or successful
+farm placement consumes it. Materialized terrain work may temporarily suppress
+its visualization without removing the intent.
+_Avoid_: One-shot preparation job, leveling proxy
+
+**Farmland intent cancellation**:
+Explicit removal of farmland intent and all structurally owned materialized
+work justified only by it. Shared support work remains while another intent
+still justifies it.
+_Avoid_: Hide intent, clear overlay only
+
+**Pending farm placement**:
+A committed farm placement blocked only by terrain preparation and retained
+while its generated farmland intent is fulfilled. It replays when that intent
+is satisfied. Explicitly cancelling any required farmland intent cancels the
+pending placement. If pending placements overlap, the first successful
+placement consumes its footprint intent and cancels every competing placement
+that requires any consumed origin. If replay becomes impossible for a new
+non-terrain reason, the placement is cancelled but its farmland intent remains.
+Repainting any required origin to a different target height also cancels the
+placement while retaining the new intent.
+_Avoid_: Placement preview, failed build command
+
+**Unmanaged farmland intent**:
+Farmland intent whose center tile is not covered by a suitable servicing tower.
+It remains valid and visible but produces no materialized work.
+_Avoid_: Invalid farmland designation, orphaned work
+
+**Servicing tower**:
+A capable area-managing tower whose area contains a farmland intent origin's
+center tile. Its job system can service excavation and filling work, and ATD
+can control its dumpable-product rules. A temporary lack of assigned vehicles
+blocks progress but does not make the tower unsuitable. Several towers may
+service the same origin.
+_Avoid_: Intent owner, coordinating tower, primary tower
+
+**Materialized farmland work**:
+Vanilla terrain designations created or adopted to advance farmland intent.
+They remain globally ATD-owned even when no tower currently services them.
+_Avoid_: Tower-owned work, ephemeral save work
+
+**Structural work ownership**:
+ATD's authority over vanilla work it created or adopted because the live
+origin, proto, and complete designation geometry exactly matched a currently
+required materialized-work role. The resulting owned-work record must continue
+to match before mutation. Fulfillment does not end ownership while associated
+farmland intent remains.
+_Avoid_: Historical provenance, persistent object identity
+
+**Owned-work record**:
+A persisted structural ownership claim for one materialized farmland-work role,
+including primary work, shoulders, rims, accessways, and debris cleanup.
+_Avoid_: Primary-origin cache, runtime request state
+
+**Farmland preparation cohort**:
+Farmland intent and servicing towers connected through shared intent origins.
+All preparation in the cohort must complete before any of it enters filling.
+_Avoid_: Overlapping tower areas, geographic farmland region
+
 ## Accessway pathfinding
 
 **Access obligation**:
