@@ -1,3 +1,11 @@
+v0.5.12 [unreleased]
+
+* Added a three-option idle truck behavior dropdown for mine towers: **Park at tower**, **Stay put** (the new default), and **Soft release**. Stay put keeps trucks assigned without issuing vanilla return-to-tower parking jobs.
+* Added migration for the former `autoReleaseTrucksWhenIdle` setting and per-tower state.
+* Fixed: Soft release now treats paused towers and towers without an unpaused assigned excavator as idle, and the tower tooltip refreshes its soft-released truck list after each release tick.
+* Improved: The idle truck behavior tooltip now shows a clickable soft-released truck card; clicking it cycles through and pans to the released trucks.
+* Improved: The excavator idle-release tooltip now shows a clickable card for soft-released excavators.
+
 v0.5.11 [packaged]
 
 * Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases.

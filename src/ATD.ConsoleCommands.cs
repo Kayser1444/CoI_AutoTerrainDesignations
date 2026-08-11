@@ -42,7 +42,7 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  ExcavatorCompleteNtf  = {AutoTerrainDesignationsMod.ExcavatorCompletionNotificationsEnabled}");
         sb.AppendLine($"  RampNotifications     = {AutoTerrainDesignationsMod.RampNotificationsEnabled}");
         sb.AppendLine($"  AutoReleaseExcavators = {AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle}");
-        sb.AppendLine($"  AutoReleaseTrucks     = {AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle}");
+        sb.AppendLine($"  TruckIdlePolicy       = {AutoTerrainDesignationsMod.TruckIdlePolicy}");
         sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
@@ -267,6 +267,18 @@ public sealed class AtdConsoleCommands
 
         AutoTerrainDesignationsMod.SetAutoReleaseTrucksWhenIdle(parsed);
         return $"[ATD] AutoReleaseTrucksWhenIdle set to {AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle}.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the global default truck idle behavior on new towers (ParkAtTower, StayPut, or SoftRelease).", null)]
+    private string atdSetTruckIdlePolicy(string value)
+    {
+        if (!System.Enum.TryParse(value, true, out TruckIdleBehavior parsed)
+            || parsed < TruckIdleBehavior.ParkAtTower
+            || parsed > TruckIdleBehavior.SoftRelease)
+            return $"[ATD] Invalid truck idle behavior '{value}'. Use ParkAtTower, StayPut, or SoftRelease.";
+
+        AutoTerrainDesignationsMod.SetTruckIdlePolicy(parsed);
+        return $"[ATD] TruckIdlePolicy set to {AutoTerrainDesignationsMod.TruckIdlePolicy}.";
     }
 
     [ConsoleCommand(false, false, "Sets the key used to enter corner designation mode (Unity KeyCode name, e.g. K, Alpha1, F1).", null)]

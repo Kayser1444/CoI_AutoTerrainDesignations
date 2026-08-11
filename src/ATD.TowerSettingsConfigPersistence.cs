@@ -165,7 +165,7 @@ namespace AutoTerrainDesignations
                     AppendNullableIntOverride(sb, "maxDepthToDigTo", settings.MaxDepthToDigTo, AutoTerrainDesignationsMod.MaxDepthToDigTo);
                     AppendIntOverride(sb, "orePurityLevel", settings.OrePurityLevel, AutoTerrainDesignationsMod.OrePurityLevel);
                     AppendBoolOverride(sb, "autoReleaseExcavatorsWhenIdle", settings.AutoReleaseExcavatorsWhenIdle, AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle);
-                    AppendBoolOverride(sb, "autoReleaseTrucksWhenIdle", settings.AutoReleaseTrucksWhenIdle, AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle);
+                    AppendIntOverride(sb, "truckIdlePolicy", (int)settings.TruckIdlePolicy, (int)AutoTerrainDesignationsMod.TruckIdlePolicy);
                 }
 
                 if (hasOre && ore != null)
@@ -326,7 +326,9 @@ namespace AutoTerrainDesignations
                     settings.SetAutoReleaseWhenIdle(autoRelease);
                 if (TryGetBool(entry, "autoReleaseExcavatorsWhenIdle", out bool autoReleaseExcavators))
                     settings.SetAutoReleaseExcavatorsWhenIdle(autoReleaseExcavators);
-                if (TryGetBool(entry, "autoReleaseTrucksWhenIdle", out bool autoReleaseTrucks))
+                if (TryGetInt(entry, "truckIdlePolicy", out int truckIdlePolicy))
+                    settings.SetTruckIdlePolicy((TruckIdleBehavior)truckIdlePolicy);
+                else if (TryGetBool(entry, "autoReleaseTrucksWhenIdle", out bool autoReleaseTrucks))
                     settings.SetAutoReleaseTrucksWhenIdle(autoReleaseTrucks);
 
                 s_towerSettingsByEntityId[entityId] = settings;

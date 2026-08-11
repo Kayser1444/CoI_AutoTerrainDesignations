@@ -648,12 +648,40 @@
     "Annulla automaticamente l'assegnazione degli escavatori da questa torre quando nessuna designazione ha lavori di scavo in sospeso o quando la torre è in pausa.\nGli escavatori vengono tracciati e riassegnati quando riprendono i lavori di scavo."
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "Rilascio camion quando inattivi"
+    "panel.farming.truck_idle_policy.label",
+    "Comportamento del camion in folle"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "Annulla automaticamente l'assegnazione dei camion da questa torre quando nessuna designazione ha lavori di scavo in sospeso o quando la torre è in pausa.\nI camion vengono tracciati e riassegnati quando riprendono i lavori di scavo."
+    "panel.farming.truck_idle_policy.tooltip",
+    "Scegli cosa fanno i camion assegnati quando questa torre non ha lavori di scavo in sospeso o mentre la torre è in pausa."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "Parcheggiare alla torre"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "Comportamento standard: mantieni i camion assegnati e rimandali alla torre quando sono inattivi.\nPro: i camion restano vicini e pronti per il lavoro successivo.\nContro: i camion inattivi possono occupare l'area della torre e compiere inutili viaggi di ritorno."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "Resta fermo"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "Mantieni i camion assegnati senza rimandarli alla torre quando sono inattivi.\nPro: evita inutili viaggi di ritorno e mantiene i camion vicino all'ultima area di lavoro.\nContro: i camion potrebbero essere sparsi nell'area di lavoro."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "Rilascio morbido"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "Annulla temporaneamente l'assegnazione dei camion inattivi in ​​modo che possano assistere nei lavori generali di trasporto e costruzione. I camion vengono semplicemente riassegnati a questa torre quando riprendono i lavori di scavo.\nPro: i camion rilasciati possono aiutare con il trasporto generale e la costruzione mentre sono inattivi.\nContro: se assegnati a un'altra torre, soprattutto una che non utilizza il rilascio Soft, potrebbero non essere disponibili quando riprenderà il lavoro di questa torre."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "Escavatori a rilascio morbido:"
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "nessuno"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "Truck con rilascio morbido:"
   ],
   [
     "panel.farming.vehicle_status.released",

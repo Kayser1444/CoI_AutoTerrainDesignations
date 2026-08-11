@@ -648,12 +648,40 @@
     "Remove automaticamente a atribuição de escavadeiras desta torre quando nenhuma designação tiver trabalho de escavação pendente, ou enquanto a torre estiver pausada.\nAs escavadeiras são rastreadas e reatribuídas quando o trabalho de escavação retornar."
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "Liberar caminhões quando ociosos"
+    "panel.farming.truck_idle_policy.label",
+    "Comportamento do caminhão ocioso"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "Remove automaticamente a atribuição de caminhões desta torre quando nenhuma designação tiver trabalho de escavação pendente, ou enquanto a torre estiver pausada.\nOs caminhões são rastreados e reatribuídos quando o trabalho de escavação retornar."
+    "panel.farming.truck_idle_policy.tooltip",
+    "Escolha o que os caminhões atribuídos farão quando esta torre não tiver trabalhos de escavação pendentes ou enquanto a torre estiver pausada."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "Estacione na torre"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "Comportamento básico: mantenha os caminhões atribuídos e envie-os de volta para a torre quando estiverem ociosos.\nPrós: os caminhões ficam por perto e prontos para o próximo trabalho.\nContras: caminhões parados podem ocupar a área da torre e fazer viagens de retorno desnecessárias."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "Fique onde está"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "Mantenha os caminhões designados sem mandá-los de volta para a torre quando estiverem ociosos.\nPrós: evita viagens de retorno desnecessárias e mantém os caminhões próximos à última área de trabalho.\nContras: os caminhões podem estar espalhados pela área de trabalho."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "Liberação suave"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "Cancele temporariamente a atribuição de caminhões ociosos para que eles possam ajudar nos trabalhos gerais de transporte e construção. Os caminhões são simplesmente transferidos para esta torre quando o trabalho de escavação retorna.\nPrós: os caminhões liberados podem ajudar no transporte geral e na construção enquanto estão ociosos.\nContras: se atribuídos a outra torre, especialmente uma que não utilize Soft release, eles podem ficar indisponíveis quando o trabalho desta torre for retomado."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "Escavadeiras com liberação suave:"
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "nenhum"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "Caminhões com liberação suave:"
   ],
   [
     "panel.farming.vehicle_status.released",

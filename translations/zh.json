@@ -648,12 +648,40 @@
     "在区域内无挖掘作业或矿塔暂停时，自动解除挖掘机的分配。\n当有新增挖掘工作后会自动重新分配挖掘机。"
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "闲置时释放卡车"
+    "panel.farming.truck_idle_policy.label",
+    "卡车闲置行为"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "在区域内无挖掘作业或矿塔暂停时，自动解除卡车的分配。\n当有新增挖掘工作后会自动重新分配卡车。"
+    "panel.farming.truck_idle_policy.tooltip",
+    "选择当该塔没有待处理的挖掘工作或塔暂停时分配的卡车执行的操作。"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "停在塔楼"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "普通行为：分配卡车并在闲置时将其送回塔楼。\n优点：卡车保持在附近并为下一项工作做好准备。\n缺点：闲置的卡车会占用塔台区域并进行不必要的回程。"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "留在原地"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "保持卡车的分配，闲置时不将其送回塔台。\n优点：避免不必要的回程并使卡车靠近最后的工作区域。\n缺点：卡车可能分散在工作区域各处。"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "软释放"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "暂时取消分配闲置卡车，以便它们可以协助进行一般运输和建筑工作。当挖掘工作恢复时，卡车只需重新分配到这座塔即可。\n优点：释放的卡车可以在闲置时帮助进行一般运输和施工。\n缺点：如果分配给另一座塔，尤其是不使用软发布的塔，当该塔恢复工作时，它们可能不可用。"
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "软释放挖掘机："
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "无"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "软释放卡车："
   ],
   [
     "panel.farming.vehicle_status.released",

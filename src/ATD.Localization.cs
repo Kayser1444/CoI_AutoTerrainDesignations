@@ -381,17 +381,44 @@ namespace AutoTerrainDesignations
                 "Automatically unassign excavators from this tower when no designation has pending excavation work, or while the tower is paused.\n" +
                 "Excavators are tracked and re-assigned when excavation work returns.",
                 "Tooltip on the auto-release excavators when idle toggle.");
-        public static LocStr FarmingIdleReleaseTrucksLabel =
-            Loc.Str("panel.farming.idle_release_trucks.label", "Auto-release trucks when idle", "Label on the auto-release trucks when idle toggle.");
-        public static LocStr FarmingIdleReleaseTrucksTip =
-            Loc.Str("panel.farming.idle_release_trucks.tooltip",
-                "Automatically unassign trucks from this tower when no designation has pending excavation work, or while the tower is paused.\n" +
-                "Trucks are tracked and re-assigned when excavation work returns.",
-                "Tooltip on the auto-release trucks when idle toggle.");
+        public static LocStr FarmingTruckIdlePolicyLabel =
+            Loc.Str("panel.farming.truck_idle_policy.label", "Idle truck behavior", "Label on the mine-tower truck idle behavior dropdown.");
+        public static LocStr FarmingTruckIdlePolicyTip =
+            Loc.Str("panel.farming.truck_idle_policy.tooltip",
+                "Choose what assigned trucks do when this tower has no pending excavation work, or while the tower is paused.",
+                "Tooltip on the mine-tower truck idle behavior dropdown.");
+        public static LocStr FarmingTruckIdlePolicyParkAtTower =
+            Loc.Str("panel.farming.truck_idle_policy.park_at_tower", "Park at tower", "Option in the mine-tower truck idle behavior dropdown.");
+        public static LocStr FarmingTruckIdlePolicyParkAtTowerTip =
+            Loc.Str("panel.farming.truck_idle_policy.park_at_tower.tooltip",
+                "Vanilla behavior: keep trucks assigned and send them back to the tower when idle.\n" +
+                "Pros: trucks stay close and ready for the next job.\n" +
+                "Cons: idle trucks can occupy the tower area and make unnecessary return trips.",
+                "Tooltip for the Park at tower truck idle behavior option.");
+        public static LocStr FarmingTruckIdlePolicyStayPut =
+            Loc.Str("panel.farming.truck_idle_policy.stay_put", "Stay put", "Option in the mine-tower truck idle behavior dropdown.");
+        public static LocStr FarmingTruckIdlePolicyStayPutTip =
+            Loc.Str("panel.farming.truck_idle_policy.stay_put.tooltip",
+                "Keep trucks assigned without sending them back to the tower when idle.\n" +
+                "Pros: avoids unnecessary return trips and keeps trucks near their last work area.\n" +
+                "Cons: trucks may be scattered across the work area.",
+                "Tooltip for the Stay put truck idle behavior option.");
+        public static LocStr FarmingTruckIdlePolicySoftRelease =
+            Loc.Str("panel.farming.truck_idle_policy.soft_release", "Soft release", "Option in the mine-tower truck idle behavior dropdown.");
+        public static LocStr FarmingTruckIdlePolicySoftReleaseTip =
+            Loc.Str("panel.farming.truck_idle_policy.soft_release.tooltip",
+                "Temporarily unassign idle trucks so they can assist with general hauling and construction jobs. Trucks are simply re-assigned to this tower when excavation work returns.\n" +
+                "Pros: released trucks can help with general hauling and construction while idle.\n" +
+                "Cons: if assigned to another tower, especially one not using Soft release, they may be unavailable when this tower's work resumes.",
+                "Tooltip for the Soft release truck idle behavior option.");
+        public static LocStr FarmingSoftReleasedExcavatorsLabel =
+            Loc.Str("panel.farming.soft_released_excavators.label", "Soft released excavators: ", "Label for the soft-released excavator card in the excavator idle-release tooltip.");
         public static LocStr FarmingVehicleStatusAssigned =
             Loc.Str("panel.farming.vehicle_status.assigned", "Assigned: {0}", "Prefix for the mine-tower assigned-vehicle status summary. {0} is the vehicle list or the localized none value.");
         public static LocStr FarmingVehicleStatusNone =
             Loc.Str("panel.farming.vehicle_status.none", "none", "Value shown when no vehicles are assigned to a mine tower.");
+        public static LocStr FarmingSoftReleasedTrucksLabel =
+            Loc.Str("panel.farming.soft_released_trucks.label", "Soft released trucks: ", "Label for the soft-released truck card in the idle truck behavior tooltip.");
         public static LocStr FarmingVehicleStatusReleased =
             Loc.Str("panel.farming.vehicle_status.released", "ATD-released: ", "Prefix for vehicles temporarily released by ATD.");
         public static LocStr FarmingVehicleStatusDestroyed =

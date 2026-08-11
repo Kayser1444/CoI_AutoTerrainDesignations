@@ -648,12 +648,40 @@
     "Släpp tillfälligt grävmaskiner från detta torn när ingen anvisning har väntande grävarbete, eller när tornet är pausat.\nGrävmaskiner spåras och tilldelas igen när grävarbetet återkommer."
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "Släpp lastbilar vid inaktivitet"
+    "panel.farming.truck_idle_policy.label",
+    "Inaktiv lastbils beteende"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "Släpp tillfälligt lastbilar från detta torn när ingen anvisning har väntande grävarbete, eller när tornet är pausat.\nLastbilar spåras och tilldelas igen när grävarbetet återkommer."
+    "panel.farming.truck_idle_policy.tooltip",
+    "Välj vad tilldelade lastbilar gör när det här tornet inte har något pågående grävarbete eller när tornet är pausat."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "Parkera vid tornet"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "Vaniljbeteende: behåll lastbilar tilldelade och skicka tillbaka dem till tornet när de är inaktiva.\nFördelar: lastbilar håller sig nära och redo för nästa jobb.\nNackdelar: lediga lastbilar kan ockupera tornområdet och göra onödiga returresor."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "Stanna kvar"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "Håll lastbilar tilldelade utan att skicka dem tillbaka till tornet när de är inaktiva.\nFördelar: undviker onödiga returresor och håller lastbilar nära deras senaste arbetsområde.\nNackdelar: lastbilar kan vara utspridda över arbetsområdet."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "Mjuk släppning"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "Ta tillfälligt bort tilldelningen av lediga lastbilar så att de kan hjälpa till med allmänna transport- och byggjobb. Lastbilar flyttas helt enkelt om till detta torn när grävarbetet återvänder.\nFördelar: släppta lastbilar kan hjälpa till med allmän transport och konstruktion när de är på tomgång.\nNackdelar: om de tilldelas ett annat torn, särskilt ett som inte använder Soft Release, kan de vara otillgängliga när det här tornets arbete återupptas."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "Mjukfrigjorda grävmaskiner:"
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "inga"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "Mjuksläppta lastbilar:"
   ],
   [
     "panel.farming.vehicle_status.released",

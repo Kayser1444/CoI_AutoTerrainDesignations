@@ -648,12 +648,40 @@
     "Hebt automatisch die Zuweisung von Baggern von diesem Turm auf, wenn kein Gebiet ausstehende Aushubarbeiten hat oder wenn der Turm pausiert ist.\nBagger werden verfolgt und erneut zugewiesen, sobald wieder Aushubarbeiten anstehen."
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "LKWs freigeben bei Leerlauf"
+    "panel.farming.truck_idle_policy.label",
+    "Verhalten des Lkw im Leerlauf"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "Hebt automatisch die Zuweisung von LKWs von diesem Turm auf, wenn kein Gebiet ausstehende Aushubarbeiten hat oder wenn der Turm pausiert ist.\nLKWs werden verfolgt und erneut zugewiesen, sobald wieder Aushubarbeiten anstehen."
+    "panel.farming.truck_idle_policy.tooltip",
+    "Wählen Sie aus, was zugewiesene LKWs tun sollen, wenn für diesen Turm keine Aushubarbeiten anstehen oder während der Turm angehalten ist."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "Parken Sie am Turm"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "Vanilla-Verhalten: Behalten Sie die zugewiesenen Lastwagen bei und schicken Sie sie im Leerlauf zum Turm zurück.\nVorteile: Die LKWs bleiben in der Nähe und sind für den nächsten Einsatz bereit.\nNachteile: Stillstehende LKWs können den Turmbereich belegen und unnötige Rückfahrten machen."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "Bleib dran"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "Behalten Sie die zugewiesenen Lastwagen bei, ohne sie im Leerlauf zum Turm zurückzuschicken.\nVorteile: vermeidet unnötige Rückfahrten und hält die LKWs in der Nähe ihres letzten Arbeitsbereichs.\nNachteile: LKWs können über den Arbeitsbereich verstreut sein."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "Sanfte Freigabe"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "Heben Sie die Zuweisung freier LKWs vorübergehend auf, damit diese bei allgemeinen Transport- und Bauarbeiten helfen können. Sobald die Aushubarbeiten wieder aufgenommen werden, werden die LKWs einfach wieder diesem Turm zugewiesen.\nVorteile: Freigegebene Lkw können im Leerlauf bei allgemeinen Transport- und Bauarbeiten helfen.\nNachteile: Wenn sie einem anderen Turm zugewiesen werden, insbesondere einem, der die Soft-Release nicht verwendet, sind sie möglicherweise nicht verfügbar, wenn die Arbeit dieses Turms wieder aufgenommen wird."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "Sanft freigegebene Bagger:"
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "keine"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "Soft Release Trucks:"
   ],
   [
     "panel.farming.vehicle_status.released",

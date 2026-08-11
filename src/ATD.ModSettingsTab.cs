@@ -554,12 +554,28 @@ namespace AutoTerrainDesignations
                 () => AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle,
                 value => AutoTerrainDesignationsMod.SetAutoReleaseExcavatorsWhenIdle(value),
                 refreshers));
-            content.Add(BuildToggleRow(
-                AtdLocalization.FarmingIdleReleaseTrucksLabel.AsFormatted,
-                AtdLocalization.FarmingIdleReleaseTrucksTip.AsFormatted,
-                () => AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle,
-                value => AutoTerrainDesignationsMod.SetAutoReleaseTrucksWhenIdle(value),
-                refreshers));
+            content.Add(BuildTruckIdlePolicyRow(refreshers));
+        }
+
+        private static Row BuildTruckIdlePolicyRow(List<Action> refreshers)
+        {
+            var dropdown = new Dropdown<TruckIdleBehavior>(TruckIdlePolicyUi.Option)
+                .SetOptions(
+                    TruckIdleBehavior.ParkAtTower,
+                    TruckIdleBehavior.StayPut,
+                    TruckIdleBehavior.SoftRelease)
+                .SetValue(AutoTerrainDesignationsMod.TruckIdlePolicy)
+                .OnValueChanged((policy, _) =>
+                    AutoTerrainDesignationsMod.SetTruckIdlePolicy(policy));
+            dropdown.Width(130.px());
+            refreshers.Add(() => dropdown.SetValue(AutoTerrainDesignationsMod.TruckIdlePolicy));
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
+            row.Add(new Label(AtdLocalization.FarmingTruckIdlePolicyLabel.AsFormatted)
+                .Tooltip(AtdLocalization.FarmingTruckIdlePolicyTip.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(dropdown);
+            return row;
         }
 
         private static void AddNotificationsSection(Column content, List<Action> refreshers)

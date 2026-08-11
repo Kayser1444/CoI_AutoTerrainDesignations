@@ -1,6 +1,6 @@
 # Farmland preparation
 
-*Current as of: v0.5.11*
+*Current as of: v0.5.12*
 
 ## What it does
 
@@ -61,15 +61,17 @@ If the placement came from a blueprint, ATD holds the whole placement batch unti
 
 ## Settings
 
-### Auto-release when idle
+### Idle vehicle behavior
 
-The tower panel has separate toggles for **Auto-release excavators when idle** and **Auto-release trucks when idle**.
+The tower panel has an **Auto-release excavators when idle** toggle and an **Idle truck behavior** dropdown.
 
-When enabled, the selected vehicle class is automatically unassigned while none of the tower's managed mining or leveling designations have pending excavation work, or while the tower is paused.
+When enabled, the selected vehicle class is automatically unassigned while none of the tower's managed mining or leveling designations have pending excavation work, while the tower is paused, or while the tower has no unpaused assigned excavator. The last condition also covers towers where every assigned excavator is paused.
 
 - Released vehicles are tracked. When pending excavation work returns, ATD re-assigns those vehicles back to the tower.
-- Useful for sharing trucks between multiple towers while keeping excavators reserved, or for releasing both classes when excavation work is intermittent.
-- Defaults are off. The global defaults are controlled by **autoReleaseExcavatorsWhenIdle** and **autoReleaseTrucksWhenIdle** in `ATDsettings.json`.
+- Useful when trucks can assist with general hauling and construction while this tower is idle. They can also be assigned to another tower, but may not be available when this tower's work resumes, especially if that tower is not using Soft release.
+- Excavator auto-release defaults to off. The global excavator default is controlled by **autoReleaseExcavatorsWhenIdle** in `ATDsettings.json`.
+- Truck behavior options are **Park at tower** (vanilla behavior), **Stay put** (the ATD default; keeps trucks assigned without sending them back), and **Soft release** (temporarily unassigns trucks and reassigns them when work returns).
+- The global truck default is controlled by **truckIdlePolicy** in `ATDsettings.json`: `0` = Park at tower, `1` = Stay put, `2` = Soft release.
 
 ### `farmingPanelCollapsed` (ATDsettings.json)
 

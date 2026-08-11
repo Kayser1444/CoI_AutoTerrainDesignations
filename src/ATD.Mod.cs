@@ -49,6 +49,7 @@ namespace AutoTerrainDesignations;
 
 internal enum SafetyPolicy { Min = 0, Low = 1, Med = 2, High = 3, Max = 4 }
 internal enum QuickRemoveDebrisPolicy { Always = 0, Restrictive = 1, Never = 2 }
+internal enum TruckIdleBehavior { ParkAtTower = 0, StayPut = 1, SoftRelease = 2 }
 
 public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
 {
@@ -97,6 +98,7 @@ public static string Tt(string text) => text;
         }
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
+        TruckIdlePolicyPatches.Apply(m_harmony);
         PreAllocationPatches.Apply(m_harmony);
         AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
@@ -134,7 +136,8 @@ public static string Tt(string text) => text;
         SetFarmingPanelCollapsed(true);
         SetExcavatorCompletionNotificationsEnabled(true);
         SetRampNotificationsEnabled(true);
-        SetAutoReleaseVehiclesWhenIdle(false);
+        SetAutoReleaseExcavatorsWhenIdle(false);
+        SetTruckIdlePolicy(TruckIdleBehavior.StayPut);
         SetTurningRampsExperimental(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
@@ -300,8 +303,11 @@ public static string Tt(string text) => text;
     /// <summary>Whether ATD automatically releases excavators from a tower when there are no pending excavation jobs.</summary>
     public static bool AutoReleaseExcavatorsWhenIdle { get; private set; } = false;
 
-    /// <summary>Whether ATD automatically releases trucks from a tower when there are no pending excavation jobs.</summary>
-    public static bool AutoReleaseTrucksWhenIdle { get; private set; } = false;
+    /// <summary>What assigned trucks do when their mine tower has no pending excavation jobs.</summary>
+    internal static TruckIdleBehavior TruckIdlePolicy { get; private set; } = TruckIdleBehavior.StayPut;
+
+    /// <summary>Legacy view retained for old console output and config migration.</summary>
+    public static bool AutoReleaseTrucksWhenIdle => TruckIdlePolicy == TruckIdleBehavior.SoftRelease;
 
     /// <summary>Legacy combined view retained for old console output and config migration.</summary>
     public static bool AutoReleaseVehiclesWhenIdle => AutoReleaseExcavatorsWhenIdle || AutoReleaseTrucksWhenIdle;
@@ -311,9 +317,16 @@ public static string Tt(string text) => text;
         AutoReleaseExcavatorsWhenIdle = value;
     }
 
+    internal static void SetTruckIdlePolicy(TruckIdleBehavior value)
+    {
+        TruckIdlePolicy = value < TruckIdleBehavior.ParkAtTower || value > TruckIdleBehavior.SoftRelease
+            ? TruckIdleBehavior.StayPut
+            : value;
+    }
+
     public static void SetAutoReleaseTrucksWhenIdle(bool value)
     {
-        AutoReleaseTrucksWhenIdle = value;
+        SetTruckIdlePolicy(value ? TruckIdleBehavior.SoftRelease : TruckIdleBehavior.ParkAtTower);
     }
 
     public static void SetAutoReleaseVehiclesWhenIdle(bool value)
@@ -764,7 +777,11 @@ public static string Tt(string text) => text;
         m_lastSimTick = current;
         try { AutoDepthDesignation.TickFarmingPreparationSessions(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickFarmingPreparationSessions"); }
-        try { AutoDepthDesignation.TickIdleVehicleRelease(); }
+        try
+        {
+            AutoDepthDesignation.TickIdleVehicleRelease();
+            m_gameLoopEvents?.InvokeInSyncNotSaved(FarmingAnalysisPanel.RefreshIdleVehicleTooltips);
+        }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickIdleVehicleRelease"); }
         try { AutoDepthDesignation.PropRemovalManager?.Tick(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "ATDPropRemovalManager.Tick"); }

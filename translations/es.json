@@ -648,12 +648,40 @@
     "Desasigna automáticamente las excavadoras de esta torre cuando ninguna designación tiene trabajos de excavación pendientes o cuando la torre está pausada.\nLas excavadoras se registran y se reasignan cuando vuelve a haber trabajos de excavación."
   ],
   [
-    "panel.farming.idle_release_trucks.label",
-    "Liberar camiones al estar inactivos"
+    "panel.farming.truck_idle_policy.label",
+    "Comportamiento del camión inactivo"
   ],
   [
-    "panel.farming.idle_release_trucks.tooltip",
-    "Desasigna automáticamente los camiones de esta torre cuando ninguna designación tiene trabajos de excavación pendientes o cuando la torre está pausada.\nLos camiones se registran y se reasignan cuando vuelve a haber trabajos de excavación."
+    "panel.farming.truck_idle_policy.tooltip",
+    "Elija qué hacen los camiones asignados cuando esta torre no tiene trabajos de excavación pendientes o mientras la torre está en pausa."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "Estacionar en la torre"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "Comportamiento estándar: mantenga los camiones asignados y envíelos de regreso a la torre cuando estén inactivos.\nVentajas: los camiones permanecen cerca y listos para el siguiente trabajo.\nDesventajas: los camiones inactivos pueden ocupar el área de la torre y realizar viajes de regreso innecesarios."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "Quedarse en el mismo sitio"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "Mantenga los camiones asignados sin enviarlos de regreso a la torre cuando estén inactivos.\nVentajas: evita viajes de regreso innecesarios y mantiene los camiones cerca de su última zona de trabajo.\nDesventajas: los camiones pueden estar dispersos por el área de trabajo."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "liberación suave"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "Cancelar temporalmente la asignación de camiones inactivos para que puedan ayudar con trabajos generales de transporte y construcción. Los camiones simplemente se reasignan a esta torre cuando regresan los trabajos de excavación.\nVentajas: los camiones liberados pueden ayudar con el transporte general y la construcción mientras están inactivos.\nDesventajas: si se asignan a otra torre, especialmente a una que no utilice la versión suave, es posible que no estén disponibles cuando se reanude el trabajo de esta torre."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "Excavadoras de liberación suave:"
   ],
   [
     "panel.farming.vehicle_status.assigned",
@@ -662,6 +690,10 @@
   [
     "panel.farming.vehicle_status.none",
     "ninguno"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "Camiones con liberación suave:"
   ],
   [
     "panel.farming.vehicle_status.released",

@@ -1,3 +1,9 @@
+v0.5.12 | 2026-08-11
+* Added: Idle truck behavior options for mine towers: Park at tower (the vanilla default), Stay put (the new default, which keeps trucks assigned near their last work area without unnecessary return trips), and Soft release
+* Added: Migration for the previous automatic truck-release setting and per-tower state
+* Changed: Soft release now also applies while a tower is paused or has no active excavator capacity, and reassigns trucks when excavation work resumes
+* Improved: Mine tower idle vehicle tooltips now show clickable cards for soft-released trucks and excavators
+
 v0.5.11 | 2026-08-09
 * Improved: Large farming accessway searches now run cooperatively in small slices, keeping the game responsive while access is being planned
 * Changed: Access progress toasts now show the current phase and progress details for interactive and managed searches, with a Hide control that suppresses the toast without cancelling the active request

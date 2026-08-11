@@ -29,7 +29,7 @@ namespace AutoTerrainDesignations
         // Increment when a built-in setting default changes in a way that must
         // migrate an older generated settings file. This is separate from the
         // mod version because packages can be rebuilt without changing it.
-        private const int SETTINGS_DEFAULTS_REVISION = 3;
+        private const int SETTINGS_DEFAULTS_REVISION = 4;
         private const int TURNING_RAMPS_DEFAULTS_REVISION = 3;
 
         private static bool s_settingsLoadAttempted;
@@ -505,9 +505,18 @@ namespace AutoTerrainDesignations
                 if (autoReleaseExcavatorsWhenIdle.HasValue && ShouldPreserveBool(autoReleaseExcavatorsWhenIdle.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetAutoReleaseExcavatorsWhenIdle(autoReleaseExcavatorsWhenIdle.Value);
 
-                bool? autoReleaseTrucksWhenIdle = ParseBool(json, "autoReleaseTrucksWhenIdle");
-                if (autoReleaseTrucksWhenIdle.HasValue && ShouldPreserveBool(autoReleaseTrucksWhenIdle.Value, migrateGeneratedDefaults, false))
-                    AutoTerrainDesignationsMod.SetAutoReleaseTrucksWhenIdle(autoReleaseTrucksWhenIdle.Value);
+                int? truckIdlePolicy = ParseInt(json, "truckIdlePolicy");
+                if (truckIdlePolicy.HasValue && ShouldPreserveInt(truckIdlePolicy.Value, migrateGeneratedDefaults, (int)TruckIdleBehavior.StayPut))
+                    AutoTerrainDesignationsMod.SetTruckIdlePolicy((TruckIdleBehavior)truckIdlePolicy.Value);
+                else if (!truckIdlePolicy.HasValue)
+                {
+                    bool? autoReleaseTrucksWhenIdle = ParseBool(json, "autoReleaseTrucksWhenIdle");
+                    if (autoReleaseTrucksWhenIdle.HasValue && ShouldPreserveBool(autoReleaseTrucksWhenIdle.Value, migrateGeneratedDefaults, false))
+                        AutoTerrainDesignationsMod.SetTruckIdlePolicy(
+                            autoReleaseTrucksWhenIdle.Value
+                                ? TruckIdleBehavior.SoftRelease
+                                : TruckIdleBehavior.ParkAtTower);
+                }
 
                 bool? turningRampsExperimental = ParseBool(json, "turningRampsExperimental");
                 if (turningRampsExperimental.HasValue)
@@ -1081,8 +1090,8 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_autoReleaseExcavatorsWhenIdle\": \"Default starting value for the Auto-release excavators when idle toggle on each mine tower. When enabled, ATD automatically unassigns excavators from the tower once no managed designation has pending excavation work, or while the tower is paused. Vehicles are tracked and re-assigned when excavation work returns. Can be toggled per tower in-game. Default: false.\",");
             sb.AppendLine($"  \"autoReleaseExcavatorsWhenIdle\": {BoolToJsonStr(AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_autoReleaseTrucksWhenIdle\": \"Default starting value for the Auto-release trucks when idle toggle on each mine tower. When enabled, ATD automatically unassigns trucks from the tower once no managed designation has pending excavation work, or while the tower is paused. Vehicles are tracked and re-assigned when excavation work returns. Can be toggled per tower in-game. Default: false.\",");
-            sb.AppendLine($"  \"autoReleaseTrucksWhenIdle\": {BoolToJsonStr(AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle)},");
+            sb.AppendLine("  \"_comment_truckIdlePolicy\": \"Default starting behavior for trucks assigned to a mine tower when no managed designation has pending excavation work, or while the tower is paused. 0 = Park at tower (vanilla), 1 = Stay put (keeps trucks assigned without sending them back), 2 = Soft release (temporarily unassigns trucks and reassigns them when work returns). Default: 1.\",");
+            sb.AppendLine($"  \"truckIdlePolicy\": {(int)AutoTerrainDesignationsMod.TruckIdlePolicy},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, AUTO and T1-T3 may use routed turning or switchback accessways. Legacy 3-5 remain straight-only. Default: true.\",");
             sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsExperimental)},");
