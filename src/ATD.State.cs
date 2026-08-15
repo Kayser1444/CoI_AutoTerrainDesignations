@@ -1004,6 +1004,7 @@ namespace AutoTerrainDesignations
             s_latestCreateDesignationsRequestId++;
             s_cancelExperimentalAccessSearch = true;
             s_createDesignationsOperationActive = false;
+            s_createDesignationsAccessRequest = null;
 
             s_desigManager = null;
             s_miningProto = null;

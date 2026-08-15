@@ -91,7 +91,12 @@ namespace AutoTerrainDesignations
             if (manager == null || s_accesswayManagerSuspendedForSave)
                 return;
 
-            bool suspendedForInteractive = s_createDesignationsOperationActive;
+            // Create Designations owns the manager only while its accessway
+            // request is queued/active. Its scan and commit phases remain
+            // exclusive, but the manager must keep ticking once the request
+            // has been handed off or the interactive operation would deadlock.
+            bool suspendedForInteractive = s_createDesignationsOperationActive
+                && s_createDesignationsAccessRequest == null;
             manager.Tick(suspendedForInteractive);
             if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
             {
@@ -211,10 +216,28 @@ namespace AutoTerrainDesignations
 
             try
             {
-                string workType = handle.Kind ==
-                        ATDAccesswayRequestKind.FarmingFilling
-                    ? "farming filling access"
-                    : "farming preparation access";
+                string workType = handle.Kind switch
+                {
+                    ATDAccesswayRequestKind.FarmingFilling
+                        => "farming filling access",
+                    ATDAccesswayRequestKind.FarmingPreparation
+                        => "farming preparation access",
+                    ATDAccesswayRequestKind.CreateDesignations
+                        => "interactive mining access",
+                    ATDAccesswayRequestKind.PlannedTower
+                        => "planned tower access",
+                    ATDAccesswayRequestKind.ConstructionLeveling
+                        => "construction leveling access",
+                    _ => "terrain access"
+                };
+                string stopWork = handle.Kind switch
+                {
+                    ATDAccesswayRequestKind.CreateDesignations
+                        => "Stop interactive mining access",
+                    ATDAccesswayRequestKind.PlannedTower
+                        => "Stop planned tower access",
+                    _ => "Stop automatic farming access"
+                };
                 var progressText = new LocStrFormatted(
                     $"[ATD] {snapshot.Phase}; finding {workType}; "
                     + $"visited {snapshot.VisitedNodes:N0}/"
@@ -241,8 +264,7 @@ namespace AutoTerrainDesignations
                         s_accesswayManagerProgressLabel,
                         new ButtonText(
                             Button.General,
-                            new LocStrFormatted(
-                                "Stop automatic farming access"),
+                            new LocStrFormatted(stopWork),
                             () => manager.Cancel(handle, "UserCancelled"))
                             .MarginLeft(8.pt()),
                         new ButtonText(

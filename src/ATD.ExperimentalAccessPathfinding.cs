@@ -1015,6 +1015,87 @@ namespace AutoTerrainDesignations
                 phaseTimer.Restart();
             }
 
+            bool useAStar =
+                AutoTerrainDesignationsMod.ExperimentalAccessUseAStar;
+            AccessV1GroundGoalDistance? prebuiltV1GroundGoalDistance = null;
+            float[]? prebuiltAnyGoalDistance = null;
+            if (sliceControl != null && useAStar)
+            {
+                sliceControl.ReportPhase("Building V1 ground routes");
+                var groundGoalBuild =
+                    new AccessV1GroundGoalDistance.BuildSession(
+                        groundNodes,
+                        propCleanupByTile,
+                        towerReachableGround,
+                        takeOwnership: true);
+                while (!groundGoalBuild.IsComplete)
+                {
+                    Stopwatch buildSlice = Stopwatch.StartNew();
+                    do
+                    {
+                        groundGoalBuild.Advance(maxWorkItems: 64);
+                    }
+                    while (!groundGoalBuild.IsComplete
+                        && !sliceControl.CancellationRequested
+                        && buildSlice.ElapsedMilliseconds
+                            < sliceControl.SliceBudgetMilliseconds);
+                    if (sliceControl.CancellationRequested)
+                    {
+                        output.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    yield return null;
+                }
+                prebuiltV1GroundGoalDistance = groundGoalBuild.Result;
+
+                Tile2i goalDistanceMin = boundsMin;
+                Tile2i goalDistanceMax = boundsMax;
+                foreach (Tile2i tile in groundNodes)
+                    ExpandGoalDistanceBounds(tile);
+                foreach (KeyValuePair<Tile2i, AccessPropCleanupInfo> pair
+                    in propCleanupByTile)
+                {
+                    if (pair.Value.IsEligible)
+                        ExpandGoalDistanceBounds(pair.Key);
+                }
+
+                sliceControl.ReportPhase("Building V1 goal potential");
+                var anyGoalBuild = new AccessGoalDistanceBuildSession(
+                    goalDistanceMin,
+                    goalDistanceMax,
+                    towerReachableGround);
+                while (!anyGoalBuild.IsComplete)
+                {
+                    Stopwatch buildSlice = Stopwatch.StartNew();
+                    do
+                    {
+                        anyGoalBuild.Advance(maxWorkItems: 64);
+                    }
+                    while (!anyGoalBuild.IsComplete
+                        && !sliceControl.CancellationRequested
+                        && buildSlice.ElapsedMilliseconds
+                            < sliceControl.SliceBudgetMilliseconds);
+                    if (sliceControl.CancellationRequested)
+                    {
+                        output.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    yield return null;
+                }
+                prebuiltAnyGoalDistance = anyGoalBuild.Result;
+
+                void ExpandGoalDistanceBounds(Tile2i tile)
+                {
+                    goalDistanceMin = new Tile2i(
+                        Math.Min(goalDistanceMin.X, tile.X),
+                        Math.Min(goalDistanceMin.Y, tile.Y));
+                    goalDistanceMax = new Tile2i(
+                        Math.Max(goalDistanceMax.X, tile.X),
+                        Math.Max(goalDistanceMax.Y, tile.Y));
+                }
+            }
+
+            sliceControl?.ReportPhase("Constructing snapshot");
             snapshot = new AccessSearchSnapshot(
                 boundsMin,
                 boundsMax,
@@ -1023,7 +1104,7 @@ namespace AutoTerrainDesignations
                 maxHeight2 + 2,
                 isMining,
                 allowsMixedWork,
-                AutoTerrainDesignationsMod.ExperimentalAccessUseAStar,
+                useAStar,
                 AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale,
                 landslideRunPerHeight,
                 groundHeight2,
@@ -1105,7 +1186,10 @@ namespace AutoTerrainDesignations
                 usefulHeightEnvelope: usefulHeightEnvelope,
                 terrainPathableWithoutBlockers:
                     terrainPathableWithoutProps,
-                takeOwnership: sliceControl != null);
+                takeOwnership: sliceControl != null,
+                prebuiltV1GroundGoalDistance:
+                    prebuiltV1GroundGoalDistance,
+                prebuiltAnyGoalDistance: prebuiltAnyGoalDistance);
             snapshotTimer.Stop();
             output.Snapshot = snapshot;
             output.FailureReason = string.Empty;
@@ -1135,6 +1219,8 @@ namespace AutoTerrainDesignations
                     ? "sliceStats=sync"
                     : sliceControl.FormatDiagnostics()));
             LogAccessPropCleanupDiagnostics(cleanupDiagnostics);
+            if (sliceControl != null)
+                yield return null;
             yield break;
         }
 
@@ -1768,12 +1854,65 @@ namespace AutoTerrainDesignations
                 $"[ATD Experimental Access Search Start] request={request.RequestId} cluster={cluster.ClusterId} " +
                 $"{FormatAccessPathRequest(request)} cleanupOrigins={snapshot.EligibleCleanupOriginCount}");
             sliceControl?.ReportPhase("Preparing search session");
-            Stopwatch createSessionTimer = Stopwatch.StartNew();
-            AccessSearchSessionBuildDiagnostics sessionDiagnostics;
-            var session = AccessPathSearch.CreateSession(
-                request, out sessionDiagnostics);
-            createSessionTimer.Stop();
-            TimeSpan managedProcessingElapsed = createSessionTimer.Elapsed;
+            AccessPathSearch.AccessPathSearchSessionBuilder sessionBuilder =
+                AccessPathSearch.CreateSessionBuilder(request);
+            TimeSpan managedProcessingElapsed = TimeSpan.Zero;
+            int frames = 0;
+            TimeSpan maxSlice = TimeSpan.Zero;
+            int lastToastSecond = -1;
+            int slowStepLogCount = 0;
+            int slowSliceLogCount = 0;
+
+            bool IsCancellationRequested()
+                => sliceControl?.CancellationRequested
+                    ?? s_cancelExperimentalAccessSearch;
+
+            while (!sessionBuilder.IsComplete
+                && !IsCancellationRequested())
+            {
+                sliceControl?.ReportPhase(sessionBuilder.Phase);
+                Stopwatch preparationSliceTimer = Stopwatch.StartNew();
+                do
+                {
+                    sessionBuilder.Advance(maxWorkItems: 64);
+                }
+                while (!sessionBuilder.IsComplete
+                    && !IsCancellationRequested()
+                    && preparationSliceTimer.ElapsedMilliseconds
+                        < (sliceControl?.SliceBudgetMilliseconds
+                            ?? AutoTerrainDesignationsMod
+                                .AccessSearchFrameBudgetMs)
+                    && (sliceControl == null
+                        ? searchTimer.Elapsed.TotalSeconds
+                        : (managedProcessingElapsed
+                            + preparationSliceTimer.Elapsed).TotalSeconds)
+                        < AutoTerrainDesignationsMod
+                            .AccessSearchTimeoutSeconds);
+                preparationSliceTimer.Stop();
+                if (sliceControl != null)
+                    managedProcessingElapsed +=
+                        preparationSliceTimer.Elapsed;
+                if (preparationSliceTimer.Elapsed > maxSlice)
+                    maxSlice = preparationSliceTimer.Elapsed;
+                frames++;
+                sliceControl?.ReportProgress(0, 0);
+                if (!sessionBuilder.IsComplete
+                    && !IsCancellationRequested()
+                    && (sliceControl == null
+                        ? searchTimer.Elapsed.TotalSeconds
+                        : managedProcessingElapsed.TotalSeconds)
+                        < AutoTerrainDesignationsMod
+                            .AccessSearchTimeoutSeconds)
+                    yield return null;
+                if ((sliceControl == null
+                        ? searchTimer.Elapsed.TotalSeconds
+                        : managedProcessingElapsed.TotalSeconds)
+                    >= AutoTerrainDesignationsMod
+                        .AccessSearchTimeoutSeconds)
+                    break;
+            }
+            AccessSearchSessionBuildDiagnostics sessionDiagnostics =
+                sessionBuilder.Diagnostics;
             LogExperimentalAccessTrace(
                 $"[ATD Experimental Access Search Preparation] "
                 + $"request={request.RequestId} cluster={cluster.ClusterId} "
@@ -1787,10 +1926,60 @@ namespace AutoTerrainDesignations
                     "0.##", CultureInfo.InvariantCulture)} "
                 + $"v2SessionMs={sessionDiagnostics.V2SessionMilliseconds.ToString(
                     "0.##", CultureInfo.InvariantCulture)} "
+                + $"v1GoalCollectionMs={sessionDiagnostics.V1GoalCollectionMilliseconds.ToString(
+                    "0.##", CultureInfo.InvariantCulture)} "
                 + $"v1GoalIndexMs={sessionDiagnostics.V1GoalIndexMilliseconds.ToString(
                     "0.##", CultureInfo.InvariantCulture)} "
                 + $"v1InitialExpansionMs={sessionDiagnostics.V1InitialExpansionMilliseconds.ToString(
                     "0.##", CultureInfo.InvariantCulture)}");
+            if (!sessionBuilder.IsComplete)
+            {
+                searchTimer.Stop();
+                bool cancelledDuringPreparation =
+                    IsCancellationRequested();
+                AccessSearchResult preparationFailure =
+                    new AccessSearchResult(
+                        false,
+                        cancelledDuringPreparation
+                            ? "SearchCancelled"
+                            : "SearchTimeLimit",
+                        request.Start.Nodes.Count > 0
+                            ? request.Start.Nodes[0]
+                            : default,
+                        Array.Empty<AccessSearchNode>(),
+                        0f,
+                        0,
+                        new Dictionary<string, int>(
+                            StringComparer.Ordinal));
+                if (sliceControl == null)
+                    HideTerrainAnalysisProgressToast();
+                TimeSpan preparationElapsed = sliceControl == null
+                    ? searchTimer.Elapsed
+                    : managedProcessingElapsed;
+                AccessDesignationPlan? preparationPlan =
+                    RecordExperimentalAccessDryRun(
+                        request,
+                        cluster,
+                        snapshot,
+                        preparationFailure,
+                        preparationElapsed,
+                        frames,
+                        maxSlice);
+                if (sliceControl != null)
+                {
+                    LogExperimentalAccessDebug(
+                        $"[ATD Experimental Access Slice Summary] "
+                        + $"request={request.RequestId} "
+                        + $"cluster={cluster.ClusterId} "
+                        + sliceControl.FormatDiagnostics());
+                }
+                output.Complete(preparationFailure, preparationPlan);
+                yield break;
+            }
+            AccessPathSearch.AccessPathSearchSession session =
+                sessionBuilder.Session;
+            if (sliceControl != null)
+                yield return null;
             sliceControl?.ReportPhase("Searching");
             if (ShowExperimentalAccessSearchOverlay
                 || ShowExperimentalAccessPotentialOverlay)
@@ -1805,17 +1994,8 @@ namespace AutoTerrainDesignations
             }
             LogExperimentalAccessDebug(
                 $"[ATD Experimental Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
-                $"createMs={createSessionTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
+                $"createMs={sessionDiagnostics.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"complete={session.IsComplete} pending={session.PendingNodes} visited={session.VisitedNodes}");
-            int frames = 0;
-            TimeSpan maxSlice = TimeSpan.Zero;
-            int lastToastSecond = -1;
-            int slowStepLogCount = 0;
-            int slowSliceLogCount = 0;
-
-            bool IsCancellationRequested()
-                => sliceControl?.CancellationRequested
-                    ?? s_cancelExperimentalAccessSearch;
 
             while (!session.IsComplete && !IsCancellationRequested())
             {
@@ -3556,7 +3736,7 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            AccessDesignationPlan placementPlan = AccessPathMaterializer.Materialize(snapshot, candidate.SearchResult);
+            AccessDesignationPlan placementPlan = candidate.Plan;
             if (!placementPlan.IsValid
                 || (placementPlan.Designations.Count == 0
                     && placementPlan.CleanupOrigins.Count == 0))

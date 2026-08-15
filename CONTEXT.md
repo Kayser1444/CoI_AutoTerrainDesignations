@@ -18,6 +18,135 @@ work justified only by it. Shared support work remains while another intent
 still justifies it.
 _Avoid_: Hide intent, clear overlay only
 
+**Active soil import**:
+A transient logistics behavior that treats pending farmland filling as a
+material demand: a free global truck may collect an eligible soil material
+from any registered output and deliver it to a specific materialized farmland
+filling designation owned by the active farmland workflow. Normal output
+priority and protected import quantity still apply; neutral storage contents are
+therefore a low-priority fallback. It does not preempt ordinary dumping; it
+intervenes only for still-pending farmland filling. Final filling may initially
+allow all farmable materials, but the tower's live dumpable-material list is
+consulted for each new import, so the player can remove a material during
+filling. It does not create persistent farmland intent, claim tower ownership,
+or change a storage's player-configured import/export settings.
+The source's import reserve remains a hard quantity limit, and disabling
+logistics output removes the source entirely. The export-from slider retains
+vanilla meaning as a priority preference: material below its threshold may
+still be used as the lowest-priority fallback rather than becoming absolutely
+unavailable.
+Active soil import only reads the live storage-to-tower route graph; it never
+creates temporary routes, changes assignments, or broadens a player-authored
+route.
+Route edits affect only future active-import dispatches. An already reserved
+vanilla pickup/dump chain is allowed to finish or cancel under its normal job
+rules.
+Removing a material from the live tower list does not cancel an already
+reserved import chain; it only prevents new chains for that material.
+Truck load sizing follows the world's vanilla partial-load policy rather than
+an ATD-specific full-or-partial threshold.
+At most one active-import truck may be dispatched for a target origin at a
+time; distinct farmland origins may import soil in parallel.
+Within one filling pass, the dispatcher may greedily issue one eligible import
+per origin until no source/truck match remains. There is no additional ATD-wide
+truck cap: 100 eligible origins may involve 100 trucks when vanilla source
+quantity and truck eligibility permit it.
+Each greedy iteration is globally priority-driven by the eligible source and
+product, then selects the closest reachable farmland target and closest
+eligible truck; origin enumeration order does not override vanilla priority.
+Equal-priority candidates resolve by proximity, with a stable origin/entity-ID
+tie-break only for final deterministic ties.
+Source ranking uses vanilla `RegisteredOutputBuffer.CombinedPriorityCached`,
+including queued-job pressure, rather than raw output priority alone.
+Candidate discovery follows vanilla's product-indexed output registry rather
+than scanning every world entity each tick. ATD uses a small, read-only,
+version-guarded compatibility adapter over that registry; if the expected
+internal shape is unavailable, active import degrades without dispatching
+rather than changing the player's logistics state.
+When several free trucks could serve an import, the closest eligible truck to
+the selected soil source is preferred, matching vanilla logistics. Eligibility
+is checked against both source and target first, so a blocked nearest truck is
+skipped in favor of a farther truck that can reach both.
+For multiple eligible farmland origins, the closest valid target to the selected
+source is preferred, also matching vanilla dumping. Target ranking first
+discards origins for which no eligible truck can reach both endpoints, so a
+nearer universally unreachable origin cannot block a farther reachable one.
+When several allowed farmable materials are available, their normal logistics
+priority and source proximity decide which material is imported; active soil
+import adds no material preference.
+After the initially targeted farmland origin is fulfilled, any remaining cargo
+is ordinary truck cargo and follows vanilla continuation and disposal rules,
+including priority and proximity to the next valid dumping designation.
+The active-import `DumpingJob` receives only its selected farmland origin as
+the primary target; ATD supplies no precomputed nearby extra designations.
+Active-import slot bookkeeping is runtime-only and is rebuilt from live vanilla
+truck jobs and designation reservations after loading a save.
+If no eligible source or truck can complete an import, filling remains pending
+indefinitely with no new player-facing notification, matching vanilla's silent
+no-soil behavior; diagnostics may still expose the waiting reason. The existing
+farming status/debug surface distinguishes a route-blocked source, a genuinely
+unavailable soil source, no eligible truck, and an otherwise eligible truck set
+blocked by source/target reachability.
+Active soil import is automatic during final filling and has no separate user
+toggle; existing farming automation and live tower material controls remain the
+control surfaces. Dispatch attempts run from the existing farming-session
+filling pass once per farming automation tick; no separate global logistics or
+simulation loop is introduced.
+Any live vanilla dumping job or designation reservation claims an origin, so
+active import does not preempt, duplicate, or second-guess ordinary work even
+when that job is delayed or unreachable.
+An origin must remain without an ordinary vanilla job or reservation for one
+complete farming tick before active import dispatches, so fallback behavior does
+not depend on simulation-event ordering.
+If an ordinary claim appears during that grace period and then cancels, the
+grace period resets and another complete no-claim tick is required.
+Dispatch also requires vanilla `TerrainDesignation.CanBeAssigned(false)`;
+the normal `DumpingJob` creates the actual designation reservation and remains
+the authority for assignment races. ATD's one-origin slot is an additional
+anti-flocking guard only.
+If source reservation fails while a candidate is being dispatched, that
+candidate is discarded and the same pass continues matching remaining eligible
+sources, trucks, and origins.
+Dispatch eligibility follows the current filling analysis rather than the
+stabilization phase label: each pass rechecks origins first, and a landslide or
+other change that makes an origin unfulfilled can re-enable active import even
+during stabilization. A pass with no pending origins creates no new chains.
+Target eligibility uses vanilla's per-truck reachability result: an origin may
+be eligible for one candidate truck and unreachable for another, and an origin
+that the selected truck cannot reach does not consume a slot. Normal zone,
+amphibious, and path restrictions remain part of that check. Active import
+reuses vanilla's current per-truck unreachable cache and leaves retry timing
+and invalidation to vanilla; ATD does not force fresh pathfinding attempts.
+It preserves ordinary truck and source eligibility, including allowed truck
+groups, job filters, logistics zones, reachability, amphibious requirements, and
+assigned-building restrictions. Route assignments are authoritative for the
+target tower: when one or more storages are assigned as outputs to that tower,
+only those storages may supply the tower's farmland filling products. Vanilla
+has no corresponding "allow non-assigned input" escape for a tower, so an
+unassigned storage is excluded in that case. When no explicit tower route
+constrains the target, the source still follows vanilla output-side assignment
+rules, including its own non-assigned-output setting. If an origin is managed by
+multiple servicing towers, a source is route-eligible when at least one of
+those towers is an allowed match; it is rejected only when no servicing tower
+permits that source.
+The route endpoint set is the designation's current live `ManagedByTowers`
+collection at dispatch time, not a stale farming-session tower assumption.
+If that collection is empty, active import waits; the designation is then
+governed only by ordinary global dumping rules, which may or may not allow the
+soil materials.
+Route eligibility is evaluated before normal material, source, and proximity
+priority, so an unrouted source cannot compete merely because it has a better
+logistics priority.
+Dispatch composes a vanilla `BalancingJobSpec` and uses
+`DefaultTruckJobProvider.AssignBalancingJob`; it does not construct pickup or
+dumping jobs through a parallel ATD path. A default-provider truck with only
+non-true parking/navigation work remains vanilla-available; the provider may
+clear those jobs when assigning the import. Trucks with true jobs remain
+ineligible.
+Each active-import load contains only its selected farmable product; no
+secondary output buffers are added.
+_Avoid_: Farmland fill demand, tower truck import, temporary storage export
+
 **Pending farm placement**:
 A committed farm placement blocked only by terrain preparation and retained
 while its generated farmland intent is fulfilled. It replays when that intent

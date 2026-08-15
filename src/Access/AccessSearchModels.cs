@@ -460,7 +460,9 @@ namespace AutoTerrainDesignations.Access
                 projectedCutSafetySourcesByTile = null,
             IDictionary<Tile2i, HashSet<Tile2i>>?
                 projectedFillSafetySourcesByTile = null,
-            bool takeOwnership = false)
+            bool takeOwnership = false,
+            AccessV1GroundGoalDistance? prebuiltV1GroundGoalDistance = null,
+            float[]? prebuiltAnyGoalDistance = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -619,8 +621,11 @@ namespace AutoTerrainDesignations.Access
                     ? ownedPropCleanupByTile
                     : new Dictionary<Tile2i, AccessPropCleanupInfo>(propCleanupByTile);
             m_v1GroundGoalDistance = useAStar
-                ? new AccessV1GroundGoalDistance(
-                    m_groundNodes, m_propCleanupByTile, m_goalGroundNodes)
+                ? prebuiltV1GroundGoalDistance
+                    ?? new AccessV1GroundGoalDistance(
+                        m_groundNodes,
+                        m_propCleanupByTile,
+                        m_goalGroundNodes)
                 : null;
             if (VehicleWidth > 4)
             {
@@ -664,10 +669,19 @@ namespace AutoTerrainDesignations.Access
             m_goalDistanceHeight =
                 m_goalDistanceMax.Y - m_goalDistanceMin.Y + 1;
             m_anyGoalDistance = useAStar
-                ? BuildGoalDistance(
-                    m_goalDistanceMin, m_goalDistanceMax,
-                    m_goalGroundNodes)
+                ? prebuiltAnyGoalDistance
+                    ?? BuildGoalDistance(
+                        m_goalDistanceMin,
+                        m_goalDistanceMax,
+                        m_goalGroundNodes)
                 : Array.Empty<float>();
+            if (m_anyGoalDistance.Length != 0
+                && m_anyGoalDistance.Length
+                    != m_goalDistanceWidth * m_goalDistanceHeight)
+                throw new ArgumentException(
+                    "Prebuilt goal-distance dimensions do not match "
+                    + "the snapshot bounds.",
+                    nameof(prebuiltAnyGoalDistance));
 
             void ExpandGoalDistanceBounds(Tile2i tile)
             {
@@ -2286,68 +2300,109 @@ namespace AutoTerrainDesignations.Access
         internal static float[] BuildGoalDistance(Tile2i boundsMin, Tile2i boundsMax,
             HashSet<Tile2i> goals)
         {
-            int width = boundsMax.X - boundsMin.X + 1;
-            int height = boundsMax.Y - boundsMin.Y + 1;
-            var result = new float[width * height];
-            for (int i = 0; i < result.Length; i++) result[i] = -1;
-            var queue = new SortedDictionary<float, Queue<int>>();
+            var build = new AccessGoalDistanceBuildSession(
+                boundsMin, boundsMax, goals);
+            while (!build.IsComplete)
+                build.Advance(int.MaxValue);
+            return build.Result;
+        }
+    }
+
+    internal sealed class AccessGoalDistanceBuildSession
+    {
+        private const float DiagonalCost = 1.41421356237f;
+        private readonly int m_width;
+        private readonly int m_height;
+        private readonly float[] m_result;
+        private readonly SortedDictionary<float, Queue<int>> m_queue = new();
+
+        public bool IsComplete => m_queue.Count == 0;
+        public float[] Result => m_result;
+
+        public AccessGoalDistanceBuildSession(
+            Tile2i boundsMin,
+            Tile2i boundsMax,
+            IEnumerable<Tile2i> goals)
+        {
+            m_width = boundsMax.X - boundsMin.X + 1;
+            m_height = boundsMax.Y - boundsMin.Y + 1;
+            m_result = new float[m_width * m_height];
+            for (int i = 0; i < m_result.Length; i++)
+                m_result[i] = -1;
             foreach (Tile2i goal in goals)
             {
                 if (goal.X < boundsMin.X || goal.X > boundsMax.X
                     || goal.Y < boundsMin.Y || goal.Y > boundsMax.Y)
                     continue;
-                int index = (goal.Y - boundsMin.Y) * width + goal.X - boundsMin.X;
-                result[index] = 0;
+                int index = (goal.Y - boundsMin.Y) * m_width
+                    + goal.X - boundsMin.X;
+                m_result[index] = 0;
                 Enqueue(index, 0f);
             }
-            while (queue.Count > 0)
+        }
+
+        public int Advance(int maxWorkItems)
+        {
+            int processed = 0;
+            while (m_queue.Count > 0 && processed < Math.Max(1, maxWorkItems))
             {
-                KeyValuePair<float, Queue<int>> first = First(queue);
+                KeyValuePair<float, Queue<int>> first = First(m_queue);
                 int current = first.Value.Dequeue();
-                if (first.Value.Count == 0) queue.Remove(first.Key);
-                if (Math.Abs(result[current] - first.Key) > 0.0001f)
+                if (first.Value.Count == 0)
+                    m_queue.Remove(first.Key);
+                processed++;
+                if (Math.Abs(m_result[current] - first.Key) > 0.0001f)
                     continue;
-                int x = current % width;
-                int y = current / width;
+                int x = current % m_width;
+                int y = current / m_width;
                 Relax(current - 1, first.Key, 1f, x > 0);
-                Relax(current + 1, first.Key, 1f, x + 1 < width);
-                Relax(current - width, first.Key, 1f, y > 0);
-                Relax(current + width, first.Key, 1f, y + 1 < height);
-                const float diagonal = 1.41421356237f;
-                Relax(current - width - 1, first.Key, diagonal, x > 0 && y > 0);
-                Relax(current - width + 1, first.Key, diagonal, x + 1 < width && y > 0);
-                Relax(current + width - 1, first.Key, diagonal, x > 0 && y + 1 < height);
-                Relax(current + width + 1, first.Key, diagonal, x + 1 < width && y + 1 < height);
+                Relax(current + 1, first.Key, 1f, x + 1 < m_width);
+                Relax(current - m_width, first.Key, 1f, y > 0);
+                Relax(current + m_width, first.Key, 1f, y + 1 < m_height);
+                Relax(current - m_width - 1, first.Key, DiagonalCost,
+                    x > 0 && y > 0);
+                Relax(current - m_width + 1, first.Key, DiagonalCost,
+                    x + 1 < m_width && y > 0);
+                Relax(current + m_width - 1, first.Key, DiagonalCost,
+                    x > 0 && y + 1 < m_height);
+                Relax(current + m_width + 1, first.Key, DiagonalCost,
+                    x + 1 < m_width && y + 1 < m_height);
             }
-            return result;
+            return processed;
+        }
 
-            void Relax(int next, float currentDistance, float stepCost, bool inside)
-            {
-                if (!inside) return;
-                float nextDistance = currentDistance + stepCost;
-                if (result[next] >= 0f && result[next] <= nextDistance + 0.0001f)
-                    return;
-                result[next] = nextDistance;
-                Enqueue(next, nextDistance);
-            }
+        private void Relax(
+            int next,
+            float currentDistance,
+            float stepCost,
+            bool inside)
+        {
+            if (!inside) return;
+            float nextDistance = currentDistance + stepCost;
+            if (m_result[next] >= 0f
+                && m_result[next] <= nextDistance + 0.0001f)
+                return;
+            m_result[next] = nextDistance;
+            Enqueue(next, nextDistance);
+        }
 
-            void Enqueue(int tile, float distance)
+        private void Enqueue(int tile, float distance)
+        {
+            if (!m_queue.TryGetValue(distance, out Queue<int> bucket))
             {
-                if (!queue.TryGetValue(distance, out Queue<int> bucket))
-                {
-                    bucket = new Queue<int>();
-                    queue.Add(distance, bucket);
-                }
-                bucket.Enqueue(tile);
+                bucket = new Queue<int>();
+                m_queue.Add(distance, bucket);
             }
+            bucket.Enqueue(tile);
+        }
 
-            KeyValuePair<float, Queue<int>> First(
-                SortedDictionary<float, Queue<int>> items)
-            {
-                foreach (KeyValuePair<float, Queue<int>> pair in items)
-                    return pair;
-                throw new InvalidOperationException("Goal-distance queue is empty.");
-            }
+        private static KeyValuePair<float, Queue<int>> First(
+            SortedDictionary<float, Queue<int>> items)
+        {
+            foreach (KeyValuePair<float, Queue<int>> pair in items)
+                return pair;
+            throw new InvalidOperationException(
+                "Goal-distance queue is empty.");
         }
     }
 

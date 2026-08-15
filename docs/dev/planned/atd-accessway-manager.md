@@ -1,9 +1,10 @@
 # ATD Accessway Manager
 
-Status: approved design; implementation steps 1-4 complete and step 5 partially
-implemented. Adaptive budgeting
-has a preserved prototype but is intentionally unwired until step 11. Interactive
-migration and the remaining heavy-phase incrementalization remain.
+Status: approved design; implementation steps 1-5 complete. Interactive Create
+Designations access-ramp, existing-terrain repair, and planned-tower ghost
+access are now manager-owned; the remaining heavy phases are still to be
+migrated. Adaptive budgeting has a preserved prototype but is intentionally
+unwired until step 11.
 
 Decision record: [Coordinate accessway work through one cooperative manager](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
 
@@ -555,7 +556,7 @@ Useful console diagnostics:
    backpressure, and manager health diagnostics. Farming stale/overflow results
    feed its existing 10-to-60-second owner retry policy; owner completion and
    explicit cancellation remain non-retrying.
-5. **Partially implemented.** Make farming snapshot and search-session
+5. Make farming snapshot and search-session
    preparation cooperative. Deterministic V1/V2 fixtures now validate once
    during initialization, cache the terminal result, and fail closed if
    validation fails. Snapshot collection, projected-designation analysis,
@@ -567,12 +568,22 @@ Useful console diagnostics:
    the current request without cancelling it. Capture records the
    relevant world revisions before its first slice and validates them before
    publishing the immutable snapshot; a changed capture is discarded and
-   enters the existing bounded retry policy. Request-scoped fixed-provider
-   ground graph overlays reuse immutable topology and incrementally update goal
-   distances. Search-session construction remains an atomic preparation step
-   and is instrumented for the next incrementalization pass.
+   enters the existing bounded retry policy. Snapshot-level V1 ground-route and
+   unrestricted-goal potentials,
+   plus V1 request goal collection and height-aware A* goal-distance indexing,
+   now advance cooperatively through manager-owned builders. V1 initial
+   expansion, final immutable snapshot assembly, and the V2 potential/session
+   constructors remain atomic and instrumented for the next pass.
 6. Route Create Designations and planned-tower access through the manager with
-   strict interactive priority and request-owned cancellation.
+   strict interactive priority and request-owned cancellation. The primary
+   Create Designations mining access-ramp phase now queues a
+   `CreateDesignations` request, advances through the same cooperative slice
+   budget as farming, exposes request-scoped progress/cancellation diagnostics,
+   and commits its ramp result back to the owning scan. Existing-terrain repair
+   and planned-tower ghost access now use the same request-owned handoff and
+   cancellation boundary, including their distinct marker/reachability
+   results. Snapshot construction and the remaining synchronous preparation
+   phases are still separate follow-up work.
 7. Remove legacy ramp generation, candidate comparison, global result state,
    and every synchronous fallback after all callers have migrated.
 8. Integrate the future Construction Assist leveling facet through the same
@@ -607,13 +618,17 @@ automation is explicitly disabled and re-enabled.
 
 This slice removes the synchronous farming drain. Snapshot preparation now
 checks cancellation and yields through its major collection and graph-building
-phases, but search-session construction and one `Step(1)` expansion remain
-atomic operations whose timings are reported separately. The latest large live
-snapshot stayed below 61 ms per snapshot slice; request preparation reached
-about 139 ms in one fixed-provider case, while the fixed-provider ground-graph
-component itself stayed below 100 ms. The remaining search-session work belongs
-to the next incrementalization pass; step 9 handles any later
-materialization/commit overruns.
+phases. V1 snapshot finalization now yields while building its traversable-ground
+route field and unrestricted goal potential. V1 request preparation likewise
+yields while collecting goals and flooding each height-aware A* goal-distance
+band; synchronous callers drain the same builders, retaining one implementation
+and identical route semantics. Before these changes, current live V1 tests
+showed 287-354 ms in the snapshot-constructor tail and 108-369 ms of a 120-382
+ms session preparation in the request goal index. V1 initial expansion, final
+snapshot object assembly, and V2 request preparation remain atomic operations
+whose component timings are reported separately; the latest V2 samples took
+about 11-127 ms in total. Step 9 handles any later materialization/commit
+overruns.
 
 ## Acceptance criteria
 
@@ -623,8 +638,10 @@ materialization/commit overruns.
   once per production snapshot.
 - Snapshot preparation exposes bounded cooperative progress, cancellation, and
   phase diagnostics; the measured 124,711-tile farming case no longer produces
-  a monolithic pre-search frame stall. Search-session preparation exposes
-  component timings and remains the next atomic phase to incrementalize.
+  a monolithic pre-search frame stall. Snapshot and request-level V1
+  goal-distance indexing are cooperative and preserve synchronous-search
+  equivalence; remaining V1/V2 constructor atomics retain phase/component
+  timings.
 - A world revision change during cooperative capture discards the partial
   snapshot before it can be searched or materialized.
 - Measured manager work stays within the configured frame budget except for

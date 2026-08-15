@@ -15,6 +15,7 @@ namespace AutoTerrainDesignations.Access
         public double RequestGroundGraphMilliseconds;
         public double PotentialFieldMilliseconds;
         public double V2SessionMilliseconds;
+        public double V1GoalCollectionMilliseconds;
         public double V1GoalIndexMilliseconds;
         public double V1InitialExpansionMilliseconds;
     }
@@ -563,6 +564,39 @@ namespace AutoTerrainDesignations.Access
                     [treeTwo.Origin] = treeTwo,
                 },
                 new[] { new Tile2i(3, 0) });
+            var incrementalGroundGoalBuild =
+                new AccessV1GroundGoalDistance.BuildSession(
+                    new HashSet<Tile2i>
+                    {
+                        Tile2i.Zero,
+                        new Tile2i(3, 0),
+                        new Tile2i(10, 10),
+                    },
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>
+                    {
+                        [treeOne.Origin] = treeOne,
+                        [treeTwo.Origin] = treeTwo,
+                    },
+                    new[] { new Tile2i(3, 0) },
+                    takeOwnership: false);
+            int groundGoalBuildAdvances = 0;
+            while (!incrementalGroundGoalBuild.IsComplete
+                && groundGoalBuildAdvances < 64)
+            {
+                incrementalGroundGoalBuild.Advance(maxWorkItems: 1);
+                groundGoalBuildAdvances++;
+            }
+            if (!incrementalGroundGoalBuild.IsComplete
+                || groundGoalBuildAdvances <= 1
+                || !incrementalGroundGoalBuild.Result.TryGetDistance(
+                    Tile2i.Zero, out float incrementalTreeCorridorDistance)
+                || Math.Abs(incrementalTreeCorridorDistance - 3f) > 0.0001f)
+            {
+                failure =
+                    "V1 snapshot ground-goal preparation must advance "
+                    + "incrementally without changing its distances";
+                return false;
+            }
             if (!groundGoalDistance.TryGetDistance(Tile2i.Zero, out float treeCorridorDistance)
                 || Math.Abs(treeCorridorDistance - 3f) > 0.0001f
                 || !groundGoalDistance.EnumerateDescendingSteps(Tile2i.Zero)
@@ -1348,8 +1382,34 @@ namespace AutoTerrainDesignations.Access
                     astarFixture.GoalGroundNodes),
                 1,
                 AccessPathIntent.ConstructAccessway);
+            AccessPathSearchSessionBuilder incrementalSessionBuilder =
+                CreateSessionBuilder(astarRequest);
+            int sessionPreparationAdvances = 0;
+            while (!incrementalSessionBuilder.IsComplete
+                && sessionPreparationAdvances < 4096)
+            {
+                incrementalSessionBuilder.Advance(maxWorkItems: 1);
+                sessionPreparationAdvances++;
+            }
+            if (!incrementalSessionBuilder.IsComplete
+                || sessionPreparationAdvances <= 1)
+            {
+                failure =
+                    "V1 A* session preparation must advance incrementally "
+                    + "instead of draining its goal index atomically";
+                return false;
+            }
+            AccessPathSearchSession incrementalSession =
+                incrementalSessionBuilder.Session;
+            while (!incrementalSession.IsComplete)
+                incrementalSession.Step(int.MaxValue);
             AccessSearchResult astarResult = FindPath(astarRequest);
             if (!astarResult.Success
+                || !incrementalSession.Result.Success
+                || Math.Abs(incrementalSession.Result.Cost
+                    - astarResult.Cost) > 0.0001f
+                || incrementalSession.Result.Path.Count
+                    != astarResult.Path.Count
                 || Math.Abs(astarResult.Cost - requestResult.Cost) > 0.0001f
                 || !CostBreakdownsMatch(astarResult, requestResult)
                 || !CostBreakdownSumsToTotal(astarResult)
@@ -1358,7 +1418,9 @@ namespace AutoTerrainDesignations.Access
             { failure = "height-aware A* must match Dijkstra fixture route, cost, and cost breakdown"; return false; }
             for (int i = 0; i < astarResult.Path.Count; i++)
             {
-                if (!astarResult.Path[i].Equals(requestResult.Path[i]))
+                if (!astarResult.Path[i].Equals(requestResult.Path[i])
+                    || !incrementalSession.Result.Path[i].Equals(
+                        astarResult.Path[i]))
                 { failure = "height-aware A* must reproduce the Dijkstra fixture path"; return false; }
             }
             Tile2i startHandoffGoal = fixtureStart + new RelTile2i(2, 2);
@@ -1698,18 +1760,165 @@ namespace AutoTerrainDesignations.Access
             AccessPathRequest request,
             out AccessSearchSessionBuildDiagnostics buildDiagnostics)
         {
-            buildDiagnostics = new AccessSearchSessionBuildDiagnostics();
-            long sessionStart = AtdDiagnostics.Timestamp();
-            AccessPathSearchSession session = CreateSessionCore(
-                request, buildDiagnostics);
-            buildDiagnostics.TotalMilliseconds = AtdDiagnostics.ElapsedSince(
-                sessionStart) * 1000d / Stopwatch.Frequency;
-            return session;
+            AccessPathSearchSessionBuilder build =
+                CreateSessionBuilder(request);
+            while (!build.IsComplete)
+                build.Advance(int.MaxValue);
+            buildDiagnostics = build.Diagnostics;
+            return build.Session;
+        }
+
+        internal static AccessPathSearchSessionBuilder CreateSessionBuilder(
+            AccessPathRequest request)
+            => new AccessPathSearchSessionBuilder(request);
+
+        internal sealed class AccessPathSearchSessionBuilder
+        {
+            private readonly AccessPathRequest m_request;
+            private readonly Dictionary<int, List<Tile2i>>
+                m_goalsByHeight2 = new();
+            private IEnumerator<Tile2i>? m_groundGoalEnumerator;
+            private IReadOnlyList<Tile2i>? m_fixedGoalOrigins;
+            private int m_fixedGoalIndex;
+            private HeightAwareGoalIndex.BuildSession? m_goalIndexBuild;
+            private HeightAwareGoalIndex? m_prebuiltV1GoalIndex;
+            private AccessPathSearchSession? m_session;
+
+            public bool IsComplete => m_session != null;
+            public AccessPathSearchSession Session => m_session
+                ?? throw new InvalidOperationException(
+                    "Search session preparation is not complete.");
+            public AccessSearchSessionBuildDiagnostics Diagnostics { get; } =
+                new AccessSearchSessionBuildDiagnostics();
+            public string Phase { get; private set; } =
+                "Preparing search session";
+
+            internal AccessPathSearchSessionBuilder(AccessPathRequest request)
+            {
+                m_request = request;
+                if (!CanBuildV1GoalIndexIncrementally(request)) return;
+                bool includeGroundGoals =
+                    request.Goal.GroundTileNodes.Count > 0;
+                m_groundGoalEnumerator = includeGroundGoals
+                    ? request.Snapshot.GoalGroundNodes.GetEnumerator()
+                    : null;
+                m_fixedGoalOrigins = request.Goal.FixedProfileNodes;
+                Phase = "Collecting search goals";
+            }
+
+            public int Advance(int maxWorkItems)
+            {
+                if (IsComplete) return 0;
+                long advanceStart = AtdDiagnostics.Timestamp();
+                int processed = 0;
+                if (m_groundGoalEnumerator != null
+                    || m_fixedGoalOrigins != null)
+                {
+                    long goalCollectionStart = AtdDiagnostics.Timestamp();
+                    processed = CollectV1Goals(maxWorkItems);
+                    Diagnostics.V1GoalCollectionMilliseconds +=
+                        AtdDiagnostics.ElapsedSince(goalCollectionStart)
+                        * 1000d / Stopwatch.Frequency;
+                }
+                else if (m_goalIndexBuild != null)
+                {
+                    long goalIndexStart = AtdDiagnostics.Timestamp();
+                    processed = m_goalIndexBuild.Advance(maxWorkItems);
+                    Diagnostics.V1GoalIndexMilliseconds +=
+                        AtdDiagnostics.ElapsedSince(goalIndexStart)
+                        * 1000d / Stopwatch.Frequency;
+                    if (m_goalIndexBuild.IsComplete)
+                    {
+                        m_prebuiltV1GoalIndex = m_goalIndexBuild.Result;
+                        m_goalIndexBuild = null;
+                        Phase = "Finalizing search session";
+                    }
+                }
+                else
+                {
+                    m_session = CreateSessionCore(
+                        m_request, Diagnostics, m_prebuiltV1GoalIndex);
+                    Phase = "Search session ready";
+                    processed = 1;
+                }
+                Diagnostics.TotalMilliseconds +=
+                    AtdDiagnostics.ElapsedSince(advanceStart)
+                    * 1000d / Stopwatch.Frequency;
+                return processed;
+            }
+
+            private int CollectV1Goals(int maxWorkItems)
+            {
+                int remaining = Math.Max(1, maxWorkItems);
+                int processed = 0;
+                while (m_groundGoalEnumerator != null && remaining > 0)
+                {
+                    if (!m_groundGoalEnumerator.MoveNext())
+                    {
+                        m_groundGoalEnumerator.Dispose();
+                        m_groundGoalEnumerator = null;
+                        break;
+                    }
+                    Tile2i goal = m_groundGoalEnumerator.Current;
+                    if (m_request.Snapshot.TryGetGroundHeight2(
+                        goal, out int height2))
+                        AddV1Goal(m_goalsByHeight2, height2, goal);
+                    remaining--;
+                    processed++;
+                }
+                while (m_groundGoalEnumerator == null
+                    && m_fixedGoalOrigins != null
+                    && m_fixedGoalIndex < m_fixedGoalOrigins.Count
+                    && remaining > 0)
+                {
+                    Tile2i goal =
+                        m_fixedGoalOrigins[m_fixedGoalIndex++];
+                    if (m_request.Snapshot.TryGetFixedProfile(
+                        goal, out AccessHeightProfile profile))
+                        AddV1Goal(
+                            m_goalsByHeight2,
+                            profile.Center2,
+                            goal + new RelTile2i(2, 2));
+                    remaining--;
+                    processed++;
+                }
+                if (m_groundGoalEnumerator == null
+                    && m_fixedGoalOrigins != null
+                    && m_fixedGoalIndex >= m_fixedGoalOrigins.Count)
+                {
+                    bool includeGroundGoals =
+                        m_request.Goal.GroundTileNodes.Count > 0;
+                    m_fixedGoalOrigins = null;
+                    m_goalIndexBuild =
+                        new HeightAwareGoalIndex.BuildSession(
+                            m_request.Snapshot,
+                            m_goalsByHeight2,
+                            includeGroundGoals);
+                    Phase = "Building goal distance index";
+                }
+                return processed;
+            }
+
+            private static bool CanBuildV1GoalIndexIncrementally(
+                AccessPathRequest request)
+                => request.RequiredWidth == 1
+                    && request.Snapshot.UseAStar
+                    && request.Start.Kind
+                        == AccessPathEndpointKind.FixedProfiles
+                    && (request.Goal.Kind
+                        == AccessPathEndpointKind.GroundTiles
+                        || request.Goal.Kind
+                            == AccessPathEndpointKind.FixedProfiles
+                        || request.Goal.Kind
+                            == AccessPathEndpointKind.CombinedGoals)
+                    && request.Intent
+                        == AccessPathIntent.ConstructAccessway;
         }
 
         private static AccessPathSearchSession CreateSessionCore(
             AccessPathRequest request,
-            AccessSearchSessionBuildDiagnostics buildDiagnostics)
+            AccessSearchSessionBuildDiagnostics buildDiagnostics,
+            HeightAwareGoalIndex? prebuiltV1GoalIndex = null)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             var diagnostics = new AccessSearchDiagnostics();
@@ -1869,7 +2078,8 @@ namespace AutoTerrainDesignations.Access
             return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
                 includeGroundGoals, useAStarHeuristic: request.Snapshot.UseAStar,
                 maxCostLimit: request.MaxCostLimit,
-                buildDiagnostics: buildDiagnostics);
+                buildDiagnostics: buildDiagnostics,
+                prebuiltGoalIndex: prebuiltV1GoalIndex);
         }
 
         internal static AccessV2GroundGraph BuildV2RequestGroundGraph(
@@ -1910,7 +2120,8 @@ namespace AutoTerrainDesignations.Access
             bool includeGroundGoals,
             bool useAStarHeuristic,
             float maxCostLimit,
-            AccessSearchSessionBuildDiagnostics? buildDiagnostics = null)
+            AccessSearchSessionBuildDiagnostics? buildDiagnostics = null,
+            HeightAwareGoalIndex? prebuiltGoalIndex = null)
         {
             var rejections = new Dictionary<string, int>(StringComparer.Ordinal);
             var diagnostics = new AccessSearchDiagnostics();
@@ -1938,41 +2149,21 @@ namespace AutoTerrainDesignations.Access
                     AtdDiagnostics.ElapsedSince(requestEnvelopeStart)
                     * 1000d / Stopwatch.Frequency;
 
-            var goalsByHeight2 = new Dictionary<int, List<Tile2i>>();
-            if (includeGroundGoals)
-            {
-                foreach (Tile2i goal in snapshot.GoalGroundNodes)
-                    if (snapshot.TryGetGroundHeight2(goal, out int height2))
-                        AddGoal(height2, goal);
-            }
-            if (fixedGoalOrigins != null)
-            {
-                foreach (Tile2i goal in fixedGoalOrigins)
-                {
-                    if (snapshot.TryGetFixedProfile(goal, out AccessHeightProfile profile))
-                        AddGoal(profile.Center2, goal + new RelTile2i(2, 2));
-                }
-            }
             long goalIndexStart = AtdDiagnostics.Timestamp();
-            HeightAwareGoalIndex goalIndex =
-                snapshot.UseAStar && useAStarHeuristic
+            HeightAwareGoalIndex goalIndex = prebuiltGoalIndex
+                ?? (snapshot.UseAStar && useAStarHeuristic
                     ? HeightAwareGoalIndex.Build(
-                        snapshot, goalsByHeight2, includeGroundGoals)
-                    : HeightAwareGoalIndex.Empty;
-            if (buildDiagnostics != null)
+                        snapshot,
+                        BuildV1GoalsByHeight(
+                            snapshot,
+                            fixedGoalOrigins,
+                            includeGroundGoals),
+                        includeGroundGoals)
+                    : HeightAwareGoalIndex.Empty);
+            if (buildDiagnostics != null && prebuiltGoalIndex == null)
                 buildDiagnostics.V1GoalIndexMilliseconds =
                     AtdDiagnostics.ElapsedSince(goalIndexStart)
                     * 1000d / Stopwatch.Frequency;
-
-            void AddGoal(int height2, Tile2i goal)
-            {
-                if (!goalsByHeight2.TryGetValue(height2, out List<Tile2i> goals))
-                {
-                    goals = new List<Tile2i>();
-                    goalsByHeight2.Add(height2, goals);
-                }
-                goals.Add(goal);
-            }
 
             var distance = new Dictionary<AccessSearchNode, float>();
             var previous = new Dictionary<AccessSearchNode, AccessSearchNode>();
@@ -2006,6 +2197,47 @@ namespace AutoTerrainDesignations.Access
                 distance, previous, generatedHistory, queue, rejections, diagnostics, lastRejectedGoalPath,
                 lastGoalRejectionReason, lastRejectedGoalCost,
                 handoffDominance);
+        }
+
+        private static Dictionary<int, List<Tile2i>> BuildV1GoalsByHeight(
+            AccessSearchSnapshot snapshot,
+            HashSet<Tile2i>? fixedGoalOrigins,
+            bool includeGroundGoals)
+        {
+            var goalsByHeight2 = new Dictionary<int, List<Tile2i>>();
+            if (includeGroundGoals)
+            {
+                foreach (Tile2i goal in snapshot.GoalGroundNodes)
+                    if (snapshot.TryGetGroundHeight2(goal, out int height2))
+                        AddV1Goal(goalsByHeight2, height2, goal);
+            }
+            if (fixedGoalOrigins != null)
+            {
+                foreach (Tile2i goal in fixedGoalOrigins)
+                {
+                    if (snapshot.TryGetFixedProfile(
+                        goal, out AccessHeightProfile profile))
+                        AddV1Goal(
+                            goalsByHeight2,
+                            profile.Center2,
+                            goal + new RelTile2i(2, 2));
+                }
+            }
+            return goalsByHeight2;
+        }
+
+        private static void AddV1Goal(
+            Dictionary<int, List<Tile2i>> goalsByHeight2,
+            int height2,
+            Tile2i goal)
+        {
+            if (!goalsByHeight2.TryGetValue(
+                height2, out List<Tile2i> goals))
+            {
+                goals = new List<Tile2i>();
+                goalsByHeight2.Add(height2, goals);
+            }
+            goals.Add(goal);
         }
 
         private static AccessUsefulHeightEnvelope?
@@ -4418,23 +4650,88 @@ namespace AutoTerrainDesignations.Access
                 IReadOnlyDictionary<int, List<Tile2i>> goalsByHeight2,
                 bool includeGroundGoals = false)
             {
-                var bands = new List<GoalHeightBand>(goalsByHeight2.Count);
-                foreach (KeyValuePair<int, List<Tile2i>> pair in goalsByHeight2)
+                var build = new BuildSession(
+                    snapshot, goalsByHeight2, includeGroundGoals);
+                while (!build.IsComplete)
+                    build.Advance(int.MaxValue);
+                return build.Result;
+            }
+
+            internal sealed class BuildSession
+            {
+                private readonly AccessSearchSnapshot m_snapshot;
+                private readonly bool m_includeGroundGoals;
+                private readonly List<KeyValuePair<int, List<Tile2i>>> m_sources;
+                private readonly List<GoalHeightBand> m_bands;
+                private int m_sourceIndex;
+                private AccessGoalDistanceBuildSession? m_distanceBuild;
+                private HeightAwareGoalIndex? m_result;
+
+                public bool IsComplete => m_result != null;
+                public HeightAwareGoalIndex Result => m_result
+                    ?? throw new InvalidOperationException(
+                        "Goal index preparation is not complete.");
+
+                public BuildSession(
+                    AccessSearchSnapshot snapshot,
+                    IReadOnlyDictionary<int, List<Tile2i>> goalsByHeight2,
+                    bool includeGroundGoals)
                 {
-                    if (pair.Value.Count == 0) continue;
-                    bands.Add(new GoalHeightBand(
-                        pair.Key,
-                        AccessSearchSnapshot.BuildGoalDistance(
-                            snapshot.GoalDistanceMin,
-                            snapshot.GoalDistanceMax,
-                            new HashSet<Tile2i>(pair.Value))));
+                    m_snapshot = snapshot;
+                    m_includeGroundGoals = includeGroundGoals;
+                    m_sources = goalsByHeight2
+                        .Where(pair => pair.Value.Count > 0)
+                        .ToList();
+                    m_bands = new List<GoalHeightBand>(m_sources.Count);
+                    CompleteIfFinished();
                 }
-                return new HeightAwareGoalIndex(
-                    snapshot.GoalDistanceMin,
-                    snapshot.GoalDistanceWidth,
-                    snapshot.GoalDistanceHeight,
-                    bands.ToArray(),
-                    includeGroundGoals ? snapshot.V1GroundGoalDistance : null);
+
+                public int Advance(int maxWorkItems)
+                {
+                    if (IsComplete) return 0;
+                    int remaining = Math.Max(1, maxWorkItems);
+                    int processed = 0;
+                    while (!IsComplete && remaining > 0)
+                    {
+                        if (m_distanceBuild == null)
+                        {
+                            KeyValuePair<int, List<Tile2i>> source =
+                                m_sources[m_sourceIndex];
+                            m_distanceBuild =
+                                new AccessGoalDistanceBuildSession(
+                                    m_snapshot.GoalDistanceMin,
+                                    m_snapshot.GoalDistanceMax,
+                                    source.Value);
+                        }
+                        int advanced = m_distanceBuild.Advance(remaining);
+                        if (advanced == 0 && m_distanceBuild.IsComplete)
+                            advanced = 1;
+                        processed += advanced;
+                        remaining -= advanced;
+                        if (!m_distanceBuild.IsComplete)
+                            break;
+                        m_bands.Add(new GoalHeightBand(
+                            m_sources[m_sourceIndex].Key,
+                            m_distanceBuild.Result));
+                        m_distanceBuild = null;
+                        m_sourceIndex++;
+                        CompleteIfFinished();
+                    }
+                    return processed;
+                }
+
+                private void CompleteIfFinished()
+                {
+                    if (m_sourceIndex < m_sources.Count) return;
+                    m_result = new HeightAwareGoalIndex(
+                        m_snapshot.GoalDistanceMin,
+                        m_snapshot.GoalDistanceWidth,
+                        m_snapshot.GoalDistanceHeight,
+                        m_bands.ToArray(),
+                        m_includeGroundGoals
+                            ? m_snapshot.V1GroundGoalDistance
+                            : null);
+                }
             }
 
             public float GetLowerBound(

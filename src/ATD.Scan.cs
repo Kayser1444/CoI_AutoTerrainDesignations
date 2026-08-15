@@ -34,6 +34,49 @@ namespace AutoTerrainDesignations
     {
         private static int s_latestCreateDesignationsRequestId;
         private static bool s_createDesignationsOperationActive;
+        private static ATDAccesswayRequestHandle?
+            s_createDesignationsAccessRequest;
+
+        private sealed class CreateDesignationsManagedAccessResult
+        {
+            public RampGenerationResult RampResult { get; }
+            public IReadOnlyList<Tile2i> PlacedOrigins { get; }
+
+            public CreateDesignationsManagedAccessResult(
+                RampGenerationResult rampResult,
+                IReadOnlyList<Tile2i> placedOrigins)
+            {
+                RampResult = rampResult;
+                PlacedOrigins = placedOrigins;
+            }
+        }
+
+        private sealed class ExistingTerrainRepairManagedResult
+        {
+            public ExistingTerrainWorkAccessResult RepairResult { get; }
+
+            public ExistingTerrainRepairManagedResult(
+                ExistingTerrainWorkAccessResult repairResult)
+            {
+                RepairResult = repairResult;
+            }
+        }
+
+        private sealed class PlannedTowerManagedResult
+        {
+            public PlannedTowerAccessResult AccessResult { get; }
+
+            public PlannedTowerManagedResult(
+                PlannedTowerAccessResult accessResult)
+            {
+                AccessResult = accessResult;
+            }
+        }
+
+        private sealed class CreateDesignationsAccessRequestCompletion
+        {
+            public ATDAccesswayHandleSnapshot Snapshot { get; set; }
+        }
         private static readonly Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>
             s_manualDebrisRemovalRequestsByTower =
                 new Dictionary<EntityId, List<ATDPropRemovalRequestHandle>>();
@@ -83,14 +126,122 @@ namespace AutoTerrainDesignations
             }
         }
 
+        private static IEnumerator RunCreateDesignationsAccessRampWithDebugGate(
+            ExperimentalAccessSliceControl sliceControl,
+            IEnumerator routine)
+        {
+            try
+            {
+                while (!sliceControl.CancellationRequested)
+                {
+                    bool movedNext;
+                    object? current = null;
+                    InvalidateTowerReachabilityFlood();
+                    s_createDesignationsDebugContext = true;
+                    try
+                    {
+                        movedNext = routine.MoveNext();
+                        if (movedNext)
+                            current = routine.Current;
+                    }
+                    finally
+                    {
+                        s_createDesignationsDebugContext = false;
+                    }
+
+                    if (!movedNext)
+                        yield break;
+                    yield return current;
+                }
+            }
+            finally
+            {
+                (routine as IDisposable)?.Dispose();
+            }
+        }
+
+        private static string BuildCreateDesignationsAccessOwnerKey(
+            IAreaManagingTower tower,
+            string phase)
+        {
+            string towerOwnerKey = TryGetTowerEntityId(
+                    tower,
+                    out EntityId towerEntityId)
+                && towerEntityId.IsValid
+                ? towerEntityId.ToString()
+                : $"area:{tower.Area.BoundingBoxMin.X}:"
+                    + $"{tower.Area.BoundingBoxMin.Y}:"
+                    + $"{tower.Area.BoundingBoxMax.X}:"
+                    + $"{tower.Area.BoundingBoxMax.Y}";
+            return "create-designations/tower:" + towerOwnerKey
+                + "/" + phase;
+        }
+
+        private static IEnumerator AwaitCreateDesignationsAccessRequest(
+            string ownerKey,
+            string workFingerprint,
+            Func<ExperimentalAccessSliceControl, IEnumerator> workFactory,
+            Func<ATDAccesswayRequestResult> resultFactory,
+            CreateDesignationsAccessRequestCompletion completion,
+            ATDAccesswayRequestKind requestKind =
+                ATDAccesswayRequestKind.CreateDesignations)
+        {
+            var request = new ATDAccesswayRequest(
+                ownerKey,
+                workFingerprint,
+                requestKind,
+                ATDAccesswayPriority.Interactive,
+                () => new ATDAccesswayCoroutineWork(
+                    workFactory,
+                    resultFactory,
+                    GetManagedAccesswaySliceBudgetMilliseconds));
+            ATDAccesswayRequestHandle? handle = null;
+            bool reachedTerminalState = false;
+            try
+            {
+                handle = EnqueueAccesswayRequest(request);
+                s_createDesignationsAccessRequest = handle;
+                ATDAccesswayHandleSnapshot snapshot;
+                do
+                {
+                    snapshot = ReadAccesswayRequest(handle);
+                    if (!snapshot.IsTerminal)
+                        yield return null;
+                }
+                while (!snapshot.IsTerminal);
+                completion.Snapshot = snapshot;
+                reachedTerminalState = true;
+            }
+            finally
+            {
+                if (!reachedTerminalState && handle != null)
+                    CancelAccesswayRequest(handle, "Superseded");
+                if (handle != null
+                    && ReferenceEquals(
+                        s_createDesignationsAccessRequest,
+                        handle))
+                    s_createDesignationsAccessRequest = null;
+            }
+        }
+
         private static void QueueCreateDesignations(
             IAreaManagingTower tower,
-            object? panelKey)
+            object? panelKey,
+            string source)
         {
             int requestId = ++s_latestCreateDesignationsRequestId;
+            string towerText = TryGetTowerEntityId(tower, out EntityId towerId) && towerId.IsValid
+                ? towerId.ToString()
+                : "?";
+            LogDebug(
+                $"Create Designations request {requestId} queued "
+                + $"source={source} tower={towerText} panelKey={(panelKey != null ? "present" : "none")}.");
             if (s_createDesignationsOperationActive)
             {
                 s_cancelExperimentalAccessSearch = true;
+                CancelAccesswayRequest(
+                    s_createDesignationsAccessRequest,
+                    "Superseded");
                 LogDebug($"Create Designations request {requestId} supersedes the active operation.");
             }
             s_coroutineHost?.StartCoroutine(
@@ -127,6 +278,12 @@ namespace AutoTerrainDesignations
             }
             finally
             {
+                CancelAccesswayRequest(
+                    s_createDesignationsAccessRequest,
+                    requestId == s_latestCreateDesignationsRequestId
+                        ? "CreateDesignationsFinished"
+                        : "Superseded");
+                s_createDesignationsAccessRequest = null;
                 (guarded as IDisposable)?.Dispose();
                 HideTerrainAnalysisProgressToast();
                 s_createDesignationsOperationActive = false;
@@ -165,6 +322,8 @@ namespace AutoTerrainDesignations
                         repairResult);
                 while (repairRoutine.MoveNext())
                     yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
 
                 if (repairResult.InitialReachabilityEvaluated
                     && repairResult.AllClustersInitiallyConnected)
@@ -180,6 +339,8 @@ namespace AutoTerrainDesignations
                             plannedTowerAccess);
                     while (plannedTowerRoutine.MoveNext())
                         yield return plannedTowerRoutine.Current;
+                    if (plannedTowerAccess.RequestCancelled)
+                        yield break;
                 }
                 else
                 {
@@ -206,6 +367,8 @@ namespace AutoTerrainDesignations
                         plannedTowerAccess);
                 while (plannedTowerRoutine.MoveNext())
                     yield return plannedTowerRoutine.Current;
+                if (plannedTowerAccess.RequestCancelled)
+                    yield break;
                 if (plannedTowerAccess.MarkerFound)
                 {
                     MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
@@ -223,8 +386,15 @@ namespace AutoTerrainDesignations
             List<LooseProductProto> scanProducts = GetCandidateScanProducts(tower);
             if (scanProducts.Count == 0)
             {
-                yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 if (inspectorInstance != null)
                 {
@@ -313,8 +483,15 @@ namespace AutoTerrainDesignations
 
             if (targetProducts.Count == 0)
             {
-                yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
@@ -374,8 +551,15 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
@@ -385,8 +569,15 @@ namespace AutoTerrainDesignations
 
             if (maxOreDepths.Count == 0)
             {
-                yield return RepairExistingTerrainWorkAccessCoroutine(
-                    tower, terrMgr, towerSettings, generateRamps);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
@@ -415,7 +606,15 @@ namespace AutoTerrainDesignations
             {
                 RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
                 ClearGeneratedHarvestTreesForTower(tower);
-                yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine =
+                    RepairExistingTerrainWorkAccessCoroutine(
+                        tower, terrMgr, towerSettings, generateRamps,
+                        repairResult);
+                while (repairRoutine.MoveNext())
+                    yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled)
+                    yield break;
                 MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                 yield break;
             }
@@ -436,7 +635,15 @@ namespace AutoTerrainDesignations
                 {
                     RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
                     ClearGeneratedHarvestTreesForTower(tower);
-                    yield return RepairExistingTerrainWorkAccessCoroutine(tower, terrMgr, towerSettings, generateRamps);
+                    var repairResult = new ExistingTerrainWorkAccessResult();
+                    IEnumerator repairRoutine =
+                        RepairExistingTerrainWorkAccessCoroutine(
+                            tower, terrMgr, towerSettings, generateRamps,
+                            repairResult);
+                    while (repairRoutine.MoveNext())
+                        yield return repairRoutine.Current;
+                    if (repairResult.RequestCancelled)
+                        yield break;
                     MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
                     yield break;
                 }
@@ -510,25 +717,102 @@ namespace AutoTerrainDesignations
                 LogDebug("Creating access ramp...");
                 var placedAccesswayOrigins = new List<Tile2i>();
                 var rampResult = new RampGenerationResult();
-                yield return CreateAccessRampCoroutine(
-                    tower,
-                    maxOreDepths,
-                    cornerHeights,
-                    terrMgr,
-                    towerSettings.RampWidth,
-                    s_miningProto,
-                    placedAccesswayOrigins,
-                    null,
-                    useLocalSurfaceReference: false,
-                    allowExistingPlannedRampShortcut: true,
-                    result: rampResult);
-                RampPlacementOutcome rampOutcome = rampResult.Outcome;
+                string towerOwnerKey = TryGetTowerEntityId(
+                        tower,
+                        out EntityId towerEntityId)
+                    && towerEntityId.IsValid
+                    ? towerEntityId.ToString()
+                    : $"area:{tower.Area.BoundingBoxMin.X}:"
+                        + $"{tower.Area.BoundingBoxMin.Y}:"
+                        + $"{tower.Area.BoundingBoxMax.X}:"
+                        + $"{tower.Area.BoundingBoxMax.Y}";
+                string accessOwnerKey =
+                    "create-designations/tower:" + towerOwnerKey;
+                string accessFingerprint = miningPlanFingerprint
+                    + "|interactive-ramp|width="
+                    + towerSettings.RampWidth;
+                var accessRequest = new ATDAccesswayRequest(
+                    accessOwnerKey,
+                    accessFingerprint,
+                    ATDAccesswayRequestKind.CreateDesignations,
+                    ATDAccesswayPriority.Interactive,
+                    () => new ATDAccesswayCoroutineWork(
+                        sliceControl =>
+                            RunCreateDesignationsAccessRampWithDebugGate(
+                                sliceControl,
+                                CreateAccessRampCoroutine(
+                                    tower,
+                                    maxOreDepths,
+                                    cornerHeights,
+                                    terrMgr,
+                                    towerSettings.RampWidth,
+                                    s_miningProto,
+                                    placedAccesswayOrigins,
+                                    null,
+                                    useLocalSurfaceReference: false,
+                                    allowExistingPlannedRampShortcut: true,
+                                    result: rampResult,
+                                    sliceControl: sliceControl)),
+                        () =>
+                        {
+                            var payload =
+                                new CreateDesignationsManagedAccessResult(
+                                    rampResult,
+                                    placedAccesswayOrigins.ToArray());
+                            bool success = rampResult.Outcome
+                                == RampPlacementOutcome.Crested
+                                || rampResult.Outcome
+                                    == RampPlacementOutcome.Truncated;
+                            return success
+                                ? ATDAccesswayRequestResult.Succeeded(payload)
+                                : ATDAccesswayRequestResult.Failed(
+                                    rampResult.Outcome.ToString(),
+                                    payload);
+                        },
+                        GetManagedAccesswaySliceBudgetMilliseconds));
+                ATDAccesswayRequestHandle accessHandle =
+                    EnqueueAccesswayRequest(accessRequest);
+                s_createDesignationsAccessRequest = accessHandle;
+
+                ATDAccesswayHandleSnapshot accessSnapshot;
+                do
+                {
+                    accessSnapshot = ReadAccesswayRequest(
+                        accessHandle);
+                    if (!accessSnapshot.IsTerminal)
+                        yield return null;
+                }
+                while (!accessSnapshot.IsTerminal);
+                if (ReferenceEquals(
+                        s_createDesignationsAccessRequest,
+                        accessHandle))
+                    s_createDesignationsAccessRequest = null;
+
+                // A cancelled or superseded request must leave its unfinished
+                // plan for the next Create Designations request to reconcile.
+                if ((accessSnapshot.State
+                        != ATDAccesswayRequestState.Succeeded
+                    && accessSnapshot.State
+                        != ATDAccesswayRequestState.Failed)
+                    || !(accessSnapshot.Result?.Payload
+                        is CreateDesignationsManagedAccessResult terminalPayload))
+                {
+                    LogExperimentalAccessDebug(
+                        "[ATD Create Designations Access] request ended "
+                        + $"state={accessSnapshot.State} "
+                        + $"reason={accessSnapshot.Result?.Reason ?? "unknown"}");
+                    yield break;
+                }
+
+                RampPlacementOutcome rampOutcome =
+                    terminalPayload.RampResult.Outcome;
                 SetTowerLastRampOutcome(
                     tower, rampOutcome,
-                    rampResult.SuppressWarningNotification);
+                    terminalPayload.RampResult.SuppressWarningNotification);
 
                 var protectedAccesswayOrigins = new HashSet<Tile2i>(preexistingTerrainWorkOrigins);
-                protectedAccesswayOrigins.UnionWith(placedAccesswayOrigins);
+                protectedAccesswayOrigins.UnionWith(
+                    terminalPayload.PlacedOrigins);
                 RemoveFulfilledDesignationsForTower(tower, protectedAccesswayOrigins);
                 CleanupIsolatedLeftoverDesignationsForTower(tower, maxOreDepths, protectedAccesswayOrigins);
             }
@@ -944,6 +1228,7 @@ namespace AutoTerrainDesignations
         {
             public bool InitialReachabilityEvaluated;
             public bool AllClustersInitiallyConnected;
+            public bool RequestCancelled;
         }
 
         private static IEnumerator RepairExistingTerrainWorkAccessCoroutine(
@@ -951,12 +1236,14 @@ namespace AutoTerrainDesignations
             TerrainManager terrMgr,
             ATDTowerSettings towerSettings,
             bool generateRamps,
-            ExistingTerrainWorkAccessResult? repairResult = null)
+            ExistingTerrainWorkAccessResult? repairResult = null,
+            ExperimentalAccessSliceControl? sliceControl = null)
         {
             if (repairResult != null)
             {
                 repairResult.InitialReachabilityEvaluated = false;
                 repairResult.AllClustersInitiallyConnected = false;
+                repairResult.RequestCancelled = false;
             }
             string? skipReason = !generateRamps
                 ? "accessway generation disabled"
@@ -970,16 +1257,76 @@ namespace AutoTerrainDesignations
             if (skipReason != null)
             {
                 LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Repair] skipped reason={skipReason} " +
-                    $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
+                    $"[ATD Experimental Access Repair] skipped reason={skipReason} "
+                    + $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
                 yield break;
             }
 
             if (!HasExistingTerrainWorkEndpoint(tower))
             {
                 LogExperimentalAccessDebug(
-                    "[ATD Experimental Access Repair] skipped reason=no eligible external terrain-work endpoint " +
-                    $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
+                    "[ATD Experimental Access Repair] skipped reason=no eligible external terrain-work endpoint "
+                    + $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
+                yield break;
+            }
+
+            if (sliceControl == null
+                && s_createDesignationsOperationActive)
+            {
+                var managedRepairResult =
+                    new ExistingTerrainWorkAccessResult();
+                var completion =
+                    new CreateDesignationsAccessRequestCompletion();
+                string workFingerprint = "existing-repair|revision="
+                    + CurrentTerrainDesignationRevision
+                    + "|width=" + towerSettings.RampWidth
+                    + "|clearance=" + towerSettings.VehicleClearance;
+                IEnumerator requestRoutine =
+                    AwaitCreateDesignationsAccessRequest(
+                        BuildCreateDesignationsAccessOwnerKey(
+                            tower, "existing-repair"),
+                        workFingerprint,
+                        managedSlice =>
+                            RunCreateDesignationsAccessRampWithDebugGate(
+                                managedSlice,
+                                RepairExistingTerrainWorkAccessCoroutine(
+                                    tower,
+                                    terrMgr,
+                                    towerSettings,
+                                    generateRamps,
+                                    managedRepairResult,
+                                    managedSlice)),
+                        () => ATDAccesswayRequestResult.Succeeded(
+                            new ExistingTerrainRepairManagedResult(
+                                managedRepairResult)),
+                        completion);
+                while (requestRoutine.MoveNext())
+                    yield return requestRoutine.Current;
+
+                if (completion.Snapshot.State
+                        == ATDAccesswayRequestState.Succeeded
+                    && completion.Snapshot.Result?.Payload
+                        is ExistingTerrainRepairManagedResult payload)
+                {
+                    if (repairResult != null)
+                    {
+                        repairResult.InitialReachabilityEvaluated =
+                            payload.RepairResult.InitialReachabilityEvaluated;
+                        repairResult.AllClustersInitiallyConnected =
+                            payload.RepairResult.AllClustersInitiallyConnected;
+                        repairResult.RequestCancelled =
+                            payload.RepairResult.RequestCancelled;
+                    }
+                }
+                else
+                {
+                    if (repairResult != null)
+                        repairResult.RequestCancelled = true;
+                    LogExperimentalAccessDebug(
+                        "[ATD Existing Terrain Repair] request ended "
+                        + $"state={completion.Snapshot.State} "
+                        + $"reason={completion.Snapshot.Result?.Reason ?? "unknown"}");
+                }
                 yield break;
             }
 
@@ -987,7 +1334,7 @@ namespace AutoTerrainDesignations
             var endpointCornerHeights = new Dict<Tile2i, int>();
             var placedAccesswayOrigins = new List<Tile2i>();
             var rampResult = new RampGenerationResult();
-            yield return CreateAccessRampCoroutine(
+            IEnumerator rampRoutine = CreateAccessRampCoroutine(
                 tower,
                 emptyGeneratedPlan,
                 endpointCornerHeights,
@@ -998,7 +1345,10 @@ namespace AutoTerrainDesignations
                 null,
                 useLocalSurfaceReference: false,
                 allowExistingPlannedRampShortcut: true,
-                result: rampResult);
+                result: rampResult,
+                sliceControl: sliceControl);
+            while (rampRoutine.MoveNext())
+                yield return rampRoutine.Current;
             if (repairResult != null)
             {
                 repairResult.InitialReachabilityEvaluated =
@@ -1432,7 +1782,7 @@ namespace AutoTerrainDesignations
 
         internal static void CreateDesignationsForTower(IAreaManagingTower tower)
         {
-            QueueCreateDesignations(tower, null);
+            QueueCreateDesignations(tower, null, "public-api");
         }
 
         /// <summary>
@@ -1442,7 +1792,7 @@ namespace AutoTerrainDesignations
         /// </summary>
         internal static void CreateDesignationsForTower(IAreaManagingTower tower, object? panelKey)
         {
-            QueueCreateDesignations(tower, panelKey);
+            QueueCreateDesignations(tower, panelKey, "mining-panel-button");
         }
 
         internal static void MarkDebrisForRemovalForTower(IAreaManagingTower tower, bool overrideExisting, bool markUnreachable)

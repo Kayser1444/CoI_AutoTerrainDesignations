@@ -31,6 +31,7 @@ namespace AutoTerrainDesignations
         {
             public bool MarkerFound;
             public bool Connected;
+            public bool RequestCancelled;
         }
 
         private sealed class PlannedTowerApproach
@@ -75,10 +76,12 @@ namespace AutoTerrainDesignations
             TerrainManager terrMgr,
             ATDTowerSettings towerSettings,
             bool generateRamps,
-            PlannedTowerAccessResult result)
+            PlannedTowerAccessResult result,
+            ExperimentalAccessSliceControl? sliceControl = null)
         {
             result.MarkerFound = false;
             result.Connected = false;
+            result.RequestCancelled = false;
             if (s_entitiesManager == null)
                 yield break;
 
@@ -87,6 +90,61 @@ namespace AutoTerrainDesignations
             if (ghosts.Count == 0)
                 yield break;
             result.MarkerFound = true;
+
+            if (sliceControl == null
+                && s_createDesignationsOperationActive)
+            {
+                var managedResult = new PlannedTowerAccessResult();
+                var completion =
+                    new CreateDesignationsAccessRequestCompletion();
+                string workFingerprint = "planned-tower|revision="
+                    + CurrentTerrainDesignationRevision
+                    + "|ghosts="
+                    + BuildPlannedTowerGhostFingerprint(tower)
+                    + "|width=" + towerSettings.RampWidth
+                    + "|clearance=" + towerSettings.VehicleClearance;
+                IEnumerator requestRoutine =
+                    AwaitCreateDesignationsAccessRequest(
+                        BuildCreateDesignationsAccessOwnerKey(
+                            tower, "planned-tower"),
+                        workFingerprint,
+                        managedSlice =>
+                            RunCreateDesignationsAccessRampWithDebugGate(
+                                managedSlice,
+                                TryConnectToPlannedMiningTowerGhostCoroutine(
+                                    tower,
+                                    terrMgr,
+                                    towerSettings,
+                                    generateRamps,
+                                    managedResult,
+                                    managedSlice)),
+                        () => ATDAccesswayRequestResult.Succeeded(
+                            new PlannedTowerManagedResult(managedResult)),
+                        completion,
+                        ATDAccesswayRequestKind.PlannedTower);
+                while (requestRoutine.MoveNext())
+                    yield return requestRoutine.Current;
+
+                if (completion.Snapshot.State
+                        == ATDAccesswayRequestState.Succeeded
+                    && completion.Snapshot.Result?.Payload
+                        is PlannedTowerManagedResult payload)
+                {
+                    result.MarkerFound = payload.AccessResult.MarkerFound;
+                    result.Connected = payload.AccessResult.Connected;
+                    result.RequestCancelled =
+                        payload.AccessResult.RequestCancelled;
+                }
+                else
+                {
+                    result.RequestCancelled = true;
+                    LogExperimentalAccessDebug(
+                        "[ATD Planned Tower Access] request ended "
+                        + $"state={completion.Snapshot.State} "
+                        + $"reason={completion.Snapshot.Result?.Reason ?? "unknown"}");
+                }
+                yield break;
+            }
 
             if (!generateRamps
                 || !AutoTerrainDesignationsMod.TurningRampsExperimental
@@ -194,10 +252,11 @@ namespace AutoTerrainDesignations
                 groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
             IEnumerator search = RunExperimentalAccessDryRunSliced(
-                request, cluster, 1, 1, dryRun);
+                request, cluster, 1, 1, dryRun, sliceControl);
             while (search.MoveNext())
                 yield return search.Current;
-            if (s_cancelExperimentalAccessSearch)
+            if (sliceControl?.CancellationRequested
+                ?? s_cancelExperimentalAccessSearch)
                 yield break;
 
             AccessSearchResult? searchResult = dryRun.SearchResult;

@@ -662,6 +662,48 @@ namespace AutoTerrainDesignations
             }
         }
 
+        /// <summary>
+        /// Reconnects persisted farming sessions to the live MineTower entities
+        /// created while the world was loaded. The inspector is lazy UI; it is
+        /// not a valid source of runtime tower lifetime or identity.
+        /// </summary>
+        private static void RebindFarmingSessionsToLiveTowers()
+        {
+            if (s_entitiesManager == null || s_farmingPreparationSessions.Count == 0)
+                return;
+
+            int rebound = 0;
+            try
+            {
+                foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>())
+                {
+                    if (tower.IsDestroyed
+                        || !TryGetTowerEntityId(tower, out EntityId towerId)
+                        || !towerId.IsValid
+                        || !s_farmingPreparationSessions.TryGetValue(
+                            towerId,
+                            out FarmingPreparationSession session)
+                        || !session.Enabled)
+                    {
+                        continue;
+                    }
+
+                    if (!ReferenceEquals(session.Tower, tower))
+                    {
+                        session.Tower = tower;
+                        rebound++;
+                    }
+                }
+
+                if (rebound > 0)
+                    LogDebug($"[ATD Farming] Rebound {rebound} persisted farming session(s) to live mine tower entities.");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning("[ATD Farming] Failed to rebind persisted farming sessions to live towers: " + ex.Message);
+            }
+        }
+
         private static void BootstrapFarmingAutomationForExistingTowers()
         {
             if (s_farmingTowerBootstrapCompleted)
@@ -669,6 +711,7 @@ namespace AutoTerrainDesignations
 
             try
             {
+                RebindFarmingSessionsToLiveTowers();
                 foreach (FarmingPreparationSession session in s_farmingPreparationSessions.Values)
                     session.Active = session.Enabled;
                 s_farmingTowerBootstrapCompleted = true;

@@ -1,5 +1,17 @@
 v0.5.13 [unreleased]
 
+* Improved: Interactive Create Designations accessway generation now runs as a
+  manager-owned `CreateDesignations` request under the cooperative frame
+  budget, with request-scoped cancellation, progress diagnostics, and a
+  type-specific progress toast. The scan remains the owner of the final ramp
+  cleanup and designation commit.
+* Improved: Existing-terrain repair and planned mining-tower ghost access now
+  use the same manager-owned interactive handoff instead of directly draining
+  their access searches inside the Create Designations coroutine.
+* Fixed: Farmland preparation automation now reconnects persisted sessions to
+  their live mine towers before lifecycle cleanup, preventing the option from
+  turning itself off after loading a save unless the tower was actually removed.
+
 v0.5.12 [released]
 
 * Added a three-option idle truck behavior dropdown for mine towers: **Park at tower**, **Stay put** (the new default), and **Soft release**. Stay put keeps trucks assigned without issuing vanilla return-to-tower parking jobs.
