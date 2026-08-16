@@ -355,8 +355,8 @@ namespace AutoTerrainDesignations
             content.Add(BuildToggleRow(
                 AtdLocalization.SettingsTurningRampsLabel.AsFormatted,
                 AtdLocalization.SettingsTurningRampsTooltip.AsFormatted,
-                () => AutoTerrainDesignationsMod.TurningRampsExperimental,
-                AutoTerrainDesignationsMod.SetTurningRampsExperimental,
+                () => AutoTerrainDesignationsMod.TurningRampsEnabled,
+                AutoTerrainDesignationsMod.SetTurningRampsEnabled,
                 refreshers));
             content.Add(BuildToggleRow(
                 AtdLocalization.SettingsSuppressLegacyRampsLabel.AsFormatted,

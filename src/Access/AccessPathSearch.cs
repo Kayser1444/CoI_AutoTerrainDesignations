@@ -2294,7 +2294,7 @@ namespace AutoTerrainDesignations.Access
             public int PendingNodes => m_v2Session != null
                 ? m_v2Session.Pending
                 : IsComplete || m_queue == null ? 0 : m_queue.Count;
-            // Diagnostic-only hook used by the experimental search overlay.
+            // Diagnostic-only hook used by the access search overlay.
             internal Action<Tile2i, int, bool, int?>? NodeExplored
             {
                 get => m_nodeExplored;
@@ -3862,7 +3862,7 @@ namespace AutoTerrainDesignations.Access
             Tile2i center = origin + new RelTile2i(2, 2);
             if (!envelope.TryGetBand(center, out _, out _))
             {
-                // A partial snapshot must never turn the experimental gate into
+                // A partial snapshot must never turn the access gate into
                 // an unexpected hard rejection.
                 diagnostics.HeightEnvelopeMissingSamples++;
                 rejection = string.Empty;

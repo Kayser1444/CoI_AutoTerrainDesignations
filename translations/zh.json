@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "实验通道"
+    "通道"
   ],
   [
     "settings.world.safety",
@@ -401,11 +401,11 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "转弯坡道（实验）"
+    "转弯坡道"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "启用后，ATD 可以使用原版平地和坡度指定，选择并放置实验性 V1 转弯或折返通道。要求该塔的坡道宽度设置为 1。通道净宽设置互不影响。不包括更宽的坡道、转角或鞍形指定。"
+    "启用后，ATD 可以使用原版平地和坡度指定，选择并放置 V1 转弯或折返通道。要求该塔的坡道宽度设置为 1。通道净宽设置互不影响。不包括更宽的坡道、转角或鞍形指定。"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "禁用旧版直坡道生成器，以便直接测试实验通道的结果和失败情况。保持关闭则使用正常的回退行为。"
+    "禁用旧版直坡道生成器，以便直接测试通道的结果和失败情况。保持关闭则使用正常的回退行为。"
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "在实验通道试运行中使用 A*，而不是参考用的 Dijkstra。Dijkstra 是更安全的验证基准。A* 更快。"
+    "在通道试运行中使用 A*，而不是参考用的 Dijkstra。Dijkstra 是更安全的验证基准。A* 更快。"
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "实验性通路搜索中，每个障碍清理起点只收取一次的地形成本。1 单位等同于倾倒或挖掘 1 单位岩石；默认值 6 会在存在合理绕行时更倾向于绕过清理障碍。数值越高，清理路线的吸引力越低。"
+    "通路搜索中，每个障碍清理起点只收取一次的地形成本。1 单位等同于倾倒或挖掘 1 单位岩石；默认值 6 会在存在合理绕行时更倾向于绕过清理障碍。数值越高，清理路线的吸引力越低。"
   ],
   [
     "settings.experimental_access.landslide_run.label",

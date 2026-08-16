@@ -183,7 +183,7 @@ namespace AutoTerrainDesignations
         // share the same general area but none are reachable (the fallback is used anyway).
         private const int MAX_RAMP_REACHABILITY_CHECKS = 50;
 
-        // The optional public fallback expands only the experimental
+        // The optional public fallback expands only the routed
         // generated-origin domain. Ground navigation already extends beyond
         // the managed area.
         private const int OUTSIDE_TOWER_RAMP_FALLBACK_TILES = 16;
@@ -569,7 +569,7 @@ namespace AutoTerrainDesignations
                     ++nextClusterId, accessOrigins, sourceIntents));
             }
 
-            if (AutoTerrainDesignationsMod.TurningRampsExperimental)
+            if (AutoTerrainDesignationsMod.TurningRampsEnabled)
             {
                 foreach (AccessOriginCluster cluster in originClusters)
                 {
@@ -581,7 +581,7 @@ namespace AutoTerrainDesignations
                     int externalEndpointCount = cluster.Origins.Count(
                         origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Cluster] cluster={cluster.ClusterId} " +
+                        $"[ATD Access Cluster] cluster={cluster.ClusterId} " +
                         $"count={cluster.Origins.Count} generatedMining={generatedMiningCount} " +
                         $"externalEndpoints={externalEndpointCount} origins=[{origins}]");
                 }
@@ -594,18 +594,18 @@ namespace AutoTerrainDesignations
                 || AutoTerrainDesignationsMod.SuppressLegacyAccessRamps;
             bool experimentalOperationSupported = TryGetExperimentalOperation(sourceWorkProto, out bool experimentalIsMining);
             bool experimentalWidthSupported = configuredRampWidth > 0;
-            bool experimentalSearchEnabled = AutoTerrainDesignationsMod.TurningRampsExperimental
+            bool experimentalSearchEnabled = AutoTerrainDesignationsMod.TurningRampsEnabled
                 && experimentalWidthSupported
                 && experimentalOperationSupported
                 && !IsLegacyRampMode(GetTowerVehicleClearance(tower));
-            if (AutoTerrainDesignationsMod.TurningRampsExperimental && !experimentalSearchEnabled)
+            if (AutoTerrainDesignationsMod.TurningRampsEnabled && !experimentalSearchEnabled)
             {
                 string reason = !experimentalWidthSupported
                     ? "tower accessway generation is disabled"
                     : IsLegacyRampMode(GetTowerVehicleClearance(tower))
                         ? "tower is configured for a legacy straight-only ramp width"
                     : $"designation proto {sourceWorkProto.Id.Value} is neither mining nor dumping";
-                LogExperimentalAccessDebug($"[ATD Experimental Access] skipped because {reason}.");
+                LogExperimentalAccessDebug($"[ATD Access] skipped because {reason}.");
             }
             if (suppressLegacyAccessRamps)
             {
@@ -764,7 +764,7 @@ namespace AutoTerrainDesignations
                         AccessDesignationPlan? experimentalPlan = null;
 
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access Search] cluster={cluster.ClusterId} " +
+                            $"[ATD Access Search] cluster={cluster.ClusterId} " +
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +
                             $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
 
@@ -783,14 +783,14 @@ namespace AutoTerrainDesignations
                             AtdDiagnostics.ElapsedSince(designationStateStart)
                             * 1000d / System.Diagnostics.Stopwatch.Frequency;
                         LogExperimentalAccessTrace(
-                            $"[ATD Experimental Access Request Preparation] "
+                            $"[ATD Access Request Preparation] "
                             + $"cluster={cluster.ClusterId} "
                             + $"requestMs={requestBuildMilliseconds.ToString(
                                 "0.##", System.Globalization.CultureInfo.InvariantCulture)} "
                             + $"designationStateMs={designationStateMilliseconds.ToString(
                                 "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access Width] cluster={cluster.ClusterId} " +
+                            $"[ATD Access Width] cluster={cluster.ClusterId} " +
                             $"legacyRampWidth={configuredRampWidth} " +
                             $"resolvedVehicleWidth={refreshedSnapshot.VehicleWidth} " +
                             $"requiredWidth={request.RequiredWidth}");
@@ -846,7 +846,7 @@ namespace AutoTerrainDesignations
                                     AtdDiagnostics.ElapsedSince(outsideRequestBuildStart)
                                     * 1000d / System.Diagnostics.Stopwatch.Frequency;
                                 LogExperimentalAccessTrace(
-                                    $"[ATD Experimental Access Request Preparation] "
+                                    $"[ATD Access Request Preparation] "
                                     + $"cluster={cluster.ClusterId} phase=outside "
                                     + $"requestMs={outsideRequestBuildMilliseconds.ToString(
                                         "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
@@ -902,7 +902,7 @@ namespace AutoTerrainDesignations
                                     StringComparison.Ordinal))
                             .ToList();
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access Mutation Audit] cluster={cluster.ClusterId} " +
+                            $"[ATD Access Mutation Audit] cluster={cluster.ClusterId} " +
                             $"before={designationStateBeforeSearch.Count} after={designationStateAfterSearch.Count} " +
                             $"added={addedDuringSearch.Count} removed={removedDuringSearch.Count} " +
                             $"changed={changedDuringSearch.Count} " +
@@ -914,7 +914,7 @@ namespace AutoTerrainDesignations
                             ?? s_cancelExperimentalAccessSearch)
                         {
                             LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access] cluster={cluster.ClusterId} search cancelled by user");
+                                $"[ATD Access] cluster={cluster.ClusterId} search cancelled by user");
                             result.Outcome = RampPlacementOutcome.Failed;
                             yield break;
                         }
@@ -935,7 +935,7 @@ namespace AutoTerrainDesignations
                                 originClusters, states);
                             validatedExistingRoute = true;
                             LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access] cluster={cluster.ClusterId} " +
+                                $"[ATD Access] cluster={cluster.ClusterId} " +
                                 $"selected={(liveReady ? "existing-route" : "waiting-for-provider")} " +
                                 $"goal={experimentalResult.ReachedGoalKind} " +
                                 $"reused={experimentalPlan.ReusedNodeCount}");
@@ -964,7 +964,7 @@ namespace AutoTerrainDesignations
                         experimentalSnapshot = null;
                         experimentalSearchEnabled = false;
                         experimentalFailureSummary = refreshFailure;
-                        LogExperimentalAccessDebug($"[ATD Experimental Access] snapshot refresh failed: {refreshFailure}");
+                        LogExperimentalAccessDebug($"[ATD Access] snapshot refresh failed: {refreshFailure}");
                     }
                 }
 
@@ -1034,15 +1034,15 @@ namespace AutoTerrainDesignations
                     string legacyMetrics = bestCandidate == null
                         ? "none"
                         : $"complete={bestCandidate.IsReachableNow},material={bestCandidate.MaterialMoved},mouthDistance={bestCandidate.MouthDistance},designations={bestCandidate.DesignationCount}";
-                    string selectedGenerator = preferExperimental ? "experimental" : "legacy";
+                    string selectedGenerator = preferExperimental ? "routed" : "legacy";
                     string decidedBy = bestCandidate == null
                         ? (suppressLegacyAccessRamps ? "legacy-suppressed" : "only-valid-candidate")
                         : EvaluatedAccessCandidate.GetDecidedBy(
                             preferExperimental ? experimentalCandidate : bestCandidate,
                             preferExperimental ? bestCandidate : experimentalCandidate);
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Selection] cluster={cluster.ClusterId} " +
-                        $"experimental=[complete={experimentalCandidate.IsReachableNow},material={experimentalCandidate.MaterialMoved},mouthDistance={experimentalCandidate.MouthDistance},designations={experimentalCandidate.DesignationCount}] " +
+                        $"[ATD Access Selection] cluster={cluster.ClusterId} " +
+                        $"routed=[complete={experimentalCandidate.IsReachableNow},material={experimentalCandidate.MaterialMoved},mouthDistance={experimentalCandidate.MouthDistance},designations={experimentalCandidate.DesignationCount}] " +
                         $"legacy=[{legacyMetrics}] selected={selectedGenerator} decidedBy={decidedBy}");
                 }
                 if (preferExperimental)
@@ -1115,10 +1115,10 @@ namespace AutoTerrainDesignations
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
                             ClearLastExperimentalCleanupMaterialization();
-                            LogExperimentalAccessDebug($"[ATD Experimental Access] cluster={cluster.ClusterId} selected=true designations={localPlacedOrigins.Count} decidedBy={decidedBy}");
+                            LogExperimentalAccessDebug($"[ATD Access] cluster={cluster.ClusterId} selected=true designations={localPlacedOrigins.Count} decidedBy={decidedBy}");
                             AccessDiagnostics.LogAccessProvided(
                                 cluster.ClusterId,
-                                "experimental-turning-ramp",
+                                "turning-ramp",
                                 accesswayProto.Id.ToString(),
                                 localPlacedOrigins[0],
                                 "path",
@@ -1147,7 +1147,7 @@ namespace AutoTerrainDesignations
                             });
                         RecordAccessClusterOverlay(originClusters, states);
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access] cluster={cluster.ClusterId} "
+                            $"[ATD Access] cluster={cluster.ClusterId} "
                             + "post-placement provider validation failed"
                             + (newPlannerOnly
                                 ? "; managed request fails closed."
@@ -1156,7 +1156,7 @@ namespace AutoTerrainDesignations
                     else
                     {
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access] cluster={cluster.ClusterId} "
+                            $"[ATD Access] cluster={cluster.ClusterId} "
                             + $"placement failed reason={experimentalPlacementFailure}"
                             + (newPlannerOnly
                                 ? "; managed request fails closed."
@@ -1324,7 +1324,7 @@ namespace AutoTerrainDesignations
         private static string FormatOptionalAccessFailure(string failureSummary)
             => string.IsNullOrEmpty(failureSummary)
                 ? string.Empty
-                : $"; experimental={failureSummary}";
+                : $"; routed={failureSummary}";
 
         private static EvaluatedAccessCandidate? FindBestCandidateForCluster(
             IAreaManagingTower tower,

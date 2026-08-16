@@ -525,8 +525,8 @@ namespace AutoTerrainDesignations
                     // false from a user's explicit false. Promote both legacy
                     // states to the new true default, but preserve the value
                     // once the setting has passed this one-time migration.
-                    AutoTerrainDesignationsMod.SetTurningRampsExperimental(
-                        ResolveTurningRampsExperimentalValue(
+                    AutoTerrainDesignationsMod.SetTurningRampsEnabled(
+                        ResolveTurningRampsValue(
                             turningRampsExperimental.Value,
                             parsedDefaultsRevision));
                 }
@@ -719,36 +719,36 @@ namespace AutoTerrainDesignations
         private static bool ShouldPreserveBool(bool value, bool migrateGeneratedDefaults, params bool[] knownDefaults)
             => !migrateGeneratedDefaults || Array.IndexOf(knownDefaults, value) < 0;
 
-        private static bool ResolveTurningRampsExperimentalValue(
+        private static bool ResolveTurningRampsValue(
             bool value,
             int parsedDefaultsRevision)
             => parsedDefaultsRevision < TURNING_RAMPS_DEFAULTS_REVISION
                 ? true
                 : value;
 
-        internal static bool ValidateTurningRampsExperimentalMigrationFixtures(
+        internal static bool ValidateTurningRampsMigrationFixtures(
             out string failure)
         {
-            if (!ResolveTurningRampsExperimentalValue(true, 0))
+            if (!ResolveTurningRampsValue(true, 0))
             {
                 failure = "A legacy true turning-ramp value was not preserved.";
                 return false;
             }
 
-            if (!ResolveTurningRampsExperimentalValue(false, 0))
+            if (!ResolveTurningRampsValue(false, 0))
             {
                 failure = "A legacy generated false turning-ramp value was not promoted.";
                 return false;
             }
 
-            if (!ResolveTurningRampsExperimentalValue(false, 2))
+            if (!ResolveTurningRampsValue(false, 2))
             {
                 failure = "A revision-2 downgraded false turning-ramp value was not repaired.";
                 return false;
             }
 
-            if (ResolveTurningRampsExperimentalValue(false, 3)
-                || !ResolveTurningRampsExperimentalValue(true, 3))
+            if (ResolveTurningRampsValue(false, 3)
+                || !ResolveTurningRampsValue(true, 3))
             {
                 failure = "Current-revision turning-ramp values were not preserved.";
                 return false;
@@ -1094,18 +1094,18 @@ namespace AutoTerrainDesignations
             sb.AppendLine($"  \"truckIdlePolicy\": {(int)AutoTerrainDesignationsMod.TruckIdlePolicy},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, AUTO and T1-T3 may use routed turning or switchback accessways. Legacy 3-5 remain straight-only. Default: true.\",");
-            sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsExperimental)},");
+            sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsEnabled)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
+            sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
             sb.AppendLine($"  \"suppressLegacyAccessRamps\": {BoolToJsonStr(AutoTerrainDesignationsMod.SuppressLegacyAccessRamps)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for experimental access search. Set false for route and cost comparison. Default: true.\",");
+            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for access search. Set false for route and cost comparison. Default: true.\",");
             sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_cursorOverlayEnabled\": \"Whether to show the bottom-left terrain cursor coordinates at game start. Coordinates are displayed as (x, y, z). The atd_cursor_overlay console command can still override this for the current session. Default: false.\",");
             sb.AppendLine($"  \"cursorOverlayEnabled\": {BoolToJsonStr(ShowCursorOverlay)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to show the fading explored-node frontier for the experimental access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
+            sb.AppendLine("  \"_comment_experimentalAccessSearchOverlayEnabled\": \"Whether to show the fading explored-node frontier for the access search. Debug-only and default: false. The atd_access_search_overlay console command can still override this for the current session.\",");
             sb.AppendLine($"  \"experimentalAccessSearchOverlayEnabled\": {BoolToJsonStr(ShowExperimentalAccessSearchOverlay)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_experimentalAccessPotentialOverlayEnabled\": \"Whether to show the persistent sparse P-field trace for V2 A*. The trace remains until replaced by a later search or cleared with the designation Clear button or atd_clear_diagnostic_overlays. Debug-only and default: false. The atd_access_potential_overlay console command can still override this for the current session.\",");
@@ -1120,7 +1120,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, experimental narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search exhausts its available routes. Timeouts and other interrupted searches do not retry. The game may show its normal outside-area alarm. Default: true.\",");
+            sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search exhausts its available routes. Timeouts and other interrupted searches do not retry. The game may show its normal outside-area alarm. Default: true.\",");
             sb.AppendLine($"  \"allowRampsOutsideTowerAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessHarvestDisruptedTrees\": \"New-game default for the per-world Harvest disrupted trees option. When enabled, finalized accessways and Mining Designations mark trees in their disturbance zones for harvest; when disabled, ATD creates no tree harvest orders. Default: true.\",");
@@ -1132,22 +1132,22 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessQuickRemoveDebrisPolicy\": \"New-game default for Quick Remove accessway debris. 0 = Always, 1 = Restrictive, 2 = Never. Quick Remove spends Unity. Default: 1.\",");
             sb.AppendLine($"  \"accessQuickRemoveDebrisPolicy\": {(int)AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
+            sb.AppendLine("  \"_comment_accessLandscapingCostDistanceScale\": \"Tile-distance cost assigned to one unit of landscaping cost in access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100. Default: 1.\",");
             sb.AppendLine($"  \"accessLandscapingCostDistanceScale\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandscapingCostDistanceScale)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by experimental access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 8, calibrated from observed excavator cleanup effort. Range: 0-100.\",");
+            sb.AppendLine("  \"_comment_accessPropCleanupLandscapingCost\": \"Landscaping cost charged once per prop cleanup origin used by access search. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Default: 8, calibrated from observed excavator cleanup effort. Range: 0-100.\",");
             sb.AppendLine($"  \"accessPropCleanupLandscapingCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the experimental landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
+            sb.AppendLine("  \"_comment_accessLandslideRunPerHeight\": \"Horizontal exclusion distance per vertical terrain level for the landslide hourglass. 1 = 45 degrees; higher values are wider and more conservative, lower values are narrower. Range: 0.05-2. Default: 1.\",");
             sb.AppendLine($"  \"accessLandslideRunPerHeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessLandslideRunPerHeight)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessGeneratedVFixedCost\": \"Fixed cost penalty added for generated V-turn or switchback vertices in experimental access search. Default: 1.\",");
+            sb.AppendLine("  \"_comment_accessGeneratedVFixedCost\": \"Fixed cost penalty added for generated V-turn or switchback vertices in access search. Default: 1.\",");
             sb.AppendLine($"  \"accessGeneratedVFixedCost\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessGeneratedVFixedCost)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessDirectWorkWeight\": \"Cost weight factor applied to direct terrain work (dig/fill volume) in experimental access search. Default: 1.\",");
+            sb.AppendLine("  \"_comment_accessDirectWorkWeight\": \"Cost weight factor applied to direct terrain work (dig/fill volume) in access search. Default: 1.\",");
             sb.AppendLine($"  \"accessDirectWorkWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessDirectWorkWeight)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessSideRayWeight\": \"Cost weight factor applied to side-ray clearance checking in experimental access search. Default: 1.\",");
+            sb.AppendLine("  \"_comment_accessSideRayWeight\": \"Cost weight factor applied to side-ray clearance checking in access search. Default: 1.\",");
             sb.AppendLine($"  \"accessSideRayWeight\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessSideRayWeight)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_safetyPolicyExpertValues\": \"Expert values behind the World settings Safety policy. Defaults by policy: MAX=[1.1,4], HIGH=[1.0,3], MED=[0.9,2], LOW=[0.85,1], MIN=[0.8,0]. Custom values are allowed and the UI displays the nearest policy.\",");
@@ -1163,7 +1163,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessRayUnresolvedPenalty\": \"Cost penalty added when an accessway clearance ray cannot fully resolve terrain contact. Default: 200.\",");
             sb.AppendLine($"  \"accessRayUnresolvedPenalty\": {FloatToJsonStr(AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty)},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessMaxVisitedNodes\": \"Maximum node exploration limit for experimental access pathfinding search. Default: 250000.\",");
+            sb.AppendLine("  \"_comment_accessMaxVisitedNodes\": \"Maximum node exploration limit for access pathfinding search. Default: 250000.\",");
             sb.AppendLine($"  \"accessMaxVisitedNodes\": {AutoTerrainDesignationsMod.AccessMaxVisitedNodes},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessSearchTimeoutSeconds\": \"Maximum elapsed search timeout in seconds for background accessway pathfinding. Default: 60.\",");

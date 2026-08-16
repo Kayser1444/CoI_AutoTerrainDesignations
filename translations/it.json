@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "Accessi sperimentali"
+    "Accessi"
   ],
   [
     "settings.world.safety",
@@ -401,7 +401,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "Rampe di svolta (sperimentali)"
+    "Rampe di svolta"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Disattiva il generatore legacy di rampe diritte per testare direttamente risultati ed errori degli accessi sperimentali. Lascia disattivato per il normale comportamento di fallback."
+    "Disattiva il generatore legacy di rampe diritte per testare direttamente risultati ed errori degli accessi instradati. Lascia disattivato per il normale comportamento di fallback."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Usa A* invece del Dijkstra di riferimento per le prove a secco degli accessi sperimentali. Dijkstra è la base di convalida più sicura. A* è più veloce."
+    "Usa A* invece del Dijkstra di riferimento per le prove a secco degli accessi instradati. Dijkstra è la base di convalida più sicura. A* è più veloce."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Costo paesaggistico applicato una volta per ogni origine di pulizia oggetti usata dalla ricerca sperimentale degli accessi. Un'unità equivale a un'unità di roccia scaricata o scavata; il valore predefinito 6 favorisce l'aggiramento degli ostacoli di pulizia quando esiste una deviazione ragionevole. Valori più alti rendono meno attraenti i percorsi con pulizia."
+    "Costo paesaggistico applicato una volta per ogni origine di pulizia oggetti usata dalla ricerca degli accessi. Un'unità equivale a un'unità di roccia scaricata o scavata; il valore predefinito 6 favorisce l'aggiramento degli ostacoli di pulizia quando esiste una deviazione ragionevole. Valori più alti rendono meno attraenti i percorsi con pulizia."
   ],
   [
     "settings.experimental_access.landslide_run.label",

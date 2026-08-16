@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "Experimentella tillfarter"
+    "Tillfarter"
   ],
   [
     "settings.world.safety",
@@ -401,11 +401,11 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "Svängramper (experimentell)"
+    "Svängramper"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
-    "När det är aktiverat kan ATD välja och placera experimentella V1-svängnings- eller återkopplingsvägar med vaniljplatt- och sluttningsbeteckningar. Kräver att tornets rampbredd ställs in på 1. Korridorfrigången är oberoende. Bredare ramper och hörn- eller sadelbeteckningar ingår inte."
+    "När det är aktiverat kan ATD välja och placera V1-svängnings- eller återkopplingsvägar med vaniljplatt- och sluttningsbeteckningar. Kräver att tornets rampbredd ställs in på 1. Korridorfrigången är oberoende. Bredare ramper och hörn- eller sadelbeteckningar ingår inte."
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.label",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Inaktivera den äldre generatorn för raka ramper så att resultat och fel för experimentella tillfarter kan testas direkt. Lämna avstängt för normalt reservbeteende."
+    "Inaktivera den äldre generatorn för raka ramper så att resultat och fel för tillfarter kan testas direkt. Lämna avstängt för normalt reservbeteende."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Använd A* i stället för referens-Dijkstra för torrkörningar av experimentella tillfarter. Dijkstra är den säkrare valideringsbasen. A* är snabbare."
+    "Använd A* i stället för referens-Dijkstra för torrkörningar av tillfarter. Dijkstra är den säkrare valideringsbasen. A* är snabbare."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Terrängkostnad som debiteras en gång per rensningsursprung för objekt som används av den experimentella åtkomstsökningen. En enhet motsvarar en dumpad eller grävd enhet sten; standard 6 gynnar att köra runt rensningshinder när en rimlig omväg finns. Högre värden gör rensningsrutter mindre attraktiva."
+    "Terrängkostnad som debiteras en gång per rensningsursprung för objekt som används av åtkomstsökningen. En enhet motsvarar en dumpad eller grävd enhet sten; standard 6 gynnar att köra runt rensningshinder när en rimlig omväg finns. Högre värden gör rensningsrutter mindre attraktiva."
   ],
   [
     "settings.experimental_access.landslide_run.label",

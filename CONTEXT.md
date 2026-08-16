@@ -216,7 +216,7 @@ _Avoid_: Tower owner, pathfinder owner
 **Modeled-rule preservation**:
 The promise that making accessway search faster does not exclude a route that
 the active physical accessway model permits. Deliberate player-relevance
-pruning is a separate experimental policy, not an implicit feasibility rule.
+pruning is a separate optional policy, not an implicit feasibility rule.
 _Avoid_: Absolute search completeness, silent futile-route pruning
 
 **Active ray envelope**:
@@ -680,7 +680,7 @@ extrema is owned by the immutable terrain snapshot. A key mismatch rebuilds the
 artifact or weakens the heuristic to zero.
 _Avoid_: Global terrain cache, partial configuration key
 
-**Experimental heuristic gate**:
+**Heuristic safety gate**:
 The first implementation is a non-persistent A* ordering experiment. Coverage
 or invariant failure weakens it to zero. It remains disabled unless A* matches
 Dijkstra optimal results and improves end-to-end search time and queue pressure

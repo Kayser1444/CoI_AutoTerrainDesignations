@@ -1,4 +1,5 @@
-v0.5.13 | 2026-08-16
+v0.6.0 | 2026-08-16
+* Changed: Routed turning ramps are now the default accessway generator for AUTO and T1-T3, while legacy straight ramps remain available as an explicit fallback option
 * Improved: Interactive Create Designations accessway generation now uses the same cooperative manager as existing-terrain repair and planned mining-tower access, with request-scoped cancellation and progress diagnostics
 * Fixed: Farmland preparation automation now reconnects persisted sessions to their live mine towers after loading a save
 * Added: Farmland preparation filling can request farmable soil from eligible storages, including neutral storages that are not configured as exporters

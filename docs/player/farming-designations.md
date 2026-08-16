@@ -58,7 +58,7 @@ If the placement came from a blueprint, ATD holds the whole placement batch unti
 - The initial filling product set is all farmable products. If you do not want a product such as compost dumped into this farm, disable that product on the tower before the relevant import is dispatched.
 - If no eligible soil source or reachable truck exists, filling remains pending silently and retries on later farming ticks.
 - Automation state is saved per tower. After reloading a save, towers restore their own farmland preparation automation setting.
-- Pending Farm Placement Assist batches have limited save/load recovery while this feature is experimental. Pending farms restore crop schedules, fertility targets, rotation, and reflection; full blueprint configuration persistence is still planned.
+- Pending Farm Placement Assist batches have limited save/load recovery. Pending farms restore crop schedules, fertility targets, rotation, and reflection; full blueprint configuration persistence is still planned.
 - If you manually remove or replace a tracked designation, the mod drops that tile from the session. Place a new flat level designation and the next scan will pick it up.
 - When extending a farming area adjacent to a previously completed area, the completed tiles are temporarily hidden to prevent dirt-spill conflicts with the new preparation work. They are restored together with the new tiles during the filling phase.
 - When extending a farming area, make sure new designations use the correct target height. If they do not match the adjacent area's height, new tiles may be treated as a separate session at the wrong elevation.

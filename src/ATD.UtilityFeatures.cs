@@ -21,9 +21,9 @@ partial class AutoDepthDesignation
 {
     // Whether the cursor tile-position debug overlay is visible.
     internal static bool ShowCursorOverlay;
-    // Whether the experimental access search shows recently explored nodes.
+    // Whether the access search shows recently explored nodes.
     internal static bool ShowExperimentalAccessSearchOverlay;
-    // Whether the experimental access search shows its persistent P trace.
+    // Whether the access search shows its persistent P trace.
     internal static bool ShowExperimentalAccessPotentialOverlay;
     // Whether the latest V2 handoff candidates show their captured Mega-ground
     // connectivity. This is a session-only diagnostic overlay.

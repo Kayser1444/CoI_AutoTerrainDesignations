@@ -147,7 +147,7 @@ namespace AutoTerrainDesignations
             }
 
             if (!generateRamps
-                || !AutoTerrainDesignationsMod.TurningRampsExperimental
+                || !AutoTerrainDesignationsMod.TurningRampsEnabled
                 || (towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2)
                 || s_miningProto == null
                 || s_levelingProto == null

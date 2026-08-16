@@ -479,10 +479,10 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            if (!AutoTerrainDesignationsMod.TurningRampsExperimental)
+            if (!AutoTerrainDesignationsMod.TurningRampsEnabled)
             {
                 session.LastAccessRampDetail =
-                    "Managed farming access requires Turning ramps (experimental); "
+                    "Managed farming access requires Turning ramps; "
                     + "legacy generation is not used by the accessway manager.";
                 SetFarmingAccessCache(
                     session,
@@ -604,7 +604,7 @@ namespace AutoTerrainDesignations
 
                 ATDTowerSettings liveSettings =
                     GetOrCreateTowerSettings(tower);
-                if (!AutoTerrainDesignationsMod.TurningRampsExperimental
+                if (!AutoTerrainDesignationsMod.TurningRampsEnabled
                     || AutoTerrainDesignationsMod
                         .AccessPlanningSettingsFingerprint
                         != expectedPlanningSettings

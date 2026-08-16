@@ -838,7 +838,7 @@ namespace AutoTerrainDesignations
                 groundStart = towerReachableGround.First();
                 fullTowerGoalCount = towerReachableGround.Count;
                 LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Ground Goal Override] " +
+                    $"[ATD Access Ground Goal Override] " +
                     $"selected={towerReachableGround.Count} " +
                     $"goals=[{string.Join(",", towerReachableGround)}]");
             }
@@ -871,7 +871,7 @@ namespace AutoTerrainDesignations
                     maxSteps: 12,
                     out string radialGoalDiagnostic);
                 LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Tower Radial Goals] center={towerCenter} " +
+                    $"[ATD Access Tower Radial Goals] center={towerCenter} " +
                     $"selected={towerReachableGround.Count} maxSteps=12 {radialGoalDiagnostic}");
                 if (towerReachableGround.Count == 0)
                 {
@@ -1194,7 +1194,7 @@ namespace AutoTerrainDesignations
             output.Snapshot = snapshot;
             output.FailureReason = string.Empty;
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
+                $"[ATD Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"elapsedMs={snapshotTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"goals={snapshot.GoalCount} fullTowerGoals={fullTowerGoalCount} towerGroundStart={groundStart} " +
                 $"v1GroundPotentialNodes={snapshot.V1GroundGoalDistance?.ReachableNodeCount ?? 0} " +
@@ -1736,7 +1736,7 @@ namespace AutoTerrainDesignations
                     .OrderBy(pair => pair.Key.ToString(), StringComparer.Ordinal)
                     .Select(pair => $"{pair.Key}:{pair.Value}"));
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Cleanup] propSamples={diagnostics.PropSamples} " +
+                $"[ATD Access Cleanup] propSamples={diagnostics.PropSamples} " +
                 $"treeSamples={diagnostics.TreeSamples} eligibleOrigins={diagnostics.EligibleOrigins} " +
                 $"treeOrigins={diagnostics.TreeCleanupOrigins} denseDebrisOrigins={diagnostics.DenseDebrisCleanupOrigins} " +
                 $"hardBlockedOrigins={diagnostics.HardBlockedOrigins} blockers=[{blockers}] " +
@@ -1746,18 +1746,18 @@ namespace AutoTerrainDesignations
                 || diagnostics.HardBlockedOrigins > 64)
             {
                 LogExperimentalAccessDebug(
-                    "[ATD Experimental Access Cleanup Details] suppressed for large snapshot");
+                    "[ATD Access Cleanup Details] suppressed for large snapshot");
                 return;
             }
             if (diagnostics.SampleDetails.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access Cleanup Samples] {string.Join("; ", diagnostics.SampleDetails)}");
+                    $"[ATD Access Cleanup Samples] {string.Join("; ", diagnostics.SampleDetails)}");
             if (diagnostics.EligibleOriginDetails.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access Cleanup Eligible Origins] {string.Join("; ", diagnostics.EligibleOriginDetails)}");
+                    $"[ATD Access Cleanup Eligible Origins] {string.Join("; ", diagnostics.EligibleOriginDetails)}");
             if (diagnostics.BlockedOriginDetails.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access Cleanup Blocked Origins] {string.Join("; ", diagnostics.BlockedOriginDetails)}");
+                    $"[ATD Access Cleanup Blocked Origins] {string.Join("; ", diagnostics.BlockedOriginDetails)}");
         }
 
         private static AccessPathRequest BuildMergedGoalAccessRequest(
@@ -1851,7 +1851,7 @@ namespace AutoTerrainDesignations
                 yield return null;
             Stopwatch searchTimer = Stopwatch.StartNew();
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Search Start] request={request.RequestId} cluster={cluster.ClusterId} " +
+                $"[ATD Access Search Start] request={request.RequestId} cluster={cluster.ClusterId} " +
                 $"{FormatAccessPathRequest(request)} cleanupOrigins={snapshot.EligibleCleanupOriginCount}");
             sliceControl?.ReportPhase("Preparing search session");
             AccessPathSearch.AccessPathSearchSessionBuilder sessionBuilder =
@@ -1914,7 +1914,7 @@ namespace AutoTerrainDesignations
             AccessSearchSessionBuildDiagnostics sessionDiagnostics =
                 sessionBuilder.Diagnostics;
             LogExperimentalAccessTrace(
-                $"[ATD Experimental Access Search Preparation] "
+                $"[ATD Access Search Preparation] "
                 + $"request={request.RequestId} cluster={cluster.ClusterId} "
                 + $"totalMs={sessionDiagnostics.TotalMilliseconds.ToString(
                     "0.##", CultureInfo.InvariantCulture)} "
@@ -1968,7 +1968,7 @@ namespace AutoTerrainDesignations
                 if (sliceControl != null)
                 {
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Slice Summary] "
+                        $"[ATD Access Slice Summary] "
                         + $"request={request.RequestId} "
                         + $"cluster={cluster.ClusterId} "
                         + sliceControl.FormatDiagnostics());
@@ -1993,7 +1993,7 @@ namespace AutoTerrainDesignations
                         RecordExperimentalAccessSearchNode;
             }
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
+                $"[ATD Access Search Session] request={request.RequestId} cluster={cluster.ClusterId} " +
                 $"createMs={sessionDiagnostics.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                 $"complete={session.IsComplete} pending={session.PendingNodes} visited={session.VisitedNodes}");
 
@@ -2009,7 +2009,7 @@ namespace AutoTerrainDesignations
                     {
                         slowStepLogCount++;
                         LogExperimentalAccessDebug(
-                            $"[ATD Experimental Access Search SlowStep] request={request.RequestId} " +
+                            $"[ATD Access Search SlowStep] request={request.RequestId} " +
                             $"cluster={cluster.ClusterId} stepMs={stepTimer.Elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)} " +
                             $"visited={session.VisitedNodes} pending={session.PendingNodes} " +
                             $"elapsedMs={(sliceControl == null
@@ -2039,7 +2039,7 @@ namespace AutoTerrainDesignations
                 {
                     slowSliceLogCount++;
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access SlowSlice] "
+                        $"[ATD Access SlowSlice] "
                         + $"request={request.RequestId} "
                         + $"cluster={cluster.ClusterId} "
                         + $"phase={sliceControl.Phase} "
@@ -2113,7 +2113,7 @@ namespace AutoTerrainDesignations
             if (sliceControl != null)
             {
                 LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Slice Summary] "
+                    $"[ATD Access Slice Summary] "
                     + $"request={request.RequestId} cluster={cluster.ClusterId} "
                     + sliceControl.FormatDiagnostics());
             }
@@ -2222,7 +2222,7 @@ namespace AutoTerrainDesignations
                     ? "none"
                     : result.FailureReason;
                 LogInfo(
-                    $"[ATD Experimental Access] request={request.RequestId} cluster={cluster.ClusterId} " +
+                    $"[ATD Access] request={request.RequestId} cluster={cluster.ClusterId} " +
                     $"width={request.RequiredWidth} success={result.Success} reason={conciseReason} " +
                     $"visited={result.VisitedNodes} pathNodes={result.Path.Count} " +
                     $"searchMs={elapsed.TotalMilliseconds.ToString("0.##", CultureInfo.InvariantCulture)}");
@@ -2307,7 +2307,7 @@ namespace AutoTerrainDesignations
                     $"localEscape:{(diag.V2LocalEscapeTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}]";
                 }
                 LogExperimentalAccessDebug(
-                $"[ATD Experimental Access] request={request.RequestId} " +
+                $"[ATD Access] request={request.RequestId} " +
                 $"{FormatAccessPathRequest(request)} cluster={cluster.ClusterId} " +
                 $"algorithm={(request.RequiredWidth == 2 ? AccessPathSearch.ShouldUseV2AStar(request) ? "A*" : "Dijkstra" : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
                 $"success={result.Success} reason={reason} start=({result.StartOrigin.X},{result.StartOrigin.Y}) " +
@@ -2320,11 +2320,11 @@ namespace AutoTerrainDesignations
             }
             if (diag.StartSuccessorDetails.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access Start Successors] cluster={cluster.ClusterId} " +
+                    $"[ATD Access Start Successors] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.StartSuccessorDetails));
             if (diag.FirstGeneratedHandoffDetails.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access First Handoffs] cluster={cluster.ClusterId} " +
+                    $"[ATD Access First Handoffs] cluster={cluster.ClusterId} " +
                     string.Join("; ", diag.FirstGeneratedHandoffDetails));
             if (diag.V2RouteHandoffDetails.Count > 0)
                 LogExperimentalAccessTrace(
@@ -2350,7 +2350,7 @@ namespace AutoTerrainDesignations
             if (result.Success)
             {
                 if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
-                    LogExperimentalAccessTrace($"[ATD Experimental Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
+                    LogExperimentalAccessTrace($"[ATD Access Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
                 LogExperimentalNonGoalGroundDiagnostics(snapshot, result, cluster.ClusterId);
                 LogExperimentalSelectedVToGHandoffDiagnostics(snapshot, result, cluster.ClusterId);
                 long materializeStart = AtdDiagnostics.Timestamp();
@@ -2367,7 +2367,7 @@ namespace AutoTerrainDesignations
                     float selectedCenterOnlyCost = result.Cost
                         - AccessPathSearch.SideRayWeight * selectedSideRayCost;
                     LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} " +
+                    $"[ATD Access Plan] cluster={cluster.ClusterId} valid={plan.IsValid} " +
                     $"reason={(string.IsNullOrEmpty(plan.FailureReason) ? "none" : plan.FailureReason)} " +
                     $"designations={plan.Designations.Count} reused={plan.ReusedNodeCount} " +
                     $"groundNodes={plan.GroundNodeCount} cleanupOrigins={plan.CleanupOrigins.Count} " +
@@ -2392,7 +2392,7 @@ namespace AutoTerrainDesignations
                 if (plan.IsValid)
                 {
                     if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
-                        LogExperimentalAccessTrace($"[ATD Experimental Access Plan Tiles] cluster={cluster.ClusterId} {FormatExperimentalPlan(plan)}");
+                        LogExperimentalAccessTrace($"[ATD Access Plan Tiles] cluster={cluster.ClusterId} {FormatExperimentalPlan(plan)}");
                     LogExperimentalCleanupRouteDiagnostics(snapshot, result, plan, cluster.ClusterId);
                 }
             }
@@ -2401,7 +2401,7 @@ namespace AutoTerrainDesignations
                 LastExperimentalAccessPlan = null;
                 if (result.Path.Count > 0)
                     if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
-                        LogExperimentalAccessTrace($"[ATD Experimental Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
+                        LogExperimentalAccessTrace($"[ATD Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
             return completedPlan;
         }
@@ -2434,7 +2434,7 @@ namespace AutoTerrainDesignations
             if (nonGoalGroundCount == 0)
                 return;
             LogExperimentalAccessTrace(
-                $"[ATD Experimental Access NonGoalGround] cluster={clusterId} " +
+                $"[ATD Access NonGoalGround] cluster={clusterId} " +
                 $"count={nonGoalGroundCount} first=[{string.Join("; ", firstDetails)}] " +
                 $"tail=[{string.Join("; ", tailDetails)}]");
         }
@@ -2511,7 +2511,7 @@ namespace AutoTerrainDesignations
 
             if (details.Count > 0)
                 LogExperimentalAccessTrace(
-                    $"[ATD Experimental Access Selected VToG] cluster={clusterId} " +
+                    $"[ATD Access Selected VToG] cluster={clusterId} " +
                     $"count={details.Count} details=[{string.Join("; ", details)}]");
         }
 
@@ -2947,7 +2947,7 @@ namespace AutoTerrainDesignations
             if (!nearExistingDesignation)
                 return;
             LogExperimentalAccessTrace(
-                $"[ATD Experimental Access Handoff Diagnostic] origin=({origin.X},{origin.Y}) " +
+                    $"[ATD Access Handoff Diagnostic] origin=({origin.X},{origin.Y}) " +
                 $"predecessor=({predecessorOrigin.X},{predecessorOrigin.Y}) {details}");
         }
 
@@ -3842,7 +3842,7 @@ namespace AutoTerrainDesignations
                     failureReason = "DesignationAppeared";
                     TerrainDesignation existing = existingDesignation.Value;
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Placement Collision] " +
+                        $"[ATD Access Placement Collision] " +
                         $"index={placementIndex}/{placementPlan.Designations.Count} " +
                         $"origin=({item.Origin.X},{item.Origin.Y}) mode={item.Mode} " +
                         $"profile=[{item.Profile.Nw2},{item.Profile.Ne2},{item.Profile.Se2},{item.Profile.Sw2}] " +
@@ -3873,7 +3873,7 @@ namespace AutoTerrainDesignations
                 reservedRampTiles?.Add(item.Origin);
                 if (planned.Proto != rampProto)
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Terminal] origin={item.Origin} proto={planned.Proto.Id.Value}");
+                        $"[ATD Access Terminal] origin={item.Origin} proto={planned.Proto.Id.Value}");
             }
 
             placedRampOrigins?.AddRange(placedNow.Select(item => item.Origin));
@@ -4407,7 +4407,7 @@ namespace AutoTerrainDesignations
                     // or landscaping, retain the accessway so the player can
                     // remove the prop manually.
                     LogExperimentalAccessDebug(
-                        $"[ATD Experimental Access Cleanup] request={request.RequestId} " +
+                        $"[ATD Access Cleanup] request={request.RequestId} " +
                         $"origin={request.Origin} outcome={request.Result.Outcome} " +
                         "accesswayRetained=true manualRemovalRequired=true");
                 }
@@ -4425,7 +4425,7 @@ namespace AutoTerrainDesignations
                         if (result.Outcome != ATDPropRemovalOutcome.Removed
                             && result.Outcome != ATDPropRemovalOutcome.AlreadyAbsent)
                             LogExperimentalAccessDebug(
-                                $"[ATD Experimental Access Cleanup] request={result.RequestId} " +
+                                $"[ATD Access Cleanup] request={result.RequestId} " +
                                 $"origin={result.Origin} outcome={result.Outcome} " +
                                 "accesswayRetained=true manualRemovalRequired=true");
                         return;
@@ -4439,7 +4439,7 @@ namespace AutoTerrainDesignations
             }
 
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Cleanup] dense debris materialization origins={denseCleanupOrigins} " +
+                $"[ATD Access Cleanup] dense debris materialization origins={denseCleanupOrigins} " +
                 $"props={cleanupOriginsByProp.Count} " +
                 $"requests={placedCleanupRequests.Count} " +
                 $"buried={buriedProps} defaultHandled={handledByDefaultOperation} " +
@@ -4529,7 +4529,7 @@ namespace AutoTerrainDesignations
             }
 
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Cleanup] tree materialization origins={treeCleanupOrigins} " +
+                $"[ATD Access Cleanup] tree materialization origins={treeCleanupOrigins} " +
                 $"newHarvestSelections={selectedTrees.Count}");
             return true;
         }
@@ -4568,7 +4568,7 @@ namespace AutoTerrainDesignations
                 added++;
             }
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Cleanup] disruptedTiles={disturbed.Count} " +
+                $"[ATD Access Cleanup] disruptedTiles={disturbed.Count} " +
                 $"additionalTreeHarvestSelections={added}");
             return true;
         }
@@ -4585,7 +4585,7 @@ namespace AutoTerrainDesignations
                     s_treesManager.RemoveFromHarvest(treeId);
             }
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Cleanup] rolled back tree harvest selections={selectedTrees.Count}");
+                $"[ATD Access Cleanup] rolled back tree harvest selections={selectedTrees.Count}");
         }
 
         private static void RollBackLastExperimentalCleanupMaterialization(
@@ -4747,7 +4747,7 @@ namespace AutoTerrainDesignations
             }
 
             LogExperimentalAccessTrace(
-                $"[ATD Experimental Access Cleanup Route] cluster={clusterId} {string.Join("; ", details)}");
+                $"[ATD Access Cleanup Route] cluster={clusterId} {string.Join("; ", details)}");
         }
 
         private static bool IsTileInDesignationOrigin(Tile2i tile, Tile2i origin)
@@ -5467,7 +5467,7 @@ namespace AutoTerrainDesignations
                 .ThenBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => $"{pair.Key}:{pair.Value}"));
             LogExperimentalAccessDebug(
-                $"[ATD Experimental Access Tower Ground Frontier] start={start} reached={reachedGround.Count} " +
+                $"[ATD Access Tower Ground Frontier] start={start} reached={reachedGround.Count} " +
                 $"frontier=[{summary}] samples=[{string.Join(";", samples)}]");
         }
 

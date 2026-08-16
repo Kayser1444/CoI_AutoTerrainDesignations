@@ -1,4 +1,6 @@
-v0.5.13 [packaged]
+v0.6.0 [unreleased]
+
+* Changed: Routed turning ramps are now the default accessway generator for AUTO and T1-T3. The legacy straight-ramp generator remains available as an explicit fallback option.
 
 * Improved: Interactive Create Designations accessway generation now runs as a
   manager-owned `CreateDesignations` request under the cooperative frame

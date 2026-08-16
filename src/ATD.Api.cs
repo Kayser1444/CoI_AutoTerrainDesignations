@@ -32,7 +32,7 @@ namespace AutoTerrainDesignations
 
         /// <summary>
         /// Gets the landscaping cost charged once per prop cleanup origin used by
-        /// experimental access routing. One landscaping-cost unit is equivalent to dumping or
+        /// access routing. One landscaping-cost unit is equivalent to dumping or
         /// digging one unit of rock.
         /// </summary>
         public static float GetAccessPropCleanupLandscapingCost() =>
@@ -40,7 +40,7 @@ namespace AutoTerrainDesignations
 
         /// <summary>
         /// Sets the landscaping cost charged once per prop cleanup origin used by
-        /// experimental access routing. Values are clamped to the global mod-settings range.
+        /// access routing. Values are clamped to the global mod-settings range.
         /// </summary>
         public static void SetAccessPropCleanupLandscapingCost(float value) =>
             AutoTerrainDesignationsMod.SetAccessPropCleanupLandscapingCost(value);

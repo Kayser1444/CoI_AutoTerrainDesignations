@@ -390,7 +390,7 @@ namespace AutoTerrainDesignations.Access
         internal AccessV1GroundGoalDistance? V1GroundGoalDistance
             => m_v1GroundGoalDistance;
         /// <summary>
-        /// Experimental useful-height hull built from this immutable snapshot.
+        /// Useful-height hull built from this immutable snapshot.
         /// When present, V1 and V2 generated-profile centers are pruned against
         /// it; ground and fixed-profile nodes are always retained.
         /// </summary>

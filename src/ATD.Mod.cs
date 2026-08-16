@@ -140,7 +140,7 @@ public static string Tt(string text) => text;
         SetRampNotificationsEnabled(true);
         SetAutoReleaseExcavatorsWhenIdle(false);
         SetTruckIdlePolicy(TruckIdleBehavior.StayPut);
-        SetTurningRampsExperimental(true);
+        SetTurningRampsEnabled(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
         SetExperimentalAccessUsefulHeightEnvelope(true);
@@ -337,15 +337,15 @@ public static string Tt(string text) => text;
         SetAutoReleaseTrucksWhenIdle(value);
     }
 
-    /// <summary>Enables the V1 turning-ramp search. Experimental and on by default.</summary>
-    public static bool TurningRampsExperimental { get; private set; } = true;
+    /// <summary>Enables the V1 turning-ramp search. On by default.</summary>
+    public static bool TurningRampsEnabled { get; private set; } = true;
 
-    public static void SetTurningRampsExperimental(bool value)
+    public static void SetTurningRampsEnabled(bool value)
     {
-        TurningRampsExperimental = value;
+        TurningRampsEnabled = value;
     }
 
-    /// <summary>Debug/experimental switch that disables the legacy straight-ramp fallback.</summary>
+    /// <summary>Debug switch that disables the legacy straight-ramp fallback.</summary>
     public static bool SuppressLegacyAccessRamps { get; private set; }
 
     public static void SetSuppressLegacyAccessRamps(bool value)
@@ -353,7 +353,7 @@ public static string Tt(string text) => text;
         SuppressLegacyAccessRamps = value;
     }
 
-    /// <summary>Uses A* instead of reference Dijkstra for the experimental access search.</summary>
+    /// <summary>Uses A* instead of reference Dijkstra for the access search.</summary>
     public static bool ExperimentalAccessUseAStar { get; private set; }
 
     public static void SetExperimentalAccessUseAStar(bool value)
@@ -362,7 +362,7 @@ public static string Tt(string text) => text;
     }
 
     /// <summary>
-    /// Builds the access useful-height hull and enables experimental V1
+    /// Builds the access useful-height hull and enables V1
     /// generated-center pruning. This session-only switch defaults to on.
     /// </summary>
     public static bool ExperimentalAccessUsefulHeightEnvelope { get; private set; } = true;
@@ -460,7 +460,7 @@ public static string Tt(string text) => text;
     }
 
     /// <summary>
-    /// Allows a bounded experimental accessway retry beyond the tower area
+    /// Allows a bounded accessway retry beyond the tower area
     /// after the normal in-area search exhausts its available routes.
     /// </summary>
     public static bool AllowRampsOutsideTowerAreas { get; private set; } = true;
@@ -509,7 +509,7 @@ public static string Tt(string text) => text;
         AccessLandscapingCostDistanceScale = Math.Max(0f, Math.Min(100f, value));
     }
 
-    /// <summary>Landscaping cost charged once per cleanup origin used by experimental access routing.</summary>
+    /// <summary>Landscaping cost charged once per cleanup origin used by access routing.</summary>
     public static float AccessPropCleanupLandscapingCost { get; private set; } = 8f;
 
     public static void SetAccessPropCleanupLandscapingCost(float value)
@@ -622,7 +622,7 @@ public static string Tt(string text) => text;
             {
                 int hash = 17;
                 void Add(int value) => hash = hash * 31 + value;
-                Add(TurningRampsExperimental ? 1 : 0);
+                Add(TurningRampsEnabled ? 1 : 0);
                 Add(ExperimentalAccessUseAStar ? 1 : 0);
                 Add(ExperimentalAccessUsefulHeightEnvelope ? 1 : 0);
                 Add(ExperimentalAccessV1HeightEnvelopeLowerAllowance32);

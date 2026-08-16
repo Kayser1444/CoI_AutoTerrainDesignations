@@ -73,12 +73,12 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 if (!removalSuccess) return 1;
 
                 MethodInfo validateSettingsMigration = state.GetMethod(
-                    "ValidateTurningRampsExperimentalMigrationFixtures",
+                    "ValidateTurningRampsMigrationFixtures",
                     BindingFlags.Static | BindingFlags.Public
                         | BindingFlags.NonPublic)
                     ?? throw new MissingMethodException(
                         state.FullName,
-                        "ValidateTurningRampsExperimentalMigrationFixtures");
+                        "ValidateTurningRampsMigrationFixtures");
                 object[] settingsMigrationArgs = { string.Empty };
                 bool settingsMigrationSuccess = (bool)(
                     validateSettingsMigration.Invoke(

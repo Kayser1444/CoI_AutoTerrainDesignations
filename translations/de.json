@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "Experimentelle Zugänge"
+    "Zugänge"
   ],
   [
     "settings.world.safety",
@@ -401,7 +401,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "Wenderampen (experimentell)"
+    "Wenderampen"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Deaktiviert den alten Generator für gerade Rampen, damit Ergebnisse und Fehler der experimentellen Zugangswege direkt getestet werden können. Für normales Fallback-Verhalten ausgeschaltet lassen."
+    "Deaktiviert den alten Generator für gerade Rampen, damit Ergebnisse und Fehler der gerouteten Zugangswege direkt getestet werden können. Für normales Fallback-Verhalten ausgeschaltet lassen."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "A* statt Referenz-Dijkstra für experimentelle Zugangsweg-Trockenläufe verwenden. Dijkstra ist die sicherere Validierungsbasis. A* ist schneller."
+    "A* statt Referenz-Dijkstra für Zugangsweg-Trockenläufe verwenden. Dijkstra ist die sicherere Validierungsbasis. A* ist schneller."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Landschaftsbaukosten, die einmal pro Prop-Bereinigungsursprung in der experimentellen Zufahrtssuche berechnet werden. Eine Einheit entspricht einer aufgeschütteten oder abgetragenen Einheit Gestein; Standard 6 bevorzugt Umfahrungen von Bereinigungshindernissen, wenn ein sinnvoller Umweg existiert. Höhere Werte machen Bereinigungsrouten weniger attraktiv."
+    "Landschaftsbaukosten, die einmal pro Prop-Bereinigungsursprung in der Zufahrtssuche berechnet werden. Eine Einheit entspricht einer aufgeschütteten oder abgetragenen Einheit Gestein; Standard 6 bevorzugt Umfahrungen von Bereinigungshindernissen, wenn ein sinnvoller Umweg existiert. Höhere Werte machen Bereinigungsrouten weniger attraktiv."
   ],
   [
     "settings.experimental_access.landslide_run.label",

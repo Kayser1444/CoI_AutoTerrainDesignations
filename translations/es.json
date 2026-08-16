@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "Accesos experimentales"
+    "Vías de acceso"
   ],
   [
     "settings.world.safety",
@@ -401,7 +401,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "Rampas de giro (experimental)"
+    "Rampas de giro"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Desactiva el generador heredado de rampas rectas para que los resultados y fallos de los accesos experimentales puedan probarse directamente. Déjalo desactivado para el comportamiento normal de reserva."
+    "Desactiva el generador heredado de rampas rectas para que los resultados y fallos de las vías de acceso enrutadas puedan probarse directamente. Déjalo desactivado para el comportamiento normal de reserva."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Usa A* en lugar del Dijkstra de referencia para pruebas en seco de accesos experimentales. Dijkstra es la base de validación más segura. A* es más rápido."
+    "Usa A* en lugar del Dijkstra de referencia para pruebas en seco de vías de acceso. Dijkstra es la base de validación más segura. A* es más rápido."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Coste de paisajismo cobrado una vez por cada origen de limpieza de objetos usado por la búsqueda experimental de accesos. Una unidad equivale a una unidad de roca vertida o excavada; el valor predeterminado 6 favorece rodear obstáculos de limpieza cuando existe un desvío razonable. Valores más altos hacen menos atractivas las rutas con limpieza."
+    "Coste de paisajismo cobrado una vez por cada origen de limpieza de objetos usado por la búsqueda de vías de acceso. Una unidad equivale a una unidad de roca vertida o excavada; el valor predeterminado 6 favorece rodear obstáculos de limpieza cuando existe un desvío razonable. Valores más altos hacen menos atractivas las rutas con limpieza."
   ],
   [
     "settings.experimental_access.landslide_run.label",

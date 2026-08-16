@@ -149,7 +149,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsHeadingNotifications =
             Loc.Str("settings.heading.notifications", "Notifications", "Settings section heading for notification settings.");
         public static LocStr SettingsHeadingExperimentalAccess =
-            Loc.Str("settings.heading.experimental_access", "Experimental accessways", "Settings section heading for experimental accessway settings.");
+            Loc.Str("settings.heading.experimental_access", "Accessways", "Settings section heading for accessway settings.");
         public static LocStr SettingsHeadingWorldSafety =
             Loc.Str("settings.world.safety", "Terrain safety", "Settings section heading for world terrain-safety settings.");
         public static LocStr SettingsAvoidOceanLabel =
@@ -189,7 +189,7 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsAllowRampsOutsideTowerAreasLabel =
             Loc.Str("settings.world.allow_ramps_outside_tower_areas.label", "Allow ramps outside tower areas", "World setting label for bounded out-of-area accessway fallback.");
         public static LocStr SettingsAllowRampsOutsideTowerAreasTooltip =
-            Loc.Str("settings.world.allow_ramps_outside_tower_areas.tooltip", "If an experimental ramp search exhausts the available routes inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, does not run after a timeout or other search interruption, and may trigger the game's normal outside-area alarm. Default: enabled.", "Tooltip for bounded out-of-area accessway fallback.");
+            Loc.Str("settings.world.allow_ramps_outside_tower_areas.tooltip", "If an accessway search exhausts the available routes inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, does not run after a timeout or other search interruption, and may trigger the game's normal outside-area alarm. Default: enabled.", "Tooltip for bounded out-of-area accessway fallback.");
         public static LocStr SettingsSafetyPolicyTooltip =
             Loc.Str("settings.world.safety_policy.tooltip", "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL.", "World safety policy setting tooltip.");
         public static LocStr SettingsSafetyPolicyValueTooltip =
@@ -247,29 +247,29 @@ namespace AutoTerrainDesignations
         public static LocStr SettingsUnresolvedRayPenaltyTooltip =
             Loc.Str("settings.pathfinder.ray_unresolved.tooltip", "Penalty when a ray does not meet terrain inside its trace range.", "Pathfinder setting tooltip for unresolved ray penalty.");
         public static LocStr SettingsTurningRampsLabel =
-            Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps (experimental)", "Settings toggle label for experimental turning ramps.");
+            Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps", "Settings toggle label for turning ramps.");
         public static LocStr SettingsTurningRampsTooltip =
-            Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included.", "Tooltip for experimental turning ramps.");
+            Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included.", "Tooltip for turning ramps.");
         public static LocStr SettingsSuppressLegacyRampsLabel =
             Loc.Str("settings.experimental_access.suppress_legacy_ramps.label", "Suppress legacy ramps", "Settings toggle label for suppressing legacy access ramps.");
         public static LocStr SettingsSuppressLegacyRampsTooltip =
-            Loc.Str("settings.experimental_access.suppress_legacy_ramps.tooltip", "Disable the legacy straight-ramp generator so experimental accessway results and failures can be tested directly. Leave off for normal fallback behavior.", "Tooltip for suppressing legacy access ramps.");
+            Loc.Str("settings.experimental_access.suppress_legacy_ramps.tooltip", "Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave off for normal fallback behavior.", "Tooltip for suppressing legacy access ramps.");
         public static LocStr SettingsAccessAStarLabel =
-            Loc.Str("settings.experimental_access.astar.label", "Use A* search", "Settings toggle label for experimental A* access search.");
+            Loc.Str("settings.experimental_access.astar.label", "Use A* search", "Settings toggle label for A* access search.");
         public static LocStr SettingsAccessAStarTooltip =
-            Loc.Str("settings.experimental_access.astar.tooltip", "Use A* instead of reference Dijkstra for experimental accessway dry runs. Dijkstra is the safer validation baseline. A* is faster.", "Tooltip for experimental A* access search.");
+            Loc.Str("settings.experimental_access.astar.tooltip", "Use A* instead of reference Dijkstra for accessway dry runs. Dijkstra is the safer validation baseline. A* is faster.", "Tooltip for A* access search.");
         public static LocStr SettingsAccessLandscapingCostScaleLabel =
-            Loc.Str("settings.experimental_access.landscaping_cost_scale.label", "Landscaping cost vs. distance", "Settings row label for experimental access landscaping cost scale.");
+            Loc.Str("settings.experimental_access.landscaping_cost_scale.label", "Landscaping cost vs. distance", "Settings row label for access landscaping cost scale.");
         public static LocStr SettingsAccessLandscapingCostScaleTooltip =
-            Loc.Str("settings.experimental_access.landscaping_cost_scale.tooltip", "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming.", "Tooltip for experimental access landscaping cost distance scale.");
+            Loc.Str("settings.experimental_access.landscaping_cost_scale.tooltip", "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming.", "Tooltip for access landscaping cost distance scale.");
         public static LocStr SettingsAccessPropCleanupLandscapingCostLabel =
-            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.label", "Prop cleanup landscaping cost", "Settings row label for experimental access prop cleanup cost.");
+            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.label", "Prop cleanup landscaping cost", "Settings row label for access prop cleanup cost.");
         public static LocStr SettingsAccessPropCleanupLandscapingCostTooltip =
-            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.tooltip", "Landscaping cost charged once per prop cleanup origin used by experimental access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive.", "Tooltip for experimental access prop cleanup cost.");
+            Loc.Str("settings.experimental_access.prop_cleanup_landscaping_cost.tooltip", "Landscaping cost charged once per prop cleanup origin used by access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive.", "Tooltip for access prop cleanup cost.");
         public static LocStr SettingsAccessLandslideRunLabel =
-            Loc.Str("settings.experimental_access.landslide_run.label", "Landslide protection slope factor", "Settings row label for the experimental landslide envelope scale.");
+            Loc.Str("settings.experimental_access.landslide_run.label", "Landslide protection slope factor", "Settings row label for the landslide envelope scale.");
         public static LocStr SettingsAccessLandslideRunTooltip =
-            Loc.Str("settings.experimental_access.landslide_run.tooltip", "Horizontal exclusion distance per vertical terrain level. 1 translates to a 45-degree slope; higher values widen the exclusion zone (use in e.g. pure sand), while lower values narrow it. Range: 0.05-2; default: 1.", "Tooltip for experimental access landslide run setting.");
+            Loc.Str("settings.experimental_access.landslide_run.tooltip", "Horizontal exclusion distance per vertical terrain level. 1 translates to a 45-degree slope; higher values widen the exclusion zone (use in e.g. pure sand), while lower values narrow it. Range: 0.05-2; default: 1.", "Tooltip for access landslide run setting.");
         public static LocStr SettingsMaxSlopeLabel =
             Loc.Str("settings.max_slope.label", "Max slope", "Settings row label for maximum designation slope.");
         public static LocStr SettingsMaxSlopeTooltip =

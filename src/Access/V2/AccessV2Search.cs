@@ -311,7 +311,7 @@ namespace AutoTerrainDesignations.Access.V2
         public int Pending => m_queueCount;
         public int VehicleWidth { get; }
         internal Dictionary<string, int> LiveRejections => m_rejections;
-        // Diagnostic-only hook used by the experimental search overlay.
+        // Diagnostic-only hook used by the access search overlay.
         internal Action<Tile2i, int, bool, int?>? NodeExplored { get; set; }
         internal IReadOnlyList<AccessV2PotentialSample> PotentialSamples
             => m_potentialField?.GetDiagnosticSamples()

@@ -43,12 +43,12 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  RampNotifications     = {AutoTerrainDesignationsMod.RampNotificationsEnabled}");
         sb.AppendLine($"  AutoReleaseExcavators = {AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle}");
         sb.AppendLine($"  TruckIdlePolicy       = {AutoTerrainDesignationsMod.TruckIdlePolicy}");
-        sb.AppendLine($"  TurningRampsExperimental = {AutoTerrainDesignationsMod.TurningRampsExperimental}");
+        sb.AppendLine($"  TurningRampsEnabled     = {AutoTerrainDesignationsMod.TurningRampsEnabled}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
-        sb.AppendLine($"  ExperimentalAStar     = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
+        sb.AppendLine($"  AccessAStar            = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
         sb.AppendLine($"  AccessSearchOverlay   = {AutoDepthDesignation.ShowExperimentalAccessSearchOverlay}");
         sb.AppendLine($"  AccessPotentialOverlay = {AutoDepthDesignation.ShowExperimentalAccessPotentialOverlay}");
-        sb.AppendLine($"  ExperimentalHeightHull = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
+        sb.AppendLine($"  AccessHeightHull       = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
         sb.AppendLine($"  HeightHullV1LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}");
         sb.AppendLine($"  HeightHullV2LowerAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}");
         sb.AppendLine($"  HeightHullV1UpperAllowance = {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}");
@@ -486,8 +486,8 @@ public sealed class AtdConsoleCommands
         if (!parsed)
             AutoDepthDesignation.ClearExperimentalAccessSearchOverlay();
         return parsed
-            ? "[ATD] Experimental access search overlay ON. Re-run accessway generation to populate it."
-            : "[ATD] Experimental access search overlay OFF.";
+            ? "[ATD] Access search overlay ON. Re-run accessway generation to populate it."
+            : "[ATD] Access search overlay OFF.";
     }
 
     [ConsoleCommand(false, false, "Toggles the persistent sparse P-field trace. Optionally pass 'on' or 'off'; use atd_save_settings to persist it.", null)]
@@ -502,8 +502,8 @@ public sealed class AtdConsoleCommands
             AutoDepthDesignation
                 .ClearExperimentalAccessPotentialOverlay();
         return parsed
-            ? "[ATD] Experimental access P-field overlay ON. Re-run accessway generation to populate it."
-            : "[ATD] Experimental access P-field overlay OFF.";
+            ? "[ATD] Access P-field overlay ON. Re-run accessway generation to populate it."
+            : "[ATD] Access P-field overlay OFF.";
     }
 
     [ConsoleCommand(false, false, "Clears all stored ATD diagnostic overlays without changing which overlays are enabled.", null)]
@@ -541,7 +541,7 @@ public sealed class AtdConsoleCommands
             : "[ATD] Access cluster overlay OFF.";
     }
 
-    [ConsoleCommand(false, false, "Builds the experimental access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
+    [ConsoleCommand(false, false, "Builds the access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
     private string atdAccessHeightEnvelope(string value = "")
     {
         bool current = AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope;
@@ -549,8 +549,8 @@ public sealed class AtdConsoleCommands
             parsed = !current;
         AutoTerrainDesignationsMod.SetExperimentalAccessUsefulHeightEnvelope(parsed);
         return parsed
-            ? "[ATD] Experimental access useful-height hull and V1/V2 center pruning ON."
-            : "[ATD] Experimental access useful-height hull and V1/V2 center pruning OFF.";
+            ? "[ATD] Access useful-height hull and V1/V2 center pruning ON."
+            : "[ATD] Access useful-height hull and V1/V2 center pruning OFF.";
     }
 
     [ConsoleCommand(false, false, "Sets the session-only V1 fixed-endpoint lower hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v1_lower_allowance")]

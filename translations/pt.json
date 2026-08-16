@@ -205,7 +205,7 @@
   ],
   [
     "settings.heading.experimental_access",
-    "Acessos experimentais"
+    "Acessos"
   ],
   [
     "settings.world.safety",
@@ -401,7 +401,7 @@
   ],
   [
     "settings.experimental_access.turning_ramps.label",
-    "Rampas de viragem (experimental)"
+    "Rampas de viragem"
   ],
   [
     "settings.experimental_access.turning_ramps.tooltip",
@@ -413,7 +413,7 @@
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
-    "Desative o gerador legado de rampas retas para que resultados e falhas dos acessos experimentais possam ser testados diretamente. Deixe desativado para o comportamento normal de fallback."
+    "Desative o gerador legado de rampas retas para que resultados e falhas dos acessos roteados possam ser testados diretamente. Deixe desativado para o comportamento normal de fallback."
   ],
   [
     "settings.experimental_access.astar.label",
@@ -421,7 +421,7 @@
   ],
   [
     "settings.experimental_access.astar.tooltip",
-    "Use A* em vez do Dijkstra de referência para testes a seco de acessos experimentais. Dijkstra é a base de validação mais segura. A* é mais rápido."
+    "Use A* em vez do Dijkstra de referência para testes a seco de acessos roteados. Dijkstra é a base de validação mais segura. A* é mais rápido."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -437,7 +437,7 @@
   ],
   [
     "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
-    "Custo de terraplenagem cobrado uma vez por origem de limpeza de objetos usada pela busca experimental de acessos. Uma unidade equivale a uma unidade de rocha despejada ou escavada; o padrão 6 favorece contornar obstáculos de limpeza quando houver um desvio razoável. Valores mais altos tornam rotas com limpeza menos atraentes."
+    "Custo de terraplenagem cobrado uma vez por origem de limpeza de objetos usada pela busca de acessos. Uma unidade equivale a uma unidade de rocha despejada ou escavada; o padrão 6 favorece contornar obstáculos de limpeza quando houver um desvio razoável. Valores mais altos tornam rotas com limpeza menos atraentes."
   ],
   [
     "settings.experimental_access.landslide_run.label",

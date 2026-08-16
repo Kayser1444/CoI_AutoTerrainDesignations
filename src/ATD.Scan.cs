@@ -1247,8 +1247,8 @@ namespace AutoTerrainDesignations
             }
             string? skipReason = !generateRamps
                 ? "accessway generation disabled"
-                : !AutoTerrainDesignationsMod.TurningRampsExperimental
-                    ? "experimental access disabled"
+                : !AutoTerrainDesignationsMod.TurningRampsEnabled
+                    ? "access search disabled"
                     : towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2
                         ? $"unsupported width {towerSettings.RampWidth}"
                         : s_miningProto == null
@@ -1257,7 +1257,7 @@ namespace AutoTerrainDesignations
             if (skipReason != null)
             {
                 LogExperimentalAccessDebug(
-                    $"[ATD Experimental Access Repair] skipped reason={skipReason} "
+                    $"[ATD Access Repair] skipped reason={skipReason} "
                     + $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
                 yield break;
             }
@@ -1265,7 +1265,7 @@ namespace AutoTerrainDesignations
             if (!HasExistingTerrainWorkEndpoint(tower))
             {
                 LogExperimentalAccessDebug(
-                    "[ATD Experimental Access Repair] skipped reason=no eligible external terrain-work endpoint "
+                    "[ATD Access Repair] skipped reason=no eligible external terrain-work endpoint "
                     + $"vehicleClearance={towerSettings.VehicleClearance} width={towerSettings.RampWidth}");
                 yield break;
             }
