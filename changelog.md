@@ -1,3 +1,5 @@
+v0.6.1 [unreleased]
+
 v0.6.0 [released]
 
 * Changed: Routed turning ramps are now the default accessway generator for AUTO and T1-T3. The legacy straight-ramp generator remains available as an explicit fallback option.
