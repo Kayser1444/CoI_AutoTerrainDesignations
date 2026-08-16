@@ -1,3 +1,10 @@
+v0.5.13 | 2026-08-16
+* Improved: Interactive Create Designations accessway generation now uses the same cooperative manager as existing-terrain repair and planned mining-tower access, with request-scoped cancellation and progress diagnostics
+* Fixed: Farmland preparation automation now reconnects persisted sessions to their live mine towers after loading a save
+* Added: Farmland preparation filling can request farmable soil from eligible storages, including neutral storages that are not configured as exporters
+* Improved: ATD console setter commands now report their current values when invoked without changing settings
+* Added: Mine Tower copy, blueprint, repeated placement, eligible Cut, and Copy settings workflows now preserve the tower's exact managed area and ATD mining settings while retaining vanilla vehicle-assignment behavior
+
 v0.5.12 | 2026-08-11
 * Added: Idle truck behavior options for mine towers: Park at tower (the vanilla default), Stay put (the new default, which keeps trucks assigned near their last work area without unnecessary return trips), and Soft release
 * Added: Migration for the previous automatic truck-release setting and per-tower state

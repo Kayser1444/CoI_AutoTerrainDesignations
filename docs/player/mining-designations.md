@@ -137,6 +137,8 @@ Useful console commands:
 | `atd_save_settings` | Writes the current in-memory defaults to `ATDsettings.json`. |
 | `atd_reset_to_defaults` | Resets the in-memory defaults to the built-in values. |
 
+For setter commands, omit the value (or values) to print the currently set value to the console and ATD log without changing it.
+
 ## Things to know
 
 - ATD only clears mining designations that it recognizes as mining work. It does not bulk-remove unrelated designation types when using the clear action.

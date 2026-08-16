@@ -90,36 +90,51 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the global default max height diff (1-3).", null)]
-    private string atdSetMaxHeightDiff(int value)
+    private string atdSetMaxHeightDiff(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetMaxHeightDiff(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"MaxHeightDiff currently set to {AutoTerrainDesignationsMod.MaxHeightDiff}.");
+
+        AutoTerrainDesignationsMod.SetMaxHeightDiff(value.Value);
         return $"[ATD] MaxHeightDiff set to {AutoTerrainDesignationsMod.MaxHeightDiff}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default ramp width (0-5). 0 disables ramp generation.", null)]
-    private string atdSetRampWidth(int value)
+    private string atdSetRampWidth(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetRampWidth(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"RampWidth currently set to {AutoTerrainDesignationsMod.RampWidth}.");
+
+        AutoTerrainDesignationsMod.SetRampWidth(value.Value);
         return $"[ATD] RampWidth set to {AutoTerrainDesignationsMod.RampWidth}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default max layers to excavate from the surface. 0 = no limit.", null)]
-    private string atdSetMaxLayersToExcavate(int value)
+    private string atdSetMaxLayersToExcavate(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetMaxLayersToExcavate(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"MaxLayersToExcavate currently set to {AutoTerrainDesignationsMod.MaxLayersToExcavate}.");
+
+        AutoTerrainDesignationsMod.SetMaxLayersToExcavate(value.Value);
         return $"[ATD] MaxLayersToExcavate set to {AutoTerrainDesignationsMod.MaxLayersToExcavate}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default ore purity level (0=Off, 1=Low, 2=Medium, 3=High, 4=Max).", null)]
-    private string atdSetOrePurityLevel(int value)
+    private string atdSetOrePurityLevel(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetOrePurityLevel(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"OrePurityLevel currently set to {AutoTerrainDesignationsMod.OrePurityLevel}.");
+
+        AutoTerrainDesignationsMod.SetOrePurityLevel(value.Value);
         return $"[ATD] OrePurityLevel set to {AutoTerrainDesignationsMod.OrePurityLevel}.";
     }
 
     [ConsoleCommand(false, false, "Enables/disables the extra bottom-flattening pass (true/false, on/off, 1/0).", null)]
-    private string atdSetBottomFlattening(string value)
+    private string atdSetBottomFlattening(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"BottomFlattening currently set to {AutoTerrainDesignationsMod.BottomFlatteningEnabled}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -128,15 +143,21 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the bottom-flattening strength (1-10). Higher = deeper target = more tiles affected.", null)]
-    private string atdSetBottomFlatteningStrength(int value)
+    private string atdSetBottomFlatteningStrength(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetBottomFlatteningStrength(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"BottomFlatteningStrength currently set to {AutoTerrainDesignationsMod.BottomFlatteningStrength}.");
+
+        AutoTerrainDesignationsMod.SetBottomFlatteningStrength(value.Value);
         return $"[ATD] BottomFlatteningStrength set to {AutoTerrainDesignationsMod.BottomFlatteningStrength}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default max depth to dig to (absolute elevation). Use '-' for no limit.", null)]
-    private string atdSetMaxDepthToDigTo(string value)
+    private string atdSetMaxDepthToDigTo(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"MaxDepthToDigTo currently set to {AutoTerrainDesignationsMod.MaxDepthToDigTo?.ToString() ?? "-"}.");
+
         if (value == "-")
         {
             AutoTerrainDesignationsMod.SetMaxDepthToDigTo(null);
@@ -151,23 +172,33 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets minOreHeight for a purity level (0-4). E.g. atd_set_min_ore_height 2 1.0", null)]
-    private string atdSetMinOreHeight(int level, float value)
+    private string atdSetMinOreHeight(int? level = null, float? value = null)
     {
-        if (!AutoDepthDesignation.TrySetMinOreHeightForLevel(level, value))
-            return $"[ATD] Level {level} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
-        return $"[ATD] minOreHeight[{level}] set to {value}.";
+        if (!level.HasValue && !value.HasValue)
+            return ReportCurrentValue(AutoDepthDesignation.FormatPurityArrays());
+        if (!level.HasValue || !value.HasValue)
+            return "[ATD] Usage: atd_set_min_ore_height level value.";
+        if (!AutoDepthDesignation.TrySetMinOreHeightForLevel(level.Value, value.Value))
+            return $"[ATD] Level {level.Value} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
+        return $"[ATD] minOreHeight[{level.Value}] set to {value.Value}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default corridor clearance (0=none, 1=small+med vehicles, 2=mega vehicles). Per-tower override available in the mine tower inspector.", null)]
-    private string atdSetMinCorridorClearance(int value)
+    private string atdSetMinCorridorClearance(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetMinCorridorClearance(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"MinCorridorClearance currently set to {AutoTerrainDesignationsMod.MinCorridorClearance}.");
+
+        AutoTerrainDesignationsMod.SetMinCorridorClearance(value.Value);
         return $"[ATD] MinCorridorClearance set to {AutoTerrainDesignationsMod.MinCorridorClearance}.";
     }
 
     [ConsoleCommand(false, false, "Sets whether the Mining designations panel starts collapsed by default (true/false, on/off, 1/0).", null)]
-    private string atdSetTerrainDesignationsPanelCollapsed(string value)
+    private string atdSetTerrainDesignationsPanelCollapsed(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"TerrainDesignationsPanelCollapsed currently set to {AutoTerrainDesignationsMod.TerrainDesignationsPanelCollapsed}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -176,8 +207,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets whether the Ore composition panel starts collapsed by default (true/false, on/off, 1/0).", null)]
-    private string atdSetOreCompositionPanelCollapsed(string value)
+    private string atdSetOreCompositionPanelCollapsed(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"OreCompositionPanelCollapsed currently set to {AutoTerrainDesignationsMod.OreCompositionPanelCollapsed}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -186,8 +220,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets whether vehicle depot excavator completion notifications are shown (true/false, on/off, 1/0).", null)]
-    private string atdSetExcavatorCompletionNotifications(string value)
+    private string atdSetExcavatorCompletionNotifications(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"ExcavatorCompletionNotifications currently set to {AutoTerrainDesignationsMod.ExcavatorCompletionNotificationsEnabled}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -196,8 +233,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Enables/disables ramp access warning notifications on mine towers (true/false, on/off, 1/0).", null)]
-    private string atdSetRampNotifications(string value)
+    private string atdSetRampNotifications(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"RampNotifications currently set to {AutoTerrainDesignationsMod.RampNotificationsEnabled}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -206,8 +246,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets whether the Farming panel starts collapsed by default (true/false, on/off, 1/0).", null)]
-    private string atdSetFarmingPanelCollapsed(string value)
+    private string atdSetFarmingPanelCollapsed(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"FarmingPanelCollapsed currently set to {AutoTerrainDesignationsMod.FarmingPanelCollapsed}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -216,8 +259,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the global default for both Auto-release when idle toggles on new towers (true/false, on/off, 1/0).", null)]
-    private string atdSetAutoReleaseVehiclesWhenIdle(string value)
+    private string atdSetAutoReleaseVehiclesWhenIdle(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"AutoReleaseVehiclesWhenIdle currently set to {AutoTerrainDesignationsMod.AutoReleaseVehiclesWhenIdle}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -226,8 +272,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the World safety policy (MIN, LOW, MED, HIGH, or MAX).", null)]
-    private string atdSetSafetyPolicy(string value)
+    private string atdSetSafetyPolicy(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"SafetyPolicy currently set to {AutoTerrainDesignationsMod.GetSafetyPolicy().ToString().ToUpperInvariant()}.");
+
         if (!System.Enum.TryParse(value, true, out SafetyPolicy parsed)
             || parsed < SafetyPolicy.Min || parsed > SafetyPolicy.Max)
             return $"[ATD] Invalid safety policy '{value}'. Use MIN, LOW, MED, HIGH, or MAX.";
@@ -236,22 +285,31 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the landslide predictor slope factor (0-1.5). This is the expert value behind Safety policy.", null)]
-    private string atdSetLandslidePredictorSlopeFactor(float value)
+    private string atdSetLandslidePredictorSlopeFactor(float? value = null)
     {
-        AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"LandslidePredictorSlopeFactor currently set to {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}.");
+
+        AutoTerrainDesignationsMod.SetAccessRaySlopeConservatism(value.Value);
         return $"[ATD] Landslide predictor slope factor set to {AutoTerrainDesignationsMod.AccessRaySlopeConservatism}.";
     }
 
     [ConsoleCommand(false, false, "Sets the landslide safety buffer (0-16 tiles). This is the expert value behind Safety policy.", null)]
-    private string atdSetLandslideBuffer(int value)
+    private string atdSetLandslideBuffer(int? value = null)
     {
-        AutoTerrainDesignationsMod.SetAccessRayEndBuffer(value);
+        if (!value.HasValue)
+            return ReportCurrentValue($"LandslideBuffer currently set to {AutoTerrainDesignationsMod.AccessRayEndBuffer}.");
+
+        AutoTerrainDesignationsMod.SetAccessRayEndBuffer(value.Value);
         return $"[ATD] Landslide buffer set to {AutoTerrainDesignationsMod.AccessRayEndBuffer}.";
     }
 
     [ConsoleCommand(false, false, "Sets the global default for Auto-release excavators when idle on new towers (true/false, on/off, 1/0).", null)]
-    private string atdSetAutoReleaseExcavatorsWhenIdle(string value)
+    private string atdSetAutoReleaseExcavatorsWhenIdle(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"AutoReleaseExcavatorsWhenIdle currently set to {AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -260,8 +318,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the global default for Auto-release trucks when idle on new towers (true/false, on/off, 1/0).", null)]
-    private string atdSetAutoReleaseTrucksWhenIdle(string value)
+    private string atdSetAutoReleaseTrucksWhenIdle(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"AutoReleaseTrucksWhenIdle currently set to {AutoTerrainDesignationsMod.AutoReleaseTrucksWhenIdle}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -270,8 +331,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the global default truck idle behavior on new towers (ParkAtTower, StayPut, or SoftRelease).", null)]
-    private string atdSetTruckIdlePolicy(string value)
+    private string atdSetTruckIdlePolicy(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"TruckIdlePolicy currently set to {AutoTerrainDesignationsMod.TruckIdlePolicy}.");
+
         if (!System.Enum.TryParse(value, true, out TruckIdleBehavior parsed)
             || parsed < TruckIdleBehavior.ParkAtTower
             || parsed > TruckIdleBehavior.SoftRelease)
@@ -282,8 +346,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the key used to enter corner designation mode (Unity KeyCode name, e.g. K, Alpha1, F1).", null)]
-    private string atdSetCornerDesignationKey(string value)
+    private string atdSetCornerDesignationKey(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"CornerDesignationMode currently set to {AutoTerrainDesignationsMod.CornerDesignationMode.ToNiceStringLong()}.");
+
         if (!System.Enum.TryParse<KeyCode>(value, true, out KeyCode parsed))
             return $"[ATD] Unknown key '{value}'. Use a valid Unity KeyCode name (e.g. K, Alpha1, F1).";
 
@@ -292,8 +359,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Enables/disables the legacy straight-ramp generator fallback (true/false, on/off, 1/0).", null)]
-    private string atdSetSuppressLegacyRamps(string value)
+    private string atdSetSuppressLegacyRamps(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"SuppressLegacyAccessRamps currently set to {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}.");
+
         if (!TryParseConsoleBool(value, out bool parsed))
             return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
 
@@ -302,27 +372,39 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets minBottomOreDensity for a purity level (0-4), clamped 0-1. Minimum ore/(ore+waste) ratio a zone must have to be included. E.g. atd_set_min_bottom_ore_density 2 0.25", null)]
-    private string atdSetMinBottomOreDensity(int level, float value)
+    private string atdSetMinBottomOreDensity(int? level = null, float? value = null)
     {
-        if (!AutoDepthDesignation.TrySetMinBottomOreDensityForLevel(level, value))
-            return $"[ATD] Level {level} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
-        return $"[ATD] minBottomOreDensity[{level}] set to {value}.";
+        if (!level.HasValue && !value.HasValue)
+            return ReportCurrentValue(AutoDepthDesignation.FormatPurityArrays());
+        if (!level.HasValue || !value.HasValue)
+            return "[ATD] Usage: atd_set_min_bottom_ore_density level value.";
+        if (!AutoDepthDesignation.TrySetMinBottomOreDensityForLevel(level.Value, value.Value))
+            return $"[ATD] Level {level.Value} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
+        return $"[ATD] minBottomOreDensity[{level.Value}] set to {value.Value}.";
     }
 
     [ConsoleCommand(false, false, "Sets minOrePurity ratio for a purity level (0-4), clamped 0-1. E.g. atd_set_min_ore_purity 2 0.25", null)]
-    private string atdSetMinOrePurity(int level, float value)
+    private string atdSetMinOrePurity(int? level = null, float? value = null)
     {
-        if (!AutoDepthDesignation.TrySetMinOrePurityForLevel(level, value))
-            return $"[ATD] Level {level} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
-        return $"[ATD] minOrePurity[{level}] set to {value}.";
+        if (!level.HasValue && !value.HasValue)
+            return ReportCurrentValue(AutoDepthDesignation.FormatPurityArrays());
+        if (!level.HasValue || !value.HasValue)
+            return "[ATD] Usage: atd_set_min_ore_purity level value.";
+        if (!AutoDepthDesignation.TrySetMinOrePurityForLevel(level.Value, value.Value))
+            return $"[ATD] Level {level.Value} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
+        return $"[ATD] minOrePurity[{level.Value}] set to {value.Value}.";
     }
 
     [ConsoleCommand(false, false, "Sets minComponentSize for a purity level (0-4). E.g. atd_set_min_component_size 2 8", null)]
-    private string atdSetMinComponentSize(int level, int value)
+    private string atdSetMinComponentSize(int? level = null, int? value = null)
     {
-        if (!AutoDepthDesignation.TrySetMinComponentSizeForLevel(level, value))
-            return $"[ATD] Level {level} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
-        return $"[ATD] minComponentSize[{level}] set to {value}.";
+        if (!level.HasValue && !value.HasValue)
+            return ReportCurrentValue(AutoDepthDesignation.FormatPurityArrays());
+        if (!level.HasValue || !value.HasValue)
+            return "[ATD] Usage: atd_set_min_component_size level value.";
+        if (!AutoDepthDesignation.TrySetMinComponentSizeForLevel(level.Value, value.Value))
+            return $"[ATD] Level {level.Value} out of range (0-{AutoDepthDesignation.PurityLevelCount - 1}).";
+        return $"[ATD] minComponentSize[{level.Value}] set to {value.Value}.";
     }
 
     [ConsoleCommand(false, false, "Saves current ATD global settings to ATDsettings.json in the mod folder.", null)]
@@ -374,7 +456,7 @@ public sealed class AtdConsoleCommands
     private string atdDiagnosticLevel(string value = "")
     {
         if (string.IsNullOrWhiteSpace(value))
-            return $"[ATD] Diagnostic level: {AtdDiagnostics.Describe()}.";
+            return ReportCurrentValue($"Diagnostic level: {AtdDiagnostics.Describe()}.");
 
         if (!AtdDiagnostics.TrySetSessionLevel(value, out string error))
             return $"[ATD] Invalid diagnostic level '{value}'. {error}";
@@ -472,8 +554,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the session-only V1 fixed-endpoint lower hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v1_lower_allowance")]
-    private string atdAccessHeightEnvelopeV1LowerAllowance(string value)
+    private string atdAccessHeightEnvelopeV1LowerAllowance(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"V1 fixed-endpoint lower hull extension currently set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeLowerAllowance}.");
+
         if (!TryParseConsoleFloat(value, out float parsed))
             return $"[ATD] Invalid V1 lower allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
         if (!AutoTerrainDesignationsMod
@@ -483,8 +568,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint lower hull extension. Nonnegative; rounded to 1/32 height. Default 1.5. Applies to newly built snapshots.", "atd_access_height_envelope_v2_lower_allowance")]
-    private string atdAccessHeightEnvelopeV2LowerAllowance(string value)
+    private string atdAccessHeightEnvelopeV2LowerAllowance(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"V2 fixed-endpoint lower hull extension currently set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeLowerAllowance}.");
+
         if (!TryParseConsoleFloat(value, out float parsed))
             return $"[ATD] Invalid V2 lower allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         if (!AutoTerrainDesignationsMod
@@ -494,8 +582,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the session-only V1 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.0. Applies to newly built snapshots.", "atd_access_height_envelope_v1_upper_allowance")]
-    private string atdAccessHeightEnvelopeV1UpperAllowance(string value)
+    private string atdAccessHeightEnvelopeV1UpperAllowance(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"V1 fixed-endpoint upper hull extension currently set to {AutoTerrainDesignationsMod.ExperimentalAccessV1HeightEnvelopeUpperAllowance}.");
+
         if (!TryParseConsoleFloat(value, out float parsed))
             return $"[ATD] Invalid V1 upper allowance '{value}'. Use a finite nonnegative number, for example 1.0.";
         if (!AutoTerrainDesignationsMod
@@ -505,8 +596,11 @@ public sealed class AtdConsoleCommands
     }
 
     [ConsoleCommand(false, false, "Sets the session-only V2 fixed-endpoint upper hull extension. Nonnegative; rounded to 1/32 height. Default 1.5. Applies to newly built snapshots.", "atd_access_height_envelope_v2_upper_allowance")]
-    private string atdAccessHeightEnvelopeV2UpperAllowance(string value)
+    private string atdAccessHeightEnvelopeV2UpperAllowance(string? value = null)
     {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"V2 fixed-endpoint upper hull extension currently set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}.");
+
         if (!TryParseConsoleFloat(value, out float parsed))
             return $"[ATD] Invalid V2 upper allowance '{value}'. Use a finite nonnegative number, for example 1.5.";
         if (!AutoTerrainDesignationsMod
@@ -515,7 +609,13 @@ public sealed class AtdConsoleCommands
         return $"[ATD] V2 fixed-endpoint upper hull extension set to {AutoTerrainDesignationsMod.ExperimentalAccessV2HeightEnvelopeUpperAllowance}. New snapshots will use this value.";
     }
 
-    private static bool TryParseConsoleBool(string value, out bool parsed)
+    private static string ReportCurrentValue(string message)
+    {
+        AutoDepthDesignation.s_log.Info(message);
+        return $"[ATD] {message}";
+    }
+
+    private static bool TryParseConsoleBool(string? value, out bool parsed)
     {
         switch ((value ?? string.Empty).Trim().ToLowerInvariant())
         {
@@ -537,7 +637,7 @@ public sealed class AtdConsoleCommands
         }
     }
 
-    private static bool TryParseConsoleFloat(string value, out float parsed)
+    private static bool TryParseConsoleFloat(string? value, out float parsed)
     {
         string text = (value ?? string.Empty).Trim();
         return float.TryParse(

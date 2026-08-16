@@ -10,7 +10,7 @@ The mod works in two steps:
 
 1. **Preparation** — Temporarily lowers the dig target one layer below the farm height where needed, so excavators remove non-farmable material from the future topsoil band. The original designation is restored once the band is clear.
 
-2. **Filling** — Once preparation is complete, restricts the tower's dump rules to farmable products (dirt, compost, and similar) so trucks fill the topsoil band with farmable material only. When all origins are done the dump rules are restored automatically.
+2. **Filling** — Once preparation is complete, restricts the tower's dump rules to farmable products (dirt, compost, and similar) so trucks fill the topsoil band with farmable material only. ATD also actively requests vanilla balancing jobs from eligible soil storage, so a storage does not need to be configured as an exporter just to supply this fill. When all origins are done the dump rules are restored automatically.
 
 Vehicle access ramps are added automatically when excavators or trucks cannot reach a work area.
 
@@ -53,6 +53,10 @@ If the placement came from a blueprint, ATD holds the whole placement batch unti
 - Only **flat** level designations participate. Designations with different corner heights are ignored.
 - The tower's dump rules are modified only during filling, and only for that tower.
 - The mod never changes global (cross-tower) dump rules.
+- Active soil import uses ordinary available trucks, including trucks temporarily soft-released by ATD. Tower-assigned trucks continue to escort excavators; they are not used for dumping.
+- If the tower has explicit storage-to-tower routes, only those storages can supply active filling. Otherwise normal vanilla storage route and truck-filter rules still apply. A neutral storage with export disabled can therefore supply the farm only through the tower's active filling request, not ordinary global dumping.
+- The initial filling product set is all farmable products. If you do not want a product such as compost dumped into this farm, disable that product on the tower before the relevant import is dispatched.
+- If no eligible soil source or reachable truck exists, filling remains pending silently and retries on later farming ticks.
 - Automation state is saved per tower. After reloading a save, towers restore their own farmland preparation automation setting.
 - Pending Farm Placement Assist batches have limited save/load recovery while this feature is experimental. Pending farms restore crop schedules, fertility targets, rotation, and reflection; full blueprint configuration persistence is still planned.
 - If you manually remove or replace a tracked designation, the mod drops that tile from the session. Place a new flat level designation and the next scan will pick it up.

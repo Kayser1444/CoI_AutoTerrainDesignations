@@ -27,6 +27,7 @@ using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
 using Mafi.Core.Terrain.Trees;
 using Mafi.Core.Vehicles.Jobs;
+using Mafi.Core.Vehicles;
 using Mafi.Core.World;
 using Mafi.Collections.ImmutableCollections;
 using Mafi.Unity.InputControl;
@@ -102,6 +103,7 @@ public static string Tt(string text) => text;
         PreAllocationPatches.Apply(m_harmony);
         AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
+        MineTowerCloneConfigPatches.Apply(m_harmony);
         CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
             m_harmony,
             Manifest.DisplayName,
@@ -726,6 +728,15 @@ public static string Tt(string text) => text;
             INotificationsManager notificationsManager = resolver.Resolve<INotificationsManager>();
             IInputScheduler inputScheduler = resolver.Resolve<IInputScheduler>();
             ConfigSerializationContext configSerializationContext = resolver.Resolve<ConfigSerializationContext>();
+            IVehicleBuffersRegistry? vehicleBuffersRegistry = null;
+            ITruckJobsFilterManager? truckJobsFilter = null;
+            UnreachableTerrainDesignationsManager? unreachableTerrainDesignations = null;
+            try { vehicleBuffersRegistry = resolver.Resolve<IVehicleBuffersRegistry>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Vehicle buffers registry unavailable for active farmland import: " + ex2.Message); }
+            try { truckJobsFilter = resolver.Resolve<ITruckJobsFilterManager>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Truck jobs filter unavailable for active farmland import: " + ex2.Message); }
+            try { unreachableTerrainDesignations = resolver.Resolve<UnreachableTerrainDesignationsManager>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Terrain reachability cache unavailable for active farmland import: " + ex2.Message); }
             AutoTerrainDesignationsTicker ticker =
                 AutoTerrainDesignationsTicker.CreateForWorld(
                     AutoDepthDesignation.CurrentWorldGeneration + 1,
@@ -734,6 +745,7 @@ public static string Tt(string text) => text;
             m_entitiesManager = entitiesManager;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
+            AutoDepthDesignation.ConfigureActiveSoilImport(vehicleBuffersRegistry, truckJobsFilter, unreachableTerrainDesignations);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
             AutoDepthDesignation.PropRemovalManager?.ResumeLoadedRequests();

@@ -103,6 +103,14 @@ namespace AutoTerrainDesignations
             public string LastFillingActivationDetail { get; set; } = string.Empty;
             public string LastVehicleClearOutDetail { get; set; } = string.Empty;
             public string LastTruckAssignmentDetail { get; set; } = string.Empty;
+            // Runtime-only active-import state. It is deliberately reconstructed from
+            // live designations and vanilla vehicle jobs after a save/load boundary.
+            public HashSet<Tile2i> ActiveSoilImportOrigins { get; } = new HashSet<Tile2i>();
+            public Dictionary<Tile2i, Truck> ActiveSoilImportTrucks { get; } =
+                new Dictionary<Tile2i, Truck>();
+            public Dictionary<Tile2i, int> ActiveSoilImportNoClaimTicks { get; } =
+                new Dictionary<Tile2i, int>();
+            public string LastActiveSoilImportDetail { get; set; } = string.Empty;
             public HashSet<Tile2i> PreparationShoulderOrigins { get; } = new HashSet<Tile2i>();
             public HashSet<Tile2i> PreparationAccessRampOrigins { get; } = new HashSet<Tile2i>();
             public HashSet<Tile2i> FillingAccessRampOrigins { get; } = new HashSet<Tile2i>();
@@ -1069,6 +1077,9 @@ namespace AutoTerrainDesignations
             if (hasFilling || !allDone)
             {
                 session.FillingAllDoneSinceRealtime = null;
+                if (hasFilling)
+                    DispatchActiveFarmingSoilImports(session);
+                session.LastReport = FormatFarmingPreparationSummary(session);
                 sw.Stop();
                 LogFarmingPerfIfSlow(session, tower, "filling pass", sw.ElapsedMilliseconds, $"hasFilling={hasFilling}, allDone={allDone}");
                 return hasFilling;
@@ -1767,6 +1778,8 @@ namespace AutoTerrainDesignations
                 sb.AppendLine("  " + session.LastVehicleClearOutDetail);
             if (!string.IsNullOrEmpty(session.LastTruckAssignmentDetail))
                 sb.AppendLine("  " + session.LastTruckAssignmentDetail);
+            if (!string.IsNullOrEmpty(session.LastActiveSoilImportDetail))
+                sb.AppendLine("  " + session.LastActiveSoilImportDetail);
             if (!string.IsNullOrEmpty(session.LastFutureRimDebrisCleanupDetail))
                 sb.AppendLine("  " + session.LastFutureRimDebrisCleanupDetail);
             if (!string.IsNullOrEmpty(session.LastDroppedOriginDetail))
@@ -1812,6 +1825,8 @@ namespace AutoTerrainDesignations
                 sb.AppendLine("  " + session.LastVehicleClearOutDetail);
             if (!string.IsNullOrEmpty(session.LastTruckAssignmentDetail))
                 sb.AppendLine("  " + session.LastTruckAssignmentDetail);
+            if (!string.IsNullOrEmpty(session.LastActiveSoilImportDetail))
+                sb.AppendLine("  " + session.LastActiveSoilImportDetail);
             if (!string.IsNullOrEmpty(session.LastFutureRimDebrisCleanupDetail))
                 sb.AppendLine("  " + session.LastFutureRimDebrisCleanupDetail);
             if (!string.IsNullOrEmpty(session.LastDroppedOriginDetail))

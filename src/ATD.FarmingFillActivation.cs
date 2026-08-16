@@ -35,6 +35,10 @@ namespace AutoTerrainDesignations
         private static void ClearFarmingFillingActivation(FarmingPreparationSession session)
         {
             session.LastFillingActivationDetail = string.Empty;
+            session.ActiveSoilImportOrigins.Clear();
+            session.ActiveSoilImportTrucks.Clear();
+            session.ActiveSoilImportNoClaimTicks.Clear();
+            session.LastActiveSoilImportDetail = string.Empty;
             RemoveFarmingRimAlignmentDesignations(session);
             RemoveOwnedFarmingFutureRimDebrisCleanup(session);
             foreach (FarmingOriginSession origin in session.Origins.Values)

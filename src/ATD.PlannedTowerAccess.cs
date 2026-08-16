@@ -224,14 +224,24 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
-            if (!TryBuildExperimentalAccessSnapshot(
-                    tower, workDepths, cornerHeights, terrMgr,
-                    isMining: true, allowsMixedWork: true,
-                    reachableFixedOrigins: null,
-                    groundGoalOverride: ghostGroundGoals,
-                    generatedAreaMarginTiles: 0,
-                    out AccessSearchSnapshot snapshot,
-                    out string snapshotFailure))
+            var snapshotBuild = new ExperimentalAccessSnapshotBuildResult();
+            IEnumerator snapshotPreparation = BuildExperimentalAccessSnapshot(
+                tower, workDepths, cornerHeights, terrMgr,
+                isMining: true, allowsMixedWork: true,
+                reachableFixedOrigins: null,
+                groundGoalOverride: ghostGroundGoals,
+                generatedAreaMarginTiles: 0,
+                snapshotBuild,
+                sliceControl);
+            while (snapshotPreparation.MoveNext())
+                yield return snapshotPreparation.Current;
+
+            if (sliceControl?.CancellationRequested ?? false)
+                yield break;
+
+            AccessSearchSnapshot? snapshot = snapshotBuild.Snapshot;
+            string snapshotFailure = snapshotBuild.FailureReason;
+            if (snapshot == null)
             {
                 LogExperimentalAccessDebug(
                     $"[ATD Planned Tower Access] snapshotFailed={snapshotFailure}");

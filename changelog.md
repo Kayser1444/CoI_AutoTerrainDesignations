@@ -11,6 +11,18 @@ v0.5.13 [unreleased]
 * Fixed: Farmland preparation automation now reconnects persisted sessions to
   their live mine towers before lifecycle cleanup, preventing the option from
   turning itself off after loading a save unless the tower was actually removed.
+ * Added: Farmland preparation filling can actively import farmable soil
+   materials from neutral storages, including storages that neither import nor
+   export; tower material routes and dumpable-product settings still constrain
+   the sources and products used.
+* Improved: ATD console setter commands now report their current values when
+  invoked without arguments and write those values to the ATD log without
+  changing the settings.
+* Added: Mine Tower copy, blueprint, repeated placement, eligible Cut, and
+  Copy settings workflows now preserve the tower's exact managed area and
+  player-authored ATD settings, including ore selection and quality, mining
+  priority, accessway clearance, and vehicle idle policies. Vanilla continues
+  to handle vehicle assignments, routes, and ordinary tower configuration.
 
 v0.5.12 [released]
 

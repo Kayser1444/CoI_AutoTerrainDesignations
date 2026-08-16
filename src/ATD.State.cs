@@ -1019,6 +1019,7 @@ namespace AutoTerrainDesignations
             s_treesManager = null;
             s_vehiclePathFindingManager = null;
             s_vehiclesManager = null;
+            ResetActiveSoilImportRuntime();
             s_parkAndWaitJobFactory = null;
             s_excavatorPathFindingParams = null;
             s_standardVehiclePathFindingParams = null;
