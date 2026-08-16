@@ -1,4 +1,4 @@
-v0.5.13 [unreleased]
+v0.5.13 [packaged]
 
 * Improved: Interactive Create Designations accessway generation now runs as a
   manager-owned `CreateDesignations` request under the cooperative frame
