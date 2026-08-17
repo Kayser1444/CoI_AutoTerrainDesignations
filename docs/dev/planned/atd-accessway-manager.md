@@ -283,14 +283,17 @@ or demonstrated to be bounded. The final world mutation remains one small
 atomic transaction: cancellation is accepted through validation, but once the
 request enters `Committing`, it finishes or rolls back. If a supposedly bounded
 operation exceeds 30 ms during stress testing, it is a release blocker and must
-be split or optimized. Search work must not move to a worker thread merely to
-hide an unsliced main-thread phase.
+be split or optimized. The approved worker backend moves only pure preparation,
+search, and plan materialization off-thread; it does not excuse an unsliced
+game-thread capture, validation, or commit phase.
 
-Paused frames may advance preparation, search, and validation with the higher
-adaptive budget. A completed plan is revalidated and its single atomic mutation
-is dispatched through the simulation-safe command-processing boundary, at most
-one commit per callback. Farming phase progression itself may wait for normal
-simulation updates.
+In cooperative mode, paused frames may advance preparation, search, and
+validation with the higher fixed budget. Worker search runs continuously at
+below-normal thread priority, independent of play/pause frame budgets. A
+completed plan is revalidated and its single atomic mutation is dispatched
+through the simulation-safe command-processing boundary, at most one commit per
+callback. Farming phase progression itself may wait for normal simulation
+updates.
 
 ## Coalescing, supersession, and backpressure
 
@@ -591,14 +594,16 @@ Useful console diagnostics:
 9. Profile materialization and commit, and incrementalize any remaining phase
    that can still exceed the frame budget. Keep the final designation mutation
    transactional and atomic even if preparation for that mutation is sliced.
-10. Only after a purity/thread-safety audit, consider a worker-thread search
-   backend behind the same manager interface.
-11. Replace fixed frame budgets with the preserved adaptive-controller prototype:
-    1 ms minimum, 15 ms unpaused cap, 30 ms paused cap, fast stress backoff,
-    gradual recovery, diagnostics, configuration migration, and deterministic
-    timing tests. The prototype and its deterministic tests are preserved but
-    intentionally unwired after the initial implementation exposed an incorrect
-    fixed-60-FPS baseline assumption.
+10. Implement the approved
+    [accessway search worker](../in-progress/accessway-search-worker.md) through
+    its [five farming-first tickets](accessway-search-worker-tickets.md), then
+    phase it from explicit opt-in to default and finally enforced fail-closed
+    only when its promotion gates pass.
+11. After worker execution reaches stage two, use measurements to decide whether
+    to repurpose the preserved adaptive-controller prototype for resumable
+    game-thread capture or validation only. Worker search never consumes an
+    adaptive frame budget. If those remaining phases are already smooth, reduce
+    or close the adaptive ticket instead of enabling it without evidence.
 
 The farming-first manager slice may release before interactive migration because
 it addresses the reported path. During that transition, the existing
@@ -685,6 +690,6 @@ overruns.
    and warning thresholds within the approved 1/15/30 ms envelope?
 3. Which reliable tree/prop/entity events can augment the required spatial
    retry triggers without global invalidation churn?
-4. Can a later purity/thread-safety audit prove that immutable graph search is
-   safe on a worker thread? Worker-thread execution remains out of scope for
-   this fix regardless of that future answer.
+4. What measured snapshot-memory ceiling and diagnostic transport bounds remain
+   conservative on the 124k-tile fixture and larger farming cases without
+   excluding ordinary player hardware?

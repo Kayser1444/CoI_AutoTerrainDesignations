@@ -213,6 +213,81 @@ The workflow responsible for an access obligation and for interpreting its
 progress, result, and user cancellation.
 _Avoid_: Tower owner, pathfinder owner
 
+**Access request logical cancellation**:
+The immediate withdrawal of an access request's authority to produce a live
+designation commit. Work already executing may still need to reach a safe stop
+boundary, but its eventual route or plan cannot be accepted.
+_Avoid_: Worker termination, completed cancellation, thread abort
+
+**Search cancellation acknowledgment**:
+Confirmation that logically cancelled search work has reached a safe stop
+boundary and returned its partial progress and diagnostics without a candidate
+plan.
+_Avoid_: Logical cancellation, successful search result, silent disposal
+
+**Hard access-request invalidation**:
+A change that removes the identity or governing preconditions of an access
+request, immediately withdrawing its authority and requesting worker
+cancellation. World replacement, owner or obligation removal, and incompatible
+access-mode changes are hard invalidations.
+_Avoid_: Environmental snapshot dirtiness, ordinary stale validation
+
+**Environmental snapshot dirtiness**:
+A relevant live-world change after snapshot capture that may affect the
+captured answer without removing the access request itself. Search may finish,
+but success requires authoritative live validation and failure cannot establish
+an authoritative negative result.
+_Avoid_: Hard invalidation, automatically valid stale result
+
+**Captured access snapshot**:
+A sealed, data-only view of primitive world facts used by one access request.
+It contains no live world references, callbacks, or pure search structures that
+can instead be derived by the execution backend, and does not change after
+publication.
+_Avoid_: Live terrain view, mutable search cache, serialized world state
+
+**Access search workspace**:
+The request-local mutable state used to evaluate one captured access snapshot,
+including derived indexes and graphs, frontier, history, lazy caches, and
+temporary diagnostics. It is owned by exactly one execution context and
+discarded after terminal output.
+_Avoid_: Captured access snapshot, shared pathfinder cache, persisted request
+
+**Access search policy snapshot**:
+The immutable captured values of every configurable rule, cost, limit, and
+feature flag that can affect one access search's feasibility or result. It is
+part of request identity and is the sole configuration authority during that
+attempt.
+_Avoid_: Live global settings, diagnostic presentation options, mutable policy
+
+**Access search evaluator**:
+A pure request-local service reconstructed inside the access search workspace
+from the captured access snapshot and policy. It answers graph, feasibility,
+scoring, and handoff questions without callbacks to live game objects.
+_Avoid_: Snapshot delegate, live-world callback, precomputed all-candidates table
+
+**Search worker**:
+A runtime execution component that consumes one immutable captured access
+snapshot and request description, evaluates the pure route search away from
+the game thread, and returns route diagnostics and a candidate plan for
+game-thread validation and commit. It does not capture live world state,
+resolve workflow ownership, or mutate terrain designations.
+_Avoid_: Worker-owned access request, background game simulation, parallel
+access obligations
+
+**Access plan materialization**:
+The pure derivation and captured-snapshot validation of a candidate terrain-
+designation plan from an access route. It may run with the route search and
+does not read or mutate the live world. Its result remains provisional until
+designation commit.
+_Avoid_: Designation placement, live validation, search result mutation
+
+**Access designation commit**:
+The game-thread operation that revalidates a materialized access plan against
+the live world and applies its terrain-designation mutations transactionally.
+Search completion alone never authorizes commit.
+_Avoid_: Plan materialization, worker placement, search completion
+
 **Modeled-rule preservation**:
 The promise that making accessway search faster does not exclude a route that
 the active physical accessway model permits. Deliberate player-relevance
