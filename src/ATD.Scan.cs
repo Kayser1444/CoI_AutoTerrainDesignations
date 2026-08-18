@@ -177,7 +177,61 @@ namespace AutoTerrainDesignations
                 + "/" + phase;
         }
 
+        private static Func<ATDAccesswayValidationResult>
+            BuildInteractiveAccessValidation(
+                IAreaManagingTower tower,
+                ATDTowerSettings towerSettings)
+        {
+            int requestWorldGeneration = CurrentWorldGeneration;
+            var expectedSettingsRevision =
+                new AccessRequestSettingsRevision(
+                    towerSettings.RampWidth,
+                    towerSettings.VehicleClearance,
+                    AutoTerrainDesignationsMod
+                        .AccessPlanningSettingsFingerprint);
+            Tile2i expectedAreaMin = tower.Area.BoundingBoxMin;
+            Tile2i expectedAreaMax = tower.Area.BoundingBoxMax;
+            bool hasExpectedTowerId = TryGetTowerEntityId(
+                    tower,
+                    out EntityId expectedTowerId)
+                && expectedTowerId.IsValid;
+
+            return () =>
+            {
+                if (!IsWorldGenerationActive(requestWorldGeneration))
+                    return ATDAccesswayValidationResult.OwnerGone(
+                        "WorldGenerationChanged");
+
+                if (hasExpectedTowerId
+                    && (!TryGetTowerEntityId(
+                            tower,
+                            out EntityId liveTowerId)
+                        || liveTowerId != expectedTowerId))
+                    return ATDAccesswayValidationResult.OwnerGone(
+                        "InteractiveOwnerGone");
+
+                ATDTowerSettings liveSettings =
+                    GetOrCreateTowerSettings(tower);
+                var liveSettingsRevision =
+                    new AccessRequestSettingsRevision(
+                        liveSettings.RampWidth,
+                        liveSettings.VehicleClearance,
+                        AutoTerrainDesignationsMod
+                            .AccessPlanningSettingsFingerprint);
+                if (!AutoTerrainDesignationsMod.TurningRampsEnabled
+                    || liveSettingsRevision != expectedSettingsRevision
+                    || tower.Area.BoundingBoxMin != expectedAreaMin
+                    || tower.Area.BoundingBoxMax != expectedAreaMax)
+                    return ATDAccesswayValidationResult.Stale(
+                        "AccessModeChanged");
+
+                return ATDAccesswayValidationResult.Current();
+            };
+        }
+
         private static IEnumerator AwaitCreateDesignationsAccessRequest(
+            IAreaManagingTower tower,
+            ATDTowerSettings towerSettings,
             string ownerKey,
             string workFingerprint,
             Func<ExperimentalAccessSliceControl, IEnumerator> workFactory,
@@ -194,7 +248,8 @@ namespace AutoTerrainDesignations
                 () => new ATDAccesswayCoroutineWork(
                     workFactory,
                     resultFactory,
-                    GetManagedAccesswaySliceBudgetMilliseconds));
+                    GetManagedAccesswaySliceBudgetMilliseconds),
+                BuildInteractiveAccessValidation(tower, towerSettings));
             ATDAccesswayRequestHandle? handle = null;
             bool reachedTerminalState = false;
             try
@@ -766,10 +821,13 @@ namespace AutoTerrainDesignations
                             return success
                                 ? ATDAccesswayRequestResult.Succeeded(payload)
                                 : ATDAccesswayRequestResult.Failed(
-                                    rampResult.Outcome.ToString(),
+                                    string.IsNullOrEmpty(rampResult.FailureReason)
+                                        ? rampResult.Outcome.ToString()
+                                        : rampResult.FailureReason,
                                     payload);
                         },
-                        GetManagedAccesswaySliceBudgetMilliseconds));
+                        GetManagedAccesswaySliceBudgetMilliseconds),
+                    BuildInteractiveAccessValidation(tower, towerSettings));
                 ATDAccesswayRequestHandle accessHandle =
                     EnqueueAccesswayRequest(accessRequest);
                 s_createDesignationsAccessRequest = accessHandle;
@@ -1283,6 +1341,8 @@ namespace AutoTerrainDesignations
                     + "|clearance=" + towerSettings.VehicleClearance;
                 IEnumerator requestRoutine =
                     AwaitCreateDesignationsAccessRequest(
+                        tower,
+                        towerSettings,
                         BuildCreateDesignationsAccessOwnerKey(
                             tower, "existing-repair"),
                         workFingerprint,

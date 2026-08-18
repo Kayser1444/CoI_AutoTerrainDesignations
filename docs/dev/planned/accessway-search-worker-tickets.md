@@ -1,6 +1,8 @@
 # Accessway search worker implementation tickets
 
-Status: approved sequential implementation queue; not implemented.
+Status: approved sequential implementation queue; Ticket 1 implemented in
+cooperative mode; Ticket 2 capture contracts and backpressure guard are in
+progress, while later tickets remain queued.
 
 These tickets implement the approved
 [accessway search worker design](../in-progress/accessway-search-worker.md) and
@@ -68,6 +70,29 @@ but remains cooperative in production.
   cancels it; dirty failure cannot establish authoritative `NoCandidate`.
 - Cooperative farming results remain semantically equal to the Ticket 1 core.
 - The project builds and the focused test suite passes.
+
+### Current implementation slice
+
+The first Ticket 2 slice is now present in the cooperative path. It captures
+the start/completion revisions, records environmental dirtiness separately
+from hard world/policy invalidation, estimates retained snapshot memory before
+and after growth, and fails closed with `SnapshotTooLarge` when the configured
+ceiling is exceeded. The farming request receives the stable diagnostic reason
+and the capture fixture gate covers the revision, single-capture backpressure,
+and estimator contracts. Tower-local ramp/clearance revisions are carried into
+the snapshot and invalidate capture when they change. Prop and tree enumeration
+is also copied into value-owned primitive cleanup facts before cleanup policy
+preparation. Building occupancy and fixed-height facts are likewise copied at
+capture entry and reused by cleanup and durability preparation rather than
+reading the mutable farming cache mid-capture. Captured precise terrain
+heights now feed handoff geometry, exact-profile, leveling-face, and rank-work
+checks; vanilla designation-readiness callbacks remain to be extracted from
+their live API inputs.
+
+The remaining Ticket 2 work is the full extraction of live terrain/prop facts
+from pure graph, mask, evaluator, and lookup preparation. Until that extraction
+and its bounded stress fixtures are complete, this slice must not be treated as
+worker-ready or as evidence that all preparation is off the game thread.
 
 ## Ticket 3: Dormant farming worker
 

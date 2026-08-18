@@ -56,6 +56,22 @@
     "Accessway mode"
   ],
   [
+    "settings.dumping_priority.label",
+    "Dumping priority"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Passive"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Only import from active exporters."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Legacy 3"
   ],

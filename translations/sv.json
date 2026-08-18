@@ -56,6 +56,22 @@
     "Accessway-läge"
   ],
   [
+    "settings.dumping_priority.label",
+    "Tippningsprioritet"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Använder vaniljens importprioriteter 1–15 för aktiv tippning; lägre tal är mer brådskande. Passiv använder vaniljens passiva tippning och importerar bara från aktiva exportörer. Under fyllning av jordbruksmark använder Passiv tillfälligt aktiv prioritet 14 medan tippningsreglerna är begränsade till jordbruksprodukter. Standard: Passiv."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Passiv"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Importera endast från aktiva exportörer."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Äldre 3"
   ],

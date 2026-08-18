@@ -58,6 +58,14 @@ namespace AutoTerrainDesignations
             Loc.Str("panel.designations.ore_filter.auto", "AUTO", "Label for automatic scanning behavior in the ore picker.");
         public static LocStr DesigAccesswayModeLabel =
             Loc.Str("panel.designations.accessway_mode.label", "Accessway mode", "Label for the accessway mode selector.");
+        public static LocStr DumpingPriorityLabel =
+            Loc.Str("settings.dumping_priority.label", "Dumping priority", "Label for the tower dumping priority control.");
+        public static LocStr DumpingPriorityDescription =
+            Loc.Str("settings.dumping_priority.tooltip", "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively.", "Tooltip for the tower dumping priority control.");
+        public static LocStr DumpingPriorityPassiveLabel =
+            Loc.Str("settings.dumping_priority.passive", "Passive", "Option that disables active dumping demand.");
+        public static LocStr DumpingPriorityPassiveTooltip =
+            Loc.Str("settings.dumping_priority.passive.tooltip", "Only import from active exporters.", "Tooltip for the passive dumping priority option.");
         public static LocStr AccesswayModeLegacy3 =
             Loc.Str("panel.designations.accessway_mode.legacy_3", "Legacy 3", "Accessway mode option for a legacy straight ramp three designation cells wide.");
         public static LocStr AccesswayModeLegacy4 =

@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.5.12*
+*Current as of: v0.6.1*
 
 ## What it does
 
@@ -81,6 +81,17 @@ Forces the scan to target one specific product.
 
 When left on AUTO, ATD scans for useful products only if the tower area has no terrain designations. If terrain designations already exist, ATD creates no new mining field and instead treats the existing work as pathfinding goals. Debris cleanup and dirt scanning are manual-only selections.
 
+### `Dumping priority`
+
+Controls ATD's active input demand for dumping designations managed by this tower. The request uses ordinary vanilla logistics; tower-assigned trucks remain excavator escorts.
+
+- **1–15** — actively request products accepted by the tower for every eligible managed dumping designation. The control uses vanilla import-priority labels (**1 - high** through **15 - low**) and competes with all other vanilla importers and dumping jobs according to the normal priority rules.
+- **Passive** — use vanilla passive dumping. Only active exporters supply the tower's dumping work; neutral/passive storages are not pulled into it. During farmland automation's restricted fill window, ATD temporarily uses active priority 14 so farmable materials can be sourced without enabling tower-wide active dumping.
+
+Neutral storage contents can be used as active sources without changing storage sliders. Explicit storage-to-tower routes, disabled outputs, protected quantities, reachability, truck filters, and vanilla partial-load/continuation rules still apply. A designation outside all tower areas remains governed by global dumping rules. Farm workflow products and accessway ownership determine which designations are eligible; ATD does not apply a separate soil filter.
+
+The per-tower priority is in the Mining designations panel. The default is **Passive**. The world default is in Mod Settings → Tower defaults; **Save to config** writes that world default to `ATDsettings.json` for future worlds. Existing towers keep their concrete priority when the world default changes. The console command `atd_set_dumping_priority 1..15|Passive` changes the current world's default (omitting the argument reports it).
+
 ## Ore composition panel
 
 The **Ore composition** panel analyzes the tower's current managed designations and estimates how much material is inside them.
@@ -134,6 +145,7 @@ Useful console commands:
 | `atd_set_min_corridor_clearance n` | Sets the global default corridor clearance. |
 | `atd_set_ramp_notifications on\|off` | Enables or disables ramp access warning notifications on mine towers (Failed, Truncated, NotAccessible icons). |
 | `atd_set_auto_release_when_idle on\|off` | Sets the global default for the **Auto-release when idle** feature; individual towers can override this via the inspector toggle. |
+| `atd_set_dumping_priority 1..15\|Passive` | Sets the current world's default dumping priority. Lower numbers are more urgent; `Passive` uses vanilla dumping and only imports from active exporters. |
 | `atd_save_settings` | Writes the current in-memory defaults to `ATDsettings.json`. |
 | `atd_reset_to_defaults` | Resets the in-memory defaults to the built-in values. |
 

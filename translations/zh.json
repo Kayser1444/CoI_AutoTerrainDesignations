@@ -56,6 +56,22 @@
     "通道方式"
   ],
   [
+    "settings.dumping_priority.label",
+    "倾倒优先级"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "使用原版导入优先级 1–15 进行主动倾倒；数字越小越紧急。被动模式使用原版被动倾倒，只从主动出口导入。在农田填充期间，只要倾倒规则限定为农用产品，被动模式会暂时使用主动优先级 14。默认值：被动。"
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "被动"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "只从主动出口导入。"
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "旧版 3"
   ],

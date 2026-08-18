@@ -45,11 +45,6 @@ namespace AutoTerrainDesignations.Access
             AccessSearchMode.YNegative
         };
 
-        private static int MaxVisitedNodes => AutoTerrainDesignationsMod.AccessMaxVisitedNodes;
-        private static float GeneratedVFixedOverhead => AutoTerrainDesignationsMod.AccessGeneratedVFixedCost;
-        internal static float DirectWorkWeight => AutoTerrainDesignationsMod.AccessDirectWorkWeight;
-        internal static float SideRayWeight => AutoTerrainDesignationsMod.AccessSideRayWeight;
-
         internal static int GetVehicleDisturbanceRadius(int vehicleClearance)
             => vehicleClearance >= 5 ? 2 : 1;
 
@@ -542,9 +537,11 @@ namespace AutoTerrainDesignations.Access
                 });
             if (!mixedCleanup.IsEligible || !mixedCleanup.HasTreeCleanup || !mixedCleanup.HasDenseDebrisCleanup)
             { failure = "prop cleanup helper must preserve mixed tree and dense-debris classes"; return false; }
-            if (AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: true) != 0f
-                || AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: false)
-                    != AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost)
+            if (AccessPropCleanupPolicy.GetCleanupLandscapingCost(
+                    isTree: true, policy: fixture.Policy) != 0f
+                || AccessPropCleanupPolicy.GetCleanupLandscapingCost(
+                    isTree: false, policy: fixture.Policy)
+                    != fixture.Policy.PropCleanupLandscapingCost)
             { failure = "trees must remain cost-free while dense prop cleanup retains its configured route cost"; return false; }
             AccessPropCleanupInfo treeOne = AccessPropCleanupPolicy.BuildOriginInfo(
                 new Tile2i(1, 0), new[]
@@ -806,10 +803,10 @@ namespace AutoTerrainDesignations.Access
                 || baselineLandscapingCost.RightSideRayCost != 0f
                 || baselineLandscapingCost.UnresolvedPenalty != 0f
                 || baselineLandscapingCost.IsFatal
-                || Math.Abs(baselineFixedCost - GeneratedVFixedOverhead) > 0.0001f
+                || Math.Abs(baselineFixedCost - fixture.Policy.GeneratedVFixedCost) > 0.0001f
                 || Math.Abs(baselineGeneratedEntryCost
-                    - (DirectWorkWeight * 16f * fixture.LandscapingCostDistanceScale
-                        + GeneratedVFixedOverhead)) > 0.0001f)
+                    - (fixture.Policy.DirectWorkWeight * 16f * fixture.LandscapingCostDistanceScale
+                        + fixture.Policy.GeneratedVFixedCost)) > 0.0001f)
             { failure = "generated interior cost must preserve flat-cell normalization, respect work direction, and credit compatible projected work"; return false; }
             Tile2i preciseTerrainTile = new Tile2i(2, 2);
             Tile2i preciseOceanTile = new Tile2i(2, 3);
@@ -1163,7 +1160,7 @@ namespace AutoTerrainDesignations.Access
                 || Math.Abs(alongX.LeftSideRayCost - alongX.RightSideRayCost) > 0.0001f
                 || alongY.LeftSideRayCost != 0f
                 || alongY.RightSideRayCost != 0f
-                || (SideRayWeight > 0f && alongXCost <= alongYCost)
+                || (fixture.Policy.SideRayWeight > 0f && alongXCost <= alongYCost)
                 || miningIgnoresFill.LeftSideRayCost != 0f
                 || miningIgnoresFill.RightSideRayCost != 0f
                 || dumpingIgnoresCut.LeftSideRayCost != 0f
@@ -1281,9 +1278,9 @@ namespace AutoTerrainDesignations.Access
             if (mergedV1Ray.IsFatal
                 || mergedV1Ray.IsUnresolved
                 || mergedV1Ray.DisturbedDistance
-                    != 5 + AutoTerrainDesignationsMod.AccessRayEndBuffer
+                    != 5 + fixture.Policy.RayEndBuffer
                 || mergedV1Ray.SampleCount
-                    != 5 + AutoTerrainDesignationsMod.AccessRayEndBuffer)
+                    != 5 + fixture.Policy.RayEndBuffer)
             { failure = "V1 generated rays must honor same-sort contact, the dry-cut extension, and the ordinary safety tail"; return false; }
             if (GetVehicleDisturbanceRadius(3) != 1
                 || GetVehicleDisturbanceRadius(5) != 2)
@@ -1550,7 +1547,7 @@ namespace AutoTerrainDesignations.Access
                 new[]
                 {
                     new AccessSearchNode(cleanupGoal, 0, AccessSearchMode.Ground),
-                }, AccessPropCleanupPolicy.GetCleanupLandscapingCost() + 1f, 1,
+                }, cleanupFixture.Policy.PropCleanupLandscapingCost + 1f, 1,
                 new Dictionary<string, int>());
             AccessDesignationPlan cleanupPlan = AccessPathMaterializer.Materialize(cleanupFixture, cleanupResult);
             if (!cleanupPlan.IsValid || cleanupPlan.CleanupOrigins.Count != 1
@@ -1636,11 +1633,18 @@ namespace AutoTerrainDesignations.Access
                 new[] { generatedGoal },
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
-                Array.Empty<AccessDurabilityCorner>(),
-                (origin, profile, predecessorOrigin, predecessorProfile) => new[]
-                {
-                    new AccessGroundHandoff(generatedGoal, AccessHandoffOperation.Mining),
-                });
+                Array.Empty<AccessDurabilityCorner>());
+            var generatedWorkspace = new AccessSearchWorkspace(
+                generatedFixture,
+                new CooperativeAccessSearchEvaluator(
+                    workableHandoffs:
+                        (origin, profile, predecessorOrigin, predecessorProfile) =>
+                            new[]
+                            {
+                                new AccessGroundHandoff(
+                                    generatedGoal,
+                                    AccessHandoffOperation.Mining),
+                            }));
             var generatedResult = new AccessSearchResult(true, string.Empty, fixtureStart,
                 new AccessSearchNode[]
                 {
@@ -1648,7 +1652,9 @@ namespace AutoTerrainDesignations.Access
                     new AccessSearchNode(generatedGoal, 0, AccessSearchMode.Ground,
                         AccessHandoffOperation.Mining),
                 }, 6f, 2, new Dictionary<string, int>());
-            AccessDesignationPlan generatedPlan = AccessPathMaterializer.Materialize(generatedFixture, generatedResult);
+            AccessDesignationPlan generatedPlan =
+                AccessPathMaterializer.Materialize(
+                    generatedWorkspace, generatedResult);
             if (!generatedPlan.IsValid || generatedPlan.Designations.Count != 1
                 || generatedPlan.Designations[0].Origin != generatedOrigin
                 || generatedPlan.Designations[0].Mode != AccessSearchMode.Flat
@@ -1746,8 +1752,16 @@ namespace AutoTerrainDesignations.Access
             => FindPath(snapshot, clusterOrigins, null);
 
         public static AccessSearchResult FindPath(AccessPathRequest request)
+            => FindPath(request, new AccessSearchWorkspace(request.Snapshot));
+
+        public static AccessSearchResult FindPath(
+            AccessPathRequest request, AccessSearchWorkspace workspace)
         {
-            AccessPathSearchSession session = CreateSession(request);
+            if (!ReferenceEquals(request.Snapshot, workspace.Snapshot))
+                throw new ArgumentException(
+                    "The search workspace must belong to the request snapshot.",
+                    nameof(workspace));
+            AccessPathSearchSession session = CreateSession(request, workspace);
             while (!session.IsComplete)
                 session.Step(int.MaxValue);
             return session.Result;
@@ -1756,12 +1770,29 @@ namespace AutoTerrainDesignations.Access
         public static AccessPathSearchSession CreateSession(AccessPathRequest request)
             => CreateSession(request, out _);
 
+        public static AccessPathSearchSession CreateSession(
+            AccessPathRequest request, AccessSearchWorkspace workspace)
+        {
+            if (!ReferenceEquals(request.Snapshot, workspace.Snapshot))
+                throw new ArgumentException(
+                    "The search workspace must belong to the request snapshot.",
+                    nameof(workspace));
+            return CreateSession(request, workspace, out _);
+        }
+
         internal static AccessPathSearchSession CreateSession(
             AccessPathRequest request,
             out AccessSearchSessionBuildDiagnostics buildDiagnostics)
+            => CreateSession(request, new AccessSearchWorkspace(request.Snapshot),
+                out buildDiagnostics);
+
+        internal static AccessPathSearchSession CreateSession(
+            AccessPathRequest request,
+            AccessSearchWorkspace workspace,
+            out AccessSearchSessionBuildDiagnostics buildDiagnostics)
         {
             AccessPathSearchSessionBuilder build =
-                CreateSessionBuilder(request);
+                CreateSessionBuilder(request, workspace);
             while (!build.IsComplete)
                 build.Advance(int.MaxValue);
             buildDiagnostics = build.Diagnostics;
@@ -1770,11 +1801,22 @@ namespace AutoTerrainDesignations.Access
 
         internal static AccessPathSearchSessionBuilder CreateSessionBuilder(
             AccessPathRequest request)
-            => new AccessPathSearchSessionBuilder(request);
+            => CreateSessionBuilder(request, new AccessSearchWorkspace(request.Snapshot));
+
+        internal static AccessPathSearchSessionBuilder CreateSessionBuilder(
+            AccessPathRequest request, AccessSearchWorkspace workspace)
+        {
+            if (!ReferenceEquals(request.Snapshot, workspace.Snapshot))
+                throw new ArgumentException(
+                    "The search workspace must belong to the request snapshot.",
+                    nameof(workspace));
+            return new AccessPathSearchSessionBuilder(request, workspace);
+        }
 
         internal sealed class AccessPathSearchSessionBuilder
         {
             private readonly AccessPathRequest m_request;
+            private readonly AccessSearchWorkspace m_workspace;
             private readonly Dictionary<int, List<Tile2i>>
                 m_goalsByHeight2 = new();
             private IEnumerator<Tile2i>? m_groundGoalEnumerator;
@@ -1793,9 +1835,11 @@ namespace AutoTerrainDesignations.Access
             public string Phase { get; private set; } =
                 "Preparing search session";
 
-            internal AccessPathSearchSessionBuilder(AccessPathRequest request)
+            internal AccessPathSearchSessionBuilder(
+                AccessPathRequest request, AccessSearchWorkspace workspace)
             {
                 m_request = request;
+                m_workspace = workspace;
                 if (!CanBuildV1GoalIndexIncrementally(request)) return;
                 bool includeGroundGoals =
                     request.Goal.GroundTileNodes.Count > 0;
@@ -1837,7 +1881,7 @@ namespace AutoTerrainDesignations.Access
                 else
                 {
                     m_session = CreateSessionCore(
-                        m_request, Diagnostics, m_prebuiltV1GoalIndex);
+                        m_request, m_workspace, Diagnostics, m_prebuiltV1GoalIndex);
                     Phase = "Search session ready";
                     processed = 1;
                 }
@@ -1917,6 +1961,7 @@ namespace AutoTerrainDesignations.Access
 
         private static AccessPathSearchSession CreateSessionCore(
             AccessPathRequest request,
+            AccessSearchWorkspace workspace,
             AccessSearchSessionBuildDiagnostics buildDiagnostics,
             HeightAwareGoalIndex? prebuiltV1GoalIndex = null)
         {
@@ -1952,7 +1997,7 @@ namespace AutoTerrainDesignations.Access
                 buildDiagnostics.RequestGroundGraphMilliseconds =
                     AtdDiagnostics.ElapsedSince(groundGraphStart)
                     * 1000d / Stopwatch.Frequency;
-                bool useV2AStar = ShouldUseV2AStar(request);
+                bool useV2AStar = ShouldUseV2AStar(request, workspace);
                 long potentialBuildStart = AtdDiagnostics.Timestamp();
                 AccessV2PotentialField? v2Potential = useV2AStar
                     ? new AccessV2PotentialField(
@@ -1962,9 +2007,9 @@ namespace AutoTerrainDesignations.Access
                         request.Snapshot.V2PotentialVPrimeOrigins,
                         v2GroundGraph,
                         request.Snapshot.V2FixedNavigationGraph,
-                        GeneratedVFixedOverhead,
+                        request.Snapshot.Policy.GeneratedVFixedCost,
                         AccessV2CostModel.GetCenterSpokeCost(
-                            GeneratedVFixedOverhead))
+                            request.Snapshot.Policy.GeneratedVFixedCost))
                     : null;
                 buildDiagnostics.PotentialFieldMilliseconds =
                     AtdDiagnostics.ElapsedSince(potentialBuildStart)
@@ -1986,41 +2031,41 @@ namespace AutoTerrainDesignations.Access
                             request.Snapshot, current, transition,
                             history, connectedFixedOrigin,
                             diagnostics: diagnostics),
-                    MaxVisitedNodes,
+                    request.Snapshot.Policy.MaxVisitedNodes,
                     request.MaxCostLimit,
                     request.Snapshot.V2GroundGraph != null
-                        && request.Snapshot.HasV2WorkableHandoffEvaluator
+                        && workspace.Evaluator.HasV2WorkableHandoffEvaluator
                             ? (recent, history, requiredGroundEntry) =>
                                 EvaluateV2Handoffs(
-                                    request.Snapshot, recent, history,
+                                    request.Snapshot, workspace, recent, history,
                                     requiredGroundEntry, diagnostics)
                             : (AccessV2HandoffEvaluator?)null,
                     groundToVHandoffEvaluator:
                         request.Snapshot.V2GroundGraph != null
-                            && request.Snapshot.HasV2WorkableHandoffEvaluator
+                            && workspace.Evaluator.HasV2WorkableHandoffEvaluator
                                 ? (state, groundEntry, operation, history) =>
                                     EvaluateV2GroundToVHandoff(
-                                        request.Snapshot, state, groundEntry,
+                                        request.Snapshot, workspace, state, groundEntry,
                                         operation, history, diagnostics)
                                 : (AccessV2GroundToVHandoffEvaluator?)null,
                     terminalExtensionOperationEvaluator:
                         request.Snapshot.V2GroundGraph != null
-                            && request.Snapshot.HasV2WorkableHandoffEvaluator
+                            && workspace.Evaluator.HasV2WorkableHandoffEvaluator
                                 ? recent => AccessV2Handoffs
                                     .GetSameTypeExtensionRequest(
                                         recent,
-                                        request.Snapshot.GetV2WorkableHandoffs)
+                                        workspace.Evaluator.GetV2WorkableHandoffs)
                                 : (AccessV2TerminalExtensionOperationEvaluator?)null,
                     terminalTransitionEvaluator:
                         (current, transition, history, connectedFixedOrigin,
                             operation) => EvaluateV2Transition(
-                                request.Snapshot, current, transition,
+                            request.Snapshot, current, transition,
                                 history, connectedFixedOrigin, operation,
                                 diagnostics),
                     staggeredHandoffEvaluator:
                         (terminalStates, extensionLane, operation, history) =>
                             EvaluateV2StaggeredHandoffs(
-                                request.Snapshot, terminalStates,
+                                request.Snapshot, workspace, terminalStates,
                                 extensionLane, operation, history,
                                 diagnostics),
                     heuristicEvaluator: null,
@@ -2042,7 +2087,7 @@ namespace AutoTerrainDesignations.Access
                             tile, out float height) ? height : (float?)null,
                     groundToVCenterSpokeCost:
                         AccessV2CostModel.GetCenterSpokeCost(
-                            GeneratedVFixedOverhead),
+                            request.Snapshot.Policy.GeneratedVFixedCost),
                     fixedProfileProvider: origin =>
                         request.Snapshot.TryGetFixedProfile(
                             origin, out AccessHeightProfile fixedProfile)
@@ -2057,7 +2102,7 @@ namespace AutoTerrainDesignations.Access
                     AtdDiagnostics.ElapsedSince(v2SessionStart)
                     * 1000d / Stopwatch.Frequency;
                 return new AccessPathSearchSession(
-                    v2Session, start, diagnostics,
+                    workspace, v2Session, start, diagnostics,
                     v2FixedGoalCenters);
             }
             if (request.RequiredWidth != 1)
@@ -2075,7 +2120,7 @@ namespace AutoTerrainDesignations.Access
                     ? new HashSet<Tile2i>(request.Goal.FixedProfileNodes)
                     : null;
             bool includeGroundGoals = request.Goal.GroundTileNodes.Count > 0;
-            return CreateSession(request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
+            return CreateSession(workspace, request.Snapshot, request.Start.Nodes, null, fixedGoalOrigins,
                 includeGroundGoals, useAStarHeuristic: request.Snapshot.UseAStar,
                 maxCostLimit: request.MaxCostLimit,
                 buildDiagnostics: buildDiagnostics,
@@ -2104,7 +2149,8 @@ namespace AutoTerrainDesignations.Access
             bool useAStarHeuristic = true)
         {
             AccessPathSearchSession session = CreateSession(
-                snapshot, clusterOrigins, rejectGoal, fixedGoalOrigins,
+                new AccessSearchWorkspace(snapshot), snapshot, clusterOrigins,
+                rejectGoal, fixedGoalOrigins,
                 includeGroundGoals: fixedGoalOrigins == null,
                 useAStarHeuristic, float.MaxValue);
             while (!session.IsComplete)
@@ -2113,6 +2159,7 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static AccessPathSearchSession CreateSession(
+            AccessSearchWorkspace workspace,
             AccessSearchSnapshot snapshot,
             IReadOnlyList<Tile2i> clusterOrigins,
             Func<AccessSearchResult, string?>? rejectGoal,
@@ -2178,7 +2225,7 @@ namespace AutoTerrainDesignations.Access
             float lastRejectedGoalCost = 0f;
 
             long initialExpansionStart = AtdDiagnostics.Timestamp();
-            ExpandOrigin(snapshot, requestHeightEnvelope,
+            ExpandOrigin(snapshot, workspace, requestHeightEnvelope,
                 startNode, startProfile, 0f,
                 distance, previous, generatedHistory, queue, rejections,
                 useAStarHeuristic, goalIndex, diagnostics, handoffDominance);
@@ -2190,7 +2237,7 @@ namespace AutoTerrainDesignations.Access
             if (queue.Count == 0)
                 return AccessPathSearchSession.Completed(Failed("NoInitialSuccessor", startOrigin, 0, rejections));
 
-            return new AccessPathSearchSession(snapshot, requestHeightEnvelope,
+            return new AccessPathSearchSession(workspace, snapshot, requestHeightEnvelope,
                 startOrigin, startNode,
                 fixedGoalOrigins, includeGroundGoals, rejectGoal,
                 useAStarHeuristic, goalIndex, maxCostLimit,
@@ -2249,17 +2296,22 @@ namespace AutoTerrainDesignations.Access
                 snapshot.FixedProfiles, fixedEndpointOrigins, useV2);
 
         internal static bool ShouldUseV2AStar(AccessPathRequest request)
+            => ShouldUseV2AStar(request, new AccessSearchWorkspace(request.Snapshot));
+
+        internal static bool ShouldUseV2AStar(
+            AccessPathRequest request, AccessSearchWorkspace workspace)
             => request.RequiredWidth == 2
                 && request.Snapshot.UseAStar
                 && request.V2Endpoints != null
                 && request.Snapshot.V2GroundGraph != null
-                && request.Snapshot.HasV2WorkableHandoffEvaluator
+                && workspace.Evaluator.HasV2WorkableHandoffEvaluator
                 && request.Snapshot.GoalCount > 0;
 
         public sealed class AccessPathSearchSession
         {
             private readonly AccessV2SearchSession? m_v2Session;
             private readonly HashSet<Tile2i> m_v2FixedGoalCenters;
+            private readonly AccessSearchWorkspace m_workspace;
             private readonly AccessSearchSnapshot m_snapshot;
             private readonly AccessUsefulHeightEnvelope? m_usefulHeightEnvelope;
             private readonly Tile2i m_startOrigin;
@@ -2318,6 +2370,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_v2Session = null;
                 m_v2FixedGoalCenters = new HashSet<Tile2i>();
+                m_workspace = null!;
                 m_snapshot = null!;
                 m_usefulHeightEnvelope = null;
                 m_startOrigin = result.StartOrigin;
@@ -2343,6 +2396,7 @@ namespace AutoTerrainDesignations.Access
             }
 
             internal AccessPathSearchSession(
+                AccessSearchWorkspace workspace,
                 AccessSearchSnapshot snapshot,
                 AccessUsefulHeightEnvelope? usefulHeightEnvelope,
                 Tile2i startOrigin,
@@ -2366,6 +2420,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_v2Session = null;
                 m_v2FixedGoalCenters = new HashSet<Tile2i>();
+                m_workspace = workspace;
                 m_snapshot = snapshot;
                 m_usefulHeightEnvelope = usefulHeightEnvelope;
                 m_startOrigin = startOrigin;
@@ -2402,7 +2457,9 @@ namespace AutoTerrainDesignations.Access
                 if (maxVisitedNodes <= 0) maxVisitedNodes = 1;
 
                 int visitedThisStep = 0;
-                while (m_queue.Count > 0 && m_visited < MaxVisitedNodes && visitedThisStep < maxVisitedNodes)
+                while (m_queue.Count > 0
+                    && m_visited < m_snapshot.Policy.MaxVisitedNodes
+                    && visitedThisStep < maxVisitedNodes)
                 {
                     QueueEntry entry = m_queue.Pop();
                     if (entry.Priority > m_maxCostLimit)
@@ -2444,7 +2501,7 @@ namespace AutoTerrainDesignations.Access
                         var candidate = BuildResult(
                             true, string.Empty, m_startOrigin, m_startNode, path, known,
                             m_visited, m_rejections, m_snapshot, reachedGoalKind, m_diagnostics);
-                        AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(m_snapshot, candidate);
+                        AccessDesignationPlan goalPlan = AccessPathMaterializer.Materialize(m_workspace, candidate);
                         string goalFailure = goalPlan.IsValid
                             ? m_rejectGoal?.Invoke(candidate) ?? string.Empty
                             : string.IsNullOrEmpty(goalPlan.FailureReason)
@@ -2478,7 +2535,7 @@ namespace AutoTerrainDesignations.Access
                         {
                             AccessDesignationPlan suffixPlan =
                                 AccessPathMaterializer.Materialize(
-                                    m_snapshot, suffixCandidate);
+                                    m_workspace, suffixCandidate);
                             string suffixFailure = suffixPlan.IsValid
                                 ? m_rejectGoal?.Invoke(suffixCandidate)
                                     ?? string.Empty
@@ -2503,7 +2560,7 @@ namespace AutoTerrainDesignations.Access
                             m_lastRejectedGoalCost = suffixCandidate.Cost;
                         }
                         long phaseStart = AtdDiagnostics.Timestamp();
-                        ExpandGround(m_snapshot, m_usefulHeightEnvelope,
+                        ExpandGround(m_snapshot, m_workspace, m_usefulHeightEnvelope,
                             current, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
                             m_useAStarHeuristic, m_goalIndex, m_diagnostics);
                         m_diagnostics.GroundExpansionTicks += AtdDiagnostics.ElapsedSince(phaseStart);
@@ -2511,7 +2568,7 @@ namespace AutoTerrainDesignations.Access
                     else if (TryGetProfile(m_snapshot, current, out AccessHeightProfile currentProfile))
                     {
                         long phaseStart = AtdDiagnostics.Timestamp();
-                        ExpandOrigin(m_snapshot, m_usefulHeightEnvelope,
+                        ExpandOrigin(m_snapshot, m_workspace, m_usefulHeightEnvelope,
                             current, currentProfile, known, m_distance, m_previous, m_generatedHistory, m_queue, m_rejections,
                             m_useAStarHeuristic, m_goalIndex, m_diagnostics,
                             m_handoffDominance);
@@ -2521,7 +2578,9 @@ namespace AutoTerrainDesignations.Access
                         Reject(m_rejections, "MissingProfile");
                 }
 
-                if (!IsComplete && (m_queue.Count == 0 || m_visited >= MaxVisitedNodes))
+                if (!IsComplete
+                    && (m_queue.Count == 0
+                        || m_visited >= m_snapshot.Policy.MaxVisitedNodes))
                     CompleteFailed();
 
                 return visitedThisStep;
@@ -2743,7 +2802,7 @@ namespace AutoTerrainDesignations.Access
             {
                 if (m_lastRejectedGoalPath != null)
                 {
-                    string finalReason = reason ?? (m_visited >= MaxVisitedNodes
+                    string finalReason = reason ?? (m_visited >= m_snapshot.Policy.MaxVisitedNodes
                         ? "VisitedLimitAfterGoalRejection"
                         : m_lastGoalRejectionReason);
                     Result = new AccessSearchResult(false, finalReason, m_startOrigin, m_lastRejectedGoalPath,
@@ -2753,7 +2812,7 @@ namespace AutoTerrainDesignations.Access
                 }
                 else
                 {
-                    string finalReason = reason ?? (m_visited >= MaxVisitedNodes ? "VisitedLimit" : "NoPath");
+                    string finalReason = reason ?? (m_visited >= m_snapshot.Policy.MaxVisitedNodes ? "VisitedLimit" : "NoPath");
                     Result = Failed(finalReason, m_startOrigin, m_visited, m_rejections, m_diagnostics);
                 }
                 IsComplete = true;
@@ -2764,10 +2823,32 @@ namespace AutoTerrainDesignations.Access
                 Tile2i startOrigin,
                 AccessSearchDiagnostics diagnostics,
                 HashSet<Tile2i>? v2FixedGoalCenters = null)
+                : this(new AccessSearchWorkspace(
+                        new AccessSearchSnapshot(
+                            Tile2i.Zero, Tile2i.Zero, Tile2i.Zero, 0, 0,
+                            false, false, false, 1f, 1f,
+                            new Dictionary<Tile2i, int>(),
+                            new Dictionary<Tile2i, int>(),
+                            new Dictionary<Tile2i, AccessHeightProfile>(),
+                            Array.Empty<Tile2i>(), Array.Empty<Tile2i>(),
+                            Array.Empty<Tile2i>(), Array.Empty<Tile2i>(),
+                            Array.Empty<Tile2i>(),
+                            Array.Empty<AccessDurabilityCorner>())),
+                    v2Session, startOrigin, diagnostics, v2FixedGoalCenters)
+            {
+            }
+
+            internal AccessPathSearchSession(
+                AccessSearchWorkspace workspace,
+                AccessV2SearchSession v2Session,
+                Tile2i startOrigin,
+                AccessSearchDiagnostics diagnostics,
+                HashSet<Tile2i>? v2FixedGoalCenters = null)
             {
                 m_v2Session = v2Session;
                 m_v2FixedGoalCenters = v2FixedGoalCenters
                     ?? new HashSet<Tile2i>();
+                m_workspace = workspace;
                 m_snapshot = null!;
                 m_usefulHeightEnvelope = null;
                 m_startOrigin = startOrigin;
@@ -2815,6 +2896,7 @@ namespace AutoTerrainDesignations.Access
 
         private static void ExpandOrigin(
             AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessUsefulHeightEnvelope? usefulHeightEnvelope,
             AccessSearchNode current,
             AccessHeightProfile currentProfile, float currentCost,
@@ -2851,7 +2933,7 @@ namespace AutoTerrainDesignations.Access
                         new Tile2i(current.Position.X + direction.X, current.Position.Y + direction.Y),
                         currentProfile);
             }
-            if (snapshot.HasWorkableHandoffSpanEvaluator)
+            if (workspace.Evaluator.HasWorkableHandoffSpanEvaluator)
             {
                 for (int spanLength = 2;
                     spanLength <= recentSpanCells.Count;
@@ -2860,7 +2942,7 @@ namespace AutoTerrainDesignations.Access
                     int start = recentSpanCells.Count - spanLength;
                     var span = recentSpanCells.GetRange(start, spanLength);
                     foreach (AccessGroundHandoff handoff in
-                        snapshot.GetWorkableHandoffSpans(span))
+                        workspace.Evaluator.GetWorkableHandoffSpans(span))
                     {
                         if (emittedHandoffs.Add((
                             handoff.Tile, handoff.Operation, handoff.SpanLength)))
@@ -3056,7 +3138,7 @@ namespace AutoTerrainDesignations.Access
                 int maxSpanLength = GetMaxHandoffSpanLength(snapshot.VehicleWidth);
                 Tile2i direction = current.EntryDirection;
                 if (maxSpanLength < 2
-                    || !snapshot.HasWorkableHandoffSpanEvaluator
+                    || !workspace.Evaluator.HasWorkableHandoffSpanEvaluator
                     || current.Mode == AccessSearchMode.Existing
                     || !IsOriginStep(direction))
                     return;
@@ -3120,7 +3202,7 @@ namespace AutoTerrainDesignations.Access
                         syntheticNodes.Add(syntheticNode);
 
                         IReadOnlyList<AccessGroundHandoff> spanHandoffs =
-                            snapshot.GetWorkableHandoffSpans(span);
+                            workspace.Evaluator.GetWorkableHandoffSpans(span);
                         if (spanHandoffs.Count == 0)
                             Reject(rejections, "ForwardHandoffNoWorkableExit");
                         else
@@ -3310,7 +3392,7 @@ namespace AutoTerrainDesignations.Access
             void AddHandoffs(Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
             {
                 foreach (AccessGroundHandoff handoff in GetHandoffs(
-                    snapshot, current.Position, currentProfile,
+                    snapshot, workspace, current.Position, currentProfile,
                     predecessorOrigin, predecessorProfile))
                 {
                     if (emittedHandoffs.Add((
@@ -3327,7 +3409,7 @@ namespace AutoTerrainDesignations.Access
                     && groundPredecessor.IsGround
                     && current.HandoffOperation != AccessHandoffOperation.None
                     && !IsGroundToGeneratedContinuation(
-                        snapshot, current.Position, currentProfile,
+                        snapshot, workspace, current.Position, currentProfile,
                         groundPredecessor.Position, current.HandoffOperation, nextOrigin))
                 {
                     Reject(rejections, "GToVHandoffDirection");
@@ -3340,7 +3422,7 @@ namespace AutoTerrainDesignations.Access
                     Reject(rejections, "OriginRevisit");
                     continue;
                 }
-                AddOriginSuccessors(snapshot, usefulHeightEnvelope,
+                AddOriginSuccessors(snapshot, workspace, usefulHeightEnvelope,
                     current.Position, currentProfile, nextOrigin, direction,
                     current, true, currentCost, distance, previous, generatedHistory, queue, rejections, useAStarHeuristic,
                     goalIndex, diagnostics, !previous.ContainsKey(current));
@@ -3349,6 +3431,7 @@ namespace AutoTerrainDesignations.Access
 
         private static void AddOriginSuccessors(
             AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessUsefulHeightEnvelope? usefulHeightEnvelope,
             Tile2i currentOrigin, AccessHeightProfile currentProfile, Tile2i nextOrigin, Tile2i direction,
             AccessSearchNode current, bool hasCurrent, float baseCost,
@@ -3507,7 +3590,7 @@ namespace AutoTerrainDesignations.Access
                 }
                 if (propCleanupCost > 0f) diagnostics.PropCleanupHits++;
                 float turnOuterCost = snapshot.LandscapingCostDistanceScale
-                    * SideRayWeight * turnOuterRay.TotalCost;
+                    * snapshot.Policy.SideRayWeight * turnOuterRay.TotalCost;
                 float nextCost = baseCost + 4f + generatedEntryCost
                     + turnOuterCost + propCleanupCost;
                 Trace(mode, nextProfile,
@@ -3536,6 +3619,7 @@ namespace AutoTerrainDesignations.Access
 
         private static void ExpandGround(
             AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessUsefulHeightEnvelope? usefulHeightEnvelope,
             AccessSearchNode current, float currentCost,
             Dictionary<AccessSearchNode, float> distance,
@@ -3737,7 +3821,7 @@ namespace AutoTerrainDesignations.Access
                 {
                     long handoffStart = AtdDiagnostics.Timestamp();
                     bool hasHandoff = TryGetGroundToGeneratedHandoff(
-                        snapshot, origin, profile, current.Position,
+                        snapshot, workspace, origin, profile, current.Position,
                         out handoffOperation, out entryDirection);
                     diagnostics.HandoffValidationTicks +=
                         AtdDiagnostics.ElapsedSince(handoffStart);
@@ -4244,13 +4328,14 @@ namespace AutoTerrainDesignations.Access
                 || (Math.Abs(direction.Y) == 4 && direction.X == 0);
 
         private static IEnumerable<AccessGroundHandoff> GetHandoffs(
-            AccessSearchSnapshot snapshot, Tile2i origin, AccessHeightProfile profile,
+            AccessSearchSnapshot snapshot, AccessSearchWorkspace workspace,
+            Tile2i origin, AccessHeightProfile profile,
             Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
         {
             var emitted = new HashSet<Tile2i>();
-            if (snapshot.HasWorkableHandoffEvaluator)
+            if (workspace.Evaluator.HasWorkableHandoffEvaluator)
             {
-                foreach (AccessGroundHandoff handoff in snapshot.GetWorkableHandoffs(
+                foreach (AccessGroundHandoff handoff in workspace.Evaluator.GetWorkableHandoffs(
                     origin, profile, predecessorOrigin, predecessorProfile))
                 {
                     Tile2i corridorDirection = new Tile2i(
@@ -4301,6 +4386,18 @@ namespace AutoTerrainDesignations.Access
             Tile2i groundTile,
             out AccessHandoffOperation operation,
             out Tile2i entryDirection)
+            => TryGetGroundToGeneratedHandoff(
+                snapshot, new AccessSearchWorkspace(snapshot), origin, profile,
+                groundTile, out operation, out entryDirection);
+
+        internal static bool TryGetGroundToGeneratedHandoff(
+            AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            Tile2i groundTile,
+            out AccessHandoffOperation operation,
+            out Tile2i entryDirection)
         {
             if (TryGetV1DirectLevelingEdgeHandoff(
                     snapshot, origin, profile, groundTile,
@@ -4311,13 +4408,13 @@ namespace AutoTerrainDesignations.Access
             }
             foreach (Tile2i direction in s_originDirections)
             {
-                if (snapshot.HasWorkableHandoffEvaluator
+                if (workspace.Evaluator.HasWorkableHandoffEvaluator
                     && !IsV1HandoffLaneEligible(origin, groundTile, direction))
                     continue;
                 Tile2i connectedPredecessor = new Tile2i(
                     origin.X + direction.X, origin.Y + direction.Y);
                 foreach (AccessGroundHandoff candidate in GetHandoffs(
-                    snapshot, origin, profile, connectedPredecessor, profile))
+                    snapshot, workspace, origin, profile, connectedPredecessor, profile))
                 {
                     if (candidate.Tile != groundTile) continue;
                     operation = candidate.Operation;
@@ -4432,11 +4529,33 @@ namespace AutoTerrainDesignations.Access
             Tile2i origin,
             AccessHeightProfile profile,
             Tile2i groundTile)
+            => ContainsHandoffTile(
+                snapshot, new AccessSearchWorkspace(snapshot), origin, profile,
+                groundTile);
+
+        private static bool ContainsHandoffTile(
+            AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
+            Tile2i origin,
+            AccessHeightProfile profile,
+            Tile2i groundTile)
             => TryGetGroundToGeneratedHandoff(
-                snapshot, origin, profile, groundTile, out _, out _);
+                snapshot, workspace, origin, profile, groundTile, out _, out _);
 
         internal static bool IsGroundToGeneratedContinuation(
             AccessSearchSnapshot snapshot,
+            Tile2i handoffOrigin,
+            AccessHeightProfile handoffProfile,
+            Tile2i groundTile,
+            AccessHandoffOperation operation,
+            Tile2i nextGeneratedOrigin)
+            => IsGroundToGeneratedContinuation(
+                snapshot, new AccessSearchWorkspace(snapshot), handoffOrigin,
+                handoffProfile, groundTile, operation, nextGeneratedOrigin);
+
+        internal static bool IsGroundToGeneratedContinuation(
+            AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             Tile2i handoffOrigin,
             AccessHeightProfile handoffProfile,
             Tile2i groundTile,
@@ -4452,7 +4571,7 @@ namespace AutoTerrainDesignations.Access
                     handoffOrigin.Y - outwardDirection.Y))
                 return true;
             foreach (AccessGroundHandoff candidate in GetHandoffs(
-                snapshot, handoffOrigin, handoffProfile,
+                snapshot, workspace, handoffOrigin, handoffProfile,
                 nextGeneratedOrigin, handoffProfile))
             {
                 if (candidate.Tile == groundTile
@@ -4468,9 +4587,18 @@ namespace AutoTerrainDesignations.Access
             AccessHeightProfile profile, Tile2i predecessorOrigin,
             AccessHeightProfile predecessorProfile, Tile2i tile,
             AccessHandoffOperation operation)
+            => ContainsHandoff(
+                snapshot, origin, new AccessSearchWorkspace(snapshot), profile,
+                predecessorOrigin, predecessorProfile, tile, operation);
+
+        internal static bool ContainsHandoff(AccessSearchSnapshot snapshot, Tile2i origin,
+            AccessSearchWorkspace workspace,
+            AccessHeightProfile profile, Tile2i predecessorOrigin,
+            AccessHeightProfile predecessorProfile, Tile2i tile,
+            AccessHandoffOperation operation)
         {
             foreach (AccessGroundHandoff candidate in GetHandoffs(
-                snapshot, origin, profile, predecessorOrigin, predecessorProfile))
+                snapshot, workspace, origin, profile, predecessorOrigin, predecessorProfile))
                 if (candidate.Tile == tile && candidate.Operation == operation) return true;
             return false;
         }
@@ -4791,13 +4919,14 @@ namespace AutoTerrainDesignations.Access
                     : handoffOperation;
             float directWorkCost = EstimateDirectWorkCost(
                 snapshot, origin, profile, workOperation);
-            fixedCost = GeneratedVFixedOverhead;
+            fixedCost = snapshot.Policy.GeneratedVFixedCost;
             rejectionReason = string.Empty;
             if (entryDirection == Tile2i.Zero)
             {
                 landscapingCost = new AccessLandscapingCost(directWorkCost);
                 return snapshot.LandscapingCostDistanceScale
-                    * GetWeightedLandscapingCost(landscapingCost) + fixedCost;
+                    * GetWeightedLandscapingCost(snapshot.Policy, landscapingCost)
+                    + fixedCost;
             }
             if (!TryGetExitRayGeometry(
                     origin, profile, entryDirection,
@@ -4871,7 +5000,7 @@ namespace AutoTerrainDesignations.Access
                         snapshot, rightCorner, rightHeight, rightDirection,
                         right, workOperation, snapshot.VehicleClearanceRadius)));
             return snapshot.LandscapingCostDistanceScale
-                * GetWeightedLandscapingCost(landscapingCost)
+                * GetWeightedLandscapingCost(snapshot.Policy, landscapingCost)
                 + fixedCost;
         }
 
@@ -4991,9 +5120,10 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static float GetWeightedLandscapingCost(
+            AccessSearchPolicySnapshot policy,
             AccessLandscapingCost landscapingCost)
-            => DirectWorkWeight * landscapingCost.DirectWorkCost
-                + SideRayWeight
+            => policy.DirectWorkWeight * landscapingCost.DirectWorkCost
+                + policy.SideRayWeight
                     * (landscapingCost.LeftSideRayCost
                         + landscapingCost.RightSideRayCost
                         + landscapingCost.UnresolvedPenalty);
@@ -5010,8 +5140,11 @@ namespace AutoTerrainDesignations.Access
                 terminatesAtSameOperationRay = null,
             Func<Tile2i, AccessSideRayOperation, AccessProjectedTerrainEffect>?
                 projectedTerrainAt = null,
-            Func<Tile2i, string?>? additionalBlockerAt = null)
+            Func<Tile2i, string?>? additionalBlockerAt = null,
+            AccessSearchWorkspace? workspace = null)
         {
+            AccessSearchWorkspace cacheWorkspace =
+                workspace ?? AccessSearchWorkspace.For(snapshot);
             int plannedHeight2 = (int)Math.Round(plannedHeight * 2f);
             var cacheKey = new AccessSideRayCacheKey(
                 corner, plannedHeight2, lateralDirection, workOperation,
@@ -5019,7 +5152,7 @@ namespace AutoTerrainDesignations.Access
             if (terminatesAtSameOperationRay == null
                 && projectedTerrainAt == null
                 && additionalBlockerAt == null
-                && snapshot.TryGetCachedSideRay(
+                && cacheWorkspace.TryGetCachedSideRay(
                     cacheKey, out AccessSideRayResult cached))
             {
                 if (diagnostics != null) diagnostics.SideRayCacheHits++;
@@ -5067,7 +5200,7 @@ namespace AutoTerrainDesignations.Access
                             result = new AccessSideRayResult(
                                 0f, 0f, 0, false, false,
                                 "SideRayNoDumpingMaterial");
-                            snapshot.CacheSideRay(cacheKey, result);
+                            cacheWorkspace.CacheSideRay(cacheKey, result);
                             return result;
                         }
                         materialSlope = snapshot.DumpingMaterialSlope;
@@ -5078,7 +5211,7 @@ namespace AutoTerrainDesignations.Access
                     {
                         result = new AccessSideRayResult(
                             0f, 0f, 0, false, false, "SideRayMiningMaterialMissing");
-                        snapshot.CacheSideRay(cacheKey, result);
+                        cacheWorkspace.CacheSideRay(cacheKey, result);
                         return result;
                     }
                     result = AccessSideRayCost.Score(
@@ -5088,12 +5221,12 @@ namespace AutoTerrainDesignations.Access
                         plannedHeight,
                         operation,
                         materialSlope,
-                        maxRayCost: AutoTerrainDesignationsMod.AccessRayMaxCost,
-                        unresolvedPenalty: AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty,
+                        maxRayCost: snapshot.Policy.RayMaxCost,
+                        unresolvedPenalty: snapshot.Policy.RayUnresolvedPenalty,
                         postTerminationSafetyMargin:
-                            AutoTerrainDesignationsMod.AccessRayEndBuffer,
+                            snapshot.Policy.RayEndBuffer,
                         maxTraceDistance:
-                            AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance,
+                            snapshot.Policy.CandidateRayMaxDistance,
                         exemptDesignationOrigin: exemptDesignationOrigin,
                         terminatesAtSameOperationRay:
                             terminatesAtSameOperationRay,
@@ -5104,7 +5237,7 @@ namespace AutoTerrainDesignations.Access
             if (terminatesAtSameOperationRay == null
                 && projectedTerrainAt == null
                 && additionalBlockerAt == null)
-                snapshot.CacheSideRay(cacheKey, result);
+                cacheWorkspace.CacheSideRay(cacheKey, result);
             return result;
         }
 
@@ -5506,7 +5639,7 @@ namespace AutoTerrainDesignations.Access
                     return AccessV2TransitionEvaluation.Reject(profileReason);
 
                 directCost += snapshot.LandscapingCostDistanceScale
-                    * DirectWorkWeight
+                    * snapshot.Policy.DirectWorkWeight
                     * EstimateDirectWorkCost(
                         snapshot, item.Origin, item.Profile,
                         operation,
@@ -5517,9 +5650,9 @@ namespace AutoTerrainDesignations.Access
                             projected.Merge(
                                 history.GetProjectedTerrainEffect(
                                     tile, null, diagnostics));
-                            return projected;
+                        return projected;
                         });
-                fixedCost += GeneratedVFixedOverhead;
+                        fixedCost += snapshot.Policy.GeneratedVFixedCost;
 
                 CalculateGeneratedPropCleanupCost(
                     snapshot, item.Origin, item.Profile,
@@ -5577,7 +5710,7 @@ namespace AutoTerrainDesignations.Access
                     || !cleanupKeys.Add(key))
                     return;
                 cleanupCost += snapshot.LandscapingCostDistanceScale
-                    * AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree);
+                    * (isTree ? 0f : snapshot.Policy.PropCleanupLandscapingCost);
             }
         }
 
@@ -5588,24 +5721,36 @@ namespace AutoTerrainDesignations.Access
                 AccessV2History history,
                 Tile2i? requiredGroundEntry = null,
                 AccessSearchDiagnostics? diagnostics = null)
+            => EvaluateV2Handoffs(
+                snapshot, new AccessSearchWorkspace(snapshot), recentNewestFirst,
+                history, requiredGroundEntry, diagnostics);
+
+        internal static IReadOnlyList<AccessV2HandoffCandidate>
+            EvaluateV2Handoffs(
+                AccessSearchSnapshot snapshot,
+                AccessSearchWorkspace workspace,
+                IReadOnlyList<AccessV2BandState> recentNewestFirst,
+                AccessV2History history,
+                Tile2i? requiredGroundEntry = null,
+                AccessSearchDiagnostics? diagnostics = null)
         {
             if (snapshot.V2GroundGraph == null
-                || !snapshot.HasV2WorkableHandoffEvaluator)
+                || !workspace.Evaluator.HasV2WorkableHandoffEvaluator)
                 return Array.Empty<AccessV2HandoffCandidate>();
             return AccessV2Handoffs.Evaluate(
                 recentNewestFirst,
                 history,
                 snapshot.V2GroundGraph,
-                snapshot.GetV2WorkableHandoffs,
-                snapshot.GetV2WorkableHandoffSpans,
+                workspace.Evaluator.GetV2WorkableHandoffs,
+                workspace.Evaluator.GetV2WorkableHandoffSpans,
                 snapshot.LandscapingCostDistanceScale,
                 snapshot.IsProjectedV2CenterPathable,
                 snapshot.DoesProjectedV2CenterOverlapWork,
                 snapshot.IsV2HandoffCorridorCenterPathable,
                 snapshot.IsV2HandoffGroundEntryPathable,
                 snapshot.VehicleWidth,
-                AccessV2CostModel.GetCenterSpokeCost(
-                    GeneratedVFixedOverhead),
+                    AccessV2CostModel.GetCenterSpokeCost(
+                    snapshot.Policy.GeneratedVFixedCost),
                 requiredGroundEntry,
                 diagnostics);
         }
@@ -5618,9 +5763,22 @@ namespace AutoTerrainDesignations.Access
                 AccessHandoffOperation operation,
                 AccessV2History history,
                 AccessSearchDiagnostics? diagnostics = null)
+            => EvaluateV2StaggeredHandoffs(
+                snapshot, new AccessSearchWorkspace(snapshot), terminalOldestFirst,
+                extensionLane, operation, history, diagnostics);
+
+        internal static IReadOnlyList<AccessV2HandoffCandidate>
+            EvaluateV2StaggeredHandoffs(
+                AccessSearchSnapshot snapshot,
+                AccessSearchWorkspace workspace,
+                IReadOnlyList<AccessV2BandState> terminalOldestFirst,
+                int extensionLane,
+                AccessHandoffOperation operation,
+                AccessV2History history,
+                AccessSearchDiagnostics? diagnostics = null)
         {
             if (snapshot.V2GroundGraph == null
-                || !snapshot.HasV2WorkableHandoffEvaluator)
+                || !workspace.Evaluator.HasV2WorkableHandoffEvaluator)
                 return Array.Empty<AccessV2HandoffCandidate>();
             int diagnosticBudget = 24;
             bool PostWorkCenter(
@@ -5647,14 +5805,14 @@ namespace AutoTerrainDesignations.Access
             return AccessV2Handoffs.EvaluateStaggeredExtension(
                 terminalOldestFirst, extensionLane, operation,
                 history, snapshot.V2GroundGraph,
-                snapshot.GetV2WorkableHandoffs,
-                snapshot.GetV2WorkableHandoffSpans,
+                workspace.Evaluator.GetV2WorkableHandoffs,
+                workspace.Evaluator.GetV2WorkableHandoffSpans,
                 snapshot.LandscapingCostDistanceScale,
                 snapshot.IsProjectedV2CenterPathable,
                 PostWorkCenter,
                 snapshot.IsV2HandoffGroundEntryPathable,
                 AccessV2CostModel.GetCenterSpokeCost(
-                    GeneratedVFixedOverhead),
+                    snapshot.Policy.GeneratedVFixedCost),
                 diagnostics);
         }
 
@@ -5666,11 +5824,24 @@ namespace AutoTerrainDesignations.Access
                 AccessHandoffOperation operation,
                 AccessV2History history,
                 AccessSearchDiagnostics? diagnostics = null)
+            => EvaluateV2GroundToVHandoff(
+                snapshot, new AccessSearchWorkspace(snapshot), state, groundEntry,
+                operation, history, diagnostics);
+
+        internal static AccessV2HandoffCandidate?
+            EvaluateV2GroundToVHandoff(
+                AccessSearchSnapshot snapshot,
+                AccessSearchWorkspace workspace,
+                AccessV2BandState state,
+                Tile2i groundEntry,
+                AccessHandoffOperation operation,
+                AccessV2History history,
+                AccessSearchDiagnostics? diagnostics = null)
         {
             return AccessV2Handoffs.TryCreateDeterministicGroundToVBridge(
                 state, groundEntry, operation, snapshot.VehicleWidth,
                 AccessV2CostModel.GetCenterSpokeCost(
-                    GeneratedVFixedOverhead),
+                    snapshot.Policy.GeneratedVFixedCost),
                 (Tile2i tile, out float height) =>
                     snapshot.TryGetV2GroundToVPostWorkHeight(
                         state, operation, tile, history, out height),
@@ -5942,10 +6113,10 @@ namespace AutoTerrainDesignations.Access
                 EstimateMarginalProjectedRayWorkCost(
                     snapshot, history, constraints, added, diagnostics);
             float cappedRayCost = Math.Min(
-                AutoTerrainDesignationsMod.AccessRayMaxCost,
+                snapshot.Policy.RayMaxCost,
                 projectedWorkCost + ray.UnresolvedPenalty);
             rayCost += snapshot.LandscapingCostDistanceScale
-                * SideRayWeight * cappedRayCost;
+                * snapshot.Policy.SideRayWeight * cappedRayCost;
             for (int index = 0; index < added.Count; index++)
             {
                 AccessRayHeightConstraint constraint = added[index];
@@ -6063,12 +6234,12 @@ namespace AutoTerrainDesignations.Access
             {
                 if (!toKeys.Add(key) || fromKeys.Contains(key))
                     continue;
-                newCleanupCost += AccessPropCleanupPolicy.GetCleanupLandscapingCost(
-                    key.StartsWith("tree:", StringComparison.Ordinal));
+                bool isTree = key.StartsWith("tree:", StringComparison.Ordinal);
+                newCleanupCost += isTree ? 0f : snapshot.Policy.PropCleanupLandscapingCost;
             }
             if (newCleanupCost == 0f && info.Samples.Count == 0
                 && info.HasDenseDebrisCleanup && fromInfoMissingOrDifferentOrigin())
-                newCleanupCost = AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: false);
+                newCleanupCost = snapshot.Policy.PropCleanupLandscapingCost;
             return snapshot.LandscapingCostDistanceScale
                 * newCleanupCost;
 
@@ -6102,7 +6273,7 @@ namespace AutoTerrainDesignations.Access
                 return 0f;
 
             float denseCleanupUnit = snapshot.LandscapingCostDistanceScale
-                * AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: false);
+                * snapshot.Policy.PropCleanupLandscapingCost;
             var chargedDenseDebris = new HashSet<string>(StringComparer.Ordinal);
 
             if (info.Samples.Count == 0)
@@ -6200,7 +6371,7 @@ namespace AutoTerrainDesignations.Access
                             if (!chargedCleanup.Add(key))
                                 continue;
                             dense += snapshot.LandscapingCostDistanceScale
-                                * AccessPropCleanupPolicy.GetCleanupLandscapingCost(isTree: false);
+                                * snapshot.Policy.PropCleanupLandscapingCost;
                         }
                     }
                 }
@@ -6220,7 +6391,7 @@ namespace AutoTerrainDesignations.Access
                             out float generatedFixedCost, out _,
                             history: replayHistory);
                         generated += snapshot.LandscapingCostDistanceScale
-                            * GetWeightedLandscapingCost(landscapingCost);
+                            * GetWeightedLandscapingCost(snapshot.Policy, landscapingCost);
                         generatedDirect += snapshot.LandscapingCostDistanceScale
                             * landscapingCost.DirectWorkCost;
                         leftRay += snapshot.LandscapingCostDistanceScale
@@ -6253,7 +6424,9 @@ namespace AutoTerrainDesignations.Access
                                             tile, rayOperation),
                                 out turnCorner, out turnDirection);
                             float turnScale = snapshot.LandscapingCostDistanceScale;
-                            generated += turnScale * SideRayWeight * turnOuterRay.TotalCost;
+                            generated += turnScale
+                                * snapshot.Policy.SideRayWeight
+                                * turnOuterRay.TotalCost;
                             // Keep the existing public two-ray breakdown stable:
                             // turn-owned frontal work is grouped with the right ray.
                             rightRay += turnScale * turnOuterRay.IntegratedCost;
@@ -6326,13 +6499,16 @@ namespace AutoTerrainDesignations.Access
 
         internal static IReadOnlyCollection<Tile2i> BuildFinalGeneratedDisturbedTiles(
             AccessSearchSnapshot snapshot,
-            AccessSearchResult result)
+            AccessSearchResult result,
+            AccessSearchWorkspace? workspace = null)
         {
             if (result.V2Route != null)
             {
                 var v2Disturbed = new HashSet<Tile2i>();
                 if (!AccessV2Replay.TryReplay(
-                        snapshot, result.V2Route,
+                        snapshot,
+                        workspace ?? AccessSearchWorkspace.For(snapshot),
+                        result.V2Route,
                         out AccessV2History replayedHistory,
                         out IReadOnlyList<AccessV2OriginProfile> generated,
                         out _, out _))

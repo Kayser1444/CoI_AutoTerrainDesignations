@@ -79,6 +79,51 @@ namespace AutoTerrainDesignations.Access
         }
     }
 
+    /// <summary>
+    /// Primitive prop/tree facts copied from the live world during capture.
+    /// The cleanup policy consumes this value-owned record and never needs to
+    /// enumerate a live prop or tree manager while preparing a snapshot.
+    /// </summary>
+    internal sealed class AccessCapturedProp
+    {
+        public bool IsTree { get; }
+        public bool IsDenseDebris { get; }
+        public string CleanupObjectKey { get; }
+        public IReadOnlyList<Tile2i> OccupiedTiles { get; }
+        public TerrainPropId? DenseDebrisPropId { get; }
+        public bool HasDumpBurialProbe { get; }
+        public Tile2i DumpBurialProbeTile { get; }
+        public float DumpBurialProbeOffsetX { get; }
+        public float DumpBurialProbeOffsetY { get; }
+        public float PlacedHeight { get; }
+        public float DumpBurialThreshold { get; }
+
+        public AccessCapturedProp(
+            bool isTree,
+            bool isDenseDebris,
+            string cleanupObjectKey,
+            IReadOnlyList<Tile2i> occupiedTiles,
+            TerrainPropId? denseDebrisPropId = null,
+            Tile2i? dumpBurialProbeTile = null,
+            float dumpBurialProbeOffsetX = 0f,
+            float dumpBurialProbeOffsetY = 0f,
+            float placedHeight = 0f,
+            float dumpBurialThreshold = 0.5f)
+        {
+            IsTree = isTree;
+            IsDenseDebris = isDenseDebris;
+            CleanupObjectKey = cleanupObjectKey ?? string.Empty;
+            OccupiedTiles = occupiedTiles ?? Array.Empty<Tile2i>();
+            DenseDebrisPropId = denseDebrisPropId;
+            HasDumpBurialProbe = dumpBurialProbeTile.HasValue;
+            DumpBurialProbeTile = dumpBurialProbeTile ?? default;
+            DumpBurialProbeOffsetX = dumpBurialProbeOffsetX;
+            DumpBurialProbeOffsetY = dumpBurialProbeOffsetY;
+            PlacedHeight = placedHeight;
+            DumpBurialThreshold = dumpBurialThreshold;
+        }
+    }
+
     internal sealed class AccessPropCleanupInfo
     {
         public Tile2i Origin { get; }
@@ -258,12 +303,16 @@ namespace AutoTerrainDesignations.Access
                     usesTerrainRemovalPolicy, collectedSamples);
         }
 
-        public static float GetCleanupLandscapingCost() =>
-            AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
+        public static float GetCleanupLandscapingCost(
+            AccessSearchPolicySnapshot? policy = null)
+            => (policy ?? AccessSearchPolicySnapshot.Capture())
+                .PropCleanupLandscapingCost;
 
-        public static float GetCleanupLandscapingCost(bool isTree) =>
+        public static float GetCleanupLandscapingCost(
+            bool isTree,
+            AccessSearchPolicySnapshot? policy = null) =>
             isTree
                 ? 0f
-                : AutoTerrainDesignationsMod.AccessPropCleanupLandscapingCost;
+                : GetCleanupLandscapingCost(policy);
     }
 }

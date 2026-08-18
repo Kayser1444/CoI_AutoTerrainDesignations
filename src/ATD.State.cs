@@ -112,6 +112,8 @@ namespace AutoTerrainDesignations
             public int CorridorClearance => CorridorClearanceForMode(VehicleClearance);
             public bool AutoReleaseExcavatorsWhenIdle { get; private set; }
             public TruckIdleBehavior TruckIdlePolicy { get; private set; }
+            public int DumpingPriority { get; private set; }
+            public bool HasExplicitDumpingPriority { get; private set; }
             public bool AutoReleaseTrucksWhenIdle => TruckIdlePolicy == TruckIdleBehavior.SoftRelease;
             public bool MiningPlanDirty { get; private set; } = true;
             public string? LastMiningPlanFingerprint { get; private set; }
@@ -120,7 +122,7 @@ namespace AutoTerrainDesignations
             public RampPlacementOutcome? LastRampOutcome { get; set; }
             public bool SuppressLastRampWarningNotification { get; set; }
 
-            public ATDTowerSettings(int maxHeightDiff, int rampWidth, int maxLayersToExcavate, int? maxDepthToDigTo, int orePurityLevel, int corridorClearance, bool autoReleaseExcavatorsWhenIdle = false, TruckIdleBehavior truckIdlePolicy = TruckIdleBehavior.StayPut)
+            public ATDTowerSettings(int maxHeightDiff, int rampWidth, int maxLayersToExcavate, int? maxDepthToDigTo, int orePurityLevel, int corridorClearance, bool autoReleaseExcavatorsWhenIdle = false, TruckIdleBehavior truckIdlePolicy = TruckIdleBehavior.StayPut, int dumpingPriority = AutoDepthDesignation.DumpingPriorityPassive)
             {
                 SetMaxHeightDiff(maxHeightDiff);
                 SetRampWidth(rampWidth);
@@ -129,6 +131,7 @@ namespace AutoTerrainDesignations
                 SetOrePurityLevel(orePurityLevel);
                 SetAutoReleaseExcavatorsWhenIdle(autoReleaseExcavatorsWhenIdle);
                 SetTruckIdlePolicy(truckIdlePolicy);
+                SetDumpingPriority(dumpingPriority, configured: false);
             }
 
             public static ATDTowerSettings FromGlobalDefaults()
@@ -141,7 +144,8 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.OrePurityLevel,
                 AutoTerrainDesignationsMod.MinCorridorClearance,
                 AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle,
-                AutoTerrainDesignationsMod.TruckIdlePolicy);
+                AutoTerrainDesignationsMod.TruckIdlePolicy,
+                s_dumpingPriorityWorldDefault);
                 settings.SetVehicleClearance(AutoTerrainDesignationsMod.VehicleClearance);
                 return settings;
             }
@@ -199,6 +203,15 @@ namespace AutoTerrainDesignations
                     : value;
             }
 
+            public void SetDumpingPriority(int value) => SetDumpingPriority(value, configured: true);
+
+            private void SetDumpingPriority(int value, bool configured)
+            {
+                DumpingPriority = ClampDumpingPriority(value);
+                if (configured)
+                    HasExplicitDumpingPriority = true;
+            }
+
             public void SetAutoReleaseTrucksWhenIdle(bool value) =>
                 SetTruckIdlePolicy(value ? TruckIdleBehavior.SoftRelease : TruckIdleBehavior.ParkAtTower);
 
@@ -228,7 +241,9 @@ namespace AutoTerrainDesignations
                     && OrePurityLevel == AutoTerrainDesignationsMod.OrePurityLevel
                     && CorridorClearance == AutoTerrainDesignationsMod.MinCorridorClearance
                     && AutoReleaseExcavatorsWhenIdle == AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle
-                    && TruckIdlePolicy == AutoTerrainDesignationsMod.TruckIdlePolicy;
+                    && TruckIdlePolicy == AutoTerrainDesignationsMod.TruckIdlePolicy
+                    && !HasExplicitDumpingPriority
+                    && DumpingPriority == s_dumpingPriorityWorldDefault;
             }
         }
 
@@ -269,6 +284,8 @@ namespace AutoTerrainDesignations
         private static bool s_accessAllowDigToRemoveDebris = true;
         private static QuickRemoveDebrisPolicy s_accessQuickRemoveDebrisPolicy =
             QuickRemoveDebrisPolicy.Restrictive;
+        private static int s_dumpingPriorityWorldDefault =
+            AutoDepthDesignation.DumpingPriorityPassive;
         private static ATDPropRemovalManager? s_propRemovalManager;
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
@@ -279,6 +296,7 @@ namespace AutoTerrainDesignations
         internal static bool AccessAllowDigToRemoveDebris => s_accessAllowDigToRemoveDebris;
         internal static QuickRemoveDebrisPolicy AccessQuickRemoveDebrisPolicy =>
             s_accessQuickRemoveDebrisPolicy;
+        internal static int DumpingPriorityWorldDefault => s_dumpingPriorityWorldDefault;
         internal static ATDPropRemovalManager? PropRemovalManager => s_propRemovalManager;
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
@@ -289,6 +307,8 @@ namespace AutoTerrainDesignations
         internal static void SetAccessAllowDigToRemoveDebris(bool value) => s_accessAllowDigToRemoveDebris = value;
         internal static void SetAccessQuickRemoveDebrisPolicy(
             QuickRemoveDebrisPolicy value) => s_accessQuickRemoveDebrisPolicy = value;
+        internal static void SetDumpingPriorityWorldDefault(int value) =>
+            s_dumpingPriorityWorldDefault = ClampDumpingPriority(value);
 
         internal static void ResetWorldPathfinderSettingsToDefaults()
         {
@@ -300,6 +320,8 @@ namespace AutoTerrainDesignations
             s_accessAllowDigToRemoveDebris = AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris;
             s_accessQuickRemoveDebrisPolicy =
                 AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy;
+            s_dumpingPriorityWorldDefault =
+                AutoTerrainDesignationsMod.DumpingPriorityDefault;
         }
 
         internal static bool IsLegacyRampMode(AccessVehicleClearanceMode mode) =>
@@ -347,6 +369,8 @@ namespace AutoTerrainDesignations
             AutoTerrainDesignationsMod.SetAccessAllowDigToRemoveDebris(s_accessAllowDigToRemoveDebris);
             AutoTerrainDesignationsMod.SetAccessQuickRemoveDebrisPolicy(
                 s_accessQuickRemoveDebrisPolicy);
+            AutoTerrainDesignationsMod.SetDumpingPriority(
+                s_dumpingPriorityWorldDefault);
         }
 
         // Keep the broad create-designations trace quiet unless explicitly
@@ -452,6 +476,16 @@ namespace AutoTerrainDesignations
         internal static void SetTowerRampWidth(IAreaManagingTower tower, int value) => GetOrCreateTowerSettings(tower).SetRampWidth(value);
         internal static AccessVehicleClearanceMode GetTowerVehicleClearance(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).VehicleClearance;
         internal static void SetTowerVehicleClearance(IAreaManagingTower tower, AccessVehicleClearanceMode value) => GetOrCreateTowerSettings(tower).SetVehicleClearance(value);
+
+        internal static int GetTowerDumpingPriority(IAreaManagingTower tower)
+        {
+            return TryGetTowerEntityId(tower, out EntityId entityId)
+                && s_towerSettingsByEntityId.TryGetValue(entityId, out ATDTowerSettings? settings)
+                ? settings.DumpingPriority
+                : s_dumpingPriorityWorldDefault;
+        }
+        internal static void SetTowerDumpingPriority(IAreaManagingTower tower, int value) =>
+            GetOrCreateTowerSettings(tower).SetDumpingPriority(value);
 
         internal static int GetTowerMaxLayersToExcavate(IAreaManagingTower tower) => GetOrCreateTowerSettings(tower).MaxLayersToExcavate;
         internal static void SetTowerMaxLayersToExcavate(IAreaManagingTower tower, int value) => GetOrCreateTowerSettings(tower).SetMaxLayersToExcavate(value);

@@ -129,6 +129,7 @@ namespace AutoTerrainDesignations
         {
             public RampPlacementOutcome Outcome = RampPlacementOutcome.Failed;
             public Tile2i TopRowTile = default;
+            public string FailureReason = string.Empty;
             public bool InitialReachabilityEvaluated;
             public bool AllClustersInitiallyConnected;
             public bool SuppressWarningNotification;
@@ -759,6 +760,8 @@ namespace AutoTerrainDesignations
                     {
                         AccessSearchSnapshot refreshedSnapshot =
                             snapshotBuild.Snapshot;
+                        AccessSearchWorkspace refreshedWorkspace =
+                            snapshotBuild.Workspace!;
                         experimentalSnapshot = refreshedSnapshot;
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
@@ -796,7 +799,7 @@ namespace AutoTerrainDesignations
                             $"requiredWidth={request.RequiredWidth}");
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
                         IEnumerator mergedSearch = RunExperimentalAccessDryRunSliced(
-                            request, cluster, currentClusterOrdinal, unreachableClusterCount,
+                            request, refreshedWorkspace, cluster, currentClusterOrdinal, unreachableClusterCount,
                             experimentalDryRun, sliceControl);
                         while (mergedSearch.MoveNext())
                             yield return mergedSearch.Current;
@@ -835,6 +838,8 @@ namespace AutoTerrainDesignations
                             {
                                 AccessSearchSnapshot outsideSnapshot =
                                     outsideSnapshotBuild.Snapshot;
+                                AccessSearchWorkspace outsideWorkspace =
+                                    outsideSnapshotBuild.Workspace!;
                                 experimentalSnapshot = outsideSnapshot;
                                 sliceControl?.ReportPhase("Preparing search request");
                                 long outsideRequestBuildStart =
@@ -854,7 +859,7 @@ namespace AutoTerrainDesignations
                                     new ExperimentalAccessDryRunResult();
                                 IEnumerator outsideSearch =
                                     RunExperimentalAccessDryRunSliced(
-                                        request, cluster, currentClusterOrdinal,
+                                        request, outsideWorkspace, cluster, currentClusterOrdinal,
                                         unreachableClusterCount, outsideDryRun,
                                         sliceControl);
                                 while (outsideSearch.MoveNext())
@@ -964,6 +969,7 @@ namespace AutoTerrainDesignations
                         experimentalSnapshot = null;
                         experimentalSearchEnabled = false;
                         experimentalFailureSummary = refreshFailure;
+                        result.FailureReason = refreshFailure;
                         LogExperimentalAccessDebug($"[ATD Access] snapshot refresh failed: {refreshFailure}");
                     }
                 }
@@ -1153,9 +1159,10 @@ namespace AutoTerrainDesignations
                                 ? "; managed request fails closed."
                                 : "; using legacy fallback."));
                     }
-                    else
-                    {
-                        LogExperimentalAccessDebug(
+                            else
+                            {
+                                result.FailureReason = experimentalPlacementFailure;
+                                LogExperimentalAccessDebug(
                             $"[ATD Access] cluster={cluster.ClusterId} "
                             + $"placement failed reason={experimentalPlacementFailure}"
                             + (newPlannerOnly

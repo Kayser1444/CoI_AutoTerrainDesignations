@@ -56,6 +56,22 @@
     "Modo de acceso"
   ],
   [
+    "settings.dumping_priority.label",
+    "Prioridad de vertido"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Usa las prioridades de importación de vanilla 1–15 para el vertido activo; los números menores son más urgentes. Pasiva usa el vertido pasivo de vanilla y solo importa de exportadores activos. Durante el llenado de tierras de cultivo, Pasiva usa temporalmente la prioridad activa 14 mientras las reglas de vertido están limitadas a productos agrícolas. Predeterminada: Pasiva."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Pasiva"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Importar solo de exportadores activos."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Legado 3"
   ],

@@ -105,6 +105,8 @@ namespace AutoTerrainDesignations
                     + "|clearance=" + towerSettings.VehicleClearance;
                 IEnumerator requestRoutine =
                     AwaitCreateDesignationsAccessRequest(
+                        tower,
+                        towerSettings,
                         BuildCreateDesignationsAccessOwnerKey(
                             tower, "planned-tower"),
                         workFingerprint,
@@ -240,8 +242,9 @@ namespace AutoTerrainDesignations
                 yield break;
 
             AccessSearchSnapshot? snapshot = snapshotBuild.Snapshot;
+            AccessSearchWorkspace? workspace = snapshotBuild.Workspace;
             string snapshotFailure = snapshotBuild.FailureReason;
-            if (snapshot == null)
+            if (snapshot == null || workspace == null)
             {
                 LogExperimentalAccessDebug(
                     $"[ATD Planned Tower Access] snapshotFailed={snapshotFailure}");
@@ -262,7 +265,7 @@ namespace AutoTerrainDesignations
                 groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
             IEnumerator search = RunExperimentalAccessDryRunSliced(
-                request, cluster, 1, 1, dryRun, sliceControl);
+                request, workspace, cluster, 1, 1, dryRun, sliceControl);
             while (search.MoveNext())
                 yield return search.Current;
             if (sliceControl?.CancellationRequested

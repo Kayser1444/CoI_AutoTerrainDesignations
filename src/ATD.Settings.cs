@@ -518,6 +518,14 @@ namespace AutoTerrainDesignations
                                 : TruckIdleBehavior.ParkAtTower);
                 }
 
+                int? dumpingPriority = ParseInt(json, "dumpingPriority");
+                if (dumpingPriority.HasValue
+                    && ShouldPreserveInt(
+                        dumpingPriority.Value,
+                        migrateGeneratedDefaults,
+                        AutoTerrainDesignationsMod.DumpingPriorityDefault))
+                    AutoTerrainDesignationsMod.SetDumpingPriority(dumpingPriority.Value);
+
                 bool? turningRampsExperimental = ParseBool(json, "turningRampsExperimental");
                 if (turningRampsExperimental.HasValue)
                 {
@@ -684,6 +692,7 @@ namespace AutoTerrainDesignations
                 ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
                 ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
                 ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
+                ApplyInt("accessSnapshotMemoryCeilingMiB", 512, AutoTerrainDesignationsMod.SetAccessSnapshotMemoryCeilingMiB);
                 ApplyInt("accessManagerAutomatedFrameBudgetMs", 10, AutoTerrainDesignationsMod.SetAccessManagerAutomatedFrameBudgetMs);
                 ApplyInt("accessManagerInteractiveFrameBudgetMs", 15, AutoTerrainDesignationsMod.SetAccessManagerInteractiveFrameBudgetMs);
                 ApplyInt("accessManagerPausedMaxFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessManagerPausedMaxFrameBudgetMs);
@@ -1093,6 +1102,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_truckIdlePolicy\": \"Default starting behavior for trucks assigned to a mine tower when no managed designation has pending excavation work, or while the tower is paused. 0 = Park at tower (vanilla), 1 = Stay put (keeps trucks assigned without sending them back), 2 = Soft release (temporarily unassigns trucks and reassigns them when work returns). Default: 1.\",");
             sb.AppendLine($"  \"truckIdlePolicy\": {(int)AutoTerrainDesignationsMod.TruckIdlePolicy},");
             sb.AppendLine();
+            sb.AppendLine("  \"_comment_dumpingPriority\": \"Default Dumping priority for new worlds and previously unconfigured Mine Towers. Priorities 1-15 actively request tower-approved terrain products; lower numbers are more urgent. Passive uses vanilla dumping and only imports from active exporters. During ATD farmland fill, Passive temporarily uses active priority 14 while farmable dump rules are active. Existing towers retain their concrete priority. Default: Passive.\",");
+            sb.AppendLine($"  \"dumpingPriority\": {AutoTerrainDesignationsMod.DumpingPriority},");
+            sb.AppendLine();
             sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, AUTO and T1-T3 may use routed turning or switchback accessways. Legacy 3-5 remain straight-only. Default: true.\",");
             sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsEnabled)},");
             sb.AppendLine();
@@ -1171,6 +1183,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessSearchFrameBudgetMs\": \"Time budget in milliseconds per frame allocated to sliced background access search. Default: 30.\",");
             sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_accessSnapshotMemoryCeilingMiB\": \"Conservative estimated retained-memory ceiling for one access snapshot. Capture fails closed as SnapshotTooLarge above this value. Advanced users may raise it after profiling. Default: 512.\",");
+            sb.AppendLine($"  \"accessSnapshotMemoryCeilingMiB\": {AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessManagerAutomatedFrameBudgetMs\": \"Managed farming and Construction Assist search budget per rendered frame during normal play. Default: 10.\",");
             sb.AppendLine($"  \"accessManagerAutomatedFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessManagerAutomatedFrameBudgetMs},");

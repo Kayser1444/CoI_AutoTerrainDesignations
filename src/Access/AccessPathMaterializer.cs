@@ -8,11 +8,17 @@ namespace AutoTerrainDesignations.Access
 {
     internal static class AccessPathMaterializer
     {
-        public static AccessDesignationPlan Materialize(AccessSearchSnapshot snapshot, AccessSearchResult result)
+        public static AccessDesignationPlan Materialize(
+            AccessSearchSnapshot snapshot, AccessSearchResult result)
+            => Materialize(new AccessSearchWorkspace(snapshot), result);
+
+        public static AccessDesignationPlan Materialize(
+            AccessSearchWorkspace workspace, AccessSearchResult result)
         {
+            AccessSearchSnapshot snapshot = workspace.Snapshot;
             if (!result.Success) return AccessDesignationPlan.Invalid("SearchFailed", result.StartOrigin);
             if (result.V2Route != null)
-                return MaterializeV2(snapshot, result);
+                return MaterializeV2(workspace, result);
             if (result.Path.Count == 0) return AccessDesignationPlan.Invalid("EmptyPath", result.StartOrigin);
             if (!snapshot.TryGetFixedProfile(result.StartOrigin, out AccessHeightProfile previousProfile))
                 return AccessDesignationPlan.Invalid("MissingStartProfile", result.StartOrigin);
@@ -90,7 +96,7 @@ namespace AutoTerrainDesignations.Access
                                     result, pathIndex, snapshot,
                                     node.HandoffSpanLength,
                                     out List<AccessHandoffSpanCell> span)
-                                && snapshot.GetWorkableHandoffSpans(span).Any(candidate =>
+                                && workspace.Evaluator.GetWorkableHandoffSpans(span).Any(candidate =>
                                     candidate.Tile == node.Position
                                     && candidate.Operation == node.HandoffOperation
                                     && candidate.SpanLength == node.HandoffSpanLength);
@@ -101,7 +107,7 @@ namespace AutoTerrainDesignations.Access
                                 out Tile2i predPosition,
                                 out AccessHeightProfile predProfile);
                             validHandoff = AccessPathSearch.ContainsHandoff(
-                                snapshot, previousPosition, previousProfile,
+                                snapshot, previousPosition, workspace, previousProfile,
                                 predPosition, predProfile,
                                 node.Position, node.HandoffOperation);
                         }
@@ -154,7 +160,7 @@ namespace AutoTerrainDesignations.Access
                 if (previousWasGround)
                 {
                     if (!AccessPathSearch.TryGetGroundToGeneratedHandoff(
-                        snapshot, node.Position, profile, previousPosition,
+                        snapshot, workspace, node.Position, profile, previousPosition,
                         out AccessHandoffOperation operation,
                         out Tile2i entryDirection)
                         || operation != node.HandoffOperation
@@ -175,7 +181,7 @@ namespace AutoTerrainDesignations.Access
                         && pathIndex >= 2
                         && result.Path[pathIndex - 2].IsGround
                         && !AccessPathSearch.IsGroundToGeneratedContinuation(
-                            snapshot, previousNode.Position, previousProfile,
+                            snapshot, workspace, previousNode.Position, previousProfile,
                             result.Path[pathIndex - 2].Position,
                             previousNode.HandoffOperation, node.Position))
                     {
@@ -276,12 +282,13 @@ namespace AutoTerrainDesignations.Access
         }
 
         private static AccessDesignationPlan MaterializeV2(
-            AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessSearchResult result)
         {
+            AccessSearchSnapshot snapshot = workspace.Snapshot;
             AccessV2RouteData route = result.V2Route!;
             if (!AccessV2Replay.TryReplay(
-                    snapshot, route,
+                    snapshot, workspace, route,
                     out _,
                     out IReadOnlyList<AccessV2OriginProfile> ordered,
                     out AccessV2HandoffCandidate? handoff,

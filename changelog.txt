@@ -1,3 +1,9 @@
+v0.6.1 | 2026-08-18
+* Added: Per-tower and world dumping priority controls with vanilla active priorities 1–15 and a Passive mode that imports only from active exporters; farmland topsoil still uses active dumping during filling
+* Changed: The default dumping priority is now Passive. Existing towers retain their stored priority; a stored value of 15 now means active low priority, so choose Passive to retain the previous passive behavior
+* Fixed: Interactive accessway searches now invalidate when accessway mode, ramp width, world access policy, tower ownership, or tower area changes, preventing stale routes from being committed
+* Improved: Accessway planning now captures terrain and building state before preparation so route validation remains consistent with the world state used to start the search
+
 v0.6.0 | 2026-08-16
 * Improved: Mine Tower copy, blueprint, repeated placement, eligible Cut, and Copy settings workflows now preserve the tower's exact managed area and ATD mining settings, including ore selection and quality, mining priority, accessway clearance, and vehicle idle policies, while retaining vanilla vehicle-assignment behavior
 * Added: Farmland preparation filling can request farmable soil from eligible storages, including neutral storages that are not configured as exporters

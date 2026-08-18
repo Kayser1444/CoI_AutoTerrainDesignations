@@ -56,6 +56,22 @@
     "Accessway-Modus"
   ],
   [
+    "settings.dumping_priority.label",
+    "Abladepriorität"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Verwendet die Vanilla-Importprioritäten 1–15 für aktives Abladen; kleinere Zahlen sind dringender. Passiv verwendet passives Vanilla-Abladen und importiert nur von aktiven Exporteuren. Während des Ackerland-Füllens verwendet Passiv vorübergehend die aktive Priorität 14, solange die Ablageregeln auf landwirtschaftliche Produkte beschränkt sind. Standard: Passiv."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Passiv"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Nur von aktiven Exporteuren importieren."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Altmodus 3"
   ],

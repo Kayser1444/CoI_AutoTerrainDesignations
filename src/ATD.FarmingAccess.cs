@@ -690,7 +690,10 @@ namespace AutoTerrainDesignations
                                     == RampPlacementOutcome.Truncated
                             ? ATDAccesswayRequestResult.Succeeded(payload)
                             : ATDAccesswayRequestResult.Failed(
-                                rampResult.Outcome.ToString(), payload);
+                                string.IsNullOrEmpty(rampResult.FailureReason)
+                                    ? rampResult.Outcome.ToString()
+                                    : rampResult.FailureReason,
+                                payload);
                     },
                     GetManagedAccesswaySliceBudgetMilliseconds),
                 ValidateLiveRequest);

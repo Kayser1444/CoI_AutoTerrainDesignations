@@ -45,6 +45,7 @@ internal static class MineTowerCloneConfigPatches
     private const string OrePurityLevelKey = KeyPrefix + "OrePurityLevel";
     private const string AutoReleaseExcavatorsKey = KeyPrefix + "AutoReleaseExcavators";
     private const string TruckIdlePolicyKey = KeyPrefix + "TruckIdlePolicy";
+    private const string DumpingPriorityKey = KeyPrefix + "DumpingPriority";
     private const string SelectedOrePresentKey = KeyPrefix + "SelectedOrePresent";
     private const string SelectedOreKey = KeyPrefix + "SelectedOre";
     private const string ExcavatorPriorityPresentKey = KeyPrefix + "ExcavatorPriorityPresent";
@@ -63,6 +64,7 @@ internal static class MineTowerCloneConfigPatches
         OrePurityLevelKey,
         AutoReleaseExcavatorsKey,
         TruckIdlePolicyKey,
+        DumpingPriorityKey,
         SelectedOrePresentKey,
         SelectedOreKey,
         ExcavatorPriorityPresentKey,
@@ -168,6 +170,9 @@ internal static class MineTowerCloneConfigPatches
             data.SetInt(
                 TruckIdlePolicyKey,
                 (int)AutoDepthDesignation.GetTowerTruckIdlePolicy(__instance));
+            data.SetInt(
+                DumpingPriorityKey,
+                AutoDepthDesignation.GetTowerDumpingPriority(__instance));
 
             ProductProto? selectedOre = AutoDepthDesignation.GetSelectedOre(__instance);
             data.SetBool(SelectedOrePresentKey, true);
@@ -241,6 +246,10 @@ internal static class MineTowerCloneConfigPatches
                     __instance,
                     (TruckIdleBehavior)(data.GetInt(TruckIdlePolicyKey)
                         ?? (int)AutoTerrainDesignationsMod.TruckIdlePolicy));
+                AutoDepthDesignation.SetTowerDumpingPriority(
+                    __instance,
+                    data.GetInt(DumpingPriorityKey)
+                        ?? AutoDepthDesignation.DumpingPriorityWorldDefault);
             }
 
             if (data.GetBool(SelectedOrePresentKey) == true)

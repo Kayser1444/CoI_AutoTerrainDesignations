@@ -4270,9 +4270,14 @@ namespace AutoTerrainDesignations.Access.V2
                     projectedCutSourcesByTile: projectedCutSources,
                     projectedFillSourcesByTile: projectedFillSources,
                     vehicleWidth: 5,
-                    dumpingMaterialSlope: replayDumpingSlope,
-                    v2WorkableHandoffs: UniformSingle,
-                    v2WorkableHandoffSpans: Span);
+                    dumpingMaterialSlope: replayDumpingSlope);
+            AccessSearchWorkspace CreateReplayWorkspace(
+                AccessSearchSnapshot snapshot)
+                => new AccessSearchWorkspace(
+                    snapshot,
+                    new CooperativeAccessSearchEvaluator(
+                        v2WorkableHandoffs: UniformSingle,
+                        v2WorkableHandoffSpans: Span));
             AccessSearchSnapshot replaySnapshot = CreateReplaySnapshot();
             AccessHeightProfile.TryForMode(
                 AccessSearchMode.Flat, 2,
@@ -4636,7 +4641,8 @@ namespace AutoTerrainDesignations.Access.V2
                 v2Route: retainedPairRoute);
             AccessDesignationPlan retainedPairPlan =
                 AccessPathMaterializer.Materialize(
-                    retainedPairSnapshot, retainedPairResult);
+                    CreateReplayWorkspace(retainedPairSnapshot),
+                    retainedPairResult);
             if (!retainedPairPlan.IsValid)
             {
                 failure = "V2 materialization replay must retain fixed predecessor safety ownership exactly as search does: "
@@ -5073,7 +5079,8 @@ namespace AutoTerrainDesignations.Access.V2
                 v2Route: materializationRoute);
             AccessDesignationPlan materialized =
                 AccessPathMaterializer.Materialize(
-                    replaySnapshot, materializationResult);
+                    CreateReplayWorkspace(replaySnapshot),
+                    materializationResult);
             if (!materialized.IsValid
                 || materialized.Designations.Count != 1
                 || materialized.Designations[0].Origin != syntheticOrigin

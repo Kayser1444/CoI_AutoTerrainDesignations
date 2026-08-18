@@ -9,6 +9,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using CoI.AutoHelpers.Settings;
 using Mafi;
 using Mafi.Localization;
@@ -177,6 +178,7 @@ namespace AutoTerrainDesignations
             content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingMiningDefaults.AsFormatted));
 
             content.Add(BuildAccesswayModeRow(refreshers));
+            content.Add(BuildDumpingPriorityRow(refreshers));
             content.Add(BuildIntStepRow(
                 AtdLocalization.DesigMaxLayersLabel.AsFormatted,
                 AtdLocalization.DesigMaxLayersTip.AsFormatted,
@@ -207,6 +209,27 @@ namespace AutoTerrainDesignations
 
             var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
             row.Add(new Label(AtdLocalization.DesigAccesswayModeLabel.AsFormatted));
+            row.Add(new UiComponent().FlexGrow(1f));
+            row.Add(dropdown);
+            return row;
+        }
+
+        private static Row BuildDumpingPriorityRow(List<Action> refreshers)
+        {
+            var dropdown = new DesignationPanel.DumpingPriorityDropdown();
+            dropdown.SetValue(AutoDepthDesignation.DumpingPriorityWorldDefault);
+            dropdown.OnValueChanged((option, _) =>
+                {
+                    int priority = DesignationPanel.DumpingPriorityFromOption(option);
+                    AutoDepthDesignation.SetDumpingPriorityWorldDefault(priority);
+                    dropdown.SetValue(priority);
+                });
+            refreshers.Add(() => dropdown.SetValue(
+                AutoDepthDesignation.DumpingPriorityWorldDefault));
+
+            var row = new Row().MarginTop(1.pt()).AlignItemsCenter();
+            row.Add(new Label(AtdLocalization.DumpingPriorityLabel.AsFormatted)
+                .Tooltip(AtdLocalization.DumpingPriorityDescription.AsFormatted));
             row.Add(new UiComponent().FlexGrow(1f));
             row.Add(dropdown);
             return row;

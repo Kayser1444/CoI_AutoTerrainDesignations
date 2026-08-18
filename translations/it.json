@@ -56,6 +56,22 @@
     "Modalità di accesso"
   ],
   [
+    "settings.dumping_priority.label",
+    "Priorità di scarico"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Usa le priorità di importazione vanilla 1–15 per lo scarico attivo; i numeri più bassi sono più urgenti. Passiva usa lo scarico passivo vanilla e importa solo da esportatori attivi. Durante il riempimento dei terreni agricoli, Passiva usa temporaneamente la priorità attiva 14 mentre le regole di scarico sono limitate ai prodotti agricoli. Predefinita: Passiva."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Passiva"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Importa solo da esportatori attivi."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Modalità precedente 3"
   ],

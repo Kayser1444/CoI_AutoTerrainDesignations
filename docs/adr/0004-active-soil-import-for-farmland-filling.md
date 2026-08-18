@@ -4,27 +4,33 @@ status: accepted
 
 # Active soil import for farmland filling
 
+> Scope note: this ADR remains the source of truth for vanilla logistics
+> delegation, route handling, truck eligibility, partial loads, and silent
+> fallback behavior. Its original final-filling-only scope is superseded by
+> the priority-driven, tower-wide implementation described below and in
+> issue #25.
+
 ATD farmland filling currently relies on ordinary terrain-dumping logistics.
 Vanilla terrain balancing ignores output buffers whose effective priority is
 15, so a neutral storage (neither importing nor exporting) cannot supply soil
 to a farmland dumping designation even when material is present.
 
-Define active soil import as a fallback demand for still-pending,
-ATD-managed farmland filling. ATD will compose the existing vanilla pickup and
-dumping job machinery through a localized dispatcher rather than patching the
-global balancing sweep. The dispatcher will use any registered output with an
-eligible farmable material, preserve vanilla output/product ordering and
-protected import quantities, and allow neutral storage contents as the
-low-priority fallback. It will target only the closest valid farmland
-designation, choose the closest eligible free global truck to the source, and
-use the vanilla partial-load policy.
+Define active dumping as a runtime-only, product-indexed input demand for
+still-pending dumping designations managed by a Mine Tower. Priorities 1–15
+compose the existing vanilla pickup and dumping machinery and allow neutral
+storage contents to compete at the selected priority. The separate Passive
+setting normally registers no input demand and preserves vanilla passive
+dumping; only active exporters may supply it. While ATD owns the farm-fill dump
+rules, Passive is temporarily evaluated as active priority 14. The tower's live
+`DumpableProducts` list and managed designations determine eligibility; there
+is no separate soil-only product filter.
 
 The source's import reserve remains a hard quantity limit, and disabling
 logistics output removes the source entirely. The export-from slider retains
 vanilla meaning as a priority preference: material below its threshold may
 still be used as the lowest-priority fallback rather than becoming absolutely
 unavailable.
-Active soil import only reads the live storage-to-tower route graph; it never
+Active dumping only reads the live storage-to-tower route graph; it never
 creates temporary routes, changes assignments, or broadens a player-authored
 route.
 Route edits affect only future active-import dispatches. An already reserved
@@ -89,11 +95,9 @@ distinguishes a route-blocked source, a genuinely unavailable soil source, no
 eligible truck, and an otherwise eligible truck set blocked by source/target
 reachability.
 
-Active soil import is automatic during final filling and has no separate
-toggle; existing farming automation and live tower material controls remain the
-control surfaces. Dispatch attempts run from the existing farming-session
-filling pass once per farming automation tick; no separate global logistics or
-simulation loop is introduced.
+Active dumping is synchronized once per simulation second and after save/load;
+the per-tower priority and the existing farming/tower material controls are
+the control surfaces. There is no separate farmland-only mode.
 Any live vanilla dumping job or designation reservation claims an origin, so
 active import does not preempt, duplicate, or second-guess ordinary work even
 when that job is delayed or unreachable.

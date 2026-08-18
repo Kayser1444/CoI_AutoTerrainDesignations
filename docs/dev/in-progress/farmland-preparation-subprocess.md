@@ -299,12 +299,15 @@ Each tick while filling:
    The vanilla readiness gate is `IsReadyToDumpNonAmphibious()`.
 5. **Advance.** Re-analyze each `Filling` origin; move to `Done` when the farmable
    band check passes.
-6. **Active soil import.** For origins still pending after the live analysis,
-   ATD may submit vanilla balancing jobs from product-indexed output buffers,
-   including neutral soil storage. Route assignments, truck filters, cached
-   reachability, source reservations, partial loads, and cargo continuation
-   remain vanilla-owned; ATD only selects the source, reachable target, and
-   available truck and supplies the target designation.
+6. **Active dumping.** For pending dumping work, a tower priority from 1
+   through 15 advertises runtime-only vanilla input demand from product-indexed
+   output buffers, including neutral storage. Route assignments, truck filters,
+   cached reachability, source reservations, partial loads, and cargo
+   continuation remain vanilla-owned; ATD only supplies the managed target
+   designation. Passive leaves the tower on vanilla passive dumping and only
+   imports from active exporters outside farm filling; while ATD owns the
+   restricted farm-fill dump rules, it is temporarily evaluated as active
+   priority 14.
 
 ### Completion
 
@@ -426,7 +429,7 @@ and the decision. Performance lines are tagged separately.
 | [src/ATD.FarmingAnalysis.cs](../../../src/ATD.FarmingAnalysis.cs) | Read-only per-origin terrain analysis (`FarmingAnalysisState`) |
 | [src/ATD.FarmingPreparationSession.cs](../../../src/ATD.FarmingPreparationSession.cs) | Session data, tick loop, phase transitions, save hook |
 | [src/ATD.FarmingFillActivation.cs](../../../src/ATD.FarmingFillActivation.cs) | Filling: dump rules, clear-out, fill activation, rim alignment |
-| [src/ATD.FarmingActiveSoilImport.cs](../../../src/ATD.FarmingActiveSoilImport.cs) | Filling: transient active soil import through vanilla output buffers and balancing jobs |
+| [src/ATD.FarmingActiveSoilImport.cs](../../../src/ATD.FarmingActiveSoilImport.cs) | Runtime-only active dumping through vanilla output buffers and balancing jobs |
 | [src/ATD.FarmingAccess.cs](../../../src/ATD.FarmingAccess.cs) | Access ramp placement for both phases, result caching |
 | [src/ATD.FarmingDebugTransitions.cs](../../../src/ATD.FarmingDebugTransitions.cs) | Shoulders, transitions, `atd_farming_*` console commands |
 | [src/ATD.FarmingAnalysisPanel.cs](../../../src/ATD.FarmingAnalysisPanel.cs) | Tower inspector panel |

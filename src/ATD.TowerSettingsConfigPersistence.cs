@@ -92,6 +92,9 @@ namespace AutoTerrainDesignations
             sb.Append(",\"quickRemoveDebrisPolicy\":")
                 .Append(((int)AccessQuickRemoveDebrisPolicy)
                     .ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\"dumpingPriority\":")
+                .Append(s_dumpingPriorityWorldDefault
+                    .ToString(CultureInfo.InvariantCulture));
             sb.Append('}');
             sb.Append(",\"towerSettings\":[");
 
@@ -166,6 +169,13 @@ namespace AutoTerrainDesignations
                     AppendIntOverride(sb, "orePurityLevel", settings.OrePurityLevel, AutoTerrainDesignationsMod.OrePurityLevel);
                     AppendBoolOverride(sb, "autoReleaseExcavatorsWhenIdle", settings.AutoReleaseExcavatorsWhenIdle, AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle);
                     AppendIntOverride(sb, "truckIdlePolicy", (int)settings.TruckIdlePolicy, (int)AutoTerrainDesignationsMod.TruckIdlePolicy);
+                    if (settings.HasExplicitDumpingPriority
+                        || settings.DumpingPriority != s_dumpingPriorityWorldDefault)
+                    {
+                        sb.Append(",\"dumpingPriority\":")
+                            .Append(settings.DumpingPriority
+                                .ToString(CultureInfo.InvariantCulture));
+                    }
                 }
 
                 if (hasOre && ore != null)
@@ -258,6 +268,8 @@ namespace AutoTerrainDesignations
                             (int)QuickRemoveDebrisPolicy.Always,
                             Math.Min((int)QuickRemoveDebrisPolicy.Never,
                                 quickRemovePolicy)));
+                if (TryGetInt(worldSettings, "dumpingPriority", out int dumpingPriority))
+                    SetDumpingPriorityWorldDefault(dumpingPriority);
             }
 
             if (root.TryGetValue("pendingPropRemovals", out object rawPropRemovals)
@@ -330,6 +342,9 @@ namespace AutoTerrainDesignations
                     settings.SetTruckIdlePolicy((TruckIdleBehavior)truckIdlePolicy);
                 else if (TryGetBool(entry, "autoReleaseTrucksWhenIdle", out bool autoReleaseTrucks))
                     settings.SetAutoReleaseTrucksWhenIdle(autoReleaseTrucks);
+
+                if (TryGetInt(entry, "dumpingPriority", out int dumpingPriority))
+                    settings.SetDumpingPriority(dumpingPriority);
 
                 s_towerSettingsByEntityId[entityId] = settings;
 

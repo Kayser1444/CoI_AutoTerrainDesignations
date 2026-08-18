@@ -56,6 +56,22 @@
     "Modo de acesso"
   ],
   [
+    "settings.dumping_priority.label",
+    "Prioridade de despejo"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "Usa as prioridades de importação vanilla 1–15 para despejo ativo; números menores são mais urgentes. Passivo usa o despejo passivo vanilla e importa apenas de exportadores ativos. Durante o preenchimento de terras agrícolas, Passivo usa temporariamente a prioridade ativa 14 enquanto as regras de despejo estão limitadas a produtos agrícolas. Padrão: Passivo."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "Passivo"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "Importar apenas de exportadores ativos."
+  ],
+  [
     "panel.designations.accessway_mode.legacy_3",
     "Legado 3"
   ],

@@ -1,6 +1,14 @@
 # Accessway Search Worker
 
-Status: approved design; not implemented.
+Status: approved worker design; the worker itself is not implemented. Ticket 1
+is running through the cooperative execution seam, and the first Ticket 2
+capture-contract slice adds revision diagnostics, memory backpressure, and
+fail-closed snapshot sizing. Interactive and capture paths now also carry
+tower-local ramp/clearance revisions; pure live-fact extraction remains in
+progress. Building occupancy and fixed-height facts are now copied at capture
+entry and reused by cleanup and durability preparation. Captured precise
+terrain heights now feed handoff geometry and rank-work checks; vanilla
+designation-readiness callbacks remain a separate live-API extraction seam.
 
 Related design: [ATD Accessway Manager](../planned/atd-accessway-manager.md)
 and [ADR 0003](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).

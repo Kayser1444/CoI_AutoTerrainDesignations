@@ -42,8 +42,32 @@ namespace AutoTerrainDesignations.Access
             s_validationRunCount++;
             bool v1Valid = false;
             bool v2Valid = false;
+            bool architectureValid = false;
+            bool captureValid = false;
             string v1Failure = string.Empty;
             string v2Failure = string.Empty;
+            string architectureFailure = string.Empty;
+            string captureFailure = string.Empty;
+
+            try
+            {
+                architectureValid = AccessSearchArchitectureFixtures.ValidateAll(
+                    out architectureFailure);
+            }
+            catch (Exception ex)
+            {
+                architectureFailure = "Exception:" + ex.GetType().Name;
+            }
+
+            try
+            {
+                captureValid = AccessCaptureFixtures.ValidateAll(
+                    out captureFailure);
+            }
+            catch (Exception ex)
+            {
+                captureFailure = "Exception:" + ex.GetType().Name;
+            }
 
             try
             {
@@ -65,7 +89,7 @@ namespace AutoTerrainDesignations.Access
                 v2Failure = "Exception:" + ex.GetType().Name;
             }
 
-            s_valid = v1Valid && v2Valid;
+            s_valid = architectureValid && captureValid && v1Valid && v2Valid;
             if (s_valid)
             {
                 s_failureReason = string.Empty;
@@ -73,7 +97,9 @@ namespace AutoTerrainDesignations.Access
             else
             {
                 s_failureReason =
-                    "V1=" + (v1Valid ? "ok" : v1Failure)
+                    "Architecture=" + (architectureValid ? "ok" : architectureFailure)
+                    + ";Capture=" + (captureValid ? "ok" : captureFailure)
+                    + ";V1=" + (v1Valid ? "ok" : v1Failure)
                     + ";V2=" + (v2Valid ? "ok" : v2Failure);
             }
             s_initialized = true;

@@ -1078,7 +1078,7 @@ namespace AutoTerrainDesignations
             {
                 session.FillingAllDoneSinceRealtime = null;
                 if (hasFilling)
-                    DispatchActiveFarmingSoilImports(session);
+                    session.LastActiveSoilImportDetail = s_lastActiveDumpingDetail;
                 session.LastReport = FormatFarmingPreparationSummary(session);
                 sw.Stop();
                 LogFarmingPerfIfSlow(session, tower, "filling pass", sw.ElapsedMilliseconds, $"hasFilling={hasFilling}, allDone={allDone}");

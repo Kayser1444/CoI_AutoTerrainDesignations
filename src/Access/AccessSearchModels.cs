@@ -296,8 +296,6 @@ namespace AutoTerrainDesignations.Access
 
     internal sealed class AccessSearchSnapshot
     {
-        private readonly Dictionary<AccessSideRayCacheKey, AccessSideRayResult> m_sideRayCache =
-            new Dictionary<AccessSideRayCacheKey, AccessSideRayResult>();
         private readonly Dictionary<Tile2i, int> m_groundHeight2;
         private readonly Dictionary<Tile2i, float> m_preciseTerrainHeights;
         private readonly Dictionary<Tile2i, AccessTerrainColumn> m_terrainColumns;
@@ -348,18 +346,6 @@ namespace AutoTerrainDesignations.Access
         private readonly int m_gridWidth;
         private readonly int m_gridHeight;
         private const int SPATIAL_CELL_SIZE = 16;
-        private readonly Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
-            IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffs;
-        private readonly Func<IReadOnlyList<AccessHandoffSpanCell>,
-            IReadOnlyList<AccessGroundHandoff>>? m_workableHandoffSpans;
-        private readonly Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
-            IReadOnlyList<AccessGroundHandoff>>? m_v2WorkableHandoffs;
-        private readonly Func<IReadOnlyList<AccessHandoffSpanCell>,
-            IReadOnlyList<AccessGroundHandoff>>? m_v2WorkableHandoffSpans;
-        private V2.AccessV2History? m_projectedV2CachedHistory;
-        private IReadOnlyDictionary<Tile2i, AccessHeightProfile>
-            m_projectedV2CachedProfiles =
-                new Dictionary<Tile2i, AccessHeightProfile>();
 
         public Tile2i BoundsMin { get; }
         public Tile2i BoundsMax { get; }
@@ -382,6 +368,16 @@ namespace AutoTerrainDesignations.Access
         public float FallbackMiningSlope { get; }
         public bool DumpingSlopeUsedFallback { get; }
         public bool HasDumpingMaterial { get; }
+        internal IReadOnlyDictionary<Tile2i, float> PreciseTerrainHeights
+            => m_preciseTerrainHeights;
+        public AccessSearchPolicySnapshot Policy { get; }
+        public AccessRequestSettingsRevision RequestSettingsRevision { get; }
+        public AccessCaptureRevision CaptureRevision { get; }
+        public AccessCaptureRevision CaptureCompletionRevision { get; }
+        public bool IsEnvironmentallyDirty { get; }
+        public string CaptureDirtyReason { get; }
+        public long EstimatedRetainedMemoryBytes { get; }
+        public long CaptureMemoryCeilingBytes { get; }
         public int GoalCount => m_goalGroundNodes.Count;
         public int EligibleCleanupOriginCount { get; }
         public V2.AccessV2GroundGraph? V2GroundGraph { get; }
@@ -419,6 +415,9 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i> occupiedTiles,
             IEnumerable<Tile2i> oceanTiles,
             IEnumerable<AccessDurabilityCorner> durabilityCorners,
+            // Compatibility-only inputs retained while callers migrate to
+            // AccessSearchWorkspace. They are intentionally not stored on the
+            // immutable snapshot or consulted by the execution core.
             Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
                 IReadOnlyList<AccessGroundHandoff>>? workableHandoffs = null,
             IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin = null,
@@ -462,7 +461,10 @@ namespace AutoTerrainDesignations.Access
                 projectedFillSafetySourcesByTile = null,
             bool takeOwnership = false,
             AccessV1GroundGoalDistance? prebuiltV1GroundGoalDistance = null,
-            float[]? prebuiltAnyGoalDistance = null)
+            float[]? prebuiltAnyGoalDistance = null,
+            AccessSearchPolicySnapshot? policy = null,
+            AccessCaptureDiagnostics? captureDiagnostics = null,
+            AccessRequestSettingsRevision requestSettingsRevision = default)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -504,6 +506,25 @@ namespace AutoTerrainDesignations.Access
             FallbackMiningSlope = fallbackMiningSlope;
             DumpingSlopeUsedFallback = dumpingSlopeUsedFallback;
             HasDumpingMaterial = hasDumpingMaterial;
+            Policy = (policy ?? AccessSearchPolicySnapshot.Capture())
+                .WithSnapshotOverrides(
+                    useAStar,
+                    landscapingCostDistanceScale,
+                    landslideRunPerHeight,
+                    avoidOcean,
+                    avoidBuildings);
+            RequestSettingsRevision = requestSettingsRevision;
+            CaptureRevision = captureDiagnostics?.StartRevision
+                ?? default(AccessCaptureRevision);
+            CaptureCompletionRevision = captureDiagnostics?.CompletionRevision
+                ?? CaptureRevision;
+            IsEnvironmentallyDirty = captureDiagnostics?.IsEnvironmentallyDirty
+                ?? false;
+            CaptureDirtyReason = captureDiagnostics?.DirtyReason ?? string.Empty;
+            EstimatedRetainedMemoryBytes = captureDiagnostics?.EstimatedRetainedBytes
+                ?? 0L;
+            CaptureMemoryCeilingBytes = captureDiagnostics?.MemoryCeilingBytes
+                ?? 0L;
             m_terrainCenterHeight2 = takeOwnership
                 && terrainCenterHeight2
                     is Dictionary<Tile2i, int> ownedTerrainCenterHeight2
@@ -635,7 +656,8 @@ namespace AutoTerrainDesignations.Access
                 V2GroundGraph = new V2.AccessV2GroundGraph(
                     projectedGround, m_goalGroundNodes,
                     m_propCleanupByTile,
-                    m_projectedFixedGroundNodes);
+                    m_projectedFixedGroundNodes,
+                    Policy.PropCleanupLandscapingCost);
                 V2FixedNavigationGraph =
                     new V2.AccessV2FixedNavigationGraph(
                         m_fixedProfiles, V2GroundGraph);
@@ -744,10 +766,6 @@ namespace AutoTerrainDesignations.Access
                 }
             }
 
-            m_workableHandoffs = workableHandoffs;
-            m_workableHandoffSpans = workableHandoffSpans;
-            m_v2WorkableHandoffs = v2WorkableHandoffs;
-            m_v2WorkableHandoffSpans = v2WorkableHandoffSpans;
         }
 
         private static Dictionary<Tile2i, float> BuildPreciseTerrainHeights(
@@ -1245,7 +1263,7 @@ namespace AutoTerrainDesignations.Access
                 for (int index = 0; index < profileCandidates.Length; index++)
                 {
                     Tile2i profileOrigin = profileCandidates[index];
-                    if (!m_projectedV2CachedProfiles.TryGetValue(
+                    if (!AccessSearchWorkspace.For(this).ProjectedV2CachedProfiles.TryGetValue(
                             profileOrigin, out AccessHeightProfile profile)
                         && !m_fixedProfiles.TryGetValue(
                             profileOrigin, out profile))
@@ -1381,7 +1399,7 @@ namespace AutoTerrainDesignations.Access
                 for (int index = 0; index < candidates.Length; index++)
                 {
                     Tile2i profileOrigin = candidates[index];
-                    if (!m_projectedV2CachedProfiles.TryGetValue(
+                    if (!AccessSearchWorkspace.For(this).ProjectedV2CachedProfiles.TryGetValue(
                             profileOrigin, out AccessHeightProfile profile)
                         && !m_fixedProfiles.TryGetValue(
                             profileOrigin, out profile))
@@ -1733,8 +1751,9 @@ namespace AutoTerrainDesignations.Access
 
         private bool HasProjectedV2ProfileAt(Tile2i tile)
         {
+            AccessSearchWorkspace workspace = AccessSearchWorkspace.For(this);
             Tile2i canonical = TerrainOriginForTile(tile);
-            if (m_projectedV2CachedProfiles.ContainsKey(canonical))
+            if (workspace.ProjectedV2CachedProfiles.ContainsKey(canonical))
                 return true;
 
             // Adjacent 4x4 origins share their outer row/column at local 4.
@@ -1742,12 +1761,12 @@ namespace AutoTerrainDesignations.Access
             // covered by one of these predecessor profiles.
             bool onWestEdge = tile.X == canonical.X;
             bool onSouthEdge = tile.Y == canonical.Y;
-            return onWestEdge && m_projectedV2CachedProfiles.ContainsKey(
+            return onWestEdge && workspace.ProjectedV2CachedProfiles.ContainsKey(
                        canonical + new RelTile2i(-4, 0))
-                || onSouthEdge && m_projectedV2CachedProfiles.ContainsKey(
+                || onSouthEdge && workspace.ProjectedV2CachedProfiles.ContainsKey(
                        canonical + new RelTile2i(0, -4))
                 || onWestEdge && onSouthEdge
-                    && m_projectedV2CachedProfiles.ContainsKey(
+                    && workspace.ProjectedV2CachedProfiles.ContainsKey(
                         canonical + new RelTile2i(-4, -4));
         }
 
@@ -1795,7 +1814,7 @@ namespace AutoTerrainDesignations.Access
                 if (localX < 0 || localX > 4
                     || localY < 0 || localY > 4)
                     continue;
-                if (m_projectedV2CachedProfiles.TryGetValue(
+                if (AccessSearchWorkspace.For(this).ProjectedV2CachedProfiles.TryGetValue(
                         origin, out AccessHeightProfile generatedProfile))
                 {
                     height = generatedProfile.GetHeight2NumeratorAt(
@@ -1825,10 +1844,11 @@ namespace AutoTerrainDesignations.Access
         private void EnsureProjectedV2ProfileCache(
             V2.AccessV2History history)
         {
-            if (ReferenceEquals(m_projectedV2CachedHistory, history))
+            AccessSearchWorkspace workspace = AccessSearchWorkspace.For(this);
+            if (ReferenceEquals(workspace.ProjectedV2CachedHistory, history))
                 return;
-            m_projectedV2CachedHistory = history;
-            m_projectedV2CachedProfiles = history.Flatten();
+            workspace.ProjectedV2CachedHistory = history;
+            workspace.ProjectedV2CachedProfiles = history.Flatten();
         }
         public AccessTerrainSampleKind GetSideRayTerrainSample(
             Tile2i tile,
@@ -2091,34 +2111,6 @@ namespace AutoTerrainDesignations.Access
             Tile2i tile, Tile2i origin)
             => tile.X >= origin.X && tile.X <= origin.X + 4
                 && tile.Y >= origin.Y && tile.Y <= origin.Y + 4;
-        public bool TryGetCachedSideRay(AccessSideRayCacheKey key, out AccessSideRayResult result)
-            => m_sideRayCache.TryGetValue(key, out result);
-        public void CacheSideRay(AccessSideRayCacheKey key, AccessSideRayResult result)
-            => m_sideRayCache[key] = result;
-        public bool HasWorkableHandoffEvaluator => m_workableHandoffs != null;
-        public bool HasWorkableHandoffSpanEvaluator => m_workableHandoffSpans != null;
-        public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffs(
-            Tile2i origin, AccessHeightProfile profile,
-            Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
-            => m_workableHandoffs?.Invoke(origin, profile, predecessorOrigin, predecessorProfile)
-                ?? Array.Empty<AccessGroundHandoff>();
-        public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffSpans(
-            IReadOnlyList<AccessHandoffSpanCell> cells)
-            => m_workableHandoffSpans?.Invoke(cells)
-                ?? Array.Empty<AccessGroundHandoff>();
-        public bool HasV2WorkableHandoffEvaluator
-            => m_v2WorkableHandoffs != null && m_v2WorkableHandoffSpans != null;
-        public IReadOnlyList<AccessGroundHandoff> GetV2WorkableHandoffs(
-            Tile2i origin, AccessHeightProfile profile,
-            Tile2i predecessorOrigin, AccessHeightProfile predecessorProfile)
-            => m_v2WorkableHandoffs?.Invoke(
-                    origin, profile, predecessorOrigin, predecessorProfile)
-                ?? Array.Empty<AccessGroundHandoff>();
-        public IReadOnlyList<AccessGroundHandoff> GetV2WorkableHandoffSpans(
-            IReadOnlyList<AccessHandoffSpanCell> cells)
-            => m_v2WorkableHandoffSpans?.Invoke(cells)
-                ?? Array.Empty<AccessGroundHandoff>();
-
         public bool IsProfileOceanBlocked(Tile2i origin, AccessHeightProfile profile)
         {
             if (!AvoidOcean)

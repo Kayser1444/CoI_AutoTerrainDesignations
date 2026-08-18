@@ -101,6 +101,7 @@ public static string Tt(string text) => text;
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
         TruckIdlePolicyPatches.Apply(m_harmony);
         PreAllocationPatches.Apply(m_harmony);
+        ActiveDumpingPatches.Apply(m_harmony);
         AutoDepthDesignation.ApplyVehicleDepotPatches(m_harmony);
         AutoDepthDesignation.ApplyFarmPlacementAssistPatches(m_harmony);
         MineTowerCloneConfigPatches.Apply(m_harmony);
@@ -140,6 +141,7 @@ public static string Tt(string text) => text;
         SetRampNotificationsEnabled(true);
         SetAutoReleaseExcavatorsWhenIdle(false);
         SetTruckIdlePolicy(TruckIdleBehavior.StayPut);
+        SetDumpingPriority(DumpingPriorityDefault);
         SetTurningRampsEnabled(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
@@ -168,6 +170,7 @@ public static string Tt(string text) => text;
         SetAccessMaxVisitedNodes(250000);
         SetAccessSearchTimeoutSeconds(60);
         SetAccessSearchFrameBudgetMs(30);
+        SetAccessSnapshotMemoryCeilingMiB(512);
         SetAccessManagerAutomatedFrameBudgetMs(10);
         SetAccessManagerInteractiveFrameBudgetMs(15);
         SetAccessManagerPausedMaxFrameBudgetMs(30);
@@ -177,6 +180,15 @@ public static string Tt(string text) => text;
     public static void SetMaxHeightDiff(int value)
     {
         MaxHeightDiff = Math.Max(1, Math.Min(3, value));
+    }
+
+    /// <summary>Global default for the per-world Mine Tower dumping priority.</summary>
+    internal const int DumpingPriorityDefault = AutoDepthDesignation.DumpingPriorityPassive;
+    internal static int DumpingPriority { get; private set; } = DumpingPriorityDefault;
+
+    internal static void SetDumpingPriority(int value)
+    {
+        DumpingPriority = AutoDepthDesignation.ClampDumpingPriority(value);
     }
 
     /// <summary>Ramp width in tiles. Allowed range: 0..5. 0 disables ramp generation.</summary>
@@ -604,6 +616,9 @@ public static string Tt(string text) => text;
     public static void SetAccessSearchTimeoutSeconds(int value) => AccessSearchTimeoutSeconds = Math.Max(5, Math.Min(600, value));
     public static int AccessSearchFrameBudgetMs { get; private set; } = 30;
     public static void SetAccessSearchFrameBudgetMs(int value) => AccessSearchFrameBudgetMs = Math.Max(1, Math.Min(100, value));
+    public static int AccessSnapshotMemoryCeilingMiB { get; private set; } = 512;
+    public static void SetAccessSnapshotMemoryCeilingMiB(int value)
+        => AccessSnapshotMemoryCeilingMiB = Math.Max(128, Math.Min(8192, value));
     public static int AccessManagerAutomatedFrameBudgetMs { get; private set; } = 10;
     public static void SetAccessManagerAutomatedFrameBudgetMs(int value)
         => AccessManagerAutomatedFrameBudgetMs = Math.Max(1, Math.Min(15, value));
@@ -615,41 +630,7 @@ public static string Tt(string text) => text;
         => AccessManagerPausedMaxFrameBudgetMs = Math.Max(1, Math.Min(30, value));
 
     internal static int AccessPlanningSettingsFingerprint
-    {
-        get
-        {
-            unchecked
-            {
-                int hash = 17;
-                void Add(int value) => hash = hash * 31 + value;
-                Add(TurningRampsEnabled ? 1 : 0);
-                Add(ExperimentalAccessUseAStar ? 1 : 0);
-                Add(ExperimentalAccessUsefulHeightEnvelope ? 1 : 0);
-                Add(ExperimentalAccessV1HeightEnvelopeLowerAllowance32);
-                Add(ExperimentalAccessV2HeightEnvelopeLowerAllowance32);
-                Add(ExperimentalAccessV1HeightEnvelopeUpperAllowance32);
-                Add(ExperimentalAccessV2HeightEnvelopeUpperAllowance32);
-                Add(AccessAvoidOcean ? 1 : 0);
-                Add(AccessAvoidBuildings ? 1 : 0);
-                Add(AllowRampsOutsideTowerAreas ? 1 : 0);
-                Add(AccessHarvestDisruptedTrees ? 1 : 0);
-                Add(AccessAllowDigToRemoveDebris ? 1 : 0);
-                Add((int)AccessQuickRemoveDebrisPolicy);
-                Add(AccessLandscapingCostDistanceScale.GetHashCode());
-                Add(AccessPropCleanupLandscapingCost.GetHashCode());
-                Add(AccessLandslideRunPerHeight.GetHashCode());
-                Add(AccessGeneratedVFixedCost.GetHashCode());
-                Add(AccessDirectWorkWeight.GetHashCode());
-                Add(AccessSideRayWeight.GetHashCode());
-                Add(AccessRaySlopeConservatism.GetHashCode());
-                Add(AccessRayEndBuffer);
-                Add(AccessCandidateRayMaxDistance);
-                Add(AccessRayMaxCost.GetHashCode());
-                Add(AccessRayUnresolvedPenalty.GetHashCode());
-                return hash;
-            }
-        }
-    }
+        => Access.AccessSearchPolicySnapshot.Capture().SemanticFingerprint;
 
     /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
     [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
@@ -731,12 +712,24 @@ public static string Tt(string text) => text;
             IVehicleBuffersRegistry? vehicleBuffersRegistry = null;
             ITruckJobsFilterManager? truckJobsFilter = null;
             UnreachableTerrainDesignationsManager? unreachableTerrainDesignations = null;
+            DumpingJob.Factory? dumpingJobFactory = null;
+            CargoPickUpJob.Factory? cargoPickUpFactory = null;
+            ChainedNavigationJob.Factory? chainedNavigationFactory = null;
+            VehicleLastOutputBufferManager? vehicleLastOutputBufferManager = null;
             try { vehicleBuffersRegistry = resolver.Resolve<IVehicleBuffersRegistry>(); }
             catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Vehicle buffers registry unavailable for active farmland import: " + ex2.Message); }
             try { truckJobsFilter = resolver.Resolve<ITruckJobsFilterManager>(); }
             catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Truck jobs filter unavailable for active farmland import: " + ex2.Message); }
             try { unreachableTerrainDesignations = resolver.Resolve<UnreachableTerrainDesignationsManager>(); }
             catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Terrain reachability cache unavailable for active farmland import: " + ex2.Message); }
+            try { dumpingJobFactory = resolver.Resolve<DumpingJob.Factory>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Dumping job factory unavailable for active dumping: " + ex2.Message); }
+            try { cargoPickUpFactory = resolver.Resolve<CargoPickUpJob.Factory>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Cargo pickup factory unavailable for active dumping: " + ex2.Message); }
+            try { chainedNavigationFactory = resolver.Resolve<ChainedNavigationJob.Factory>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Chained navigation factory unavailable for active dumping: " + ex2.Message); }
+            try { vehicleLastOutputBufferManager = resolver.Resolve<VehicleLastOutputBufferManager>(); }
+            catch (Exception ex2) { AutoDepthDesignation.s_log.Warning("Vehicle last-output manager unavailable for active dumping: " + ex2.Message); }
             AutoTerrainDesignationsTicker ticker =
                 AutoTerrainDesignationsTicker.CreateForWorld(
                     AutoDepthDesignation.CurrentWorldGeneration + 1,
@@ -745,7 +738,7 @@ public static string Tt(string text) => text;
             m_entitiesManager = entitiesManager;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
-            AutoDepthDesignation.ConfigureActiveSoilImport(vehicleBuffersRegistry, truckJobsFilter, unreachableTerrainDesignations);
+            AutoDepthDesignation.ConfigureActiveSoilImport(vehicleBuffersRegistry, truckJobsFilter, unreachableTerrainDesignations, dumpingJobFactory, cargoPickUpFactory, chainedNavigationFactory, vehicleLastOutputBufferManager);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
             AutoDepthDesignation.PropRemovalManager?.ResumeLoadedRequests();
@@ -789,6 +782,8 @@ public static string Tt(string text) => text;
         m_lastSimTick = current;
         try { AutoDepthDesignation.TickFarmingPreparationSessions(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickFarmingPreparationSessions"); }
+        try { AutoDepthDesignation.TickActiveDumpingDemand(); }
+        catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickActiveDumpingDemand"); }
         try
         {
             AutoDepthDesignation.TickIdleVehicleRelease();
@@ -812,6 +807,7 @@ public static string Tt(string text) => text;
 
     private void beforeSave()
     {
+        AutoDepthDesignation.PrepareActiveDumpingForSave();
         AutoDepthDesignation.PrepareAccesswayManagerForSave();
         AutoDepthDesignation.PropRemovalManager?.PrepareForSave();
         IModStateJsonStore store = m_towerSettingsStateStore
@@ -831,6 +827,7 @@ public static string Tt(string text) => text;
 
     private void onSaveDone(SaveResult result)
     {
+        AutoDepthDesignation.ResumeActiveDumpingAfterSave();
         AutoDepthDesignation.ResumeAccesswayManagerAfterSave();
         AutoDepthDesignation.PropRemovalManager?.ResumeAfterSave();
         AutoDepthDesignation.ResumeFarmingRuntimeAfterSave();

@@ -2,20 +2,18 @@
 // Copyright (c) 2026 Kayser
 // Licensed under the MIT License.
 //
-// Active soil import for farmland filling. This file intentionally delegates
-// job creation, source reservation, partial-load behaviour, and continuation
-// to vanilla's balancing/truck providers.
+// Priority-driven active dumping. ATD advertises runtime-only input demand to
+// vanilla logistics and translates a winning delivery into a real terrain dump.
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using Mafi;
 using Mafi.Collections;
 using Mafi.Core;
 using Mafi.Core.Buildings.Mine;
 using Mafi.Core.Entities;
-using Mafi.Core.Entities.Dynamic;
 using Mafi.Core.Entities.Static;
 using Mafi.Core.Products;
 using Mafi.Core.Terrain.Designation;
@@ -27,681 +25,626 @@ namespace AutoTerrainDesignations;
 
 public static partial class AutoDepthDesignation
 {
-    private static IVehicleBuffersRegistry? s_activeSoilImportBuffersRegistry;
-    private static ITruckJobsFilterManager? s_activeSoilImportTruckJobsFilter;
-    private static UnreachableTerrainDesignationsManager? s_activeSoilImportUnreachables;
-    private static readonly ActiveSoilImportOutputAdapter s_activeSoilImportOutputAdapter =
-        new ActiveSoilImportOutputAdapter();
+    internal const int DumpingPriorityMinimum = 1;
+    internal const int DumpingPriorityMaximum = 15;
+    internal const int DumpingPriorityPassive = DumpingPriorityMaximum + 1;
+    private const int FarmingActiveDumpingPriorityMaximum = DumpingPriorityMaximum - 1;
 
-    private sealed class ActiveSoilImportOutputAdapter
+    private static IVehicleBuffersRegistry? s_activeDumpingBuffersRegistry;
+    private static UnreachableTerrainDesignationsManager? s_activeDumpingUnreachables;
+    private static DumpingJob.Factory? s_activeDumpingJobFactory;
+    private static CargoPickUpJob.Factory? s_activeDumpingPickUpFactory;
+    private static ChainedNavigationJob.Factory? s_activeDumpingChainFactory;
+    private static VehicleLastOutputBufferManager? s_activeDumpingLastOutputBuffers;
+    private static readonly Dictionary<ActiveDumpingDemandKey, ActiveDumpingDemand> s_activeDumpingDemands =
+        new Dictionary<ActiveDumpingDemandKey, ActiveDumpingDemand>();
+    private static readonly Dictionary<RegisteredInputBuffer, ActiveDumpingDemand> s_activeDumpingByBuffer =
+        new Dictionary<RegisteredInputBuffer, ActiveDumpingDemand>();
+    private static readonly Dictionary<Tile2i, ActiveDumpingClaim> s_activeDumpingClaims =
+        new Dictionary<Tile2i, ActiveDumpingClaim>();
+    private static string s_lastActiveDumpingDetail = string.Empty;
+    private static bool s_activeDumpingCompatibilityAvailable;
+    private static bool s_activeDumpingHooksAvailable;
+    private static bool s_activeDumpingCompatibilityFailureLogged;
+
+    private readonly struct ActiveDumpingDemandKey : IEquatable<ActiveDumpingDemandKey>
     {
-        private FieldInfo? m_productBucketsField;
-        private FieldInfo? m_outputBuffersField;
-        private bool m_initialized;
-        private bool m_available;
-        private bool m_unavailableLogged;
+        public EntityId TowerId { get; }
+        public LooseProductProto Product { get; }
 
-        public bool IsAvailable => m_available;
-
-        public void Configure(IVehicleBuffersRegistry? registry)
+        public ActiveDumpingDemandKey(EntityId towerId, LooseProductProto product)
         {
-            m_initialized = false;
-            m_available = false;
-            m_unavailableLogged = false;
-            m_productBucketsField = null;
-            m_outputBuffersField = null;
-
-            if (registry is not VehicleBuffersRegistry concreteRegistry)
-            {
-                return;
-            }
-
-            try
-            {
-                m_productBucketsField = typeof(VehicleBuffersRegistry).GetField(
-                    "m_registeredBuffersPerProduct",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                Type? bucketType = m_productBucketsField?.FieldType.GetGenericArguments().LastOrDefault();
-                m_outputBuffersField = bucketType?.GetField(
-                    "OutputBuffers",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-                m_available = m_productBucketsField != null && m_outputBuffersField != null;
-                m_initialized = true;
-                if (!m_available)
-                    LogUnavailable("VehicleBuffersRegistry product-bucket shape is unavailable.");
-            }
-            catch (Exception ex)
-            {
-                LogUnavailable("VehicleBuffersRegistry product-bucket adapter failed: " + ex.Message);
-            }
+            TowerId = towerId;
+            Product = product;
         }
 
-        public bool TryCollect(
-            ISet<LooseProductProto> allowedProducts,
-            List<RegisteredOutputBuffer> result)
+        public bool Equals(ActiveDumpingDemandKey other) =>
+            TowerId == other.TowerId && ReferenceEquals(Product, other.Product);
+
+        public override bool Equals(object? obj) =>
+            obj is ActiveDumpingDemandKey other && Equals(other);
+
+        public override int GetHashCode() =>
+            (TowerId.GetHashCode() * 397) ^ Product.GetHashCode();
+    }
+
+    private sealed class ActiveDumpingDemand
+    {
+        public MineTower Tower { get; set; }
+        public LooseProductProto Product { get; }
+        public ActiveDumpingDemandBuffer Buffer { get; }
+        public ActiveDumpingPriorityProvider PriorityProvider { get; }
+        public RegisteredInputBuffer? RegisteredBuffer { get; set; }
+
+        public ActiveDumpingDemand(
+            MineTower tower,
+            LooseProductProto product,
+            ActiveDumpingDemandBuffer buffer,
+            ActiveDumpingPriorityProvider priorityProvider)
         {
-            result.Clear();
-            if (!m_initialized || !m_available || s_activeSoilImportBuffersRegistry is not VehicleBuffersRegistry registry)
-                return false;
-
-            try
-            {
-                object? productBuckets = m_productBucketsField!.GetValue(registry);
-                if (productBuckets is not IEnumerable buckets)
-                {
-                    m_available = false;
-                    LogUnavailable("VehicleBuffersRegistry product buckets are not enumerable.");
-                    return false;
-                }
-
-                var seen = new HashSet<RegisteredOutputBuffer>();
-                foreach (object? bucketEntry in buckets)
-                {
-                    if (bucketEntry == null)
-                        continue;
-
-                    PropertyInfo? valueProperty = bucketEntry.GetType().GetProperty("Value");
-                    object? bucket = valueProperty?.GetValue(bucketEntry);
-                    object? outputs = bucket == null ? null : m_outputBuffersField!.GetValue(bucket);
-                    if (outputs is not IEnumerable outputEnumerable)
-                        continue;
-
-                    foreach (object? outputObject in outputEnumerable)
-                    {
-                        if (outputObject is not RegisteredOutputBuffer output || !seen.Add(output))
-                            continue;
-                        if (!TryGetFarmableProduct(output, out LooseProductProto product)
-                            || !allowedProducts.Contains(product))
-                            continue;
-                        result.Add(output);
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                m_available = false;
-                LogUnavailable("VehicleBuffersRegistry product-bucket enumeration failed: " + ex.Message);
-                result.Clear();
-                return false;
-            }
-        }
-
-        private void LogUnavailable(string detail)
-        {
-            if (m_unavailableLogged)
-                return;
-            m_unavailableLogged = true;
-            s_log.Warning("[ATD Farming] Active soil import disabled: " + detail);
+            Tower = tower;
+            Product = product;
+            Buffer = buffer;
+            PriorityProvider = priorityProvider;
         }
     }
 
-    private sealed class ActiveSoilImportCandidate
+    private sealed class ActiveDumpingClaim
     {
-        public RegisteredOutputBuffer Source { get; }
-        public LooseProductProto Product { get; }
-        public TerrainDesignation Target { get; }
-        public MineTower TargetTower { get; }
+        public MineTower Tower { get; }
+        public TerrainDesignation Designation { get; }
         public Truck Truck { get; }
-        public int Priority { get; }
-        public int TargetDistance { get; }
-        public int TruckDistance { get; }
-        public string SourceId { get; }
-        public string TruckId { get; }
 
-        public ActiveSoilImportCandidate(
-            RegisteredOutputBuffer source,
-            LooseProductProto product,
-            TerrainDesignation target,
-            MineTower targetTower,
-            Truck truck,
-            int priority,
-            int targetDistance,
-            int truckDistance)
+        public ActiveDumpingClaim(MineTower tower, TerrainDesignation designation, Truck truck)
         {
-            Source = source;
-            Product = product;
-            Target = target;
-            TargetTower = targetTower;
+            Tower = tower;
+            Designation = designation;
             Truck = truck;
-            Priority = priority;
-            TargetDistance = targetDistance;
-            TruckDistance = truckDistance;
-            SourceId = source.Entity.Id.ToString();
-            TruckId = truck.Id.ToString();
+        }
+    }
+
+    /// <summary>
+    /// Runtime-only input buffer. It advertises capacity to vanilla logistics but
+    /// rejects every physical delivery; the selected cargo is dumped at a real
+    /// terrain designation by the delivery adapter.
+    /// </summary>
+    private sealed class ActiveDumpingDemandBuffer : IProductBuffer
+    {
+        private int m_openSlots;
+
+        public ProductProto Product { get; }
+        public Quantity Quantity => Quantity.Zero;
+        public Quantity Capacity => m_openSlots <= 0
+            ? Quantity.Zero
+            : TruckCaps.LargeTruckCapacity * m_openSlots;
+        public Quantity UsableCapacity => Capacity;
+        public int OpenSlots => m_openSlots;
+
+        public ActiveDumpingDemandBuffer(LooseProductProto product)
+        {
+            Product = product;
         }
 
-        public string Key => SourceId + ":" + Target.OriginTileCoord + ":" + TruckId;
+        public void SetOpenSlots(int slots) => m_openSlots = Math.Max(0, slots);
+
+        public Quantity StoreAsMuchAs(Quantity quantity) => quantity;
+
+        public Quantity RemoveAsMuchAs(Quantity maxQuantity) => Quantity.Zero;
+    }
+
+    private sealed class ActiveDumpingPriorityProvider : IInputBufferPriorityProvider
+    {
+        public int InternalPriority { get; private set; }
+
+        public ActiveDumpingPriorityProvider(int displayedPriority)
+        {
+            SetDisplayedPriority(displayedPriority);
+        }
+
+        public void SetDisplayedPriority(int displayedPriority)
+        {
+            InternalPriority = Math.Max(DumpingPriorityMinimum,
+                Math.Min(DumpingPriorityMaximum, displayedPriority)) - 1;
+        }
+
+        public BufferStrategy GetInputPriority(IProductBuffer buffer, Quantity pendingQuantity) =>
+            BufferStrategy.NoQuantityPreference(InternalPriority);
     }
 
     internal static void ConfigureActiveSoilImport(
         IVehicleBuffersRegistry? buffersRegistry,
         ITruckJobsFilterManager? truckJobsFilter,
-        UnreachableTerrainDesignationsManager? unreachables)
+        UnreachableTerrainDesignationsManager? unreachables,
+        DumpingJob.Factory? dumpingJobFactory = null,
+        CargoPickUpJob.Factory? pickUpFactory = null,
+        ChainedNavigationJob.Factory? chainFactory = null,
+        VehicleLastOutputBufferManager? lastOutputBuffers = null)
     {
-        s_activeSoilImportBuffersRegistry = buffersRegistry;
-        s_activeSoilImportTruckJobsFilter = truckJobsFilter;
-        s_activeSoilImportUnreachables = unreachables;
-        s_activeSoilImportOutputAdapter.Configure(buffersRegistry);
-        if (!ActiveSoilImportFixtures.ValidateAll(out string fixtureFailure))
-            s_log.Warning("[ATD Farming] Active soil import policy fixture failed: " + fixtureFailure);
+        s_activeDumpingBuffersRegistry = buffersRegistry;
+        s_activeDumpingUnreachables = unreachables;
+        s_activeDumpingJobFactory = dumpingJobFactory;
+        s_activeDumpingPickUpFactory = pickUpFactory;
+        s_activeDumpingChainFactory = chainFactory;
+        s_activeDumpingLastOutputBuffers = lastOutputBuffers;
+        s_activeDumpingCompatibilityAvailable = buffersRegistry != null
+            && s_activeDumpingHooksAvailable
+            && unreachables != null
+            && dumpingJobFactory != null
+            && pickUpFactory != null
+            && chainFactory != null
+            && lastOutputBuffers != null;
+        s_activeDumpingCompatibilityFailureLogged = false;
+        UnregisterAllActiveDumpingDemand();
+        s_activeDumpingClaims.Clear();
+        s_lastActiveDumpingDetail = string.Empty;
     }
 
     private static void ResetActiveSoilImportRuntime()
     {
-        s_activeSoilImportBuffersRegistry = null;
-        s_activeSoilImportTruckJobsFilter = null;
-        s_activeSoilImportUnreachables = null;
-        s_activeSoilImportOutputAdapter.Configure(null);
+        UnregisterAllActiveDumpingDemand();
+        s_activeDumpingBuffersRegistry = null;
+        s_activeDumpingUnreachables = null;
+        s_activeDumpingJobFactory = null;
+        s_activeDumpingPickUpFactory = null;
+        s_activeDumpingChainFactory = null;
+        s_activeDumpingLastOutputBuffers = null;
+        s_activeDumpingClaims.Clear();
+        s_activeDumpingCompatibilityAvailable = false;
+        s_activeDumpingCompatibilityFailureLogged = false;
+        s_lastActiveDumpingDetail = string.Empty;
     }
 
-    private static void DispatchActiveFarmingSoilImports(FarmingPreparationSession session)
+    internal static void PrepareActiveDumpingForSave() => UnregisterAllActiveDumpingDemand();
+
+    internal static void ResumeActiveDumpingAfterSave()
     {
-        session.LastActiveSoilImportDetail = string.Empty;
-        if (!s_activeSoilImportOutputAdapter.IsAvailable
-            || s_activeSoilImportTruckJobsFilter == null
-            || s_activeSoilImportUnreachables == null
-            || s_vehiclesManager == null
-            || s_desigManager == null)
+        s_activeDumpingClaims.Clear();
+        SyncActiveDumpingDemand();
+    }
+
+    internal static void TickActiveDumpingDemand()
+    {
+        SyncActiveDumpingDemand();
+        foreach (FarmingPreparationSession activeSession in s_farmingPreparationSessions.Values)
+            activeSession.LastActiveSoilImportDetail = s_lastActiveDumpingDetail;
+    }
+
+    private static void SyncActiveDumpingDemand()
+    {
+        s_lastActiveDumpingDetail = string.Empty;
+        if (!s_activeDumpingCompatibilityAvailable || s_activeDumpingBuffersRegistry == null)
         {
-            session.LastActiveSoilImportDetail = FarmingTr(
-                "active_soil_import_unavailable",
-                "Active soil import: unavailable (vanilla logistics adapter not available).");
+            LogActiveDumpingCompatibilityFailure("Required vanilla logistics seam is unavailable.");
             return;
         }
 
-        var fillingOrigins = new HashSet<Tile2i>(session.Origins.Values
-            .Where(origin => origin.Phase == FarmingOriginPhase.Filling)
-            .Select(origin => origin.Origin));
-        HashSet<TerrainDesignation> vanillaDumpingClaims = CollectVanillaDumpingClaims();
-
-        PruneActiveSoilImportSlots(session, fillingOrigins, vanillaDumpingClaims);
-
-        int ordinaryClaims = 0;
-        int graceWaiting = 0;
-        var eligibleOrigins = new List<FarmingOriginSession>();
-        foreach (FarmingOriginSession originState in session.Origins.Values)
+        try
         {
-            if (!fillingOrigins.Contains(originState.Origin))
-                continue;
-            if (session.ActiveSoilImportOrigins.Contains(originState.Origin))
-                continue;
-
-            var designationOption = s_desigManager.GetDesignationAt(originState.Origin);
-            if (!designationOption.HasValue || !IsDumpingDesignation(designationOption.Value))
-                continue;
-
-            TerrainDesignation designation = designationOption.Value;
-            if (designation.NumberOfJobsAssigned > 0 || vanillaDumpingClaims.Contains(designation))
+            PruneActiveDumpingClaims();
+            var desired = new Dictionary<ActiveDumpingDemandKey, MineTower>();
+            if (s_entitiesManager != null)
             {
-                session.ActiveSoilImportNoClaimTicks[originState.Origin] = 0;
-                ordinaryClaims++;
-                continue;
-            }
-
-            int noClaimTicks = session.ActiveSoilImportNoClaimTicks.TryGetValue(
-                originState.Origin,
-                out int previousNoClaimTicks)
-                ? previousNoClaimTicks + 1
-                : 1;
-            session.ActiveSoilImportNoClaimTicks[originState.Origin] = noClaimTicks;
-            if (noClaimTicks < 2)
-            {
-                graceWaiting++;
-                continue;
-            }
-
-            eligibleOrigins.Add(originState);
-        }
-
-        if (eligibleOrigins.Count == 0)
-        {
-            session.LastActiveSoilImportDetail = FarmingTrFormat(
-                "active_soil_import_waiting_claim",
-                "Active soil import: dispatched=0, pending={0}, ordinaryClaims={1}, graceWaiting={2}.",
-                fillingOrigins.Count,
-                ordinaryClaims,
-                graceWaiting);
-            return;
-        }
-
-        var allowedProducts = new HashSet<LooseProductProto>(GetFarmableDumpProducts());
-        var sources = new List<RegisteredOutputBuffer>();
-        if (!s_activeSoilImportOutputAdapter.TryCollect(allowedProducts, sources))
-        {
-            session.LastActiveSoilImportDetail = FarmingTrFormat(
-                "active_soil_import_source_discovery_unavailable",
-                "Active soil import: pending={0}, source discovery unavailable.",
-                fillingOrigins.Count);
-            return;
-        }
-
-        var failedCandidates = new HashSet<string>(StringComparer.Ordinal);
-        int dispatched = 0;
-        int routeBlocked = 0;
-        int unavailableSources = 0;
-        int unreachable = 0;
-        int noEligibleTruck = 0;
-
-        while (true)
-        {
-            ActiveSoilImportCandidate? candidate = FindBestActiveSoilImportCandidate(
-                eligibleOrigins,
-                sources,
-                allowedProducts,
-                failedCandidates,
-                ref routeBlocked,
-                ref unavailableSources,
-                ref unreachable,
-                ref noEligibleTruck);
-            if (candidate == null)
-                break;
-
-            if (!TryAssignActiveSoilImport(candidate))
-            {
-                failedCandidates.Add(candidate.Key);
-                continue;
-            }
-
-            session.ActiveSoilImportOrigins.Add(candidate.Target.OriginTileCoord);
-            session.ActiveSoilImportTrucks[candidate.Target.OriginTileCoord] = candidate.Truck;
-            dispatched++;
-            eligibleOrigins.RemoveAll(origin => origin.Origin == candidate.Target.OriginTileCoord);
-            if (eligibleOrigins.Count == 0)
-                break;
-        }
-
-        int pending = fillingOrigins.Count - dispatched;
-        session.LastActiveSoilImportDetail = FarmingTrFormat(
-            "active_soil_import_status",
-            "Active soil import: dispatched={0}, pending={1}, routeBlocked={2}, sourceUnavailable={3}, noEligibleTruck={4}, unreachable={5}.",
-            dispatched,
-            pending,
-            routeBlocked,
-            unavailableSources,
-            noEligibleTruck,
-            unreachable);
-        if (dispatched > 0)
-            LogRuntimeDebug("[ATD Farming] " + session.LastActiveSoilImportDetail);
-    }
-
-    private static void PruneActiveSoilImportSlots(
-        FarmingPreparationSession session,
-        ISet<Tile2i> fillingOrigins,
-        ISet<TerrainDesignation> vanillaDumpingClaims)
-    {
-        foreach (Tile2i origin in session.ActiveSoilImportOrigins.ToList())
-        {
-            if (!fillingOrigins.Contains(origin))
-            {
-                session.ActiveSoilImportOrigins.Remove(origin);
-                session.ActiveSoilImportTrucks.Remove(origin);
-                session.ActiveSoilImportNoClaimTicks.Remove(origin);
-                continue;
-            }
-
-            if (s_desigManager == null)
-                continue;
-            var designationOption = s_desigManager.GetDesignationAt(origin);
-            if (!designationOption.HasValue)
-            {
-                session.ActiveSoilImportOrigins.Remove(origin);
-                session.ActiveSoilImportTrucks.Remove(origin);
-                continue;
-            }
-
-            TerrainDesignation designation = designationOption.Value;
-            if (designation.IsDumpingFulfilled)
-            {
-                session.ActiveSoilImportOrigins.Remove(origin);
-                session.ActiveSoilImportTrucks.Remove(origin);
-                continue;
-            }
-
-            // A reserved target or a truck still carrying cargo means the vanilla
-            // chain is still live. Once both disappear, allow a later pass to
-            // re-enter through the normal no-claim grace period.
-            bool liveChain = designation.NumberOfJobsAssigned > 0
-                || vanillaDumpingClaims.Contains(designation);
-            if (!liveChain
-                && session.ActiveSoilImportTrucks.TryGetValue(origin, out Truck? truck)
-                && truck != null
-                && !truck.IsDestroyed)
-            {
-                liveChain = truck.HasJobs || truck.IsNotEmpty;
-            }
-
-            if (!liveChain)
-            {
-                session.ActiveSoilImportOrigins.Remove(origin);
-                session.ActiveSoilImportTrucks.Remove(origin);
-                session.ActiveSoilImportNoClaimTicks[origin] = 0;
-            }
-        }
-    }
-
-    private static HashSet<TerrainDesignation> CollectVanillaDumpingClaims()
-    {
-        var claims = new HashSet<TerrainDesignation>();
-        if (s_vehiclesManager == null)
-            return claims;
-
-        foreach (Truck truck in s_vehiclesManager.Trucks)
-        {
-            if (truck == null || truck.IsDestroyed)
-                continue;
-            for (int index = 0; index < truck.Jobs.Count; index++)
-            {
-                if (truck.Jobs[index] is DumpingJob dumpingJob
-                    && !dumpingJob.PrimaryDesignation.IsDestroyed)
-                    claims.Add(dumpingJob.PrimaryDesignation);
-            }
-        }
-        return claims;
-    }
-
-    private static ActiveSoilImportCandidate? FindBestActiveSoilImportCandidate(
-        IReadOnlyList<FarmingOriginSession> eligibleOrigins,
-        IReadOnlyList<RegisteredOutputBuffer> sources,
-        ISet<LooseProductProto> allowedProducts,
-        ISet<string> failedCandidates,
-        ref int routeBlocked,
-        ref int unavailableSources,
-        ref int unreachable,
-        ref int noEligibleTruck)
-    {
-        ActiveSoilImportCandidate? best = null;
-        foreach (RegisteredOutputBuffer source in sources)
-        {
-            try { source.RefreshPriorities(); }
-            catch
-            {
-                unavailableSources++;
-                continue;
-            }
-            if (!source.IsEnabled || !source.IsAvailableCached || !source.AvailableQuantityCached.IsPositive)
-            {
-                unavailableSources++;
-                continue;
-            }
-
-            if (!TryGetFarmableProduct(source, out LooseProductProto product)
-                || !allowedProducts.Contains(product))
-                continue;
-
-            bool routeMatched = false;
-            bool truckMatched = false;
-            foreach (FarmingOriginSession originState in eligibleOrigins)
-            {
-                if (s_desigManager == null)
-                    continue;
-                var designationOption = s_desigManager.GetDesignationAt(originState.Origin);
-                if (!designationOption.HasValue || !IsDumpingDesignation(designationOption.Value))
-                    continue;
-                TerrainDesignation designation = designationOption.Value;
-                if (designation.IsDumpingFulfilled || !designation.CanBeAssigned(false))
-                    continue;
-
-                var targetTowers = GetLiveFarmTargetTowers(designation, product);
-                if (targetTowers.Count == 0)
-                    continue;
-
-                foreach (MineTower targetTower in targetTowers)
+                foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>())
                 {
-                    if (!IsSourceAllowedForTarget(source, targetTower))
-                    {
-                        routeBlocked++;
+                    if (tower == null || tower.IsDestroyed || !tower.IsEnabled)
                         continue;
-                    }
-                    routeMatched = true;
 
-                    foreach (Truck truck in s_vehiclesManager!.Trucks)
+                    int priority = GetEffectiveTowerDumpingPriority(tower);
+                    if (priority >= DumpingPriorityPassive)
+                        continue;
+
+                    foreach (ProductProto productProto in tower.DumpableProducts)
                     {
-                        if (IsKnownActiveSoilImportUnreachable(source, designation, truck))
-                        {
-                            unreachable++;
+                        if (!(productProto is LooseProductProto product))
                             continue;
-                        }
-                        if (!IsEligibleActiveSoilImportTruck(source, designation, targetTower, truck))
-                        {
+                        if (!HasEligibleActiveDumpingOrigin(tower, product))
                             continue;
-                        }
-                        truckMatched = true;
-                        var candidate = new ActiveSoilImportCandidate(
-                            source,
-                            product,
-                            designation,
-                            targetTower,
-                            truck,
-                            source.CombinedPriorityCached,
-                            source.Position2f.DistanceTo(designation.CenterTileCoord.CenterTile2f).ToIntFloored(),
-                            source.Position2f.DistanceTo(truck.Position2f).ToIntFloored());
-                        if (failedCandidates.Contains(candidate.Key))
+                        if (!TryGetTowerEntityId(tower, out EntityId towerId))
                             continue;
-                        if (best == null || CompareActiveSoilImportCandidates(candidate, best) < 0)
-                            best = candidate;
+                        desired[new ActiveDumpingDemandKey(towerId, product)] = tower;
                     }
                 }
             }
 
-            if (!routeMatched)
-                routeBlocked++;
-            else if (!truckMatched)
-                noEligibleTruck++;
-        }
+            foreach (ActiveDumpingDemandKey staleKey in s_activeDumpingDemands.Keys
+                .Where(key => !desired.ContainsKey(key)).ToList())
+                UnregisterActiveDumpingDemand(staleKey);
 
-        return best;
+            foreach (KeyValuePair<ActiveDumpingDemandKey, MineTower> desiredEntry in desired)
+            {
+                if (!s_activeDumpingDemands.TryGetValue(desiredEntry.Key, out ActiveDumpingDemand? demand))
+                {
+                    demand = new ActiveDumpingDemand(
+                        desiredEntry.Value,
+                        desiredEntry.Key.Product,
+                        new ActiveDumpingDemandBuffer(desiredEntry.Key.Product),
+                        new ActiveDumpingPriorityProvider(
+                            GetEffectiveTowerDumpingPriority(desiredEntry.Value)));
+                    demand.Buffer.SetOpenSlots(
+                        CountEligibleActiveDumpingOrigins(
+                            desiredEntry.Value, desiredEntry.Key.Product));
+                    if (!s_activeDumpingBuffersRegistry.TryRegisterInputBuffer(
+                        desiredEntry.Value,
+                        demand.Buffer,
+                        demand.PriorityProvider))
+                        continue;
+
+                    demand.RegisteredBuffer = s_activeDumpingBuffersRegistry
+                        .TryGetInputBuffer(desiredEntry.Value, desiredEntry.Key.Product)
+                        .ValueOrNull;
+                    if (demand.RegisteredBuffer == null)
+                    {
+                        s_activeDumpingBuffersRegistry.TryUnregisterInputBuffer(demand.Buffer);
+                        continue;
+                    }
+                    s_activeDumpingDemands[desiredEntry.Key] = demand;
+                    s_activeDumpingByBuffer[demand.RegisteredBuffer] = demand;
+                }
+                else
+                {
+                    demand.Tower = desiredEntry.Value;
+                    demand.PriorityProvider.SetDisplayedPriority(
+                        GetEffectiveTowerDumpingPriority(desiredEntry.Value));
+                    demand.Buffer.SetOpenSlots(
+                        CountEligibleActiveDumpingOrigins(
+                            desiredEntry.Value, desiredEntry.Key.Product));
+                }
+            }
+
+            s_lastActiveDumpingDetail = $"Active dumping demand: {s_activeDumpingDemands.Count} virtual input(s), {s_activeDumpingClaims.Count} claimed origin(s).";
+        }
+        catch (Exception ex)
+        {
+            LogActiveDumpingCompatibilityFailure("Demand synchronization failed: " + ex.Message);
+            UnregisterAllActiveDumpingDemand();
+        }
     }
 
-    private static List<MineTower> GetLiveFarmTargetTowers(
-        TerrainDesignation designation,
-        LooseProductProto product)
+    private static void UnregisterAllActiveDumpingDemand()
     {
-        var result = new List<MineTower>();
-        TerrainDesignation.AssignedTowers.Enumerator enumerator = designation.ManagedByTowers.GetEnumerator();
-        while (enumerator.MoveNext())
+        if (s_activeDumpingBuffersRegistry != null)
         {
-            if (enumerator.Current is MineTower tower
-                && !tower.IsDestroyed
-                && tower.IsEnabled
-                && tower.DumpableProducts.Contains(product))
+            foreach (ActiveDumpingDemand demand in s_activeDumpingDemands.Values.ToList())
             {
-                result.Add(tower);
+                if (demand.RegisteredBuffer != null)
+                    s_activeDumpingBuffersRegistry.TryUnregisterInputBuffer(demand.Buffer);
             }
         }
-        return result;
+        s_activeDumpingByBuffer.Clear();
+        s_activeDumpingDemands.Clear();
     }
 
-    private static bool IsSourceAllowedForTarget(
-        RegisteredOutputBuffer source,
-        MineTower targetTower)
+    private static void UnregisterActiveDumpingDemand(ActiveDumpingDemandKey key)
     {
-        if (targetTower.AssignedOutputStorages.IsNotEmpty())
-        {
-            if (!source.EntityAsAssignee.HasValue)
-                return false;
-            if (!targetTower.AssignedOutputStorages.Contains(source.EntityAsAssignee.Value))
-                return false;
-        }
-        else if (targetTower.AssignedOutputTowers.IsNotEmpty() && !targetTower.AllowNonAssignedOutput)
-        {
-            if (!source.EntityAsAssignee.HasValue
-                || source.EntityAsAssignee.Value is not MineTower sourceTower
-                || !targetTower.AssignedOutputTowers.Contains(sourceTower))
-                return false;
-        }
+        if (!s_activeDumpingDemands.TryGetValue(key, out ActiveDumpingDemand? demand))
+            return;
+        if (demand.RegisteredBuffer != null)
+            s_activeDumpingByBuffer.Remove(demand.RegisteredBuffer);
+        s_activeDumpingBuffersRegistry?.TryUnregisterInputBuffer(demand.Buffer);
+        s_activeDumpingDemands.Remove(key);
+    }
 
-        if (source.EntityAsAssignee.HasValue
-            && source.EntityAsAssignee.Value.AssignedInputs.IsNotEmpty()
-            && !source.EntityAsAssignee.Value.AssignedInputs.Contains(targetTower))
+    private static void PruneActiveDumpingClaims()
+    {
+        foreach (KeyValuePair<Tile2i, ActiveDumpingClaim> entry in s_activeDumpingClaims.ToList())
         {
+            ActiveDumpingClaim claim = entry.Value;
+            if (claim.Tower.IsDestroyed
+                || claim.Designation.IsDestroyed
+                || claim.Designation.IsDumpingFulfilled
+                || !HasDumpingJobFor(claim.Truck, claim.Designation))
+                s_activeDumpingClaims.Remove(entry.Key);
+        }
+    }
+
+    private static bool HasDumpingJobFor(Truck truck, TerrainDesignation designation)
+    {
+        if (truck == null || truck.IsDestroyed)
             return false;
+        for (int index = 0; index < truck.Jobs.Count; index++)
+        {
+            if (truck.Jobs[index] is DumpingJob job && job.PrimaryDesignation == designation)
+                return true;
+        }
+        return truck.HasTrueJob && truck.IsNotEmpty;
+    }
+
+    private static bool HasEligibleActiveDumpingOrigin(MineTower tower, LooseProductProto product)
+    {
+        foreach (TerrainDesignation designation in tower.ManagedDesignations)
+        {
+            if (IsEligibleActiveDumpingOrigin(tower, designation, product, null))
+                return true;
+        }
+        return false;
+    }
+
+    private static int CountEligibleActiveDumpingOrigins(
+        MineTower tower,
+        LooseProductProto product)
+    {
+        int count = 0;
+        foreach (TerrainDesignation designation in tower.ManagedDesignations)
+        {
+            if (IsEligibleActiveDumpingOrigin(tower, designation, product, null))
+                count++;
+        }
+        return count;
+    }
+
+    private static bool IsEligibleActiveDumpingOrigin(
+        MineTower tower,
+        TerrainDesignation designation,
+        LooseProductProto product,
+        Truck? truck)
+    {
+        if (tower.IsDestroyed || !tower.IsEnabled
+            || designation == null || designation.IsDestroyed
+            || designation.IsDumpingFulfilled
+            || !IsDumpingDesignation(designation)
+            || !tower.DumpableProducts.Contains(product)
+            || s_activeDumpingClaims.ContainsKey(designation.OriginTileCoord)
+            || designation.NumberOfJobsAssigned > 0
+            || !designation.CanBeAssigned(tryIgnoreReservations: false))
+            return false;
+
+        if (truck != null)
+        {
+            if (!designation.IsReadyToDump(truck.Prototype))
+                return false;
+            try
+            {
+                if (s_activeDumpingUnreachables?.GetUnreachableDesignationsFor(truck).Contains(designation) == true)
+                    return false;
+            }
+            catch
+            {
+                // A missing reachability cache is not proof of unreachability.
+            }
         }
 
         return true;
     }
 
-    private static bool IsEligibleActiveSoilImportTruck(
-        RegisteredOutputBuffer source,
-        TerrainDesignation target,
-        MineTower targetTower,
-        Truck truck)
+    private static bool TryClaimActiveDumpingOrigin(
+        ActiveDumpingDemand demand,
+        Truck truck,
+        out TerrainDesignation designation)
     {
-        try
+        designation = null!;
+        IEnumerable<TerrainDesignation> candidates = demand.Tower.ManagedDesignations
+            .Where(item => IsEligibleActiveDumpingOrigin(demand.Tower, item, demand.Product, truck))
+            .OrderBy(item => item.CenterTileCoord.DistanceSqrTo(truck.GroundPositionTile2i));
+
+        foreach (TerrainDesignation candidate in candidates)
         {
-            if (truck == null || !truck.IsAvailableToBalanceCargo())
-                return false;
-            if (truck.ProductType.HasValue && !truck.ProductType.Value.Matches(source.Product.Type))
-                return false;
-            if (!source.IsTruckAllowed(truck, s_activeSoilImportTruckJobsFilter!))
-                return false;
-            if (!source.CanBeServedBy(truck, isBalancingJob: true))
-                return false;
-
-            ulong towerOrSourceZones = source.ZoneMask | targetTower.ZoneMask;
-            if ((towerOrSourceZones & truck.ZoneMask) == 0L)
-                return false;
-
-            IEntityAssignedWithVehicles? assignedTo = truck.AssignedTo.ValueOrNull;
-            // Mine-tower-assigned trucks are escort vehicles, not dumping
-            // vehicles. A default-provider truck assigned to a source storage
-            // remains eligible under vanilla's assigned-building rule.
-            if (assignedTo != null && assignedTo != source.Entity)
-                return false;
-
-            if (!target.IsReadyToDump(truck.Prototype))
-                return false;
+            Tile2i origin = candidate.OriginTileCoord;
+            if (s_activeDumpingClaims.ContainsKey(origin))
+                continue;
+            s_activeDumpingClaims[origin] = new ActiveDumpingClaim(demand.Tower, candidate, truck);
+            demand.Buffer.SetOpenSlots(Math.Max(0, demand.Buffer.OpenSlots - 1));
+            demand.RegisteredBuffer?.RefreshPriorities();
+            designation = candidate;
             return true;
         }
-        catch
-        {
-            return false;
-        }
+
+        return false;
     }
 
-    private static bool IsKnownActiveSoilImportUnreachable(
-        RegisteredOutputBuffer source,
-        TerrainDesignation target,
-        Truck truck)
+    internal static bool IsActiveDumpingInput(RegisteredInputBuffer buffer) =>
+        buffer != null && s_activeDumpingByBuffer.ContainsKey(buffer);
+
+    internal static bool TryHandleActiveDumpingBalancingJob(BalancingJobSpec spec)
     {
-        if (truck == null || s_activeSoilImportUnreachables == null)
+        if (!spec.InputBuffer.HasValue
+            || !s_activeDumpingByBuffer.TryGetValue(spec.InputBuffer.Value, out ActiveDumpingDemand? demand))
             return false;
+
+        // Mine-tower-assigned trucks escort excavators; they are never dumping
+        // trucks, even when vanilla selects a tower-owned input buffer.
+        if (spec.Truck.AssignedTo.ValueOrNull is MineTower)
+            return true;
+
         try
         {
-            return s_activeSoilImportUnreachables.GetUnreachableEntitiesFor(truck).Contains(source.Entity)
-                || s_activeSoilImportUnreachables.GetUnreachableDesignationsFor(truck).Contains(target);
-        }
-        catch
-        {
-            return false;
-        }
-    }
+            // A synthetic input must never be passed to vanilla's delivery job.
+            if (spec.OutputBuffer.IsNone
+                || !(spec.ProductQuantity.Product is LooseProductProto)
+                || spec.SecondaryInputBuffers.HasValue
+                || spec.SecondaryOutputBuffers.HasValue
+                || s_activeDumpingPickUpFactory == null
+                || s_activeDumpingJobFactory == null
+                || s_activeDumpingChainFactory == null
+                || s_activeDumpingLastOutputBuffers == null)
+                return true;
 
-    private static bool TryAssignActiveSoilImport(ActiveSoilImportCandidate candidate)
-    {
-        try
-        {
-            candidate.Source.RefreshPriorities();
-            if (!candidate.Source.IsAvailableCached || !candidate.Source.AvailableQuantityCached.IsPositive)
-                return false;
-            if (!candidate.Target.CanBeAssigned(false)
-                || !candidate.Target.IsReadyToDump(candidate.Truck.Prototype)
-                || !candidate.Truck.IsAvailableToBalanceCargo())
-                return false;
+            if (!spec.Truck.IsAvailableToBalanceCargo())
+                return true;
+            if (spec.Truck.HasJobs)
+            {
+                if (spec.Truck.HasTrueJob)
+                    return true;
+                spec.Truck.CancelAllJobsAndResetState();
+            }
 
-            Quantity quantity = candidate.Source.AvailableQuantityCached.Min(candidate.Truck.Capacity);
-            if (!quantity.IsPositive)
-                return false;
+            if (!TryClaimActiveDumpingOrigin(demand, spec.Truck, out TerrainDesignation designation))
+                return true;
 
-            var spec = new BalancingJobSpec(
-                candidate.Truck,
-                candidate.Target,
-                new Lyst<TerrainDesignation>(),
-                candidate.Source,
-                new ProductQuantity(candidate.Product, quantity));
-            candidate.Truck.AssignBalancingJob(spec);
-            return candidate.Truck.HasJobs;
+            RegisteredOutputBuffer source = spec.OutputBuffer.Value;
+            ProductQuantity quantity = spec.ProductQuantity;
+            // DumpingJob uses this same vanilla side table when a partial load
+            // remains after the first origin. Preserve that continuation path.
+            s_activeDumpingLastOutputBuffers.ReportOutputBufferFor(spec.Truck, source);
+            CargoPickUpJob pickup = s_activeDumpingPickUpFactory.EnqueueJob(
+                spec.Truck,
+                quantity,
+                source,
+                Option<Lyst<SecondaryOutputBufferSpec>>.None);
+            DumpingJob dump = s_activeDumpingJobFactory.EnqueueJob(
+                spec.Truck,
+                (LooseProductProto)quantity.Product,
+                designation);
+            s_activeDumpingChainFactory.EnqueueAsFirstJob(spec.Truck, pickup, dump);
+            return true;
         }
         catch (Exception ex)
         {
-            LogRuntimeDebug("[ATD Farming] Active soil import assignment failed; vanilla reservation/job creation rejected candidate: " + ex.Message);
-            return false;
+            s_log.Warning("[ATD Dumping] Failed to translate vanilla balancing job: " + ex.Message);
+            return true;
         }
     }
 
-    private static int CompareActiveSoilImportCandidates(
-        ActiveSoilImportCandidate left,
-        ActiveSoilImportCandidate right)
+    internal static bool TryHandleActiveDumpingDelivery(
+        Truck truck,
+        ProductQuantity quantity,
+        RegisteredInputBuffer inputBuffer)
     {
-        return CompareActiveSoilImportOrdering(
-            left.Priority,
-            left.TargetDistance,
-            left.TruckDistance,
-            left.SourceId,
-            left.Target.OriginTileCoord.Y,
-            left.Target.OriginTileCoord.X,
-            left.TruckId,
-            right.Priority,
-            right.TargetDistance,
-            right.TruckDistance,
-            right.SourceId,
-            right.Target.OriginTileCoord.Y,
-            right.Target.OriginTileCoord.X,
-            right.TruckId);
-    }
+        if (!s_activeDumpingByBuffer.TryGetValue(inputBuffer, out ActiveDumpingDemand? demand))
+            return false;
 
-    internal static int CompareActiveSoilImportOrdering(
-        int leftPriority,
-        int leftTargetDistance,
-        int leftTruckDistance,
-        string leftSourceId,
-        int leftTargetY,
-        int leftTargetX,
-        string leftTruckId,
-        int rightPriority,
-        int rightTargetDistance,
-        int rightTruckDistance,
-        string rightSourceId,
-        int rightTargetY,
-        int rightTargetX,
-        string rightTruckId)
-    {
-        int comparison = leftPriority.CompareTo(rightPriority);
-        if (comparison != 0)
-            return comparison;
-        comparison = leftTargetDistance.CompareTo(rightTargetDistance);
-        if (comparison != 0)
-            return comparison;
-        comparison = leftTruckDistance.CompareTo(rightTruckDistance);
-        if (comparison != 0)
-            return comparison;
-        comparison = string.CompareOrdinal(leftSourceId, rightSourceId);
-        if (comparison != 0)
-            return comparison;
-        comparison = leftTargetY.CompareTo(rightTargetY);
-        if (comparison != 0)
-            return comparison;
-        comparison = leftTargetX.CompareTo(rightTargetX);
-        if (comparison != 0)
-            return comparison;
-        return string.CompareOrdinal(leftTruckId, rightTruckId);
-    }
-
-    private static bool TryGetFarmableProduct(
-        RegisteredOutputBuffer source,
-        out LooseProductProto product)
-    {
-        Option<LooseProductProto> dumpableProduct = source.Product.DumpableProduct;
-        if (dumpableProduct.HasValue
-            && dumpableProduct.Value.TerrainMaterial.HasValue
-            && dumpableProduct.Value.TerrainMaterial.Value.IsFarmable)
+        // Assigned tower trucks are reserved for escort work. If one is
+        // already carrying cargo, let vanilla's ordinary dumping search get
+        // rid of it rather than sending it to the tower's virtual input.
+        if (truck.AssignedTo.ValueOrNull is MineTower)
         {
-            product = dumpableProduct.Value;
+            s_activeDumpingJobFactory?.TryCreateAndEnqueueJob(
+                truck, quantity.Product, truck.ZoneMask);
             return true;
         }
 
-        product = null!;
+        try
+        {
+            if (quantity.Product is LooseProductProto looseProduct
+                && s_activeDumpingJobFactory != null
+                && TryClaimActiveDumpingOrigin(demand, truck, out TerrainDesignation designation))
+            {
+                s_activeDumpingJobFactory.EnqueueJob(truck, looseProduct, designation);
+                return true;
+            }
+
+            // The vanilla input was selected at the tower position. If that
+            // position has no reachable origin for this truck, never enqueue a
+            // synthetic delivery to the virtual buffer. Let ordinary dumping
+            // rules try to dispose of the cargo instead.
+            if (s_activeDumpingJobFactory != null)
+                s_activeDumpingJobFactory.TryCreateAndEnqueueJob(
+                    truck, quantity.Product, truck.ZoneMask);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            s_log.Warning("[ATD Dumping] Failed to translate loaded-truck delivery: " + ex.Message);
+            return true;
+        }
+    }
+
+    internal static int ClampDumpingPriority(int value) =>
+        Math.Max(DumpingPriorityMinimum, Math.Min(DumpingPriorityPassive, value));
+
+    /// <summary>
+    /// A tower's configured priority is normally authoritative. During ATD's
+    /// farmland fill window, however, the tower's dumpable products are narrowed
+    /// to farmable materials, so the old active-import behavior remains useful
+    /// without making ordinary tower dumping globally active by default.
+    /// </summary>
+    private static int GetEffectiveTowerDumpingPriority(MineTower tower)
+    {
+        int configuredPriority = GetTowerDumpingPriority(tower);
+        if (!IsTowerInFarmingFillWindow(tower))
+            return configuredPriority;
+
+        return Math.Min(FarmingActiveDumpingPriorityMaximum, configuredPriority);
+    }
+
+    private static bool IsTowerInFarmingFillWindow(MineTower tower)
+    {
+        if (!TryGetTowerEntityId(tower, out EntityId towerId)
+            || !towerId.IsValid
+            || !s_farmingPreparationSessions.TryGetValue(towerId, out FarmingPreparationSession? session)
+            || !session.Enabled)
+        {
+            return false;
+        }
+
+        return session.TowerDumpRulesOwned
+            || session.Origins.Values.Any(origin => origin.Phase == FarmingOriginPhase.Filling);
+    }
+
+    private static void LogActiveDumpingCompatibilityFailure(string detail)
+    {
+        if (s_activeDumpingCompatibilityFailureLogged)
+            return;
+        s_activeDumpingCompatibilityFailureLogged = true;
+        s_log.Warning("[ATD Dumping] Active dumping disabled; using vanilla passive dumping. " + detail);
+    }
+
+    internal static void DisableActiveDumpingCompatibility(string detail)
+    {
+        s_activeDumpingCompatibilityAvailable = false;
+        LogActiveDumpingCompatibilityFailure(detail);
+        UnregisterAllActiveDumpingDemand();
+    }
+
+    internal static void SetActiveDumpingHooksAvailable(bool available)
+    {
+        s_activeDumpingHooksAvailable = available;
+        if (!available)
+        {
+            s_activeDumpingCompatibilityAvailable = false;
+            UnregisterAllActiveDumpingDemand();
+        }
+    }
+}
+
+internal static class ActiveDumpingPatches
+{
+    internal static void Apply(Harmony harmony)
+    {
+        try
+        {
+            AutoDepthDesignation.SetActiveDumpingHooksAvailable(false);
+            MethodInfo? assignMethod = AccessTools.Method(
+                typeof(Truck), nameof(Truck.AssignBalancingJob),
+                new[] { typeof(BalancingJobSpec) });
+            if (assignMethod == null)
+                throw new MissingMethodException("Truck.AssignBalancingJob(BalancingJobSpec)");
+            harmony.Patch(
+                assignMethod,
+                prefix: new HarmonyMethod(typeof(ActiveDumpingPatches), nameof(TruckAssignBalancingJobPrefix)));
+
+            MethodInfo? deliveryMethod = AccessTools.Method(
+                typeof(CargoDeliveryJob.Factory), nameof(CargoDeliveryJob.Factory.EnqueueJob));
+            if (deliveryMethod == null)
+                throw new MissingMethodException("CargoDeliveryJob.Factory.EnqueueJob");
+            harmony.Patch(
+                deliveryMethod,
+                prefix: new HarmonyMethod(typeof(ActiveDumpingPatches), nameof(CargoDeliveryEnqueuePrefix)));
+            AutoDepthDesignation.SetActiveDumpingHooksAvailable(true);
+        }
+        catch (Exception ex)
+        {
+            AutoDepthDesignation.DisableActiveDumpingCompatibility(
+                "Could not install active-demand delivery hooks: " + ex.Message);
+        }
+    }
+
+    private static bool TruckAssignBalancingJobPrefix(BalancingJobSpec spec)
+    {
+        return !AutoDepthDesignation.TryHandleActiveDumpingBalancingJob(spec);
+    }
+
+    private static bool CargoDeliveryEnqueuePrefix(
+        Truck truck,
+        ProductQuantity toDeliver,
+        RegisteredInputBuffer inputBuffer,
+        Lyst<SecondaryInputBufferSpec> secondaryBuffers,
+        ref CargoDeliveryJob __result)
+    {
+        if (!AutoDepthDesignation.IsActiveDumpingInput(inputBuffer))
+            return true;
+
+        AutoDepthDesignation.TryHandleActiveDumpingDelivery(truck, toDeliver, inputBuffer);
+        __result = null!;
         return false;
     }
 }

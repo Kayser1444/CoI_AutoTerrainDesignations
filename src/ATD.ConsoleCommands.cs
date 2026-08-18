@@ -7,6 +7,7 @@
 // intended to contain only original mod code/configuration; if MaFi Games material
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 // Auto Terrain Designations - In-Game Console Commands
+using System;
 using System.Globalization;
 using System.Text;
 using Mafi;
@@ -43,6 +44,8 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  RampNotifications     = {AutoTerrainDesignationsMod.RampNotificationsEnabled}");
         sb.AppendLine($"  AutoReleaseExcavators = {AutoTerrainDesignationsMod.AutoReleaseExcavatorsWhenIdle}");
         sb.AppendLine($"  TruckIdlePolicy       = {AutoTerrainDesignationsMod.TruckIdlePolicy}");
+        sb.AppendLine($"  DumpingPriorityDefault = {FormatDumpingPriority(AutoTerrainDesignationsMod.DumpingPriority)}");
+        sb.AppendLine($"  DumpingPriorityWorldDefault = {FormatDumpingPriority(AutoDepthDesignation.DumpingPriorityWorldDefault)}");
         sb.AppendLine($"  TurningRampsEnabled     = {AutoTerrainDesignationsMod.TurningRampsEnabled}");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
         sb.AppendLine($"  AccessAStar            = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
@@ -344,6 +347,28 @@ public sealed class AtdConsoleCommands
         AutoTerrainDesignationsMod.SetTruckIdlePolicy(parsed);
         return $"[ATD] TruckIdlePolicy set to {AutoTerrainDesignationsMod.TruckIdlePolicy}.";
     }
+
+    [ConsoleCommand(false, false, "Sets the current world's Mine Tower dumping priority (1-15, or Passive for vanilla dumping).", null)]
+    private string atdSetDumpingPriority(string? value = null)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"DumpingPriority currently set to {FormatDumpingPriority(AutoDepthDesignation.DumpingPriorityWorldDefault)}.");
+
+        int parsed;
+        if (string.Equals(value, "passive", StringComparison.OrdinalIgnoreCase))
+            parsed = AutoDepthDesignation.DumpingPriorityPassive;
+        else if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed)
+            || parsed < 1 || parsed > AutoDepthDesignation.DumpingPriorityMaximum)
+            return $"[ATD] Invalid dumping priority '{value}'. Use an integer from 1 to 15, or Passive.";
+
+        AutoDepthDesignation.SetDumpingPriorityWorldDefault(parsed);
+        return $"[ATD] DumpingPriority set to {FormatDumpingPriority(AutoDepthDesignation.DumpingPriorityWorldDefault)}.";
+    }
+
+    private static string FormatDumpingPriority(int priority) =>
+        priority == AutoDepthDesignation.DumpingPriorityPassive
+            ? "Passive"
+            : priority.ToString(CultureInfo.InvariantCulture);
 
     [ConsoleCommand(false, false, "Sets the key used to enter corner designation mode (Unity KeyCode name, e.g. K, Alpha1, F1).", null)]
     private string atdSetCornerDesignationKey(string? value = null)

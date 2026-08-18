@@ -9,6 +9,7 @@ namespace AutoTerrainDesignations.Access.V2
     {
         public static bool TryReplay(
             AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessV2RouteData route,
             out AccessV2History history,
             out IReadOnlyList<AccessV2OriginProfile> orderedGenerated,
@@ -21,7 +22,7 @@ namespace AutoTerrainDesignations.Access.V2
             orderedGenerated = ordered;
             if (route.RouteSteps.Count > 0)
                 return TryReplaySegmented(
-                    snapshot, route, ref history, ordered,
+                    snapshot, workspace, route, ref history, ordered,
                     out replayedHandoff, out reason);
             if (route.States.Count == 0)
             {
@@ -122,7 +123,7 @@ namespace AutoTerrainDesignations.Access.V2
                     .Take(AccessV2Handoffs.MaxSpanLength)
                     .ToArray();
                 replayedHandoff = AccessPathSearch.EvaluateV2Handoffs(
-                        snapshot, recent, history)
+                        snapshot, workspace, recent, history)
                     .FirstOrDefault(candidate => HandoffsEqual(
                         candidate, route.Handoff));
                 if (replayedHandoff == null)
@@ -143,6 +144,7 @@ namespace AutoTerrainDesignations.Access.V2
 
         private static bool TryReplaySegmented(
             AccessSearchSnapshot snapshot,
+            AccessSearchWorkspace workspace,
             AccessV2RouteData route,
             ref AccessV2History history,
             ICollection<AccessV2OriginProfile> ordered,
@@ -250,7 +252,7 @@ namespace AutoTerrainDesignations.Access.V2
                                     out AccessV2HandoffCandidate direct)
                                 ? direct
                                 : AccessPathSearch.EvaluateV2GroundToVHandoff(
-                                    snapshot, step.State, groundCenter,
+                                    snapshot, workspace, step.State, groundCenter,
                                     recorded.Lane0Operation, history);
                         if (replayed == null
                             || !HandoffsEqual(replayed, recorded))
@@ -315,6 +317,7 @@ namespace AutoTerrainDesignations.Access.V2
                         replayCandidates =
                             AccessPathSearch.EvaluateV2StaggeredHandoffs(
                                 snapshot,
+                                workspace,
                                 recent.Take(step.Handoff.SpanLength)
                                     .Reverse().ToArray(),
                                 extensionLane,
@@ -323,7 +326,7 @@ namespace AutoTerrainDesignations.Access.V2
                     }
                     else
                         replayCandidates = AccessPathSearch.EvaluateV2Handoffs(
-                            snapshot, recent, historyAtHandoff);
+                            snapshot, workspace, recent, historyAtHandoff);
                     replayedHandoff = replayCandidates
                         .FirstOrDefault(candidate =>
                             HandoffsEqual(candidate, step.Handoff)

@@ -14,7 +14,7 @@ Farming Designations automates the preparation and topsoil filling of flat level
 | `ATD.FarmingAnalysis.cs` | Read-only per-origin analysis; produces `FarmingAnalysisRow` |
 | `ATD.FarmingPreparationSession.cs` | Session data structures, tick loop, state transitions, save hook |
 | `ATD.FarmingFillActivation.cs` | Stage 4 — filling: dump rule manipulation, vehicle clear-out, fill designation activation, rim alignment |
-| `ATD.FarmingActiveSoilImport.cs` | Stage 4 — active soil import through vanilla product-indexed output buffers and balancing jobs |
+| `ATD.FarmingActiveSoilImport.cs` | Runtime-only active dumping through vanilla product-indexed output buffers and balancing jobs |
 | `ATD.FarmingAccess.cs` | Access ramp placement (preparation and filling phases), result caching |
 | `ATD.FarmingDebugTransitions.cs` | Shoulder placement, preparation transitions; debug console commands (`atd_farming_*`) |
 | `ATD.FarmingAnalysisPanel.cs` | UI: injects the Farmland Preparation panel into the mine tower inspector |

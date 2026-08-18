@@ -19,6 +19,7 @@ using Mafi.Localization;
 using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
 using Mafi.Unity.Ui.Library;
+using Mafi.Unity.Ui.Library.Inspectors;
 using Row = Mafi.Unity.UiToolkit.Library.Row;
 using UnityEngine;
 
@@ -39,6 +40,7 @@ namespace AutoTerrainDesignations
             public Func<IAreaManagingTower?> GetTower { get; }
             public PanelWithHeader Panel { get; }
             public Dropdown<AccessVehicleClearanceMode> AccesswayModeDropdown { get; }
+            public Dropdown<int> DumpingPriorityDropdown { get; }
             public Mafi.Unity.Ui.Library.Display MaxLayersDisplay { get; }
             public Mafi.Unity.Ui.Library.Display MinElevDisplay { get; }
             public SliderWithIncrements OrePuritySlider { get; }
@@ -48,6 +50,7 @@ namespace AutoTerrainDesignations
                 Func<IAreaManagingTower?> getTower,
                 PanelWithHeader panel,
                 Dropdown<AccessVehicleClearanceMode> accesswayModeDropdown,
+                Dropdown<int> dumpingPriorityDropdown,
                 Mafi.Unity.Ui.Library.Display maxLayersDisplay,
                 Mafi.Unity.Ui.Library.Display minElevDisplay,
                 SliderWithIncrements orePuritySlider,
@@ -56,10 +59,51 @@ namespace AutoTerrainDesignations
                 GetTower = getTower;
                 Panel = panel;
                 AccesswayModeDropdown = accesswayModeDropdown;
+                DumpingPriorityDropdown = dumpingPriorityDropdown;
                 MaxLayersDisplay = maxLayersDisplay;
                 MinElevDisplay = minElevDisplay;
                 OrePuritySlider = orePuritySlider;
                 ClearBtn = clearBtn;
+            }
+        }
+
+        /// <summary>
+        /// Uses the game's import-priority presentation (green import arrow and
+        /// "1 - high" through "15 - low" labels) while reserving the final
+        /// option value for ATD's vanilla-compatible passive mode.
+        /// </summary>
+        internal sealed class DumpingPriorityDropdown : PriorityDropdown
+        {
+            private const int PassiveOption = 15;
+
+            public DumpingPriorityDropdown()
+                : base(DumpingPriorityOption,
+                    new DisplayWithButton(
+                        "Assets/Unity/UserInterface/General/Priority.svg",
+                        Button.General))
+            {
+                // Vanilla sizes this field for two numeric digits. ATD also has
+                // the text option "Passive", so reserve one stable width for
+                // the longest display value instead of allowing it to wrap.
+                DisplayButton.Display.Width(72.px());
+                // Keep the outer dropdown intrinsically sized. Like the
+                // scanning filter's DisplayRowWithButton, its visible frame is
+                // then the row's right-aligned flex item; a second fixed width
+                // on the wrapper otherwise makes the arrow overhang it.
+                AsImportPrio();
+                SetOptions(Enumerable.Range(0, PassiveOption + 1).ToArray());
+            }
+
+            public override Dropdown<int> SetValue(int displayedPriority,
+                bool notifyChangeListeners = false)
+            {
+                int option = displayedPriority == AutoDepthDesignation.DumpingPriorityPassive
+                    ? PassiveOption
+                    : Math.Max(1, Math.Min(
+                        AutoDepthDesignation.DumpingPriorityMaximum,
+                        displayedPriority)) - 1;
+                DisplayButton.Display.Value(DumpingPriorityDisplay(displayedPriority));
+                return SetValueIndex(option, notifyChangeListeners);
             }
         }
 
@@ -84,6 +128,7 @@ namespace AutoTerrainDesignations
             if (tower == null) return;
             b.Panel.Collapsed(AutoDepthDesignation.GetTowerTerrainPanelCollapsed(tower));
             b.AccesswayModeDropdown.SetValue(AutoDepthDesignation.GetTowerVehicleClearance(tower));
+            b.DumpingPriorityDropdown.SetValue(AutoDepthDesignation.GetTowerDumpingPriority(tower));
             b.MaxLayersDisplay.SetValue(new LocStrFormatted(MaxLayersText(AutoDepthDesignation.GetTowerMaxLayersToExcavate(tower))));
             b.MinElevDisplay.SetValue(new LocStrFormatted(MinElevText(AutoDepthDesignation.GetTowerMaxDepthToDigTo(tower))));
             int orePurity = AutoDepthDesignation.GetTowerOrePurityLevel(tower);
@@ -272,6 +317,26 @@ namespace AutoTerrainDesignations
             accesswayModeRow.Add(accesswayModeDropdown);
             panel.BodyAdd(accesswayModeRow);
 
+            // --- Dumping priority ---
+            int initDumpingPriority = initialTower != null
+                ? AutoDepthDesignation.GetTowerDumpingPriority(initialTower)
+                : AutoDepthDesignation.DumpingPriorityWorldDefault;
+            var dumpingPriorityDropdown = new DumpingPriorityDropdown();
+            dumpingPriorityDropdown.SetValue(initDumpingPriority);
+            dumpingPriorityDropdown.OnValueChanged((priority, _) =>
+                {
+                    var tower = getTower(); if (tower == null) return;
+                    int displayedPriority = DumpingPriorityFromOption(priority);
+                    AutoDepthDesignation.SetTowerDumpingPriority(tower, displayedPriority);
+                    dumpingPriorityDropdown.SetValue(displayedPriority);
+                });
+            var dumpingPriorityRow = new Row().MarginTop(1.pt());
+            dumpingPriorityRow.Add(new Label(AtdLocalization.DumpingPriorityLabel.AsFormatted)
+                .Tooltip(AtdLocalization.DumpingPriorityDescription.AsFormatted));
+            dumpingPriorityRow.Add(new UiComponent().FlexGrow(1f));
+            dumpingPriorityRow.Add(dumpingPriorityDropdown);
+            panel.BodyAdd(dumpingPriorityRow);
+
             // --- Max layers ---
             int initLayers = initialTower != null
                 ? AutoDepthDesignation.GetTowerMaxLayersToExcavate(initialTower)
@@ -367,6 +432,7 @@ namespace AutoTerrainDesignations
             }
 
             s_bindings[key] = new Bindings(getTower, panel, accesswayModeDropdown,
+                dumpingPriorityDropdown,
                 maxLayersDisplay, minElevDisplay, orePuritySlider, clearBtn);
             return panel;
         }
@@ -403,6 +469,30 @@ namespace AutoTerrainDesignations
             int index,
             bool isInDropdown) => new Label(AccesswayModeText(mode))
                 .Tooltip(AccesswayModeTooltip(mode));
+
+        internal static UiComponent DumpingPriorityOption(
+            int option,
+            int index,
+            bool isInDropdown)
+        {
+            if (option == 15)
+            {
+                return new Label(AtdLocalization.DumpingPriorityPassiveLabel.AsFormatted)
+                    .Tooltip(AtdLocalization.DumpingPriorityPassiveTooltip.AsFormatted);
+            }
+
+            return PriorityDropdown.GeneralPriorityFactory(option, index, isInDropdown);
+        }
+
+        internal static int DumpingPriorityFromOption(int option) =>
+            option == 15
+                ? AutoDepthDesignation.DumpingPriorityPassive
+                : option + 1;
+
+        private static LocStrFormatted DumpingPriorityDisplay(int displayedPriority) =>
+            displayedPriority == AutoDepthDesignation.DumpingPriorityPassive
+                ? AtdLocalization.DumpingPriorityPassiveLabel.AsFormatted
+                : new LocStrFormatted(displayedPriority.ToString());
 
         internal static LocStrFormatted AccesswayModeText(AccessVehicleClearanceMode mode)
         {

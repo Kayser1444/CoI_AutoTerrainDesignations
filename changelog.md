@@ -1,5 +1,36 @@
 v0.6.1 [unreleased]
 
+* Fixed: Interactive accessway searches now invalidate before their next slice
+  when the tower's accessway mode, ramp width, global access policy, owner, or
+  area changes. A search started for T3 clearance can no longer materialize a
+  T3/V2 route after the player switches the tower to T1.
+
+* Improved: Access snapshots now carry the tower-local ramp/clearance revision
+  and invalidate during capture when those settings change, keeping capture,
+  search, and commit on the same access identity.
+
+* Improved: Access capture now copies building occupancy and fixed-height facts
+  before cleanup and durability preparation, so those phases no longer consult
+  the mutable farming building cache while a snapshot is being assembled. The
+  retained-memory estimate now accounts for copied building occupancy too.
+
+* Improved: Captured terrain heights now drive handoff geometry, exact-profile,
+  leveling-face, and rank-two work checks during access preparation. Vanilla
+  designation-readiness callbacks remain on the cooperative game-thread path
+  until their live API inputs are captured separately.
+
+* In progress: Accessway capture now records source revisions and bounded
+  retained-memory estimates, marks environmental changes without conflating
+  them with hard invalidation, and reports `SnapshotTooLarge` diagnostics
+  through farming requests. The conservative snapshot ceiling is configurable
+  for profiling; the pure-preparation extraction remains in progress.
+
+* Refined per-tower **Dumping priority** to use the vanilla green import-priority control: numeric priorities 1–15 (1 - high through 15 - low) advertise runtime-only input demand for every eligible dumping designation managed by the tower, while a separate **Passive** option preserves vanilla passive dumping and only imports from active exporters. Numeric levels no longer have redundant per-option tooltips; Passive retains its explanatory tooltip. The world default, ATDsettings persistence, clone support, and `atd_set_dumping_priority` console command follow the same model. Because this is pre-release, existing value `15` is intentionally reinterpreted as active lowest priority; choose **Passive** for the old behavior.
+
+* Changed the default dumping priority to **Passive** to avoid tower-wide active demand locking vehicles onto distant or unreachable dumping origins. During ATD farmland filling, while the tower's dumpable products are restricted to farmable materials, Passive is temporarily evaluated as active priority 14 and restored to Passive after the fill window.
+
+* Refined the dumping-priority tooltip to state that farmland topsoil always employs active dumping, and aligned the widened Passive selector with surrounding controls.
+
 v0.6.0 [released]
 
 * Changed: Routed turning ramps are now the default accessway generator for AUTO and T1-T3. The legacy straight-ramp generator remains available as an explicit fallback option.

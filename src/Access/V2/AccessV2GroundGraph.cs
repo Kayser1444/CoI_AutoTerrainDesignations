@@ -37,6 +37,7 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly Dictionary<Tile2i, int> m_componentByTile;
         private readonly HashSet<int> m_goalComponents;
         private readonly Dictionary<Tile2i, float> m_goalDistanceByTile;
+        private readonly float m_cleanupUnitCost;
 
         public int GroundNodeCount => m_groundNodes.Count;
         public int CleanupNodeCount => m_cleanupByTile.Count;
@@ -50,8 +51,10 @@ namespace AutoTerrainDesignations.Access.V2
             IEnumerable<Tile2i> groundNodes,
             IEnumerable<Tile2i> goals,
             IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile,
-            IEnumerable<Tile2i>? projectedFixedNodes = null)
+            IEnumerable<Tile2i>? projectedFixedNodes = null,
+            float cleanupUnitCost = 8f)
         {
+            m_cleanupUnitCost = cleanupUnitCost;
             m_groundNodes = new HashSet<Tile2i>(groundNodes);
             m_projectedFixedNodes = projectedFixedNodes != null
                 ? new HashSet<Tile2i>(projectedFixedNodes)
@@ -82,6 +85,7 @@ namespace AutoTerrainDesignations.Access.V2
             m_goals = new HashSet<Tile2i>(source.m_goals);
             m_componentByTile = source.m_componentByTile;
             m_goalComponents = new HashSet<int>(source.m_goalComponents);
+            m_cleanupUnitCost = source.m_cleanupUnitCost;
             var newGoals = new HashSet<Tile2i>();
             foreach (Tile2i goal in additionalGoals)
                 if (IsTraversable(goal))
@@ -334,8 +338,8 @@ namespace AutoTerrainDesignations.Access.V2
             {
                 if (history.ContainsCleanupKey(key) || !keys.Add(key))
                     return;
-                cost += cleanupCostScale * AccessPropCleanupPolicy
-                    .GetCleanupLandscapingCost(isTree);
+                cost += cleanupCostScale
+                    * (isTree ? 0f : m_cleanupUnitCost);
             }
         }
 
