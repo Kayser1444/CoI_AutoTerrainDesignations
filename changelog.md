@@ -1,4 +1,4 @@
-v0.6.1 [packaged]
+v0.6.1 [released]
 
 * Fixed: Interactive accessway searches now invalidate before their next slice
   when the tower's accessway mode, ramp width, global access policy, owner, or
