@@ -1,3 +1,5 @@
+v0.6.2 [unreleased]
+
 v0.6.1 [released]
 
 * Fixed: Interactive accessway searches now invalidate before their next slice
