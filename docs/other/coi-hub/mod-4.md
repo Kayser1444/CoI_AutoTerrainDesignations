@@ -36,6 +36,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 
 [🌾 **Farmland preparation**](#farmland-preparation)
 
+[⚙️ **Additional settings**](#additional-settings)
+
 ## ⚡ Quick Start Guide
 
 1. Select a Mine Tower whose area covers a resource deposit.
@@ -135,6 +137,23 @@ Place outer, inner, and planar corner profiles with four rotations using mining,
 *Farmland preparation automatically excavates, fills, and reconnects a level area with fertile material.*
 
 Turn flat leveling work into farmable ground with per-tower automation. ATD manages excavation, farmable-material filling, vehicle access, and completion; Farm Placement Assist can hold farm construction until the required terrain cells are ready.
+
+### ⚙️ Additional settings
+
+[insert screenshot here]
+
+*ATD's Mod Settings tabs provide worldwide behavior, reusable defaults, and optional expert controls.*
+
+Open ATD in the Mod Settings window for controls that are not available directly from an individual Mine Tower:
+
+- **Terrain safety** — Choose how cautiously ATD predicts landslides and keeps generated work away from oceans and buildings.
+- **Ramps outside tower areas** — Allow a bounded retry just beyond the tower boundary when no valid in-area accessway can be found.
+- **Debris and tree handling** — Control disrupted-tree harvesting, terrain changes used to remove debris, and when accessway cleanup may spend Unity on Quick remove.
+- **Notifications** — Enable or disable excavator-completion and accessway warning notifications.
+- **Tower panel defaults** — Choose whether the Mining Designations, Ore Composition, and Farmland Preparation panels start collapsed.
+- **Mine Tower defaults** — Set the initial accessway mode, dumping priority, excavation depth, elevation limit, ore quality, and idle-vehicle behavior, then optionally save them as the configuration for new games.
+
+For mining connoisseurs who enjoy tuning the last grain of ore, ATD also exposes expert ore-quality thresholds and accessway pathfinder controls. Most players can safely leave these at their defaults.
 
 ---
 
