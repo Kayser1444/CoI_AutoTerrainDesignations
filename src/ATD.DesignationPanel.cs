@@ -57,19 +57,19 @@ namespace AutoTerrainDesignations
             /// <summary>Row containing the flattening-mode designation type controls.</summary>
             public Row FlatteningDesignationTypeRow { get; }
 
-            /// <summary>Row containing ramp width controls, disabled during flattening mode.</summary>
+            /// <summary>Row containing ramp width controls, hidden during flattening mode.</summary>
             public Row RampWidthRow { get; }
 
-            /// <summary>Row containing max layer controls, disabled during flattening mode.</summary>
+            /// <summary>Row containing max layer controls, hidden during flattening mode.</summary>
             public Row MaxLayersRow { get; }
 
-            /// <summary>Row containing ore purity controls, disabled during flattening mode.</summary>
+            /// <summary>Row containing ore purity controls, hidden during flattening mode.</summary>
             public Row OrePurityRow { get; }
 
-            /// <summary>Row containing corridor clearance controls, disabled during flattening mode.</summary>
+            /// <summary>Row containing corridor clearance controls, hidden during flattening mode.</summary>
             public Row ClearanceRow { get; }
 
-            /// <summary>Optional row containing the product scanning filter, disabled during flattening mode.</summary>
+            /// <summary>Optional row containing the product scanning filter, hidden during flattening mode.</summary>
             public Row? OrePickerRow { get; }
 
             /// <summary>Creates panel binding references used by refresh and mode-dependent UI state.</summary>
@@ -194,7 +194,7 @@ namespace AutoTerrainDesignations
             DesignationMode designationMode = AutoDepthDesignation.GetTowerDesignationMode(tower);
             b.ModeDisplay.SetValue(new LocStrFormatted(DesignationModeText(designationMode)));
             b.FlatteningDesignationTypeDisplay.SetValue(new LocStrFormatted(FlatteningDesignationTypeText(AutoDepthDesignation.GetTowerFlatteningDesignationType(tower))));
-            SetModeDependentRowsEnabled(b, designationMode);
+            SetModeDependentRowsVisible(b, designationMode);
             b.RampWidthDisplay.SetValue(new LocStrFormatted(RampWidthText(AutoDepthDesignation.GetTowerRampWidth(tower))));
             b.MaxLayersDisplay.SetValue(new LocStrFormatted(MaxLayersText(AutoDepthDesignation.GetTowerMaxLayersToExcavate(tower))));
             b.MinElevDisplay.SetValue(new LocStrFormatted(MinElevText(AutoDepthDesignation.GetTowerMaxDepthToDigTo(tower))));
@@ -416,7 +416,7 @@ namespace AutoTerrainDesignations
                     AutoDepthDesignation.SetTowerDesignationMode(tower, NextDesignationMode(AutoDepthDesignation.GetTowerDesignationMode(tower)));
                     DesignationMode mode = AutoDepthDesignation.GetTowerDesignationMode(tower);
                     modeDisplay.SetValue(new LocStrFormatted(DesignationModeText(mode)));
-                    SetModeDependentRowsEnabled(
+                    SetModeDependentRowsVisible(
                         flatteningDesignationTypeRow,
                         rampWidthRow,
                         maxLayersRow,
@@ -431,7 +431,7 @@ namespace AutoTerrainDesignations
                     AutoDepthDesignation.SetTowerDesignationMode(tower, PreviousDesignationMode(AutoDepthDesignation.GetTowerDesignationMode(tower)));
                     DesignationMode mode = AutoDepthDesignation.GetTowerDesignationMode(tower);
                     modeDisplay.SetValue(new LocStrFormatted(DesignationModeText(mode)));
-                    SetModeDependentRowsEnabled(
+                    SetModeDependentRowsVisible(
                         flatteningDesignationTypeRow,
                         rampWidthRow,
                         maxLayersRow,
@@ -622,7 +622,7 @@ namespace AutoTerrainDesignations
                 panel.BodyAdd(oreRow);
             }
 
-            SetModeDependentRowsEnabled(
+            SetModeDependentRowsVisible(
                 flatteningDesignationTypeRow,
                 rampWidthRow,
                 maxLayersRow,
@@ -742,12 +742,12 @@ namespace AutoTerrainDesignations
             }
         }
 
-        /// <summary>Applies mode-dependent row enabled state to an existing panel binding set.</summary>
+        /// <summary>Applies mode-dependent row visibility to an existing panel binding set.</summary>
         /// <param name="bindings">Panel binding set containing rows that should be updated.</param>
         /// <param name="designationMode">Currently selected designation mode.</param>
-        private static void SetModeDependentRowsEnabled(Bindings bindings, DesignationMode designationMode)
+        private static void SetModeDependentRowsVisible(Bindings bindings, DesignationMode designationMode)
         {
-            SetModeDependentRowsEnabled(
+            SetModeDependentRowsVisible(
                 bindings.FlatteningDesignationTypeRow,
                 bindings.RampWidthRow,
                 bindings.MaxLayersRow,
@@ -757,7 +757,7 @@ namespace AutoTerrainDesignations
                 designationMode);
         }
 
-        /// <summary>Enables controls that apply to the selected designation mode and disables irrelevant rows.</summary>
+        /// <summary>Shows controls that apply to the selected designation mode and hides irrelevant rows.</summary>
         /// <param name="flatteningDesignationTypeRow">Row containing the flattening-mode designation type controls.</param>
         /// <param name="rampWidthRow">Row containing ramp width controls.</param>
         /// <param name="maxLayersRow">Row containing max layer controls.</param>
@@ -765,7 +765,7 @@ namespace AutoTerrainDesignations
         /// <param name="clearanceRow">Row containing corridor clearance controls.</param>
         /// <param name="orePickerRow">Optional row containing the product scanning filter.</param>
         /// <param name="designationMode">Currently selected designation mode.</param>
-        private static void SetModeDependentRowsEnabled(
+        private static void SetModeDependentRowsVisible(
             Row? flatteningDesignationTypeRow,
             Row? rampWidthRow,
             Row? maxLayersRow,
@@ -775,28 +775,25 @@ namespace AutoTerrainDesignations
             DesignationMode designationMode)
         {
             bool isResourceMining = designationMode == DesignationMode.ResourceMining;
-            SetRowEnabled(flatteningDesignationTypeRow, !isResourceMining);
-            SetRowEnabled(rampWidthRow, isResourceMining);
-            SetRowEnabled(maxLayersRow, isResourceMining);
-            SetRowEnabled(orePurityRow, isResourceMining);
-            SetRowEnabled(clearanceRow, isResourceMining);
-            SetRowEnabled(orePickerRow, isResourceMining);
+            SetRowVisible(flatteningDesignationTypeRow, !isResourceMining);
+            SetRowVisible(rampWidthRow, isResourceMining);
+            SetRowVisible(maxLayersRow, isResourceMining);
+            SetRowVisible(orePurityRow, isResourceMining);
+            SetRowVisible(clearanceRow, isResourceMining);
+            SetRowVisible(orePickerRow, isResourceMining);
         }
 
-        /// <summary>Enables or disables every interactive child in a row.</summary>
-        /// <param name="row">Row whose children should be enabled or disabled, or null when the row was not built.</param>
-        /// <param name="enabled">True to enable all child components; false to disable them.</param>
-        private static void SetRowEnabled(Row? row, bool enabled)
+        /// <summary>Shows or hides a row, or does nothing when the row was not built.</summary>
+        /// <param name="row">Row whose visibility should be updated, or null when the row was not built.</param>
+        /// <param name="visible">True to show the row; false to hide it.</param>
+        private static void SetRowVisible(Row? row, bool visible)
         {
             if (row == null)
             {
                 return;
             }
 
-            foreach (UiComponent child in row.AllChildren)
-            {
-                child.Enabled(enabled);
-            }
+            row.Visible(visible);
         }
 
         /// <summary>Returns the next designation mode in the inspector's two-state selector.</summary>
