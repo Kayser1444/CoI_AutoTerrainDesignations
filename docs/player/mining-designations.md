@@ -27,6 +27,12 @@ The panel also includes a **Remove Debris** action. This designates debris in th
 
 ## Inspector settings
 
+### `Mode`
+
+Use **Resource Mining** to scan for selected resources and place mining designations. This mode shows the mining-specific settings: **Ramp width**, **Max layers to excavate**, **Ore quality**, **Corridor clearance**, and **Scanning filter**.
+
+Use **Flattening** to set the tower area to the configured elevation with the selected **Level action**. The mining-specific settings are hidden while Flattening is selected.
+
 ### `Max height diff`
 
 Controls how much vertical difference ATD allows between neighboring designation cells.
