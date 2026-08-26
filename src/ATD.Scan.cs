@@ -867,6 +867,12 @@ namespace AutoTerrainDesignations
                 SetTowerLastRampOutcome(
                     tower, rampOutcome,
                     terminalPayload.RampResult.SuppressWarningNotification);
+                if (string.Equals(
+                        terminalPayload.RampResult.FailureReason,
+                        "SnapshotTooLarge",
+                        StringComparison.Ordinal)
+                    && rampOutcome == RampPlacementOutcome.Failed)
+                    UpdateTowerSnapshotTooLargeWarningNotification(tower);
 
                 var protectedAccesswayOrigins = new HashSet<Tile2i>(preexistingTerrainWorkOrigins);
                 protectedAccesswayOrigins.UnionWith(
@@ -1419,6 +1425,12 @@ namespace AutoTerrainDesignations
             SetTowerLastRampOutcome(
                 tower, rampResult.Outcome,
                 rampResult.SuppressWarningNotification);
+            if (string.Equals(
+                    rampResult.FailureReason,
+                    "SnapshotTooLarge",
+                    StringComparison.Ordinal)
+                && rampResult.Outcome == RampPlacementOutcome.Failed)
+                UpdateTowerSnapshotTooLargeWarningNotification(tower);
         }
 
         private const int RAMP_ACCESS_SEARCH_MARGIN_TILES = 48;
@@ -1486,8 +1498,10 @@ namespace AutoTerrainDesignations
             Tile2i bbMax)
         {
             if (s_towerReachabilityFloodValid
-                && s_towerReachabilityFloodBbMin == bbMin
-                && s_towerReachabilityFloodBbMax == bbMax
+                && s_towerReachabilityFloodBbMin.X <= bbMin.X
+                && s_towerReachabilityFloodBbMin.Y <= bbMin.Y
+                && s_towerReachabilityFloodBbMax.X >= bbMax.X
+                && s_towerReachabilityFloodBbMax.Y >= bbMax.Y
                 && s_towerReachabilityFloodTowerPosition == towerPosition
                 && Equals(s_towerReachabilityFloodPathFindingParams, pfParams))
             {
@@ -1673,17 +1687,22 @@ namespace AutoTerrainDesignations
             VehiclePathFindingParams pfParams = s_excavatorPathFindingParams;
             Tile2i towerPosition = GetTowerPosition(tower, bbMin, bbMax);
 
-            int baseMinX = Math.Min(bbMin.X, towerPosition.X);
-            int baseMinY = Math.Min(bbMin.Y, towerPosition.Y);
-            int baseMaxX = Math.Max(bbMax.X, towerPosition.X);
-            int baseMaxY = Math.Max(bbMax.Y, towerPosition.Y);
-            bool targetsWithinBaseBounds = targetTiles.All(target =>
-                target.X >= baseMinX && target.X <= baseMaxX
-                && target.Y >= baseMinY && target.Y <= baseMaxY);
-            if (targetsWithinBaseBounds)
+            EnsureTowerReachabilityFlood(
+                pathabilityProvider,
+                pfParams,
+                towerPosition,
+                bbMin,
+                bbMax);
+
+            bool targetsWithinCachedFlood =
+                s_towerReachabilityFloodValid
+                && targetTiles.All(target =>
+                    target.X >= s_towerReachabilityFloodBbMin.X
+                    && target.X <= s_towerReachabilityFloodBbMax.X
+                    && target.Y >= s_towerReachabilityFloodBbMin.Y
+                    && target.Y <= s_towerReachabilityFloodBbMax.Y);
+            if (targetsWithinCachedFlood)
             {
-                EnsureTowerReachabilityFlood(
-                    pathabilityProvider, pfParams, towerPosition, bbMin, bbMax);
                 if (!s_towerReachabilityFloodHasStart)
                 {
                     LogLegacyAccessDebug(

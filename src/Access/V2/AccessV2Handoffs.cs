@@ -6,23 +6,6 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access.V2
 {
-    internal readonly struct AccessV2TerminalExtensionRequest
-    {
-        public AccessHandoffOperation Operation { get; }
-        public int ExtensionLane { get; }
-        public bool IsValid => (Operation == AccessHandoffOperation.Mining
-                || Operation == AccessHandoffOperation.Dumping)
-            && (ExtensionLane == 0 || ExtensionLane == 1);
-
-        public AccessV2TerminalExtensionRequest(
-            AccessHandoffOperation operation,
-            int extensionLane)
-        {
-            Operation = operation;
-            ExtensionLane = extensionLane;
-        }
-    }
-
     internal sealed class AccessV2HandoffCandidate
     {
         public Tile2i ExitDirection { get; }
@@ -40,6 +23,9 @@ namespace AutoTerrainDesignations.Access.V2
         public bool IsQuickPath { get; }
         public float CenterSpokeCost { get; }
         public bool IsStaggeredExtension { get; }
+        internal bool IsBoundedTerminal { get; }
+        internal IReadOnlyList<AccessV2TerminalRankDelta> TerminalRanks { get; }
+        internal AccessV2TerminalFrontage TerminalFrontage { get; }
         public int NonCrestLane { get; }
         public bool Lane0RequiresCrest => NonCrestLane != 0;
         public bool Lane1RequiresCrest => NonCrestLane != 1;
@@ -59,7 +45,10 @@ namespace AutoTerrainDesignations.Access.V2
             bool isQuickPath = false,
             float centerSpokeCost = 2f,
             bool isStaggeredExtension = false,
-            int nonCrestLane = -1)
+            int nonCrestLane = -1,
+            bool isBoundedTerminal = false,
+            IReadOnlyList<AccessV2TerminalRankDelta>? terminalRanks = null,
+            AccessV2TerminalFrontage terminalFrontage = default)
         {
             ExitDirection = exitDirection;
             SpanLength = spanLength;
@@ -76,6 +65,9 @@ namespace AutoTerrainDesignations.Access.V2
             IsQuickPath = isQuickPath;
             CenterSpokeCost = Math.Max(2f, centerSpokeCost);
             IsStaggeredExtension = isStaggeredExtension;
+            IsBoundedTerminal = isBoundedTerminal;
+            TerminalRanks = terminalRanks ?? Array.Empty<AccessV2TerminalRankDelta>();
+            TerminalFrontage = terminalFrontage;
             NonCrestLane = nonCrestLane;
         }
 
@@ -131,54 +123,6 @@ namespace AutoTerrainDesignations.Access.V2
         /// bounded forward terminal extension using the operation already
         /// proven by the first lane.
         /// </summary>
-        internal static AccessV2TerminalExtensionRequest
-            GetSameTypeExtensionRequest(
-            IReadOnlyList<AccessV2BandState> recentNewestFirst,
-            AccessV2SingleLaneHandoffEvaluator singleEvaluator)
-        {
-            if (recentNewestFirst.Count == 0)
-                return default;
-            AccessV2BandState current = recentNewestFirst[0];
-            AccessHandoffOperation lane0 = GetLaneOperation(0);
-            AccessHandoffOperation lane1 = GetLaneOperation(1);
-            bool lane0Terminal = IsTerrainOperation(lane0);
-            bool lane1Terminal = IsTerrainOperation(lane1);
-            if (lane0Terminal == lane1Terminal)
-                return default;
-            AccessHandoffOperation operation = lane0Terminal ? lane0 : lane1;
-            return operation == AccessHandoffOperation.Mining
-                || operation == AccessHandoffOperation.Dumping
-                    ? new AccessV2TerminalExtensionRequest(
-                        operation, lane0Terminal ? 1 : 0)
-                    : default;
-
-            AccessHandoffOperation GetLaneOperation(int lane)
-            {
-                Tile2i origin = current.GetLaneOrigin(lane);
-                AccessHeightProfile profile = current.GetLane(lane).Profile;
-                Tile2i predecessor = AccessV2Geometry.Add(
-                    origin,
-                    AccessV2Geometry.Scale(current.EntryDirection, -1));
-                AccessHeightProfile predecessorProfile =
-                    recentNewestFirst.Count > 1
-                        ? recentNewestFirst[1].GetLane(lane).Profile
-                        : profile;
-                AccessHandoffOperation[] operations = singleEvaluator(
-                        origin, profile, predecessor, predecessorProfile)
-                    .Select(item => item.Operation)
-                    .Where(IsTerrainOperation)
-                    .Distinct()
-                    .ToArray();
-                return operations.Length == 1
-                    ? operations[0]
-                    : AccessHandoffOperation.None;
-            }
-
-            bool IsTerrainOperation(AccessHandoffOperation candidate)
-                => candidate == AccessHandoffOperation.Mining
-                    || candidate == AccessHandoffOperation.Dumping;
-        }
-
         internal static bool TryCreateDirectLevelingBridge(
             AccessV2BandState state,
             Tile2i groundEntry,
@@ -724,6 +668,8 @@ namespace AutoTerrainDesignations.Access.V2
                     $"{item.Operation}@{item.Tile}/span={item.SpanLength}"));
         }
 
+        // Save-replay compatibility for routes written before the bounded
+        // terminal evaluator. New searches never call this method.
         internal static IReadOnlyList<AccessV2HandoffCandidate>
             EvaluateStaggeredExtension(
                 IReadOnlyList<AccessV2BandState> terminalOldestFirst,

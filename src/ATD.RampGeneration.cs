@@ -155,6 +155,11 @@ namespace AutoTerrainDesignations
         private static readonly HashSet<Tile2i> s_buildingOccupiedTiles = new HashSet<Tile2i>();
         private static readonly Dictionary<Tile2i, HashSet<int>> s_buildingFixedHeights2ByTile =
             new Dictionary<Tile2i, HashSet<int>>();
+        private static readonly Dictionary<Tile2i,
+            List<AccessCapturedLayoutOccupancy>>
+            s_layoutEntityOccupanciesByTile =
+                new Dictionary<Tile2i,
+                    List<AccessCapturedLayoutOccupancy>>();
 
         /// <summary>
         /// Origin tile coordinates (4-tile-grid-aligned) of every terrain designation currently present in the
@@ -205,6 +210,7 @@ namespace AutoTerrainDesignations
 
             s_buildingOccupiedTiles.Clear();
             s_buildingFixedHeights2ByTile.Clear();
+            s_layoutEntityOccupanciesByTile.Clear();
             if (s_entitiesManager == null)
             {
                 return;
@@ -233,6 +239,7 @@ namespace AutoTerrainDesignations
                 Tile2i center = entity.CenterTile.Xy;
                 int fixedHeight2 = entity.CenterTile.Z * 2;
                 var occupiedTiles = entity.OccupiedTiles;
+                bool isLayoutEntity = entity is ILayoutEntity;
                 bool capturedEntity = false;
                 for (int i = 0; i < occupiedTiles.Length; i++)
                 {
@@ -248,6 +255,26 @@ namespace AutoTerrainDesignations
                             s_buildingFixedHeights2ByTile[absCoord] = heights;
                         }
                         heights.Add(fixedHeight2);
+                        if (isLayoutEntity)
+                        {
+                            if (!s_layoutEntityOccupanciesByTile.TryGetValue(
+                                    absCoord,
+                                    out List<AccessCapturedLayoutOccupancy>
+                                        layoutOccupancies))
+                            {
+                                layoutOccupancies =
+                                    new List<AccessCapturedLayoutOccupancy>();
+                                s_layoutEntityOccupanciesByTile[absCoord] =
+                                    layoutOccupancies;
+                            }
+                            layoutOccupancies.Add(
+                                new AccessCapturedLayoutOccupancy(
+                                    entity.CenterTile.Z
+                                        + occupiedTiles[i].FromHeightRel.Value,
+                                    entity.CenterTile.Z
+                                        + occupiedTiles[i].ToHeightRelExcl.Value,
+                                    entity.Position3f.Height.Value.ToFloat()));
+                        }
                     }
                 }
                 if (capturedEntity)
@@ -613,6 +640,26 @@ namespace AutoTerrainDesignations
                 LogExperimentalAccessDebug("[ATD Access] legacy straight-ramp generator suppressed by mod setting.");
             }
 
+            bool experimentalSnapshotTooLarge = false;
+            if (experimentalSearchEnabled)
+            {
+                bool snapshotTooLarge = IsExperimentalSnapshotTooLarge(
+                    tower,
+                    terrMgr,
+                    accessWorkDepths.Count,
+                    s_buildingOccupiedTiles.Count,
+                    out _,
+                    out _,
+                    out ExperimentalSnapshotPreflightDiagnostics preflight);
+                LogExperimentalAccessDebug(preflight.Format());
+                if (snapshotTooLarge)
+                {
+                    experimentalSearchEnabled = false;
+                    experimentalSnapshotTooLarge = true;
+                    result.FailureReason = "SnapshotTooLarge";
+                }
+            }
+
             // 2. Identify existing access providers
             var existingProviders = new List<AccessProvider>();
             var accessibleAccessOrigins = new HashSet<Tile2i>();
@@ -630,6 +677,50 @@ namespace AutoTerrainDesignations
                 {
                     bool reachesTower = ExistingAccessOriginConnectsToTower(tower, origin, accessWorkDepths, accesswayProto, accessibleAccessOrigins, inaccessibleAccessOrigins);
                     existingProviders.Add(new AccessProvider(new[] { origin, origin.AddX(4), origin.AddY(4), origin.AddXy(4) }, reachesTower));
+                }
+            }
+
+            if (s_vehiclePathFindingManager != null
+                && s_excavatorPathFindingParams != null)
+            {
+                Tile2i towerBoundsMin = tower.Area.BoundingBoxMin;
+                Tile2i towerBoundsMax = tower.Area.BoundingBoxMax;
+                int reachabilityMinX = towerBoundsMin.X;
+                int reachabilityMinY = towerBoundsMin.Y;
+                int reachabilityMaxX = towerBoundsMax.X;
+                int reachabilityMaxY = towerBoundsMax.Y;
+                foreach (AccessOriginCluster cluster in originClusters)
+                {
+                    foreach (AccessWorkOrigin origin in cluster.Origins)
+                    {
+                        reachabilityMinX = Math.Min(
+                            reachabilityMinX, origin.Origin.X);
+                        reachabilityMinY = Math.Min(
+                            reachabilityMinY, origin.Origin.Y);
+                        reachabilityMaxX = Math.Max(
+                            reachabilityMaxX, origin.Origin.X + 3);
+                        reachabilityMaxY = Math.Max(
+                            reachabilityMaxY, origin.Origin.Y + 3);
+                    }
+                }
+                if (reachabilityMinX < towerBoundsMin.X
+                    || reachabilityMinY < towerBoundsMin.Y
+                    || reachabilityMaxX > towerBoundsMax.X
+                    || reachabilityMaxY > towerBoundsMax.Y)
+                {
+                    EnsureTowerReachabilityFlood(
+                        s_vehiclePathFindingManager.PathabilityProvider,
+                        s_excavatorPathFindingParams,
+                        GetTowerPosition(
+                            tower,
+                            towerBoundsMin,
+                            towerBoundsMax),
+                        new Tile2i(reachabilityMinX, reachabilityMinY),
+                        new Tile2i(reachabilityMaxX, reachabilityMaxY));
+                    LogExperimentalAccessDebug(
+                        $"[ATD Reachability] shared flood expanded "
+                        + $"bounds=({reachabilityMinX},{reachabilityMinY}).."
+                        + $"({reachabilityMaxX},{reachabilityMaxY})");
                 }
             }
 
@@ -722,7 +813,10 @@ namespace AutoTerrainDesignations
                     origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
                 EvaluatedAccessCandidate? experimentalCandidate = null;
                 bool experimentalCandidateUsesOutsideArea = false;
-                string experimentalFailureSummary = string.Empty;
+                string experimentalFailureSummary =
+                    experimentalSnapshotTooLarge
+                        ? "SnapshotTooLarge"
+                        : string.Empty;
                 if (experimentalSearchEnabled)
                 {
                     List<Tile2i> accessibleFixedGoals = GetAccessibleFixedGoalOrigins(
@@ -956,6 +1050,12 @@ namespace AutoTerrainDesignations
                         {
                             experimentalFailureSummary =
                                 FormatExperimentalFailureSummary(experimentalResult);
+                            // Preserve the concrete search outcome for the
+                            // manager's terminal diagnostic. Without this,
+                            // managed farming requests collapsed a quick
+                            // V2NoFeasibleStart/NoPath result to the generic
+                            // RampPlacementOutcome.Failed label.
+                            result.FailureReason = experimentalFailureSummary;
                         }
 
                         if (string.IsNullOrEmpty(experimentalFailureSummary))
@@ -1249,7 +1349,7 @@ namespace AutoTerrainDesignations
                         worstOutcome = RampPlacementOutcome.Failed;
                         states[cluster] = AccessClusterState.Blocked;
                         RecordAccessClusterOverlay(originClusters, states);
-                        AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, BlockedReason.NoCandidate, 0f));
+                        AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, GetBlockedReason(experimentalFailureSummary), 0f));
                         if (emitNoCandidateWarnings)
                             Log.Warning($"[ATD Access] warning tower={towerPos} originCluster={cluster.ClusterId} reason=no valid accessway candidate{FormatOptionalAccessFailure(experimentalFailureSummary)}; work cannot progress");
                     }
@@ -1259,7 +1359,7 @@ namespace AutoTerrainDesignations
                     worstOutcome = RampPlacementOutcome.Failed;
                     states[cluster] = AccessClusterState.Blocked;
                     RecordAccessClusterOverlay(originClusters, states);
-                    AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, BlockedReason.NoCandidate, 0f));
+                    AccessDiagnostics.LogClusterState(new AccessAnalysisResult(cluster, AccessClusterState.Blocked, AccessNeed.Mining, null, null, GetBlockedReason(experimentalFailureSummary), 0f));
                     if (emitNoCandidateWarnings)
                         Log.Warning($"[ATD Access] warning tower={towerPos} originCluster={cluster.ClusterId} reason=no valid accessway candidate{FormatOptionalAccessFailure(experimentalFailureSummary)}; work cannot progress");
                 }
@@ -1327,6 +1427,14 @@ namespace AutoTerrainDesignations
             }
             return result;
         }
+
+        private static BlockedReason GetBlockedReason(
+            string failureSummary)
+            => failureSummary.IndexOf(
+                    "SnapshotTooLarge",
+                    StringComparison.Ordinal) >= 0
+                ? BlockedReason.SnapshotTooLarge
+                : BlockedReason.NoCandidate;
 
         private static string FormatOptionalAccessFailure(string failureSummary)
             => string.IsNullOrEmpty(failureSummary)

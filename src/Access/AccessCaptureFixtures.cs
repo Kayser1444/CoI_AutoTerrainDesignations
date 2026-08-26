@@ -90,20 +90,93 @@ namespace AutoTerrainDesignations.Access
             {
                 [new Tile2i(4, 8)] = new HashSet<int> { 6 }
             };
+            var layoutOccupancies = new Dictionary<Tile2i,
+                List<AccessCapturedLayoutOccupancy>>
+            {
+                [new Tile2i(4, 8)] =
+                    new List<AccessCapturedLayoutOccupancy>
+                    {
+                        new AccessCapturedLayoutOccupancy(2, 3, 3f)
+                    }
+            };
             AccessCapturedBuildingFacts buildingFacts =
                 AccessCapturedBuildingFacts.Capture(
-                    occupiedTiles, fixedHeights);
+                    occupiedTiles, fixedHeights, layoutOccupancies);
             occupiedTiles.Clear();
             fixedHeights[new Tile2i(4, 8)].Clear();
+            layoutOccupancies[new Tile2i(4, 8)].Clear();
             if (buildingFacts.OccupiedTileCount != 1
                 || !buildingFacts.ContainsOccupiedTile(new Tile2i(4, 8))
                 || !buildingFacts.FixedHeights2ByTile.TryGetValue(
                     new Tile2i(4, 8), out HashSet<int>? capturedHeights)
                 || !capturedHeights.Contains(6)
+                || !buildingFacts.LayoutOccupanciesByTile.TryGetValue(
+                    new Tile2i(4, 8),
+                    out AccessCapturedLayoutOccupancy[]? capturedOccupancies)
+                || capturedOccupancies.Length != 1
                 || !buildingFacts.DoesOriginOverlap(new Tile2i(4, 8)))
             {
                 failure =
                     "Building occupancy capture did not detach from live mutable collections.";
+                return false;
+            }
+
+            Tile2i readinessTile = new Tile2i(12, 16);
+            Tile2i clearTile = new Tile2i(13, 16);
+            var readinessFacts = new AccessDesignationReadinessFacts(
+                new Dictionary<Tile2i, float>
+                {
+                    [readinessTile] = 5f
+                },
+                new Dictionary<Tile2i, float>
+                {
+                    [readinessTile] = 4f
+                },
+                new Dictionary<Tile2i,
+                    AccessCapturedLayoutOccupancy[]>
+                {
+                    [readinessTile] = new[]
+                    {
+                        new AccessCapturedLayoutOccupancy(2, 3, 3f)
+                    }
+                });
+            if (readinessFacts.FactCount != 3
+                || readinessFacts.IsMiningFulfilled(
+                    readinessTile, 2f, 2f, upperEdge: false)
+                || readinessFacts.IsMiningFulfilled(
+                    readinessTile, 3f, 2f, upperEdge: true)
+                || !readinessFacts.IsMiningFulfilled(
+                    readinessTile, 2f, 2f, upperEdge: true)
+                || !readinessFacts.IsMiningFulfilled(
+                    clearTile, 2f, 2f, upperEdge: false)
+                || !readinessFacts.IsDumpingFulfilled(
+                    readinessTile, 2f, 3f)
+                || !readinessFacts.IsDumpingFulfilled(
+                    readinessTile, 2.9f, 3f)
+                || readinessFacts.IsDumpingFulfilled(
+                    readinessTile, 1f, 3f)
+                || readinessFacts.IsDumpingFulfilled(
+                    readinessTile, 2f, 4f))
+            {
+                failure =
+                    "Captured designation-readiness facts did not match vanilla mining/dumping rules.";
+                return false;
+            }
+
+            var lowerObstacleFacts = new AccessDesignationReadinessFacts(
+                new Dictionary<Tile2i, float>
+                {
+                    [readinessTile] = 1f
+                },
+                new Dictionary<Tile2i, float>
+                {
+                    [readinessTile] = 1f
+                });
+            if (!lowerObstacleFacts.IsMiningFulfilled(
+                    readinessTile, 2f, 2f, upperEdge: false))
+            {
+                failure =
+                    "Mining readiness must ignore props and stumps below the target height.";
                 return false;
             }
 

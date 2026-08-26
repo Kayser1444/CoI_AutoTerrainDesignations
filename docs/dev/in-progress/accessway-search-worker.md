@@ -1,17 +1,25 @@
 # Accessway Search Worker
 
 Status: approved worker design; the worker itself is not implemented. Ticket 1
-is running through the cooperative execution seam, and the first Ticket 2
-capture-contract slice adds revision diagnostics, memory backpressure, and
-fail-closed snapshot sizing. Interactive and capture paths now also carry
-tower-local ramp/clearance revisions; pure live-fact extraction remains in
-progress. Building occupancy and fixed-height facts are now copied at capture
-entry and reused by cleanup and durability preparation. Captured precise
-terrain heights now feed handoff geometry and rank-work checks; vanilla
-designation-readiness callbacks remain a separate live-API extraction seam.
+is implemented and Ticket 2 is in progress on the cooperative execution seam:
+capture has revision diagnostics, memory backpressure, fail-closed snapshot
+sizing, tower-local ramp/clearance revisions, copied building/prop/tree facts,
+and captured terrain heights. Vanilla designation-readiness callbacks are
+answered from captured primitive facts during pure preparation; no live
+designation-manager callback is retained by the cooperative evaluator.
+Oversized snapshots now fail before initial reachability classification, and
+out-of-area origin checks reuse one bounded tower flood.
+Production snapshot capture now constructs its workspace-owned evaluator from
+captured facts and policy; delegate-injected evaluators remain only in
+synthetic fixtures, and the immutable snapshot no longer accepts callback-shaped
+compatibility inputs. Readiness fixtures cover terrain, props, stumps, and exact
+layout-occupancy edge cases. Large-area capture stress evidence and final
+pure-helper isolation remain before Ticket 3 can begin.
 
-Related design: [ATD Accessway Manager](../planned/atd-accessway-manager.md)
-and [ADR 0003](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md).
+Related design: [ATD Accessway Manager](../planned/atd-accessway-manager.md),
+[Access Search Laboratory](../planned/access-search-laboratory.md),
+[ADR 0003](../../adr/0003-coordinate-accessway-work-through-one-cooperative-manager.md),
+and [ADR 0006](../../adr/0006-replay-access-search-from-owned-snapshots.md).
 
 ## Objective
 
@@ -459,6 +467,51 @@ preserved controller should be repurposed for resumable game-thread preparation
 only. If those phases are already smooth, the adaptive ticket may be reduced or
 closed rather than activated without evidence.
 
+## Approved cooperative search slicing
+
+The cooperative backend uses exact, resumable continuations for the pure
+search work that can otherwise hide a large amount of data-dependent work
+inside one visited-node expansion. The existing fixed manager budgets remain
+authoritative (currently 10 ms for automated work, 15 ms for interactive work,
+and up to 30 ms while paused). A slice
+may finish an indivisible item after its deadline; the existing slow-step and
+slice diagnostics expose that overrun, and repeated atomic overruns in the
+40-60 ms range promote that helper for a later deeper split.
+
+One search session owns at most one active, typed continuation. The continuation
+resumes before another queue node is popped and retains the exact current node,
+stage, loop indices, partial accumulators, and pending queue effects. A shared
+absolute-deadline budget object carries the deadline and cancellation state
+through nested helpers. Checkpoints occur before and after each data-dependent
+item (for example a ground path segment, portal segment, candidate pair,
+history-parent step, or ray-distance band); fixed-size geometry loops remain
+atomic initially.
+
+The first implementation slices ground suffix traversal, fixed-navigation path
+and portal traversal, and handoff candidate pairing/entry enumeration. Lane
+candidate generation, ray-overlay internals, fixed-size transition geometry,
+snapshot capture, and live plan materialization remain atomic and separately
+instrumented. Continuation state is data-only, performs no live callbacks or
+game-state mutation, and is discarded on cancellation or invalidation. A
+completed continuation publishes no gameplay effect until the complete search
+result reaches the existing commit phase.
+
+V2 frontier expansion is now sliced at straight, strafe, and turn transition
+items as well. The continuation retains the original successor order and
+performs the same predecessor and transition validation for each item, but a
+large transition evaluator can no longer make the whole band expansion one
+uninterruptible frame operation. The frontier continuation remains measured as
+an aggregate phase; lane candidate generation and fixed-size transition
+geometry are still intentionally atomic for the next deeper-split slice.
+
+Lower-priority farming work is cancelled and restarted when an interactive
+request takes ownership; continuations are not parked across requests. The
+normal toast remains one active search presentation, updated at slice
+boundaries, with aggregate diagnostics for stages, slice counts, total time,
+maximum slice, and slow atomic steps. Capture and materialization retain their
+separate atomic-phase contracts until a later worker or targeted slicing slice
+addresses them.
+
 ## Approved snapshot and workspace separation
 
 The current snapshot's captured world facts and mutable search caches become
@@ -639,20 +692,29 @@ CPU policy.
    pure graph and index preparation behind the execution seam, and add revision
    dirtiness, memory estimation, and snapshot backpressure. Apply the seam to
    farming first while execution remains cooperative.
-3. **Dormant farming worker.** Add the persistent thread, mailboxes,
+3. **Replay seam and single-case round trip.** Record one owned, validated
+   snapshot and outcome, then reproduce it exactly outside the game through the
+   exact built mod DLL. This proves the worker boundary is also a stable testing
+   seam without introducing worker scheduling.
+4. **Corpus regression and benchmark runner.** Promote local real cases into a
+   strict semantic corpus and sequential Release performance suite with
+   deterministic replay, process isolation, watchdogs, and exact result diffs.
+5. **Dormant farming worker.** Add the persistent thread, mailboxes,
    cancellation checkpoints, lifecycle and fault handling, bounded progress and
    diagnostics, and internal-only farming execution. It is not player-selectable.
-4. **Complete manager integration.** Add authoritative live-plan validation and
+6. **Complete manager integration.** Add authoritative live-plan validation and
    migrate interactive, repair, existing-terrain, and ghost-tower paths. Verify
    saving, world reset, preemption, mode transitions, terminal races, and fail-
    closed behavior.
-5. **Stage-one opt-in release.** Expose the global execution-mode setting and
+7. **Stage-one opt-in release.** Expose the global execution-mode setting and
    translations, tune measured bounds, satisfy the stage-one promotion gates,
    playtest, and prepare the public worker-opt-in release.
 
 Every slice keeps the normal production backend usable. Partial worker support
 remains inaccessible to players until all production callers honor the same
-mode contract.
+mode contract. Collaborative visualization/import and autonomous tuning follow
+the laboratory design but do not block the worker thread after its foundational
+replay and regression slices are trustworthy.
 
 ## Open decisions
 

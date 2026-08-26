@@ -23,7 +23,8 @@ namespace AutoTerrainDesignations.Access
         MouthUnreachable,
         EdgeMismatch,
         Obstructed,
-        UnsupportedGeometry
+        UnsupportedGeometry,
+        SnapshotTooLarge
     }
 
     public enum AccessNeedType

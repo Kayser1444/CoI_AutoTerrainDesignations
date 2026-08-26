@@ -744,6 +744,10 @@
     "[ATD] {entity} konnte keinen Weg zur Rampe finden"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] Der Zugangsbereich von {entity} ist für die Suche nach Wenderampen zu groß"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity} hat Feldvorbereitung und Auffüllung abgeschlossen"
   ],

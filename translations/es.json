@@ -744,6 +744,10 @@
     "[ATD] {entity} no pudo encontrar una ruta hasta la rampa"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] El área de acceso de {entity} es demasiado grande para buscar rampas de giro"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity} completó la preparación y el rellenado de tierra de cultivo"
   ],

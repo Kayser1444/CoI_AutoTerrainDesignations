@@ -10,6 +10,7 @@
   "notification.farming_complete": "[ATD] {entity} farming preparation and filling complete",
   "notification.ramp_access_failed": "[ATD] {entity} could not start an access ramp",
   "notification.ramp_access_not_accessible": "[ATD] {entity} could not path to the ramp",
+  "notification.ramp_access_snapshot_too_large": "[ATD] {entity} access area is too large for the turning-ramp search",
   "notification.ramp_access_truncated": "[ATD] {entity} could not fit a full access ramp",
   "panel.designations.accessway_mode.auto.tooltip": "Use the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF.",
   "panel.designations.accessway_mode.label": "Accessway mode",

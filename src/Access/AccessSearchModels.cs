@@ -370,6 +370,18 @@ namespace AutoTerrainDesignations.Access
         public bool HasDumpingMaterial { get; }
         internal IReadOnlyDictionary<Tile2i, float> PreciseTerrainHeights
             => m_preciseTerrainHeights;
+        internal AccessDesignationReadinessFacts DesignationReadinessFacts
+            { get; }
+        // These value-owned collections are exposed only to the workspace
+        // evaluator. They are never shared with the live game state.
+        internal HashSet<Tile2i> GroundNodes => m_groundNodes;
+        internal HashSet<Tile2i> GoalGroundNodeSet => m_goalGroundNodes;
+        internal HashSet<Tile2i> TerrainPathableWithoutBlockers
+            => m_terrainPathableWithoutBlockers;
+        internal Dictionary<Tile2i, AccessPropCleanupInfo> PropCleanupByOrigin
+            => m_propCleanupByOrigin;
+        internal Dictionary<Tile2i, AccessPropCleanupInfo> PropCleanupByTile
+            => m_propCleanupByTile;
         public AccessSearchPolicySnapshot Policy { get; }
         public AccessRequestSettingsRevision RequestSettingsRevision { get; }
         public AccessCaptureRevision CaptureRevision { get; }
@@ -415,11 +427,6 @@ namespace AutoTerrainDesignations.Access
             IEnumerable<Tile2i> occupiedTiles,
             IEnumerable<Tile2i> oceanTiles,
             IEnumerable<AccessDurabilityCorner> durabilityCorners,
-            // Compatibility-only inputs retained while callers migrate to
-            // AccessSearchWorkspace. They are intentionally not stored on the
-            // immutable snapshot or consulted by the execution core.
-            Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
-                IReadOnlyList<AccessGroundHandoff>>? workableHandoffs = null,
             IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByOrigin = null,
             IDictionary<Tile2i, float>? preciseTerrainHeights = null,
             IDictionary<Tile2i, AccessTerrainColumn>? terrainColumns = null,
@@ -443,13 +450,7 @@ namespace AutoTerrainDesignations.Access
             bool avoidOcean = true,
             bool avoidBuildings = true,
             int vehicleWidth = 1,
-            Func<IReadOnlyList<AccessHandoffSpanCell>,
-                IReadOnlyList<AccessGroundHandoff>>? workableHandoffSpans = null,
             IDictionary<Tile2i, AccessPropCleanupInfo>? propCleanupByTile = null,
-            Func<Tile2i, AccessHeightProfile, Tile2i, AccessHeightProfile,
-                IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffs = null,
-            Func<IReadOnlyList<AccessHandoffSpanCell>,
-                IReadOnlyList<AccessGroundHandoff>>? v2WorkableHandoffSpans = null,
             float vehicleMaxSteepnessDelta = 0.5f,
             AccessUsefulHeightEnvelope? usefulHeightEnvelope = null,
             IEnumerable<Tile2i>? terrainPathableWithoutBlockers = null,
@@ -464,7 +465,8 @@ namespace AutoTerrainDesignations.Access
             float[]? prebuiltAnyGoalDistance = null,
             AccessSearchPolicySnapshot? policy = null,
             AccessCaptureDiagnostics? captureDiagnostics = null,
-            AccessRequestSettingsRevision requestSettingsRevision = default)
+            AccessRequestSettingsRevision requestSettingsRevision = default,
+            AccessDesignationReadinessFacts? designationReadinessFacts = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -514,6 +516,8 @@ namespace AutoTerrainDesignations.Access
                     avoidOcean,
                     avoidBuildings);
             RequestSettingsRevision = requestSettingsRevision;
+            DesignationReadinessFacts = designationReadinessFacts
+                ?? new AccessDesignationReadinessFacts();
             CaptureRevision = captureDiagnostics?.StartRevision
                 ?? default(AccessCaptureRevision);
             CaptureCompletionRevision = captureDiagnostics?.CompletionRevision
@@ -942,6 +946,7 @@ namespace AutoTerrainDesignations.Access
                     && sample.IsDenseDebris
                     && !sample.IsTree
                     && checkedProps.Add(sample.CleanupObjectKey)
+                    && !sample.IsRemovable
                     && !DoesV2DumpingBuryProp(state, sample))
                     return true;
             }
@@ -1098,10 +1103,10 @@ namespace AutoTerrainDesignations.Access
             if (operation == AccessHandoffOperation.Mining)
                 return true;
 
-            // Trees never block the post-work dumping test. A dense prop is
-            // also gone when this profile rises strictly beyond its captured
-            // exact-position burial threshold. Otherwise it still needs an
-            // independent cleanup origin outside the generated history.
+            // Trees never block the post-work dumping test. A removable dense
+            // prop is modeled as cleared independently of how materialization
+            // later obtains that cleanup (burial, excavation, Quick remove, or
+            // player assistance).
             var checkedProps = new HashSet<string>(StringComparer.Ordinal);
             for (int index = 0; index < cleanup.Samples.Count; index++)
             {
@@ -1111,12 +1116,7 @@ namespace AutoTerrainDesignations.Access
                     || hasProfile && DoesDumpingBuryProp(
                         origin, profile, sample))
                     continue;
-                if (!sample.IsRemovable
-                    || !history.ContainsCleanupKey(sample.CleanupObjectKey)
-                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
-                        cleanupOrigin != origin
-                        && !history.ContainsOrigin(cleanupOrigin)
-                        && !m_fixedProfiles.ContainsKey(cleanupOrigin)))
+                if (!sample.IsRemovable)
                     return false;
             }
             return true;
@@ -1140,11 +1140,14 @@ namespace AutoTerrainDesignations.Access
                 && operation != AccessHandoffOperation.Leveling)
                 return false;
 
+            EnsureProjectedV2ProfileCache(history);
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile>
+                projectedProfiles = AccessSearchWorkspace.For(this)
+                    .ProjectedV2CachedProfiles;
+
             int clearance = Math.Max(1, VehicleWidth);
             Tile2i corner = center + new RelTile2i(
                 -(clearance / 2), -(clearance / 2));
-            var rayTiles = new HashSet<Tile2i>(
-                history.CollectHandoffRayTiles());
             const float epsilon = 0.0001f;
             for (int y = 0; y < clearance; y++)
                 for (int x = 0; x < clearance; x++)
@@ -1152,7 +1155,7 @@ namespace AutoTerrainDesignations.Access
                     Tile2i tile = corner + new RelTile2i(x, y);
                     if (AvoidOcean && m_oceanTiles.Contains(tile)
                         || AvoidBuildings && m_occupiedTiles.Contains(tile)
-                        || rayTiles.Contains(tile)
+                        || history.ContainsHandoffRayTile(tile)
                             && !history.ContainsGeneratedTile(tile))
                         return false;
                     if (!TryGetPostWorkHeight(tile, out float height))
@@ -1171,8 +1174,8 @@ namespace AutoTerrainDesignations.Access
                         return false;
                 }
 
-            bool hasOwnerProfile = TryGetV2HandoffProfile(
-                origin, history, out AccessHeightProfile ownerProfile);
+            bool hasOwnerProfile = TryGetProfile(
+                origin, out AccessHeightProfile ownerProfile);
             bool operationWorks = hasOwnerProfile
                 && DoesV2HandoffOperationWorkCenter(
                     origin, ownerProfile, operation, center);
@@ -1212,12 +1215,7 @@ namespace AutoTerrainDesignations.Access
                     || hasOwnerProfile
                     && DoesDumpingBuryProp(origin, ownerProfile, sample))
                     continue;
-                if (!sample.IsRemovable
-                    || !history.ContainsCleanupKey(sample.CleanupObjectKey)
-                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
-                        cleanupOrigin != origin
-                        && !history.ContainsOrigin(cleanupOrigin)
-                        && !m_fixedProfiles.ContainsKey(cleanupOrigin)))
+                if (!sample.IsRemovable)
                     return false;
             }
             return true;
@@ -1226,8 +1224,8 @@ namespace AutoTerrainDesignations.Access
             {
                 foreach (Tile2i handoffOrigin in handoffOrigins)
                 {
-                    if (!TryGetV2HandoffProfile(
-                            handoffOrigin, history,
+                    if (!TryGetProfile(
+                            handoffOrigin,
                             out AccessHeightProfile handoffProfile))
                         continue;
                     int localX = tile.X - handoffOrigin.X;
@@ -1251,7 +1249,6 @@ namespace AutoTerrainDesignations.Access
                     return true;
                 }
 
-                EnsureProjectedV2ProfileCache(history);
                 Tile2i canonical = TerrainOriginForTile(tile);
                 Tile2i[] profileCandidates =
                 {
@@ -1263,7 +1260,7 @@ namespace AutoTerrainDesignations.Access
                 for (int index = 0; index < profileCandidates.Length; index++)
                 {
                     Tile2i profileOrigin = profileCandidates[index];
-                    if (!AccessSearchWorkspace.For(this).ProjectedV2CachedProfiles.TryGetValue(
+                    if (!projectedProfiles.TryGetValue(
                             profileOrigin, out AccessHeightProfile profile)
                         && !m_fixedProfiles.TryGetValue(
                             profileOrigin, out profile))
@@ -1279,6 +1276,12 @@ namespace AutoTerrainDesignations.Access
                 }
                 return m_preciseTerrainHeights.TryGetValue(tile, out height);
             }
+
+            bool TryGetProfile(
+                Tile2i profileOrigin,
+                out AccessHeightProfile profile)
+                => projectedProfiles.TryGetValue(profileOrigin, out profile)
+                    || m_fixedProfiles.TryGetValue(profileOrigin, out profile);
         }
 
         public bool DoesV2HandoffOperationWorkCenter(
@@ -1316,8 +1319,6 @@ namespace AutoTerrainDesignations.Access
             int clearance = Math.Max(1, VehicleWidth);
             Tile2i corner = center + new RelTile2i(
                 -(clearance / 2), -(clearance / 2));
-            var rayTiles = new HashSet<Tile2i>(
-                history.CollectHandoffRayTiles());
             const float epsilon = 0.0001f;
             for (int y = 0; y < clearance; y++)
                 for (int x = 0; x < clearance; x++)
@@ -1327,7 +1328,7 @@ namespace AutoTerrainDesignations.Access
                         return $"ocean@{tile}";
                     if (AvoidBuildings && m_occupiedTiles.Contains(tile))
                         return $"building@{tile}";
-                    if (rayTiles.Contains(tile)
+                    if (history.ContainsHandoffRayTile(tile)
                         && !history.ContainsGeneratedTile(tile))
                         return $"ray@{tile}";
                     if (!TryHeight(tile, out float height))
@@ -1433,11 +1434,7 @@ namespace AutoTerrainDesignations.Access
                 AccessPropSample sample = cleanup.Samples[index];
                 if (!sample.IsDenseDebris)
                     continue;
-                if (!sample.IsRemovable
-                    || !sample.EligibleCleanupOrigins.Any(cleanupOrigin =>
-                        handoffClearingOrigins.Contains(cleanupOrigin)
-                        || (!history.ContainsOrigin(cleanupOrigin)
-                            && !m_fixedProfiles.ContainsKey(cleanupOrigin))))
+                if (!sample.IsRemovable)
                     return false;
             }
             return true;
@@ -2711,6 +2708,40 @@ namespace AutoTerrainDesignations.Access
         public long V2TransitionEvaluationTicks;
         public long V2HandoffEvaluationTicks;
         public long V2HandoffLaneEvaluationTicks;
+        public long V2MaxTransitionEvaluationTicks;
+        public string V2MaxTransitionEvaluationDetail = string.Empty;
+        public long V2MaxHandoffEvaluationTicks;
+        public string V2MaxHandoffEvaluationDetail = string.Empty;
+        public long V2MaxHandoffContinuationTicks;
+        public string V2MaxHandoffContinuationDetail = string.Empty;
+        public long V2MaxFrontierContinuationTicks;
+        public string V2MaxFrontierContinuationDetail = string.Empty;
+        public long V2NodeCallbackTicks;
+        public long V2MaxNodeCallbackTicks;
+        public string V2MaxNodeCallbackDetail = string.Empty;
+        public long V2MaxBandSetupTicks;
+        public string V2MaxBandSetupDetail = string.Empty;
+        public long V2MaxTerminalExtensionTicks;
+        public string V2MaxTerminalExtensionDetail = string.Empty;
+        public int V2TerminalAttempts;
+        public int V2TerminalApplicableAttempts;
+        public int V2TerminalSuccesses;
+        public int V2TerminalBranches;
+        public int V2TerminalFrontages;
+        public int V2TerminalMaxRank;
+        public int V2TerminalMaxShapes;
+        public long V2TerminalEvaluationTicks;
+        public int V2TerminalOperationEvaluationCount;
+        public long V2TerminalOperationEvaluationTicks;
+        public long V2MaxTerminalOperationEvaluationTicks;
+        public int V2TerminalTransitionEvaluationCount;
+        public long V2TerminalTransitionEvaluationTicks;
+        public long V2MaxTerminalTransitionEvaluationTicks;
+        public int V2TerminalStaggeredEvaluationCount;
+        public long V2TerminalStaggeredEvaluationTicks;
+        public long V2MaxTerminalStaggeredEvaluationTicks;
+        public long V2CompletionTicks;
+        public string V2CompletionDetail = string.Empty;
         public long V2CorridorTicks;
         public long V2LocalEscapeTicks;
         public List<string> StartSuccessorDetails { get; } = new List<string>();
@@ -2748,6 +2779,129 @@ namespace AutoTerrainDesignations.Access
             if (!AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace)) return;
             if (V2GroundSuffixDetails.Count < MaxV2RouteDiagnosticDetails)
                 V2GroundSuffixDetails.Add(detail);
+        }
+
+        public void RecordV2MaxTransitionEvaluation(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxTransitionEvaluationTicks)
+                return;
+            V2MaxTransitionEvaluationTicks = elapsedTicks;
+            V2MaxTransitionEvaluationDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxHandoffEvaluation(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxHandoffEvaluationTicks)
+                return;
+            V2MaxHandoffEvaluationTicks = elapsedTicks;
+            V2MaxHandoffEvaluationDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxHandoffContinuation(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxHandoffContinuationTicks)
+                return;
+            V2MaxHandoffContinuationTicks = elapsedTicks;
+            V2MaxHandoffContinuationDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2Completion(
+            long elapsedTicks,
+            string detail)
+        {
+            V2CompletionTicks += elapsedTicks;
+            V2CompletionDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxFrontierContinuation(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxFrontierContinuationTicks)
+                return;
+            V2MaxFrontierContinuationTicks = elapsedTicks;
+            V2MaxFrontierContinuationDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxNodeCallback(
+            long elapsedTicks,
+            string detail)
+        {
+            V2NodeCallbackTicks += elapsedTicks;
+            if (elapsedTicks <= V2MaxNodeCallbackTicks)
+                return;
+            V2MaxNodeCallbackTicks = elapsedTicks;
+            V2MaxNodeCallbackDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxBandSetup(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxBandSetupTicks)
+                return;
+            V2MaxBandSetupTicks = elapsedTicks;
+            V2MaxBandSetupDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2MaxTerminalExtension(
+            long elapsedTicks,
+            string detail)
+        {
+            if (elapsedTicks <= V2MaxTerminalExtensionTicks)
+                return;
+            V2MaxTerminalExtensionTicks = elapsedTicks;
+            V2MaxTerminalExtensionDetail = detail ?? string.Empty;
+        }
+
+        public void RecordV2TerminalEvaluation(
+            long elapsedTicks,
+            AccessV2TerminalStatus status,
+            int branches,
+            int frontages,
+            int rank)
+        {
+            V2TerminalAttempts++;
+            V2TerminalEvaluationTicks += elapsedTicks;
+            V2TerminalBranches += branches;
+            V2TerminalFrontages += frontages;
+            V2TerminalMaxRank = Math.Max(V2TerminalMaxRank, rank);
+            V2TerminalMaxShapes = Math.Max(
+                V2TerminalMaxShapes, branches);
+            if (status != AccessV2TerminalStatus.NotApplicable)
+                V2TerminalApplicableAttempts++;
+            if (status == AccessV2TerminalStatus.Success)
+                V2TerminalSuccesses++;
+        }
+
+        public void RecordV2TerminalOperationEvaluation(long elapsedTicks)
+        {
+            V2TerminalOperationEvaluationCount++;
+            V2TerminalOperationEvaluationTicks += elapsedTicks;
+            V2MaxTerminalOperationEvaluationTicks = Math.Max(
+                V2MaxTerminalOperationEvaluationTicks, elapsedTicks);
+        }
+
+        public void RecordV2TerminalTransitionEvaluation(long elapsedTicks)
+        {
+            V2TerminalTransitionEvaluationCount++;
+            V2TerminalTransitionEvaluationTicks += elapsedTicks;
+            V2MaxTerminalTransitionEvaluationTicks = Math.Max(
+                V2MaxTerminalTransitionEvaluationTicks, elapsedTicks);
+        }
+
+        public void RecordV2TerminalStaggeredEvaluation(long elapsedTicks)
+        {
+            V2TerminalStaggeredEvaluationCount++;
+            V2TerminalStaggeredEvaluationTicks += elapsedTicks;
+            V2MaxTerminalStaggeredEvaluationTicks = Math.Max(
+                V2MaxTerminalStaggeredEvaluationTicks, elapsedTicks);
         }
 
         public void RecordV2VPrimeAdapter(string detail)

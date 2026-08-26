@@ -197,6 +197,37 @@ _Avoid_: Overlapping tower areas, geographic farmland region
 
 ## Accessway pathfinding
 
+**Access Search Laboratory**:
+The development capability that records and replays access searches, detects
+semantic regressions, benchmarks candidates, presents route changes, and
+supports bounded autonomous tuning campaigns.
+_Avoid_: Pathfinder test harness, replay runner, worker simulator
+
+**Access search conformance tuning**:
+Automated pathfinder improvement that may change performance or implementation
+but must preserve the exact canonical access-search outcome.
+_Avoid_: Fine tuning, route-quality tuning
+
+**Autonomous access tuning**:
+Repeated out-of-game access-search development that defaults to reducing search
+duration while preserving every canonical outcome exactly. Route-cost tuning is
+a separate, explicitly initiated activity whose changed routes require player
+promotion and in-game validation.
+_Avoid_: Autonomous route approval, general fine tuning
+
+**Access route-quality tuning**:
+Automated pathfinder exploration that may change selected routes, costs, or
+plans while remaining within explicit safety constraints and quality criteria.
+It may produce and rank candidates, but only player approval may promote a
+candidate or replace a canonical outcome.
+_Avoid_: Fine tuning, conformance tuning, automatic regression repair
+
+**Access replay case**:
+One immutable recorded access request and captured access snapshot paired with
+a separately replaceable, player-approved canonical outcome and its provenance.
+A changed outcome requires validation and re-baselining, not input re-capture.
+_Avoid_: Saved game, pathfinder fixture, disposable recording
+
 **Access obligation**:
 A workflow-owned need to connect current terrain work to reachable ground. It
 remains the same obligation while world state changes and successive route
@@ -684,9 +715,147 @@ level, so a charge-separation proof must remain strictly above the terrain
 ceiling plus this value.
 _Avoid_: Floating-point guard, arbitrary epsilon
 
+**Integer-flat terrain**:
+Terrain whose required handoff samples are level with one another, within the
+terrain-contact equality tolerance, at one integer physical height. The term
+describes observable geometry, not provenance: qualifying terrain may occur
+naturally or result from player flattening. It is the sole terrain class for
+the V2 quick leveling handoff.
+_Avoid_: Player-flattened terrain, leveling terrain
+
+**Leading edge**:
+The boundary edge of a lane or rank furthest in its current travel direction;
+informally, its forward edge. Leading-edge crest state controls terminal-lane
+extension, freezing, and regression.
+_Avoid_: Front edge, G-facing edge
+
+**Lagging edge**:
+The boundary edge of a lane or rank opposite its current travel direction and
+nearest its predecessor; informally, its rear edge. The initiating straight's
+coherent crossing runs from its lagging edge toward its leading edge.
+_Avoid_: Back edge, V-facing edge
+
+**Terminal rank**:
+One longitudinal step of an independent-lane terminal form. Rank one is the
+initiating two-origin straight. Each later rank advances every non-frozen lane
+and therefore adds one or two origins; a frozen lane contributes no new origin.
+The terminal-span bound counts these steps, including rank one.
+_Avoid_: Origin count, band state
+
+**Terminal vertical successor**:
+One compatible rising, level, or falling continuation from a live terminal
+branch. The selected height direction applies to every lane advanced at that
+rank; lanes do not choose independent height directions.
+_Avoid_: Lane-height combination, deterministic terminal step
+
+**Terminal rank frontier**:
+The bounded set of live vertical branches at one terminal rank. Every eligible
+frontage on every branch in the frontier is evaluated before success is decided
+or any successor frontier is advanced. It is local rank-synchronous shape
+enumeration, not the global V/G search frontier.
+_Avoid_: Global queue, depth-first terminal branch
+
+**Half-pre-crested lane**:
+A lane whose lagging edge has terrain samples strictly on both sides of ground
+for the candidate mining or dumping operation. This geometry describes the
+approach and does not by itself prevent terminal extension.
+_Avoid_: Invalid lane, mixed lane
+
+**Fully pre-crested lane**:
+A lane whose lagging edge has no sample strictly on the pre-crest side and at
+least one sample strictly on the crossed side. It remains eligible for terminal
+extension even though extending such lanes is not presently required.
+_Avoid_: Already invalid lane, completed lane
+
+**Crested lane**:
+A lane whose leading edge has at least one sample level with or across natural
+ground for its candidate operation. It is partially crested until every required
+edge sample has reached that side, then fully crested; `corner-crested` tests
+only the extremes while `edge-crested` tests the complete edge. This leading-edge
+state controls forward extension, freezing, and regression; it does not by
+itself describe crest eligibility on a lateral terminal frontage.
+_Avoid_: Grounded lane, finished handoff
+
+**Terminal frontage**:
+A catalogued width-two exit shape on the exposed perimeter of a V2 band or
+terminal form. The catalog contains one forward candidate formed by the two
+lane cursors, whether even or staggered, plus every pair of consecutive,
+collinear origin edges on an exposed lateral run, including an inner notch
+created by a stagger. A frontage becomes handoff-eligible when either of its
+operation-facing constituent edges is fully edge-crested, independently of the
+leading-edge crest states that control terminal extension.
+_Avoid_: Leading edge, extension lane
+
+**Handoff path proof**:
+A proof that a terminal frontage's bounded post-work vehicle-center mask has a
+cardinal connection to a particular captured G entry. The internal center
+sequence has no domain identity; retained route data consists only of the G
+entry, scalar distance/cost, and the deduplicated cleanup obligations of the
+minimum-cleanup-cost valid proof. Cleanup elsewhere in the mask is neither
+charged nor emitted. Replay must reprove connectivity, not reproduce an
+incidental center sequence.
+_Avoid_: Escape route, generated corridor
+
+**Independent-lane terminal extension**:
+A V2 alternative transition form that branches from the initiating rank's V
+predecessor, owns that rank under one mining or dumping operation shared by both
+lanes, freezes fully edge-crested lanes, extends every other lane, and tests the
+complete Mega-mask handoff for every newly exposed eligible terminal frontage.
+Only a two-origin straight transition can initiate the form. Turns own no rank,
+and strafes retain a leveling lane rather than owning two new lanes under the
+shared terminal operation; either may be followed by a straight that initiates
+a form.
+Leading-edge states control which lanes freeze or advance; forward or
+lateral frontage-edge states control which handoffs are tested. Leveling is a
+forward quick handoff on integer-flat terrain only and never creates a
+terminal-extension form or lateral candidate. A genuinely compatible lateral
+terrain crossing is left to mining or dumping frontage evaluation.
+Mixed-operation terminal forms are excluded; ordinary V search remains
+responsible for traversing cut-and-fill terrain toward a later uniform-operation
+terminal. Each initiating straight derives at most one coherent shared operation
+from its lagging-to-leading crossing; ambiguous or contradictory operation
+evidence creates no terminal form rather than forking mining and dumping
+alternatives, and that operation never changes within the form. Later forward,
+lateral, and notch frontages must be compatible with it. The resulting frontage
+may be even or staggered. Lane classifications determine the frozen and advanced
+sets mechanically, while every live branch may have compatible rising, level,
+and falling vertical successors. It never branches over lane subsets or assigns
+height directions independently per lane. Branches are processed as a
+rank-synchronous terminal frontier: every eligible frontage on every branch at
+the current rank is evaluated before success is decided or the next frontier is
+generated. Every newly exposed forward or
+lateral frontage with a fully crested constituent edge is tested, including
+frontages whose companion edge remains only partially crested; such a frontage
+may be the only connected exit. Unchanged frontages are not retested. A terminal
+form contains at most four terminal ranks, including its initiating rank, and
+ends after its first successful rank. Every newly eligible frontage at that rank
+is evaluated and all nondominated successful handoffs are returned; enumeration
+order never selects the winner. The bound limits local
+handoff work, not ordinary V route reach. First-successful-rank termination
+deliberately does not search later terminal frontages for a potentially cheaper
+exit. Direct goal contact does not bypass the other eligible frontages at that
+rank. The sibling ordinary transition owns the same initiating geometry under
+leveling and remains eligible independently; the terminal form never inherits
+or refunds its leveling cost.
+_Avoid_: Single-lane fallback, companion-lane extension, mixed-operation terminal,
+leveling extension, lateral leveling handoff
+
+**Crest regression**:
+An extended lane returning to an uncrested leading edge after becoming partially
+crested. It ends that terminal-extension branch as a non-coherent terrain
+crossing. The abort belongs only to that independent-lane terminal form; it
+ends only the affected vertical branch and does not suppress, dominate, or
+otherwise affect ordinary V successors from the shared predecessor or sibling
+vertical branches. Regression of any actively extended lane ends its vertical
+branch; the branch does not continue around that lane. Changes in lateral
+frontage classification never trigger regression by themselves.
+_Avoid_: Search timeout, terminal failure
+
 **Contact support**:
-The full discrete perimeter of the current 4×8 two-lane V2 band, through which
-any legal terrain terminal could first form.
+The full discrete exposed perimeter of the current 4×8 two-lane V2 band or its
+bounded terminal form, through which any legal terrain terminal could first
+form. Terminal candidates are drawn from the fixed terminal-frontage catalog;
+contact support does not authorize arbitrary edge pairing.
 _Avoid_: Work stencil, shared support stencil
 
 **Work support**:

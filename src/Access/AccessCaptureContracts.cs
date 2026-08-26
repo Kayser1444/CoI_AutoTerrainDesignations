@@ -6,6 +6,26 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
+    internal readonly struct AccessCapturedLayoutOccupancy
+    {
+        public int FromHeight { get; }
+        public int ToHeightExclusive { get; }
+        public float EntityHeight { get; }
+
+        public AccessCapturedLayoutOccupancy(
+            int fromHeight,
+            int toHeightExclusive,
+            float entityHeight)
+        {
+            FromHeight = fromHeight;
+            ToHeightExclusive = toHeightExclusive;
+            EntityHeight = entityHeight;
+        }
+
+        public bool ContainsHeight(int height)
+            => height >= FromHeight && height < ToHeightExclusive;
+    }
+
     /// <summary>
     /// Value-owned building facts captured at the beginning of access
     /// preparation. The capture must not keep consulting the farming cache
@@ -16,14 +36,20 @@ namespace AutoTerrainDesignations.Access
         private readonly HashSet<Tile2i> m_occupiedTiles;
         private readonly Dictionary<Tile2i, HashSet<int>>
             m_fixedHeights2ByTile;
+        private readonly Dictionary<Tile2i, AccessCapturedLayoutOccupancy[]>
+            m_layoutOccupanciesByTile;
 
         public int OccupiedTileCount => m_occupiedTiles.Count;
         public IReadOnlyDictionary<Tile2i, HashSet<int>> FixedHeights2ByTile
             => m_fixedHeights2ByTile;
+        internal IReadOnlyDictionary<Tile2i, AccessCapturedLayoutOccupancy[]>
+            LayoutOccupanciesByTile => m_layoutOccupanciesByTile;
 
         private AccessCapturedBuildingFacts(
             IEnumerable<Tile2i> occupiedTiles,
-            IReadOnlyDictionary<Tile2i, HashSet<int>> fixedHeights2ByTile)
+            IReadOnlyDictionary<Tile2i, HashSet<int>> fixedHeights2ByTile,
+            IReadOnlyDictionary<Tile2i, List<AccessCapturedLayoutOccupancy>>
+                layoutOccupanciesByTile)
         {
             m_occupiedTiles = new HashSet<Tile2i>(occupiedTiles);
             m_fixedHeights2ByTile = new Dictionary<Tile2i, HashSet<int>>();
@@ -32,15 +58,27 @@ namespace AutoTerrainDesignations.Access
             {
                 m_fixedHeights2ByTile[pair.Key] = new HashSet<int>(pair.Value);
             }
+            m_layoutOccupanciesByTile =
+                new Dictionary<Tile2i, AccessCapturedLayoutOccupancy[]>();
+            foreach (KeyValuePair<Tile2i, List<AccessCapturedLayoutOccupancy>>
+                pair in layoutOccupanciesByTile)
+            {
+                m_layoutOccupanciesByTile[pair.Key] = pair.Value.ToArray();
+            }
         }
 
         internal static AccessCapturedBuildingFacts Capture(
             IEnumerable<Tile2i> occupiedTiles,
-            IReadOnlyDictionary<Tile2i, HashSet<int>> fixedHeights2ByTile)
+            IReadOnlyDictionary<Tile2i, HashSet<int>> fixedHeights2ByTile,
+            IReadOnlyDictionary<Tile2i, List<AccessCapturedLayoutOccupancy>>?
+                layoutOccupanciesByTile = null)
             => new AccessCapturedBuildingFacts(
                 occupiedTiles ?? Array.Empty<Tile2i>(),
                 fixedHeights2ByTile
-                    ?? new Dictionary<Tile2i, HashSet<int>>());
+                    ?? new Dictionary<Tile2i, HashSet<int>>(),
+                layoutOccupanciesByTile
+                    ?? new Dictionary<Tile2i,
+                        List<AccessCapturedLayoutOccupancy>>());
 
         public bool ContainsOccupiedTile(Tile2i tile)
             => m_occupiedTiles.Contains(tile);
@@ -325,7 +363,8 @@ namespace AutoTerrainDesignations.Access
             long cleanupOriginCount,
             long cleanupTileCount,
             long durabilityCornerCount,
-            long buildingOccupiedTileCount = 0)
+            long buildingOccupiedTileCount = 0,
+            long designationReadinessFactCount = 0)
         {
             long estimate = BaseBytes;
             estimate = Add(estimate, terrainTileCount, 320L);
@@ -341,6 +380,7 @@ namespace AutoTerrainDesignations.Access
             estimate = Add(estimate, cleanupTileCount, 512L);
             estimate = Add(estimate, durabilityCornerCount, 512L);
             estimate = Add(estimate, buildingOccupiedTileCount, 256L);
+            estimate = Add(estimate, designationReadinessFactCount, 192L);
             return estimate;
         }
 

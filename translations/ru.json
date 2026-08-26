@@ -744,6 +744,10 @@
     "[ATD] {entity} не удалось проложить путь к рампе"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] Область доступа {entity} слишком велика для поиска поворотной рампы"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity} завершил подготовку и засыпку полей для посевов"
   ],

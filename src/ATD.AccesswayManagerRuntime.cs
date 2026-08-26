@@ -22,6 +22,7 @@ namespace AutoTerrainDesignations
         private static bool s_accesswayManagerToastVisible;
         private static long s_accesswayManagerToastRequestId;
         private static Label? s_accesswayManagerProgressLabel;
+        private static Label? s_accesswayManagerStatsLabel;
 
         private static void InitializeAccesswayManagerRuntime()
         {
@@ -43,6 +44,7 @@ namespace AutoTerrainDesignations
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
             s_accesswayManagerProgressLabel = null;
+            s_accesswayManagerStatsLabel = null;
         }
 
         internal static ATDAccesswayRequestHandle EnqueueAccesswayRequest(
@@ -239,8 +241,9 @@ namespace AutoTerrainDesignations
                     _ => "Stop automatic farming access"
                 };
                 var progressText = new LocStrFormatted(
-                    $"[ATD] {snapshot.Phase}; finding {workType}; "
-                    + $"visited {snapshot.VisitedNodes:N0}/"
+                    $"[ATD] {snapshot.Phase}; finding {workType}");
+                var statsText = new LocStrFormatted(
+                    $"visited {snapshot.VisitedNodes:N0}/"
                     + $"{AutoTerrainDesignationsMod.AccessMaxVisitedNodes:N0} · "
                     + $"queue {snapshot.PendingNodes:N0} · "
                     + $"budget {GetManagedAccesswaySliceBudgetMilliseconds()} ms/frame · "
@@ -252,16 +255,30 @@ namespace AutoTerrainDesignations
                 var notification = s_uiRoot.ToastNotifProvider.m_notification;
                 if (!s_accesswayManagerToastVisible
                     || s_accesswayManagerToastRequestId != handle.RequestId
-                    || s_accesswayManagerProgressLabel == null)
+                    || s_accesswayManagerProgressLabel == null
+                    || s_accesswayManagerStatsLabel == null)
                 {
                     notification.ShowGeneral(
                         new LocStrFormatted(
                             "[ATD] Terrain analysis in progress"),
                         showForever: true);
                     s_accesswayManagerProgressLabel =
-                        new Label(progressText).FontSize(16);
-                    notification.Body.SetChildren(
+                        new Label(progressText)
+                            .FontSize(16)
+                            .NoTextWrap()
+                            .Width(TerrainAnalysisToastTextWidthPixels.px());
+                    s_accesswayManagerStatsLabel =
+                        new Label(statsText)
+                            .FontSize(14)
+                            .NoTextWrap()
+                            .Width(TerrainAnalysisToastTextWidthPixels.px());
+                    var progressColumn = new Column()
+                        .Width(TerrainAnalysisToastTextWidthPixels.px());
+                    progressColumn.Add(
                         s_accesswayManagerProgressLabel,
+                        s_accesswayManagerStatsLabel);
+                    notification.Body.SetChildren(
+                        progressColumn,
                         new ButtonText(
                             Button.General,
                             new LocStrFormatted(stopWork),
@@ -278,6 +295,7 @@ namespace AutoTerrainDesignations
                 else
                 {
                     s_accesswayManagerProgressLabel.Value(progressText);
+                    s_accesswayManagerStatsLabel.Value(statsText);
                 }
             }
             catch (Exception ex)

@@ -744,6 +744,10 @@
     "[ATD] {entity} kunde inte hitta en väg till rampen"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] {entity}s åtkomstområde är för stort för sökningen efter svängramper"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity} har slutfört förberedelse och fyllning av odlingsmark"
   ],

@@ -215,12 +215,10 @@ namespace AutoTerrainDesignations.Access.V2
                 return false;
             if (m_groundNodes.Contains(from) || m_groundNodes.Contains(to))
                 return true;
-            AccessPropCleanupInfo fromInfo = m_cleanupByTile[from];
-            AccessPropCleanupInfo toInfo = m_cleanupByTile[to];
-            if (fromInfo.HasTreeCleanup && !fromInfo.HasDenseDebrisCleanup
-                && toInfo.HasTreeCleanup && !toInfo.HasDenseDebrisCleanup)
-                return true;
-            return ShareCleanupObject(fromInfo, toInfo);
+            // Both centers are eligible cleanup ground. Clearing independent,
+            // adjacent removable props makes their footprints one continuous
+            // ground corridor; they do not need to share a cleanup object.
+            return true;
         }
 
         private bool CanTraverseCardinal(
@@ -448,18 +446,6 @@ namespace AutoTerrainDesignations.Access.V2
                 }
             }
             return reached;
-        }
-
-        private static bool ShareCleanupObject(
-            AccessPropCleanupInfo left,
-            AccessPropCleanupInfo right)
-        {
-            for (int leftIndex = 0; leftIndex < left.Samples.Count; leftIndex++)
-                for (int rightIndex = 0; rightIndex < right.Samples.Count; rightIndex++)
-                    if (left.Samples[leftIndex].CleanupObjectKey
-                        == right.Samples[rightIndex].CleanupObjectKey)
-                        return true;
-            return false;
         }
 
         private void BuildComponents(

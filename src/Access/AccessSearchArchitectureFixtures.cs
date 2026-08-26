@@ -40,9 +40,29 @@ namespace AutoTerrainDesignations.Access
             var workspace = new AccessSearchWorkspace(snapshot);
             if (!ReferenceEquals(workspace.Snapshot, snapshot)
                 || workspace.Evaluator == null
+                || !(workspace.Evaluator is SnapshotAccessSearchEvaluator)
                 || snapshot.Policy == null)
             {
-                failure = "workspace must retain one immutable snapshot and policy";
+                failure =
+                    "workspace must reconstruct its evaluator from one immutable snapshot and policy";
+                return false;
+            }
+
+            AccessHeightProfile flat = new AccessHeightProfile(0, 0, 0, 0);
+            IReadOnlyList<AccessGroundHandoff> v1Handoffs =
+                workspace.Evaluator.GetWorkableHandoffs(
+                    new Tile2i(4, 4), flat, new Tile2i(0, 4), flat);
+            IReadOnlyList<AccessGroundHandoff> v2Handoffs =
+                workspace.Evaluator.GetV2WorkableHandoffs(
+                    new Tile2i(4, 4), flat, new Tile2i(0, 4), flat);
+            if (!workspace.Evaluator.HasWorkableHandoffEvaluator
+                || !workspace.Evaluator.HasWorkableHandoffSpanEvaluator
+                || !workspace.Evaluator.HasV2WorkableHandoffEvaluator
+                || v1Handoffs == null
+                || v2Handoffs == null)
+            {
+                failure =
+                    "snapshot-owned evaluator did not execute from value-owned facts";
                 return false;
             }
 

@@ -744,6 +744,10 @@
     "[ATD] {entity} non è riuscita a raggiungere la rampa"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] L'area di accesso di {entity} è troppo grande per la ricerca di rampe con svolta"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] Preparazione e riempimento di {entity} completati"
   ],

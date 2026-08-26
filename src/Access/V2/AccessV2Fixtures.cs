@@ -24,6 +24,8 @@ namespace AutoTerrainDesignations.Access.V2
             if (!ValidateUsefulHeightEnvelope(out failure)) return false;
             if (!ValidateSearch(out failure)) return false;
             if (!ValidateBounds(out failure)) return false;
+            if (!AccessV2TerminalFixtures.ValidateAll(out failure))
+                return false;
             failure = string.Empty;
             return true;
         }
@@ -767,9 +769,42 @@ namespace AutoTerrainDesignations.Access.V2
                 || graph.IsCleanupGround(blocked)
                 || !graph.CanTraverse(new Tile2i(0, 0), cleanupA)
                 || !graph.CanTraverse(cleanupA, cleanupB)
-                || graph.CanTraverse(cleanupB, unrelatedDebris))
+                || !graph.CanTraverse(cleanupB, unrelatedDebris))
             {
-                failure = "Mega cleanup ground topology classification failed";
+                failure = "G traversal must cross adjacent footprints of independently removable debris";
+                return false;
+            }
+            if (!graph.TryValidateLocalEscape(
+                    new[] { cleanupA }, AccessV2History.Empty,
+                    cleanupCostScale: 1f,
+                    out IReadOnlyCollection<string> firstDebrisKeys,
+                    out float firstDebrisCost)
+                || firstDebrisKeys.Count != 1
+                || !firstDebrisKeys.Contains("prop:shared")
+                || Math.Abs(firstDebrisCost - 8f) > 0.0001f)
+            {
+                failure = "Entering removable debris ground must charge its cleanup object exactly once";
+                return false;
+            }
+            AccessV2History sharedDebrisCleared = AccessV2History.Empty
+                .ApplyCleanupKeys(firstDebrisKeys);
+            if (!graph.TryValidateLocalEscape(
+                    new[] { cleanupB }, sharedDebrisCleared,
+                    cleanupCostScale: 1f,
+                    out IReadOnlyCollection<string> repeatedDebrisKeys,
+                    out float repeatedDebrisCost)
+                || repeatedDebrisKeys.Count != 0
+                || Math.Abs(repeatedDebrisCost) > 0.0001f
+                || !graph.TryValidateLocalEscape(
+                    new[] { unrelatedDebris }, sharedDebrisCleared,
+                    cleanupCostScale: 1f,
+                    out IReadOnlyCollection<string> independentDebrisKeys,
+                    out float independentDebrisCost)
+                || independentDebrisKeys.Count != 1
+                || !independentDebrisKeys.Contains("prop:other")
+                || Math.Abs(independentDebrisCost - 8f) > 0.0001f)
+            {
+                failure = "Adjacent removable debris must retain independent deduplicated cleanup costs";
                 return false;
             }
             Tile2i handoffPropCenter = new Tile2i(6, 0);
@@ -847,10 +882,10 @@ namespace AutoTerrainDesignations.Access.V2
             }
             HashSet<Tile2i> reached = graph.Flood(new Tile2i(0, 0));
             if (!reached.Contains(cleanupB)
-                || reached.Contains(unrelatedDebris)
+                || !reached.Contains(unrelatedDebris)
                 || graph.Flood(new Tile2i(10, 10)).Count != 1)
             {
-                failure = "Mega cleanup flood or isolated-pocket fixture failed";
+                failure = "G flood must connect adjacent independently removable debris without connecting isolated ground";
                 return false;
             }
             var openGround = new List<Tile2i>();
@@ -1147,8 +1182,7 @@ namespace AutoTerrainDesignations.Access.V2
                     {
                         new AccessPropSample(
                             generatedPropCenter,
-                            false, true, true, generatedPropKey,
-                            new[] { new Tile2i(8, 4) }),
+                            false, true, true, generatedPropKey),
                     });
             var eligibleDenseSnapshot = new AccessSearchSnapshot(
                 Tile2i.Zero, new Tile2i(12, 12), new Tile2i(10, 10),
@@ -1176,14 +1210,22 @@ namespace AutoTerrainDesignations.Access.V2
                     {
                         [generatedPropCenter] = eligibleDenseCleanup,
                     });
-            if (eligibleDenseSnapshot.IsV2HandoffCenterPathable(
+            if (!eligibleDenseSnapshot.IsV2HandoffCenterPathable(
                     generatedPropOrigin, AccessHandoffOperation.Dumping,
                     generatedPropCenter, handoffLevelHistory)
                 || !eligibleDenseSnapshot.IsV2HandoffCenterPathable(
                     generatedPropOrigin, AccessHandoffOperation.Dumping,
-                    generatedPropCenter, generatedPropHistory))
+                    generatedPropCenter, generatedPropHistory)
+                || !eligibleDenseSnapshot.IsV2HandoffCorridorCenterPathable(
+                    generatedPropOrigin, AccessHandoffOperation.Dumping,
+                    generatedPropCenter, handoffLevelHistory,
+                    new[] { generatedPropOrigin })
+                || !eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                    generatedPropCenter,
+                    new[] { generatedPropOrigin },
+                    handoffLevelHistory))
             {
-                failure = "V2 dumping handoff must keep dense props blocking until a side/generated cleanup key clears them";
+                failure = "V2 handoff feasibility must assume intrinsically removable debris can be cleared without a terrain cleanup origin";
                 return false;
             }
 
@@ -1205,25 +1247,24 @@ namespace AutoTerrainDesignations.Access.V2
             }
             occupiedSideHistory = occupiedSideHistory.ApplyCleanupKeys(
                 new[] { generatedPropKey });
-            if (eligibleDenseSnapshot.IsV2HandoffCenterPathable(
+            if (!eligibleDenseSnapshot.IsV2HandoffCenterPathable(
                     generatedPropOrigin, AccessHandoffOperation.Dumping,
                     generatedPropCenter, occupiedSideHistory))
             {
-                failure = "V2 dumping handoff must treat a protruding prop as hard when its only neighboring cleanup origin is occupied by V";
+                failure = "V2 dumping handoff must not make removable debris depend on a neighboring cleanup origin";
                 return false;
             }
-            Tile2i sideCleanupOrigin = new Tile2i(8, 4);
             if (!eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
                     generatedPropCenter,
                     Array.Empty<Tile2i>(), generatedPropHistory)
-                || eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
+                || !eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
                     generatedPropCenter,
                     Array.Empty<Tile2i>(), occupiedSideHistory)
                 || !eligibleDenseSnapshot.IsV2HandoffGroundEntryPathable(
                     generatedPropCenter,
-                    new[] { sideCleanupOrigin }, occupiedSideHistory))
+                    new[] { new Tile2i(8, 4) }, occupiedSideHistory))
             {
-                failure = "V2 G entry must require either a genuinely free occupied neighbor or mining/leveling work that owns that neighbor";
+                failure = "V2 G entry must treat removable debris as provisionally cleared independently of cleanup-origin ownership";
                 return false;
             }
 
@@ -1264,22 +1305,22 @@ namespace AutoTerrainDesignations.Access.V2
                     {
                         [generatedPropCenter] = sameOriginDenseCleanup,
                     });
-            if (sameOriginDenseSnapshot.IsV2HandoffCenterPathable(
+            if (!sameOriginDenseSnapshot.IsV2HandoffCenterPathable(
                     generatedPropOrigin, AccessHandoffOperation.Dumping,
                     generatedPropCenter,
                     handoffLevelHistory.ApplyCleanupKeys(
                         new[] { sameOriginPropKey })))
             {
-                failure = "V2 dumping handoff must not count a cleanup on its own origin as the required side prop clearing";
+                failure = "V2 dumping handoff must allow player-assisted removal when cleanup shares the generated origin";
                 return false;
             }
-            if (sameOriginDenseSnapshot.IsV2HandoffGroundEntryPathable(
+            if (!sameOriginDenseSnapshot.IsV2HandoffGroundEntryPathable(
                     generatedPropCenter,
                     Array.Empty<Tile2i>(),
                     handoffLevelHistory.ApplyCleanupKeys(
                         new[] { sameOriginPropKey })))
             {
-                failure = "V2 G entry must keep a same-origin dumping prop hard when no neighboring occupied cleanup origin exists";
+                failure = "V2 G entry must allow intrinsically removable same-origin debris";
                 return false;
             }
 
@@ -3454,7 +3495,7 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessHeightProfile profile,
                 Tile2i predecessor,
                 AccessHeightProfile predecessorProfile)
-                => origin == first.GetLaneOrigin(0)
+                => origin == secondStep.Next.GetLaneOrigin(0)
                     ? new[]
                     {
                         new AccessGroundHandoff(
@@ -3462,13 +3503,14 @@ namespace AutoTerrainDesignations.Access.V2
                             AccessHandoffOperation.Mining),
                     }
                     : Array.Empty<AccessGroundHandoff>();
-            AccessV2TerminalExtensionRequest extensionRequest =
-                AccessV2Handoffs.GetSameTypeExtensionRequest(
-                    new[] { first }, PartialMiningSingle);
-            if (extensionRequest.Operation != AccessHandoffOperation.Mining
-                || extensionRequest.ExtensionLane != 1)
+            if (!PartialMiningSingle(
+                    secondStep.Next.GetLaneOrigin(0),
+                    secondStep.Next.GetLane(0).Profile,
+                    first.GetLaneOrigin(0),
+                    first.GetLane(0).Profile).Any(item =>
+                        item.Operation == AccessHandoffOperation.Mining))
             {
-                failure = "V2 one-lane mining crest must request a same-type terminal extension";
+                failure = "V2 one-lane mining crest must remain visible to the bounded terminal evaluator";
                 return false;
             }
 
@@ -3481,88 +3523,6 @@ namespace AutoTerrainDesignations.Access.V2
                     true, string.Empty,
                     current.HasValue ? 4f : 0f,
                     transition.Delta.Count, 0f);
-
-            var terminalOperations = new List<AccessHandoffOperation>();
-            Tile2i extensionEntry = new Tile2i(16, 6);
-            var extensionSession = new AccessV2SearchSession(
-                endpoints, Tile2i.Zero, new Tile2i(32, 32),
-                UnitEvaluator, 10000, float.MaxValue,
-                (states, history, requiredGroundEntry) =>
-                    Array.Empty<AccessV2HandoffCandidate>(),
-                groundGraph: graph,
-                terminalExtensionOperationEvaluator: states =>
-                    states[0].Anchor == secondStep.Next.Anchor
-                        ? new AccessV2TerminalExtensionRequest(
-                            AccessHandoffOperation.Mining, 1)
-                        : default,
-                terminalTransitionEvaluator:
-                    (current, transition, history, connectedFixedOrigin,
-                        operation) =>
-                {
-                    if (current.HasValue && transition.Delta.Count == 1)
-                        return AccessV2TransitionEvaluation.Reject(
-                            "fixture extension disabled");
-                    terminalOperations.Add(operation);
-                    return new AccessV2TransitionEvaluation(
-                        true, string.Empty,
-                        current.HasValue ? 4f : 0f,
-                        transition.Delta.Count, 0f,
-                        new[]
-                        {
-                            new AccessRayHeightConstraint(
-                                transition.Next.Anchor,
-                                operation == AccessHandoffOperation.Mining
-                                    ? AccessSideRayOperation.Cut
-                                    : AccessSideRayOperation.Fill,
-                                0f,
-                                transition.Next.Anchor),
-                        });
-                },
-                staggeredHandoffEvaluator:
-                    (states, extensionLane, operation, history) =>
-                    {
-                        if (states.Count < 1
-                            || history.RayConstraintCount < states.Count)
-                            return Array.Empty<AccessV2HandoffCandidate>();
-                        var lane0 = new AccessGroundHandoff(
-                            new Tile2i(16, 6), operation);
-                        var lane1 = new AccessGroundHandoff(
-                            new Tile2i(16, 7), operation);
-                        return new[]
-                        {
-                            new AccessV2HandoffCandidate(
-                                new Tile2i(4, 0), states.Count,
-                                lane0, lane1,
-                                new[] { states[0].GetLaneOrigin(0) },
-                                new[]
-                                {
-                                    states[0].GetLaneOrigin(1),
-                                }.Concat(states.Skip(1).Select(state =>
-                                    state.GetLaneOrigin(1))).ToArray(),
-                                new[] { extensionEntry },
-                                new[] { extensionEntry },
-                                Array.Empty<string>(), 0f,
-                                isStaggeredExtension: true,
-                                nonCrestLane: 1),
-                        };
-                    });
-            while (!extensionSession.IsComplete)
-                extensionSession.Step(7);
-            if (!extensionSession.Result.Success
-                || extensionSession.Result.Handoff == null
-                || extensionSession.Result.Handoff.SpanLength != 1
-                || extensionSession.Result.Handoff.Lane0Operation
-                    != AccessHandoffOperation.Mining
-                || terminalOperations.Count < 1
-                || terminalOperations.Any(operation =>
-                    operation != AccessHandoffOperation.Mining))
-            {
-                failure = "V2 partial crest must try the immediate post-work mask exit before extending the unfinished lane"
-                    + $": success={extensionSession.Result.Success}"
-                    + $" handoff={extensionSession.Result.Handoff}"
-                    + $" operations=[{string.Join(",", terminalOperations)}]";
-                return false;
-            }
 
             var session = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
@@ -3595,6 +3555,88 @@ namespace AutoTerrainDesignations.Access.V2
                     + $"visited={session.Result.Visited} pending={session.Result.Pending} "
                     + $"handoffs={session.Result.HandoffEvaluations}/{session.Result.QuickHandoffAccepts} "
                     + $"rejects={string.Join(",", session.Result.Rejections.Select(pair => pair.Key + ":" + pair.Value))}";
+                return false;
+            }
+
+            // Ground feasibility is history-qualified. A cheaper arrival can
+            // project work across the only goal suffix while a later arrival
+            // at the same concrete center leaves that suffix usable. The
+            // latter must not be erased by center-only label dominance.
+            Tile2i sharedHistoryGround = new Tile2i(20, 20);
+            Tile2i historyBlockedGround = new Tile2i(21, 20);
+            Tile2i historyGroundGoal = new Tile2i(22, 20);
+            var historyGroundGraph = new AccessV2GroundGraph(
+                new[]
+                {
+                    sharedHistoryGround,
+                    historyBlockedGround,
+                    historyGroundGoal,
+                },
+                new[] { historyGroundGoal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            AccessV2HandoffCandidate HistoryHandoff(
+                AccessV2BandState state,
+                float cleanupCost,
+                string historyKey)
+                => new AccessV2HandoffCandidate(
+                    state.EntryDirection, 1,
+                    new AccessGroundHandoff(
+                        state.GetLaneOrigin(0),
+                        AccessHandoffOperation.Leveling),
+                    new AccessGroundHandoff(
+                        state.GetLaneOrigin(1),
+                        AccessHandoffOperation.Leveling),
+                    new[] { state.GetLaneOrigin(0) },
+                    new[] { state.GetLaneOrigin(1) },
+                    new[] { sharedHistoryGround },
+                    new[] { sharedHistoryGround },
+                    new[] { historyKey }, cleanupCost,
+                    centerSpokeCost: 2f);
+            AccessV2BandState validHistoryState = secondStep.Next;
+            var historyQualifiedEndpoints = new AccessV2EndpointSet(
+                new[]
+                {
+                    new AccessV2StartFrontage(first, first.Anchor),
+                    new AccessV2StartFrontage(
+                        validHistoryState, validHistoryState.Anchor),
+                },
+                new AccessV2FrontageDiagnostics());
+            var historyQualifiedGroundSession = new AccessV2SearchSession(
+                historyQualifiedEndpoints,
+                Tile2i.Zero, new Tile2i(32, 32),
+                (current, transition, history, connectedFixedOrigin) =>
+                    AccessV2TransitionEvaluation.Reject(
+                        "FixtureOnlyGroundHandoffs"),
+                1000, float.MaxValue,
+                (states, history, requiredGroundEntry) =>
+                    states[0].Equals(first)
+                        ? new[]
+                        {
+                            HistoryHandoff(first, 0f, "blocked-history"),
+                        }
+                        : states[0].Equals(validHistoryState)
+                            ? new[]
+                            {
+                                HistoryHandoff(
+                                    validHistoryState, 10f,
+                                    "valid-history"),
+                            }
+                            : Array.Empty<AccessV2HandoffCandidate>(),
+                groundGraph: historyGroundGraph,
+                groundValidator: (center, history) =>
+                    center != historyBlockedGround
+                    || history.ContainsCleanupKey("valid-history"));
+            while (!historyQualifiedGroundSession.IsComplete)
+                historyQualifiedGroundSession.Step(7);
+            if (!historyQualifiedGroundSession.Result.Success
+                || !historyQualifiedGroundSession.Result.GroundPath.Contains(
+                    historyGroundGoal))
+            {
+                failure =
+                    "V2 ground dominance must retain a later history-qualified arrival when the cheaper history blocks the only goal suffix"
+                    + $": success={historyQualifiedGroundSession.Result.Success}"
+                    + $" reason={historyQualifiedGroundSession.Result.FailureReason}"
+                    + $" ground=[{string.Join(",", historyQualifiedGroundSession.Result.GroundPath)}]";
                 return false;
             }
             var wrappedV2Session =

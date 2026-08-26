@@ -88,6 +88,7 @@ namespace AutoTerrainDesignations.Access
     {
         public bool IsTree { get; }
         public bool IsDenseDebris { get; }
+        public bool IsRemovable => IsTree || IsDenseDebris;
         public string CleanupObjectKey { get; }
         public IReadOnlyList<Tile2i> OccupiedTiles { get; }
         public TerrainPropId? DenseDebrisPropId { get; }

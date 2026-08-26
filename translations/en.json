@@ -744,6 +744,10 @@
     "[ATD] {entity} could not path to the ramp"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] {entity} access area is too large for the turning-ramp search"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity} farming preparation and filling complete"
   ],

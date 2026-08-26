@@ -27,6 +27,8 @@ namespace AutoTerrainDesignations
             new EntityNotificationProto<string>.ID("ATD_RampAccessTruncated");
         internal static readonly EntityNotificationProto<string>.ID RampAccessNotAccessibleId =
             new EntityNotificationProto<string>.ID("ATD_RampAccessNotAccessible");
+        internal static readonly EntityNotificationProto<string>.ID RampAccessSnapshotTooLargeId =
+            new EntityNotificationProto<string>.ID("ATD_RampAccessSnapshotTooLarge");
         internal static readonly EntityNotificationProto<string>.ID FarmingCompleteId =
             new EntityNotificationProto<string>.ID("ATD_FarmingComplete");
         internal static readonly EntityNotificationProto<string>.ID ExcavatorCompletedId =
@@ -42,6 +44,7 @@ namespace AutoTerrainDesignations
             RampAccessFailedId.Value,
             RampAccessTruncatedId.Value,
             RampAccessNotAccessibleId.Value,
+            RampAccessSnapshotTooLargeId.Value,
             FarmingCompleteId.Value,
             ExcavatorCompletedId.Value,
             DebrisCleanupNoneFoundId.Value,
@@ -70,6 +73,14 @@ namespace AutoTerrainDesignations
                 registrator,
                 () => AtdLocalization.NotifRampNotAccessible.TranslatedString,
                 RampAccessNotAccessibleId,
+                NotificationType.Continuous,
+                NotificationStyle.Warning,
+                "Assets/Unity/UserInterface/EntityIcons/Designation.png",
+                "Assets/Unity/UserInterface/EntityIcons/Warning.png");
+            RegisterLocalizedEntity(
+                registrator,
+                () => AtdLocalization.NotifRampSnapshotTooLarge.TranslatedString,
+                RampAccessSnapshotTooLargeId,
                 NotificationType.Continuous,
                 NotificationStyle.Warning,
                 "Assets/Unity/UserInterface/EntityIcons/Designation.png",
@@ -177,6 +188,7 @@ namespace AutoTerrainDesignations
             RampAccessFailed,
             RampAccessTruncated,
             RampAccessNotAccessible,
+            RampAccessSnapshotTooLarge,
         }
 
         private readonly struct TransientNotificationKey
@@ -210,6 +222,7 @@ namespace AutoTerrainDesignations
         private static EntityNotificationProto<string>? s_rampAccessFailedNotificationProto;
         private static EntityNotificationProto<string>? s_rampAccessTruncatedNotificationProto;
         private static EntityNotificationProto<string>? s_rampAccessNotAccessibleNotificationProto;
+        private static EntityNotificationProto<string>? s_rampAccessSnapshotTooLargeNotificationProto;
         private static EntityNotificationProto<string>? s_farmingCompleteNotificationProto;
         private static EntityNotificationProto<string>? s_excavatorCompletedNotificationProto;
         private static EntityNotificationProto<string>? s_debrisCleanupNoneFoundNotificationProto;
@@ -224,6 +237,7 @@ namespace AutoTerrainDesignations
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.RampAccessFailedId, ref s_rampAccessFailedNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.RampAccessTruncatedId, ref s_rampAccessTruncatedNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.RampAccessNotAccessibleId, ref s_rampAccessNotAccessibleNotificationProto);
+            TryInitializeTransientNotificationProto(protosDb, AtdNotifications.RampAccessSnapshotTooLargeId, ref s_rampAccessSnapshotTooLargeNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.FarmingCompleteId, ref s_farmingCompleteNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.ExcavatorCompletedId, ref s_excavatorCompletedNotificationProto);
             TryInitializeTransientNotificationProto(protosDb, AtdNotifications.DebrisCleanupNoneFoundId, ref s_debrisCleanupNoneFoundNotificationProto);
@@ -247,6 +261,7 @@ namespace AutoTerrainDesignations
             s_rampAccessFailedNotificationProto = null;
             s_rampAccessTruncatedNotificationProto = null;
             s_rampAccessNotAccessibleNotificationProto = null;
+            s_rampAccessSnapshotTooLargeNotificationProto = null;
             s_farmingCompleteNotificationProto = null;
             s_excavatorCompletedNotificationProto = null;
             s_debrisCleanupNoneFoundNotificationProto = null;
@@ -273,6 +288,35 @@ namespace AutoTerrainDesignations
 
             ClearTowerRampWarningNotification(tower);
             AddTransientTowerNotification(tower, kind, proto);
+        }
+
+        private static void UpdateTowerSnapshotTooLargeWarningNotification(
+            IAreaManagingTower tower)
+        {
+            if (!AutoTerrainDesignationsMod.RampNotificationsEnabled)
+            {
+                ClearTowerRampWarningNotification(tower);
+                return;
+            }
+
+            if (HasTransientTowerNotification(
+                    tower,
+                    TransientNotificationKind.RampAccessSnapshotTooLarge))
+                return;
+
+            ClearTransientTowerNotification(
+                tower,
+                TransientNotificationKind.RampAccessFailed);
+            ClearTransientTowerNotification(
+                tower,
+                TransientNotificationKind.RampAccessTruncated);
+            ClearTransientTowerNotification(
+                tower,
+                TransientNotificationKind.RampAccessNotAccessible);
+            AddTransientTowerNotification(
+                tower,
+                TransientNotificationKind.RampAccessSnapshotTooLarge,
+                s_rampAccessSnapshotTooLargeNotificationProto);
         }
 
         private static bool TryGetRampWarningNotification(
@@ -360,6 +404,7 @@ namespace AutoTerrainDesignations
             ClearTransientTowerNotification(tower, TransientNotificationKind.RampAccessFailed);
             ClearTransientTowerNotification(tower, TransientNotificationKind.RampAccessTruncated);
             ClearTransientTowerNotification(tower, TransientNotificationKind.RampAccessNotAccessible);
+            ClearTransientTowerNotification(tower, TransientNotificationKind.RampAccessSnapshotTooLarge);
         }
 
         private static void AddFarmingCompleteNotification(IAreaManagingTower tower)

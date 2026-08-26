@@ -626,6 +626,13 @@ namespace AutoTerrainDesignations.Access
                 new[] { new AccessPropSample(new Tile2i(0, 0), false, true, false) });
             if (hardCleanup.IsEligible || hardCleanup.BlockerKind != AccessPropBlockerKind.HardBlocker)
             { failure = "non-removable prop sample must classify as a hard blocker"; return false; }
+            var capturedDebris = new AccessCapturedProp(
+                isTree: false,
+                isDenseDebris: true,
+                cleanupObjectKey: "prop:assisted",
+                occupiedTiles: new[] { Tile2i.Zero });
+            if (!capturedDebris.IsRemovable)
+            { failure = "captured dense debris must remain removable even without an automatic terrain cleanup origin"; return false; }
             if (AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Mining, 4, 4)
                 || AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Leveling, 4, 4)
                 || !AccessPropCleanupPolicy.OperationRemovesNonTreeProp(AccessHandoffOperation.Dumping, 2, 4)
@@ -719,9 +726,21 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
                 Array.Empty<AccessDurabilityCorner>());
-            if (ContainsHandoffTile(handoffFixture, handoffOrigin, edgeContactSlope, handoffCenter)
-                || !ContainsHandoffTile(handoffFixture, handoffOrigin, edgeContactSlope, handoffSw)
-                || !ContainsHandoffTile(handoffFixture, handoffOrigin, edgeContactSlope, handoffSe))
+            // This focused transition fixture exercises the legacy geometric
+            // fallback: its two expected contacts are perimeter corners, while
+            // the production snapshot evaluator deliberately applies the
+            // vehicle-clearance seam and returns exterior rank-two contacts.
+            var handoffFixtureWorkspace = new AccessSearchWorkspace(
+                handoffFixture, EmptyAccessSearchEvaluator.Instance);
+            if (ContainsHandoffTile(
+                    handoffFixture, handoffFixtureWorkspace,
+                    handoffOrigin, edgeContactSlope, handoffCenter)
+                || !ContainsHandoffTile(
+                    handoffFixture, handoffFixtureWorkspace,
+                    handoffOrigin, edgeContactSlope, handoffSw)
+                || !ContainsHandoffTile(
+                    handoffFixture, handoffFixtureWorkspace,
+                    handoffOrigin, edgeContactSlope, handoffSe))
             { failure = "V/G handoff must use matching edge contacts, not a mismatched center"; return false; }
             var oceanPreciseHeights = new Dictionary<Tile2i, float>();
             foreach (KeyValuePair<Tile2i, int> pair in groundHeights)
@@ -822,14 +841,12 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 new[] { preciseOceanTile },
                 Array.Empty<AccessDurabilityCorner>(),
-                null,
-                null,
-                new Dictionary<Tile2i, float>
+                preciseTerrainHeights: new Dictionary<Tile2i, float>
                 {
                     [preciseTerrainTile] = 0.375f,
                     [preciseOceanTile] = -2.25f,
                 },
-                new Dictionary<Tile2i, AccessTerrainColumn>
+                terrainColumns: new Dictionary<Tile2i, AccessTerrainColumn>
                 {
                     [preciseTerrainTile] = new AccessTerrainColumn(new[]
                     {
@@ -837,12 +854,12 @@ namespace AutoTerrainDesignations.Access
                         new AccessTerrainLayer(2f, -20f, 1.5f, "Rock"),
                     }),
                 },
-                new Tile2i(0, 0),
-                new Tile2i(20, 20),
-                0.4f,
-                0.3f,
-                false,
-                false);
+                physicalTerrainMin: new Tile2i(0, 0),
+                physicalTerrainMax: new Tile2i(20, 20),
+                dumpingMaterialSlope: 0.4f,
+                fallbackMiningSlope: 0.3f,
+                dumpingSlopeUsedFallback: false,
+                hasDumpingMaterial: false);
             if (raySnapshotFixture.GetSideRayTerrainSample(
                     new Tile2i(-1, 2), out _) != AccessTerrainSampleKind.PhysicalMapEdge
                 || raySnapshotFixture.GetSideRayTerrainSample(
@@ -1119,15 +1136,12 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
                 Array.Empty<AccessDurabilityCorner>(),
-                null,
-                null,
-                directionalHeights,
-                null,
-                new Tile2i(-20, -20),
-                new Tile2i(40, 40),
-                1f,
-                1f,
-                false);
+                preciseTerrainHeights: directionalHeights,
+                physicalTerrainMin: new Tile2i(-20, -20),
+                physicalTerrainMax: new Tile2i(40, 40),
+                dumpingMaterialSlope: 1f,
+                fallbackMiningSlope: 1f,
+                dumpingSlopeUsedFallback: false);
             AccessHeightProfile.TryForMode(
                 AccessSearchMode.Flat, 8, out AccessHeightProfile highFlat);
             AccessHeightProfile.TryForMode(
@@ -1293,12 +1307,22 @@ namespace AutoTerrainDesignations.Access
             if (!t3DisturbedTileSet.Contains(new Tile2i(3, 0))
                 || t3DisturbedTileSet.Contains(new Tile2i(4, 0)))
             { failure = "T3 disturbance rays must block a two-tile radius around each disturbed ray cell"; return false; }
-            AccessSearchResult fixtureResult = FindPath(fixture, new[] { fixtureStart });
+            AccessSearchResult fixtureResult = FindFixturePath(
+                fixture, new[] { fixtureStart });
             if (!fixtureResult.Success || fixtureResult.Path.Count < 2
                 || fixtureResult.Path[0].Position != fixtureWorkNeighbor
                 || fixtureResult.Path[0].Mode != AccessSearchMode.Existing
                 || fixtureResult.Path[fixtureResult.Path.Count - 1].Mode != AccessSearchMode.Ground)
-            { failure = "synthetic work-origin traversal and V-to-G Dijkstra fixture failed"; return false; }
+            {
+                failure = "synthetic work-origin traversal and V-to-G Dijkstra fixture failed"
+                    + $":success={fixtureResult.Success} reason={fixtureResult.FailureReason}"
+                    + $" path={fixtureResult.Path.Count}"
+                    + (fixtureResult.Path.Count > 0
+                        ? $" first={fixtureResult.Path[0]}"
+                            + $" last={fixtureResult.Path[fixtureResult.Path.Count - 1]}"
+                        : string.Empty);
+                return false;
+            }
             var rootedRequest = new AccessPathRequest(
                 "fixture-rooted-network",
                 fixture,
@@ -1306,7 +1330,7 @@ namespace AutoTerrainDesignations.Access
                 new AccessPathEndpoint(AccessPathEndpointKind.GroundTiles, fixture.GoalGroundNodes),
                 1,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult requestResult = FindPath(rootedRequest);
+            AccessSearchResult requestResult = FindFixturePath(rootedRequest);
             if (!requestResult.Success
                 || requestResult.Path.Count != fixtureResult.Path.Count)
             { failure = "rooted access request adapter changed path-search behavior"; return false; }
@@ -1380,7 +1404,7 @@ namespace AutoTerrainDesignations.Access
                 1,
                 AccessPathIntent.ConstructAccessway);
             AccessPathSearchSessionBuilder incrementalSessionBuilder =
-                CreateSessionBuilder(astarRequest);
+                CreateFixtureSessionBuilder(astarRequest);
             int sessionPreparationAdvances = 0;
             while (!incrementalSessionBuilder.IsComplete
                 && sessionPreparationAdvances < 4096)
@@ -1400,7 +1424,7 @@ namespace AutoTerrainDesignations.Access
                 incrementalSessionBuilder.Session;
             while (!incrementalSession.IsComplete)
                 incrementalSession.Step(int.MaxValue);
-            AccessSearchResult astarResult = FindPath(astarRequest);
+            AccessSearchResult astarResult = FindFixturePath(astarRequest);
             if (!astarResult.Success
                 || !incrementalSession.Result.Success
                 || Math.Abs(incrementalSession.Result.Cost
@@ -1433,16 +1457,29 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
                 Array.Empty<AccessDurabilityCorner>());
-            AccessSearchResult startHandoffResult = FindPath(startHandoffFixture, new[] { fixtureStart });
+            AccessSearchResult startHandoffResult = FindFixturePath(
+                startHandoffFixture, new[] { fixtureStart });
             AccessDesignationPlan startHandoffPlan = AccessPathMaterializer.Materialize(
-                startHandoffFixture, startHandoffResult);
+                new AccessSearchWorkspace(
+                    startHandoffFixture, EmptyAccessSearchEvaluator.Instance),
+                startHandoffResult);
             if (!startHandoffResult.Success
                 || startHandoffResult.Path.Count != 1
                 || !startHandoffResult.Path[0].IsGround
                 || !startHandoffPlan.IsValid
                 || startHandoffPlan.Designations.Count != 0
                 || startHandoffPlan.GroundNodeCount != 1)
-            { failure = "start fixed profile must allow immediate V-to-G handoff"; return false; }
+            {
+                failure = "start fixed profile must allow immediate V-to-G handoff"
+                    + $":success={startHandoffResult.Success}"
+                    + $" reason={startHandoffResult.FailureReason}"
+                    + $" path={startHandoffResult.Path.Count}"
+                    + $" planValid={startHandoffPlan.IsValid}"
+                    + $" planReason={startHandoffPlan.FailureReason}"
+                    + $" designations={startHandoffPlan.Designations.Count}"
+                    + $" groundNodes={startHandoffPlan.GroundNodeCount}";
+                return false;
+            }
             var v2WidthRequest = new AccessPathRequest(
                 "fixture-width-two",
                 fixture,
@@ -1450,7 +1487,7 @@ namespace AutoTerrainDesignations.Access
                 rootedRequest.Goal,
                 2,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult v2WidthResult = FindPath(v2WidthRequest);
+            AccessSearchResult v2WidthResult = FindFixturePath(v2WidthRequest);
             if (v2WidthResult.Success
                 || v2WidthResult.FailureReason != "V2FrontagesMissing")
             { failure = "Width-two request must dispatch to the V2 frontage boundary"; return false; }
@@ -1461,7 +1498,8 @@ namespace AutoTerrainDesignations.Access
                 rootedRequest.Goal,
                 1,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult unsupportedStartResult = FindPath(unsupportedStartRequest);
+            AccessSearchResult unsupportedStartResult = FindFixturePath(
+                unsupportedStartRequest);
             if (unsupportedStartResult.Success
                 || unsupportedStartResult.FailureReason != "UnsupportedStartEndpoint")
             { failure = "V1 rooted request must reject non-fixed-profile starts"; return false; }
@@ -1472,7 +1510,7 @@ namespace AutoTerrainDesignations.Access
                 new AccessPathEndpoint(AccessPathEndpointKind.FixedProfiles, new[] { fixtureWorkNeighbor }),
                 1,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult fixedGoalResult = FindPath(fixedGoalRequest);
+            AccessSearchResult fixedGoalResult = FindFixturePath(fixedGoalRequest);
             AccessDesignationPlan fixedGoalPlan = AccessPathMaterializer.Materialize(fixture, fixedGoalResult);
             if (!fixedGoalResult.Success
                 || !fixedGoalPlan.IsValid
@@ -1488,7 +1526,8 @@ namespace AutoTerrainDesignations.Access
                     fixture.GoalGroundNodes),
                 1,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult mergedFixedWinner = FindPath(mergedFixedWinnerRequest);
+            AccessSearchResult mergedFixedWinner = FindFixturePath(
+                mergedFixedWinnerRequest);
             if (!mergedFixedWinner.Success
                 || mergedFixedWinner.ReachedGoalKind != AccessReachedGoalKind.FixedNetwork)
             { failure = "merged goals must report a cheaper fixed-network terminal"; return false; }
@@ -1501,7 +1540,8 @@ namespace AutoTerrainDesignations.Access
                     fixture.GoalGroundNodes),
                 1,
                 AccessPathIntent.ConstructAccessway);
-            AccessSearchResult mergedGroundWinner = FindPath(mergedGroundWinnerRequest);
+            AccessSearchResult mergedGroundWinner = FindFixturePath(
+                mergedGroundWinnerRequest);
             if (!mergedGroundWinner.Success
                 || mergedGroundWinner.ReachedGoalKind != AccessReachedGoalKind.TowerGround)
             { failure = "merged goals must retain reachable tower-ground terminals"; return false; }
@@ -1512,11 +1552,15 @@ namespace AutoTerrainDesignations.Access
                 rootedRequest.Goal,
                 1,
                 AccessPathIntent.InspectExistingRoute);
-            AccessSearchResult unsupportedIntentResult = FindPath(unsupportedIntentRequest);
+            AccessSearchResult unsupportedIntentResult = FindFixturePath(
+                unsupportedIntentRequest);
             if (unsupportedIntentResult.Success
                 || unsupportedIntentResult.FailureReason != "UnsupportedIntent")
             { failure = "V1 rooted request must reject unsupported request intents"; return false; }
-            AccessDesignationPlan reusedPlan = AccessPathMaterializer.Materialize(fixture, fixtureResult);
+            AccessDesignationPlan reusedPlan = AccessPathMaterializer.Materialize(
+                new AccessSearchWorkspace(
+                    fixture, EmptyAccessSearchEvaluator.Instance),
+                fixtureResult);
             if (!reusedPlan.IsValid || reusedPlan.Designations.Count != 0 || reusedPlan.ReusedNodeCount != 1)
             { failure = "synthetic reused-path materialization fixture failed"; return false; }
 
@@ -1549,7 +1593,10 @@ namespace AutoTerrainDesignations.Access
                     new AccessSearchNode(cleanupGoal, 0, AccessSearchMode.Ground),
                 }, cleanupFixture.Policy.PropCleanupLandscapingCost + 1f, 1,
                 new Dictionary<string, int>());
-            AccessDesignationPlan cleanupPlan = AccessPathMaterializer.Materialize(cleanupFixture, cleanupResult);
+            AccessDesignationPlan cleanupPlan = AccessPathMaterializer.Materialize(
+                new AccessSearchWorkspace(
+                    cleanupFixture, EmptyAccessSearchEvaluator.Instance),
+                cleanupResult);
             if (!cleanupPlan.IsValid || cleanupPlan.CleanupOrigins.Count != 1
                 || !cleanupPlan.CleanupOrigins[0].HasDenseDebrisCleanup)
             { failure = "cleanup ground metadata must materialize separately from generated V designations"; return false; }
@@ -1579,7 +1626,11 @@ namespace AutoTerrainDesignations.Access
                     new AccessSearchNode(cleanupGeneratedGoal, 0, AccessSearchMode.Ground),
                 }, 2f, 2, new Dictionary<string, int>());
             AccessDesignationPlan cleanupGeneratedPlan =
-                AccessPathMaterializer.Materialize(cleanupGeneratedFixture, cleanupGeneratedResult);
+                AccessPathMaterializer.Materialize(
+                    new AccessSearchWorkspace(
+                        cleanupGeneratedFixture,
+                        EmptyAccessSearchEvaluator.Instance),
+                    cleanupGeneratedResult);
             if (!cleanupGeneratedPlan.IsValid
                 || cleanupGeneratedPlan.Designations.Count != 0
                 || cleanupGeneratedPlan.CleanupOrigins.Count != 1)
@@ -1602,7 +1653,7 @@ namespace AutoTerrainDesignations.Access
                 Array.Empty<Tile2i>(),
                 Array.Empty<Tile2i>(),
                 Array.Empty<AccessDurabilityCorner>());
-            AccessSearchResult continuationResult = FindPath(
+            AccessSearchResult continuationResult = FindFixturePath(
                 goalContinuationFixture,
                 new[] { fixtureStart },
                 candidate => candidate.Path[candidate.Path.Count - 1].Position == fixtureGoal
@@ -1691,7 +1742,10 @@ namespace AutoTerrainDesignations.Access
                     new AccessSearchNode(new Tile2i(8, 4), 0, AccessSearchMode.Flat),
                     new AccessSearchNode(fixtureGoal, 0, AccessSearchMode.Ground),
                 }, 14f, 4, new Dictionary<string, int>());
-            AccessDesignationPlan turnPlan = AccessPathMaterializer.Materialize(turnFixture, turnResult);
+            AccessDesignationPlan turnPlan = AccessPathMaterializer.Materialize(
+                new AccessSearchWorkspace(
+                    turnFixture, EmptyAccessSearchEvaluator.Instance),
+                turnResult);
             if (!turnPlan.IsValid || turnPlan.Designations.Count != 3)
             { failure = "legal diagonal self-contact at flat turn should materialize"; return false; }
 
@@ -1723,6 +1777,45 @@ namespace AutoTerrainDesignations.Access
             failure = string.Empty;
             return true;
         }
+
+        private static AccessSearchResult FindFixturePath(
+            AccessSearchSnapshot snapshot,
+            IReadOnlyList<Tile2i> clusterOrigins,
+            Func<AccessSearchResult, string?>? rejectGoal = null)
+        {
+            // These pre-worker transition fixtures intentionally exercise the
+            // legacy geometric fallback. Production snapshots use the
+            // snapshot-owned evaluator; its clearance-aware seam is covered
+            // by the architecture fixtures instead.
+            var workspace = new AccessSearchWorkspace(
+                snapshot, EmptyAccessSearchEvaluator.Instance);
+            AccessPathSearchSession session = CreateSession(
+                workspace,
+                snapshot,
+                clusterOrigins,
+                rejectGoal,
+                fixedGoalOrigins: null,
+                includeGroundGoals: true,
+                useAStarHeuristic: true,
+                maxCostLimit: float.MaxValue);
+            while (!session.IsComplete)
+                session.Step(int.MaxValue);
+            return session.Result;
+        }
+
+        private static AccessSearchResult FindFixturePath(
+            AccessPathRequest request)
+            => FindPath(
+                request,
+                new AccessSearchWorkspace(
+                    request.Snapshot, EmptyAccessSearchEvaluator.Instance));
+
+        private static AccessPathSearchSessionBuilder CreateFixtureSessionBuilder(
+            AccessPathRequest request)
+            => CreateSessionBuilder(
+                request,
+                new AccessSearchWorkspace(
+                    request.Snapshot, EmptyAccessSearchEvaluator.Instance));
 
         private static bool CostBreakdownsMatch(
             AccessSearchResult left,
@@ -2048,26 +2141,44 @@ namespace AutoTerrainDesignations.Access
                                         request.Snapshot, workspace, state, groundEntry,
                                         operation, history, diagnostics)
                                 : (AccessV2GroundToVHandoffEvaluator?)null,
-                    terminalExtensionOperationEvaluator:
-                        request.Snapshot.V2GroundGraph != null
-                            && workspace.Evaluator.HasV2WorkableHandoffEvaluator
-                                ? recent => AccessV2Handoffs
-                                    .GetSameTypeExtensionRequest(
-                                        recent,
-                                        workspace.Evaluator.GetV2WorkableHandoffs)
-                                : (AccessV2TerminalExtensionOperationEvaluator?)null,
                     terminalTransitionEvaluator:
                         (current, transition, history, connectedFixedOrigin,
                             operation) => EvaluateV2Transition(
                             request.Snapshot, current, transition,
                                 history, connectedFixedOrigin, operation,
                                 diagnostics),
-                    staggeredHandoffEvaluator:
-                        (terminalStates, extensionLane, operation, history) =>
-                            EvaluateV2StaggeredHandoffs(
-                                request.Snapshot, workspace, terminalStates,
-                                extensionLane, operation, history,
-                                diagnostics),
+                    terminalSingleLaneHandoffEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            && workspace.Evaluator.HasV2WorkableHandoffEvaluator
+                                ? workspace.Evaluator.GetV2WorkableHandoffs
+                                : (AccessV2SingleLaneHandoffEvaluator?)null,
+                    terminalLaneSpanHandoffEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            && workspace.Evaluator.HasV2WorkableHandoffEvaluator
+                                ? workspace.Evaluator.GetV2WorkableHandoffSpans
+                                : (AccessV2LaneSpanHandoffEvaluator?)null,
+                    terminalCrestEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            ? workspace.Evaluator.ClassifyV2TerminalCrest
+                            : (AccessV2TerminalCrestEvaluator?)null,
+                    terminalCenterEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            ? (origin, operation, center, history, origins) =>
+                                request.Snapshot.IsV2HandoffCorridorCenterPathable(
+                                    origin, operation, center, history, origins)
+                            : (AccessV2HandoffCenterEvaluator?)null,
+                    terminalGroundEntryEvaluator:
+                        request.Snapshot.V2GroundGraph != null
+                            ? (center, origins, history) =>
+                                request.Snapshot.IsV2HandoffGroundEntryPathable(
+                                    center, origins, history)
+                            : (AccessV2HandoffGroundEntryEvaluator?)null,
+                    terminalProjectedCenterValidator:
+                        request.Snapshot.IsProjectedV2CenterPathable,
+                    terminalTransitionValidator:
+                        transition => AccessV2SearchSession
+                            .IsTransitionWithinUsefulHeightEnvelope(
+                            requestHeightEnvelope, transition, out _),
                     heuristicEvaluator: null,
                     groundGraph: v2GroundGraph,
                     groundValidator: request.Snapshot.IsProjectedV2CenterPathable,
@@ -2346,6 +2457,7 @@ namespace AutoTerrainDesignations.Access
             public int PendingNodes => m_v2Session != null
                 ? m_v2Session.Pending
                 : IsComplete || m_queue == null ? 0 : m_queue.Count;
+            internal string Phase => m_v2Session?.Phase ?? "Searching";
             // Diagnostic-only hook used by the access search overlay.
             internal Action<Tile2i, int, bool, int?>? NodeExplored
             {
@@ -2445,10 +2557,16 @@ namespace AutoTerrainDesignations.Access
             }
 
             public int Step(int maxVisitedNodes)
+                => Step(maxVisitedNodes, null);
+
+            public int Step(
+                int maxVisitedNodes,
+                AccessSearchSliceBudget? sliceBudget)
             {
                 if (m_v2Session != null)
                 {
-                    int visited = m_v2Session.Step(maxVisitedNodes);
+                    int visited = m_v2Session.Step(
+                        maxVisitedNodes, sliceBudget);
                     if (m_v2Session.IsComplete)
                         Result = ConvertV2Result(m_v2Session.Result);
                     return visited;
@@ -5755,6 +5873,8 @@ namespace AutoTerrainDesignations.Access
                 diagnostics);
         }
 
+        // Legacy save replay only. Production V2 search uses
+        // AccessV2TerminalEvaluator directly at straight expansion.
         internal static IReadOnlyList<AccessV2HandoffCandidate>
             EvaluateV2StaggeredHandoffs(
                 AccessSearchSnapshot snapshot,

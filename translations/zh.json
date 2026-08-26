@@ -744,6 +744,10 @@
     "[ATD] {entity}斜坡无法抵达地面"
   ],
   [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] {entity} 的访问区域过大，无法搜索转向坡道"
+  ],
+  [
     "notification.farming_complete",
     "[ATD] {entity}的农地处理完成"
   ],

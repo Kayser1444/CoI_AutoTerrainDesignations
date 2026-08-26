@@ -1,6 +1,8 @@
 # Accessway V2 review and staged implementation plan
 
-Status: fully implemented (Stages 0–7 completed).
+Status: historical implementation record (Stages 0–7 completed). The current
+terminal-handoff requirements in `accessway-pathfinding.md` supersede this
+document's older common-span, mixed-operation, crest, and corridor rules.
 
 Reviewed: 2026-07-13
 

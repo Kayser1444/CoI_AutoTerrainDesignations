@@ -311,7 +311,27 @@ namespace AutoTerrainDesignations.Access.V2
                         }
                     AccessV2History historyAtHandoff = history;
                     IReadOnlyList<AccessV2HandoffCandidate> replayCandidates;
-                    if (step.Handoff.IsStaggeredExtension)
+                    if (step.Handoff.IsBoundedTerminal)
+                    {
+                        AccessV2GroundGraph? graph = snapshot.V2GroundGraph;
+                        if (!TryValidateBoundedTerminalMetadata(
+                                recent,
+                                step.Handoff,
+                                out string terminalMetadataReason)
+                            || graph == null
+                            || !graph.TryValidateLocalEscape(
+                                step.Handoff.GroundEntryCenters,
+                                historyAtHandoff,
+                                snapshot.LandscapingCostDistanceScale,
+                                out _, out _))
+                        {
+                            reason = "V2ReplayBoundedTerminalProofMismatch:" +
+                                terminalMetadataReason;
+                            return false;
+                        }
+                        replayCandidates = new[] { step.Handoff };
+                    }
+                    else if (step.Handoff.IsStaggeredExtension)
                     {
                         int extensionLane = step.Handoff.NonCrestLane;
                         replayCandidates =
@@ -410,6 +430,62 @@ namespace AutoTerrainDesignations.Access.V2
                     return false;
             }
             return true;
+        }
+
+        private static bool TryValidateBoundedTerminalMetadata(
+            IReadOnlyList<AccessV2BandState> recentNewestFirst,
+            AccessV2HandoffCandidate handoff,
+            out string reason)
+        {
+            if (handoff.TerminalRanks.Count == 0
+                || recentNewestFirst.Count < handoff.TerminalRanks.Count)
+            {
+                reason = "RankDataMissing";
+                return false;
+            }
+            if (handoff.TerminalFrontage.OutwardDirection
+                != recentNewestFirst[0].EntryDirection)
+            {
+                reason = "FrontageDirection";
+                return false;
+            }
+            for (int index = 0;
+                index < handoff.TerminalRanks.Count;
+                index++)
+            {
+                AccessV2TerminalRankDelta delta =
+                    handoff.TerminalRanks[index];
+                AccessV2BandState state = recentNewestFirst[
+                    handoff.TerminalRanks.Count - index - 1];
+                if (delta.Rank != index + 1
+                    || !RankLaneMatches(
+                        handoff.TerminalRanks, delta, state, 0)
+                    || !RankLaneMatches(
+                        handoff.TerminalRanks, delta, state, 1))
+                {
+                    reason = "RankDelta" + (index + 1);
+                    return false;
+                }
+            }
+            reason = string.Empty;
+            return true;
+
+            bool RankLaneMatches(
+                IReadOnlyList<AccessV2TerminalRankDelta> ranks,
+                AccessV2TerminalRankDelta rankDelta,
+                AccessV2BandState routeState,
+                int lane)
+            {
+                AccessV2OriginProfile actual = lane == 0
+                    ? rankDelta.Lane0
+                    : rankDelta.Lane1;
+                bool frozen = (rankDelta.FrozenLanes & (1 << lane)) != 0;
+                AccessV2OriginProfile expected = frozen
+                    ? (lane == 0 ? ranks[0].Lane0 : ranks[0].Lane1)
+                    : routeState.GetLane(lane);
+                return actual.Origin == expected.Origin
+                    && ProfilesEqual(actual.Profile, expected.Profile);
+            }
         }
 
         private static bool IsDirectLevelingBridge(
@@ -590,6 +666,8 @@ namespace AutoTerrainDesignations.Access.V2
                     && left.Lane1Operation == right.Lane1Operation
                     && left.IsStaggeredExtension
                         == right.IsStaggeredExtension
+                    && left.IsBoundedTerminal
+                        == right.IsBoundedTerminal
                     && left.NonCrestLane == right.NonCrestLane
                 && left.Lane0Contact == right.Lane0Contact
                 && left.Lane1Contact == right.Lane1Contact

@@ -450,6 +450,8 @@ namespace AutoTerrainDesignations
             Loc.Str("notification.ramp_access_truncated", "[ATD] {entity} could not fit a full access ramp", "Notification: ramp was truncated. {entity} is substituted by the game.");
         public static LocStr NotifRampNotAccessible =
             Loc.Str("notification.ramp_access_not_accessible", "[ATD] {entity} could not path to the ramp", "Notification: ramp not accessible. {entity} is substituted by the game.");
+        public static LocStr NotifRampSnapshotTooLarge =
+            Loc.Str("notification.ramp_access_snapshot_too_large", "[ATD] {entity} access area is too large for the turning-ramp search", "Notification: turning-ramp search was skipped because the access area is too large. {entity} is substituted by the game.");
         public static LocStr NotifFarmingComplete =
             Loc.Str("notification.farming_complete", "[ATD] {entity} farming preparation and filling complete", "Notification: farming complete. {entity} is substituted by the game.");
         public static LocStr NotifExcavatorCompleted =

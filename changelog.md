@@ -1,5 +1,32 @@
 v0.6.2 [unreleased]
 
+* Improved: Cooperative V2 access searches now resume exact ground suffix,
+  fixed-navigation path/portal, and handoff-entry work across frame slices
+  instead of treating a whole large expansion as one atomic step. Cancellation
+  and snapshot semantics remain unchanged; the worker-thread rollout is still
+  separate.
+
+* Improved: Access preparation now captures the primitive terrain, prop, stump,
+  and exact layout-occupancy facts needed to evaluate vanilla mining and
+  dumping readiness without consulting live designation state.
+
+* Fixed: Oversized access snapshots now fail their memory preflight before
+  expensive reachability classification, and out-of-area origin checks reuse a
+  shared bounded reachability flood. Snapshot-size failures retain their
+  diagnostic reason instead of being reported as generic no-candidate blocks.
+
+* Improved: The access-search progress toast now keeps a fixed-width
+  description row above a separate statistics row, preventing changing phase
+  text and live counters from shifting the text and controls.
+
+* Added: Access searches now show a tower warning when the area is too large
+  for the turning-ramp snapshot, instead of reporting only a generic failure.
+
+* Improved: Production access snapshots now create their search workspace from
+  captured facts and policy; caller-built handoff evaluator closures are
+  retained only by synthetic fixtures, and the immutable snapshot no longer
+  accepts callback-shaped compatibility inputs.
+
 v0.6.1 [released]
 
 * Fixed: Interactive accessway searches now invalidate before their next slice

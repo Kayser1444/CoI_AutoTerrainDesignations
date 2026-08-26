@@ -667,7 +667,11 @@ namespace AutoTerrainDesignations.Access.V2
                     currentOwners.Add(history.m_delta[index].Origin);
 
             if (currentOwners.Count == 0)
-                return CollectRayTiles();
+            {
+                m_cachedHandoffRayTiles =
+                    (HashSet<Tile2i>)CollectRayTiles();
+                return m_cachedHandoffRayTiles;
+            }
 
             var result = new HashSet<Tile2i>();
             for (AccessV2History? history = this;
@@ -679,6 +683,12 @@ namespace AutoTerrainDesignations.Access.V2
                         result.Add(pair.Key);
             m_cachedHandoffRayTiles = result;
             return result;
+        }
+
+        public bool ContainsHandoffRayTile(Tile2i tile)
+        {
+            CollectHandoffRayTiles();
+            return m_cachedHandoffRayTiles!.Contains(tile);
         }
 
         private bool ValidateContacts(

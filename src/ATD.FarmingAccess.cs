@@ -7,6 +7,7 @@
 // intended to contain only original mod code/configuration; if MaFi Games material
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 // Auto Terrain Designations - Farming Access Ramps
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -68,6 +69,12 @@ namespace AutoTerrainDesignations
                 PlacedOrigins = placedOrigins;
             }
         }
+
+        private static string GetManagedFarmingAccessFailureReason(
+            RampGenerationResult rampResult)
+            => string.IsNullOrEmpty(rampResult.FailureReason)
+                ? rampResult.Outcome.ToString()
+                : rampResult.FailureReason;
 
         private static bool EnsureFarmingAccessForCurrentPhase(
             IAreaManagingTower tower,
@@ -382,6 +389,9 @@ namespace AutoTerrainDesignations
                     if (snapshot.State == ATDAccesswayRequestState.Succeeded
                         && payload != null)
                     {
+                        ClearTransientTowerNotification(
+                            tower,
+                            TransientNotificationKind.RampAccessSnapshotTooLarge);
                         AdoptTerminalFarmingAccessOwnership(
                             snapshot, ownedRamps);
                         session.LastAccessRampRequestKey = requestFingerprint;
@@ -426,6 +436,15 @@ namespace AutoTerrainDesignations
                     {
                         string reason = snapshot.Result?.Reason
                             ?? snapshot.State.ToString();
+                        if (string.Equals(
+                                reason,
+                                "SnapshotTooLarge",
+                                StringComparison.Ordinal))
+                            UpdateTowerSnapshotTooLargeWarningNotification(tower);
+                        else
+                            ClearTransientTowerNotification(
+                                tower,
+                                TransientNotificationKind.RampAccessSnapshotTooLarge);
                         bool stoppedByUser = snapshot.State
                                 == ATDAccesswayRequestState.Cancelled
                             && string.Equals(
@@ -690,9 +709,7 @@ namespace AutoTerrainDesignations
                                     == RampPlacementOutcome.Truncated
                             ? ATDAccesswayRequestResult.Succeeded(payload)
                             : ATDAccesswayRequestResult.Failed(
-                                string.IsNullOrEmpty(rampResult.FailureReason)
-                                    ? rampResult.Outcome.ToString()
-                                    : rampResult.FailureReason,
+                                GetManagedFarmingAccessFailureReason(rampResult),
                                 payload);
                     },
                     GetManagedAccesswaySliceBudgetMilliseconds),
@@ -1296,6 +1313,20 @@ namespace AutoTerrainDesignations
                     "A generated accessway leveling origin was reclassified as a farming intent.";
                 return false;
             }
+
+            var failedRamp = new RampGenerationResult
+            {
+                Outcome = RampPlacementOutcome.Failed,
+                FailureReason = "V2NoFeasibleStart; topRejections=SourceLaunchInitial:Durability:3"
+            };
+            if (GetManagedFarmingAccessFailureReason(failedRamp)
+                != failedRamp.FailureReason)
+            {
+                failure =
+                    "Managed farming access did not preserve the concrete experimental search failure reason.";
+                return false;
+            }
+
             if (ShouldAddExistingTerrainWorkEndpoint(
                     alreadyRequested: false,
                     contextOnly: true,
