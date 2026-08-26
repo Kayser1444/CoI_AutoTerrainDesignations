@@ -371,6 +371,12 @@ namespace AutoTerrainDesignations
         public static LocStr OrePrioritySetTipFmt =
             Loc.Str("panel.ore.priority_set_tooltip", "Set tower mining priority to {0}.", "Tooltip on a priority button. {0} = colored product name.");
 
+        public static LocStr OreSorterAssignedTrucksEnforceTip =
+            Loc.Str(
+                "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+                "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here.",
+                "Tooltip for the ore sorting plant assigned-trucks-only toggle.");
+
         // ------------------------------------------------------------------ //
         // Farming analysis panel
         // ------------------------------------------------------------------ //

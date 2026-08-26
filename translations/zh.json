@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "按住 Shift-Alt 键并单击即可在 {1} 为 {2} 订购新的 {0}"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "只有已分配的卡车（以及分配给参与采矿塔的卡车）才能在此处装载或交付货物。"
   ]
 ]

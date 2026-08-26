@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Endast tilldelade lastbilar (och lastbilar tilldelade till deltagande gruvtorn) får hämta eller leverera last här."
   ]
 ]

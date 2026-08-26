@@ -61,6 +61,7 @@ public sealed class AutoTerrainDesignationsMod : IMod, IDisposable
     private SimStep m_lastSimTick;
     private IModStateJsonStore? m_towerSettingsStateStore;
     private IModStateJsonStore? m_preAllocationsStateStore;
+    private IModStateJsonStore? m_oreSorterExportStateStore;
     private IEntitiesManager? m_entitiesManager;
 
     public string Name => "Auto Terrain Designations";
@@ -98,6 +99,7 @@ public static string Tt(string text) => text;
             SetCornerDesignationMode(FromPrimaryKeys(cornerKey));
         }
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
+        AutoDepthDesignation.ApplyOreSorterExportPatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
         TruckIdlePolicyPatches.Apply(m_harmony);
         PreAllocationPatches.Apply(m_harmony);
@@ -739,12 +741,15 @@ public static string Tt(string text) => text;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
             AutoDepthDesignation.ConfigureActiveSoilImport(vehicleBuffersRegistry, truckJobsFilter, unreachableTerrainDesignations, dumpingJobFactory, cargoPickUpFactory, chainedNavigationFactory, vehicleLastOutputBufferManager);
+            AutoDepthDesignation.ConfigureOreSorterExports(vehicleBuffersRegistry);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
             AutoDepthDesignation.PropRemovalManager?.ResumeLoadedRequests();
             m_preAllocationsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, "atdPendingVehicleAllocations");
             PendingVehicleAllocations.LoadFromJsonStore(m_preAllocationsStateStore);
             PendingVehicleAllocations.ReconcileQueues(entitiesManager);
+            m_oreSorterExportStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.OreSorterExportConfigKey);
+            AutoDepthDesignation.LoadOreSorterExportsFromJsonStore(m_oreSorterExportStateStore);
             // Corner designation mode — TerrainCursor, TerrainDesignationsRenderer and
             // CursorManager may only be available on the Unity side; fail gracefully if not resolvable.
             TerrainCursor? terrainCursor = null;
@@ -820,6 +825,10 @@ public static string Tt(string text) => text;
                 PendingVehicleAllocations.ReconcileQueues(m_entitiesManager);
             PendingVehicleAllocations.SaveToJsonStore(m_preAllocationsStateStore);
         }
+        IModStateJsonStore sorterStore = m_oreSorterExportStateStore
+            ?? ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.OreSorterExportConfigKey);
+        m_oreSorterExportStateStore = sorterStore;
+        AutoDepthDesignation.SaveOreSorterExportsToJsonStore(sorterStore);
         AutoDepthDesignation.PurgeTransientNotificationsForSave();
         AutoDepthDesignation.RestoreFarmingRuntimeForSave();
         AutoDepthDesignation.RestoreIdleReleasedVehiclesForSave();
@@ -878,6 +887,7 @@ public static string Tt(string text) => text;
     private void onEntityRemoved(IEntity entity)
     {
         AutoDepthDesignation.OnFarmingTowerRemoved(entity.Id);
+        AutoDepthDesignation.OnOreSorterExportEntityRemoved(entity);
 
         if (entity is IEntityAssignedWithVehicles)
             PendingVehicleAllocations.OnTowerDestroyed(entity.Id);

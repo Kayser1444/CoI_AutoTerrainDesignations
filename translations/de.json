@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Nur die zugewiesenen Lkw (und Lkw, die teilnehmenden Minentürmen zugewiesen sind) dürfen hier Fracht aufnehmen oder abliefern."
   ]
 ]

@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-clique para solicitar um novo {0} para {2} em {1}"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Apenas os caminhões atribuídos (e os caminhões atribuídos às torres de mineração participantes) poderão coletar ou entregar carga aqui."
   ]
 ]

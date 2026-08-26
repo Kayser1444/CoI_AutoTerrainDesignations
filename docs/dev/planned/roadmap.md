@@ -26,9 +26,15 @@ The access framework, V2-style accessway search, and bounded out-of-area ramp fa
   must preserve terrain-extrema heuristic admissibility or weaken that
   heuristic component to zero wherever the rebate can apply.
 - Underground pipe construction support for both vanilla and modded scenarios, if the complexity becomes practical.
+- If the snapshot is too large, shrink it to managable size
+- Replace static T1, T2, and T3 accessway clearance levels with dynamic levels based on the available excavator base class prototypes.
 
 ## Reliability and quality work
 
+- Build the [Access Search Laboratory](access-search-laboratory.md) after the
+  primitive capture pipeline: record owned real search cases, replay the exact
+  mod DLL for semantic regression and Release benchmarking, then add
+  collaborative route validation and bounded autonomous conformance tuning.
 - Keep refining accessway heuristics and terrain-disturbance prediction, especially around avoidance settings and hazard warnings.
 - Investigate topsoil optimization so farmability can be satisfied with less over-placing where it is safe to do so.
 - Address concurrency and thread-safety issues around idle vehicle release and entity enumeration so the mod remains stable under broader game and mod interactions.

@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-click to order a new {0} for {2} at {1}"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here."
   ]
 ]

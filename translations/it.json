@@ -786,5 +786,9 @@
   [
     "vehicle_order.shortcut.tooltip",
     "Fai clic tenendo premuto Maiusc-Alt per ordinare un nuovo {0} per {2} presso {1}"
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Solo i camion assegnati (e i camion assegnati alle torri minerarie partecipanti) potranno prelevare o consegnare carichi qui."
   ]
 ]

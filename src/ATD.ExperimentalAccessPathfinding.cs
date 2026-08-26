@@ -3088,6 +3088,17 @@ namespace AutoTerrainDesignations
                 $"bounds=({request.BoundsMin.X},{request.BoundsMin.Y})..({request.BoundsMax.X},{request.BoundsMax.Y})";
         }
 
+    }
+
+    /// <summary>
+    /// Pure, snapshot-owned handoff evaluation shared by cooperative and
+    /// future worker execution. The interface accepts captured facts and
+    /// request-local caches only; live runtime state stays with the caller.
+    /// </summary>
+    internal static class AccessHandoffEvaluator
+    {
+        private const uint AllDesignationTilesMask = 0x1FFFFFF;
+
         internal static IReadOnlyList<AccessGroundHandoff> BuildProspectiveWorkableHandoffs(
             Tile2i origin,
             AccessHeightProfile profile,
@@ -3125,12 +3136,7 @@ namespace AutoTerrainDesignations
                     out handoffEdge, out operation, out fulfilledBitmap,
                     out directionalDiagnostic);
             if (!selected)
-            {
-                if (s_enableVerboseHandoffDiagnostics)
-                    LogExistingHandoffDiagnostic(origin, predecessorOrigin,
-                        directionalDiagnostic + " selected=None");
                 return Array.Empty<AccessGroundHandoff>();
-            }
             string cacheKey =
                 origin.X.ToString(CultureInfo.InvariantCulture) + "," +
                 origin.Y.ToString(CultureInfo.InvariantCulture) + "|" +
@@ -3146,11 +3152,6 @@ namespace AutoTerrainDesignations
 
             var result = new List<AccessGroundHandoff>();
             var emitted = new HashSet<Tile2i>();
-            List<string>? candidateDiagnostics = s_enableVerboseHandoffDiagnostics
-                ? new List<string>()
-                : null;
-            int groundCandidateCount = 0;
-            int connectedCandidateCount = 0;
 
             for (int offset = 0; offset <= 4; offset++)
             {
@@ -3199,8 +3200,6 @@ namespace AutoTerrainDesignations
                         terrainPathableWithoutProps);
                     bool exteriorGround = IsExperimentalAccessGroundOrCleanupCenter(
                         groundNodes, propCleanupByTile, exteriorTile);
-                    if (exteriorGround)
-                        groundCandidateCount++;
                     TryAddHandoff(
                         exteriorTile,
                         perimeterFulfilled && secondRankPathable && exteriorGround,
@@ -3212,8 +3211,6 @@ namespace AutoTerrainDesignations
                 bool perimeterGround = IsPostWorkHandoffGroundCenter(
                     groundNodes, propCleanupByTile,
                     perimeterTile, operation);
-                if (perimeterGround)
-                    groundCandidateCount++;
                 TryAddHandoff(
                     perimeterTile,
                     perimeterGround && perimeterFulfilled,
@@ -3226,25 +3223,12 @@ namespace AutoTerrainDesignations
                     string location,
                     IReadOnlyList<Tile2i>? escapeTiles)
                 {
-                    if (candidateDiagnostics != null)
-                        candidateDiagnostics.Add(
-                            $"{location}=({tile.X},{tile.Y}):connected={connected}," +
-                            $"goal={goalGroundNodes.Contains(tile)}");
                     if (!connected || !emitted.Add(tile))
                         return;
-                    connectedCandidateCount++;
                     result.Add(new AccessGroundHandoff(tile, operation, escapeTiles));
                 }
 
             }
-            if (candidateDiagnostics != null)
-                LogExistingHandoffDiagnostic(origin, predecessorOrigin,
-                    directionalDiagnostic
-                    + " selected=" + operation
-                    + " edge=" + handoffEdge.ToString(CultureInfo.InvariantCulture)
-                    + " groundCandidates=" + groundCandidateCount.ToString(CultureInfo.InvariantCulture)
-                    + " connectedCandidates=" + connectedCandidateCount.ToString(CultureInfo.InvariantCulture)
-                    + " candidates=[" + string.Join(";", candidateDiagnostics) + "]");
             handoffCache[cacheKey] = result.ToArray();
             return handoffCache[cacheKey];
         }
@@ -3503,30 +3487,6 @@ namespace AutoTerrainDesignations
                 }
             }
             return null;
-        }
-
-        private static void LogExistingHandoffDiagnostic(
-            Tile2i origin,
-            Tile2i predecessorOrigin,
-            string details)
-        {
-            if (!s_enableVerboseHandoffDiagnostics)
-                return;
-            if (s_desigManager == null)
-                return;
-            bool nearExistingDesignation = s_desigManager.GetDesignationAt(origin).HasValue;
-            var directions = new[]
-            {
-                new RelTile2i(4, 0), new RelTile2i(-4, 0),
-                new RelTile2i(0, 4), new RelTile2i(0, -4),
-            };
-            for (int i = 0; i < directions.Length && !nearExistingDesignation; i++)
-                nearExistingDesignation = s_desigManager.GetDesignationAt(origin + directions[i]).HasValue;
-            if (!nearExistingDesignation)
-                return;
-            LogExperimentalAccessTrace(
-                    $"[ATD Access Handoff Diagnostic] origin=({origin.X},{origin.Y}) " +
-                $"predecessor=({predecessorOrigin.X},{predecessorOrigin.Y}) {details}");
         }
 
         internal static bool IsInteriorHandoffEdgeTile(
@@ -4276,6 +4236,11 @@ namespace AutoTerrainDesignations
                     center, out AccessPropCleanupInfo info)
                 && info.IsEligibleWithinGeneratedV;
         }
+
+    }
+
+    public static partial class AutoDepthDesignation
+    {
 
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
             AccessSearchResult result,
