@@ -101,13 +101,14 @@ The terminal snapshot-size reason is preserved in cluster diagnostics.
 
 Ticket 2 remains in progress. Production workspaces now reconstruct their
 handoff evaluator from snapshot data and policy rather than receiving
-caller-built delegate closures. Synthetic fixtures may still inject evaluators
-for deliberately artificial materializer cases; the immutable snapshot no
-longer accepts callback-shaped compatibility inputs. Readiness fixtures cover
-terrain, props, stumps, and exact layout-occupancy edge cases. The capture pipeline still
-needs the specified large-area stress evidence for its 30 ms atomic ceiling and
-bounded-memory behavior, and the pure handoff helper must be isolated from the
-runtime type before worker execution.
+caller-built delegate closures. The complete single-cell/span handoff module is
+also isolated from the runtime `AutoDepthDesignation` type and consumes only
+captured facts plus request-local caches. Synthetic fixtures may still inject
+evaluators for deliberately artificial materializer cases; the immutable
+snapshot no longer accepts callback-shaped compatibility inputs. Readiness
+fixtures cover terrain, props, stumps, and exact layout-occupancy edge cases.
+The remaining Ticket 2 gate is the specified large-area stress evidence for
+the 30 ms atomic ceiling and bounded-memory behavior.
 The cooperative search-slicing sub-slice below is independent of worker-thread
 execution and may land while those capture items remain open. Ticket 3 remains
 blocked on the Ticket 2 acceptance items.

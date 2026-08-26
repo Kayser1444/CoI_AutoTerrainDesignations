@@ -35,8 +35,6 @@ namespace AutoTerrainDesignations
 
         internal static AccessSearchResult? LastExperimentalAccessSearch { get; private set; }
         internal static AccessDesignationPlan? LastExperimentalAccessPlan { get; private set; }
-        private static bool s_enableVerboseHandoffDiagnostics
-            => AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace);
         private static UiRoot? s_uiRoot;
         // NotificationToast is center-aligned and sizes itself from its children.
         // Keep the progress surface stable while the label contents change.
@@ -395,34 +393,6 @@ namespace AutoTerrainDesignations
             float predecessorGroundHeight,
             out AccessHandoffOperation operation)
             => TrySelectHandoffOperationForProfile(predecessorProfileCenter2, predecessorGroundHeight, out operation);
-
-        internal static bool TrySelectHandoffOperationFromEdge(
-            IReadOnlyList<int> handoffEdgeSigns,
-            out AccessHandoffOperation operation)
-        {
-            if (handoffEdgeSigns.Count == 0)
-            {
-                operation = AccessHandoffOperation.None;
-                return false;
-            }
-
-            bool allAtOrBelow = handoffEdgeSigns.All(sign => sign <= 0);
-            bool anyBelow = handoffEdgeSigns.Any(sign => sign < 0);
-            if (allAtOrBelow && anyBelow)
-            {
-                operation = AccessHandoffOperation.Mining;
-                return true;
-            }
-
-            if (handoffEdgeSigns.All(sign => sign >= 0))
-            {
-                operation = AccessHandoffOperation.Dumping;
-                return true;
-            }
-
-            operation = AccessHandoffOperation.None;
-            return false;
-        }
 
         internal static bool IsHandoffOperationCompatibleWithProfileSigns(
             IReadOnlyList<int> profileWorkSigns,
@@ -3042,12 +3012,14 @@ namespace AutoTerrainDesignations
                     continue;
                 }
 
-                if (!TryGetDirectionalHandoff(node.Position, profile,
+                if (!AccessHandoffEvaluator.TryGetDirectionalHandoff(
+                    node.Position, profile,
                     predecessor.Position, snapshot.PreciseTerrainHeights,
                     snapshot.DesignationReadinessFacts, 1, out int edge,
                     out AccessHandoffOperation operation, out _, out _))
                     continue;
-                RelTile2i outward = GetHandoffOutwardDirection(edge);
+                RelTile2i outward =
+                    AccessHandoffEvaluator.GetHandoffOutwardDirection(edge);
                 var lanes = new List<string>();
                 for (int offset = 1; offset < 4; offset++)
                 {
@@ -3090,6 +3062,10 @@ namespace AutoTerrainDesignations
 
     }
 
+}
+
+namespace AutoTerrainDesignations.Access
+{
     /// <summary>
     /// Pure, snapshot-owned handoff evaluation shared by cooperative and
     /// future worker execution. The interface accepts captured facts and
@@ -3098,6 +3074,7 @@ namespace AutoTerrainDesignations
     internal static class AccessHandoffEvaluator
     {
         private const uint AllDesignationTilesMask = 0x1FFFFFF;
+        private const uint ReadyPerimeterMask = 0x1F8C63F;
 
         internal static IReadOnlyList<AccessGroundHandoff> BuildProspectiveWorkableHandoffs(
             Tile2i origin,
@@ -3425,8 +3402,8 @@ namespace AutoTerrainDesignations
                         fulfilledBitmap |= GetDesignationMask(x, y);
                 }
             }
-            return fulfilledBitmap != ALL_DESIGNATION_TILES_MASK
-                && (fulfilledBitmap & READY_PERIMETER_MASK) != 0;
+            return fulfilledBitmap != AllDesignationTilesMask
+                && (fulfilledBitmap & ReadyPerimeterMask) != 0;
         }
 
         private static IReadOnlyList<Tile2i>? FindPostWorkGroundPathOutOfHandoffSpan(
@@ -3589,93 +3566,6 @@ namespace AutoTerrainDesignations
             insideY = edgeY - (outward.Y > 0 ? 1 : 0);
         }
 
-        private static bool DoesProfileCrossGroundInTile(
-            DesignationData data,
-            TerrainManager terrMgr,
-            int handoffEdge,
-            int tileX,
-            int tileY)
-        {
-            int nextX = handoffEdge == 0 || handoffEdge == 1 ? tileX + 1 : tileX;
-            int nextY = handoffEdge == 2 || handoffEdge == 3 ? tileY + 1 : tileY;
-            float firstDelta = GetDesignationTargetHeightAt(data, tileX, tileY).Value.ToFloat()
-                - terrMgr.GetHeight(data.OriginTile + new RelTile2i(tileX, tileY)).Value.ToFloat();
-            float secondDelta = GetDesignationTargetHeightAt(data, nextX, nextY).Value.ToFloat()
-                - terrMgr.GetHeight(data.OriginTile + new RelTile2i(nextX, nextY)).Value.ToFloat();
-            int firstSign = CompareHeightDeltaToGround(firstDelta);
-            int secondSign = CompareHeightDeltaToGround(secondDelta);
-            return firstSign == 0 || secondSign == 0 || firstSign != secondSign;
-        }
-
-        private static IReadOnlyList<Tile2i>? FindPostWorkGroundPathOutOfHandoffCell(
-            Tile2i origin,
-            Tile2i adjacentVOrigin,
-            DesignationData data,
-            TerrainManager terrMgr,
-            AccessHandoffOperation operation,
-            Tile2i start,
-            HashSet<Tile2i> groundNodes,
-            IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin)
-        {
-            if (!IsExperimentalAccessGroundOrCleanupNode(
-                    groundNodes, propCleanupByOrigin, start))
-                return null;
-
-            // The terminal designation is evaluated after its own work has
-            // completed.  Its crossed samples are therefore part of the new
-            // drivable surface, provided the underlying snapshot already admits
-            // them as G nodes.  Main-body projected work remains excluded when
-            // groundNodes is built.
-
-            if (!IsInsideVFootprint(start, origin)
-                && !IsInsideVFootprint(start, adjacentVOrigin))
-                return new[] { start };
-
-            var queue = new Queue<Tile2i>();
-            var visited = new HashSet<Tile2i>();
-            var parent = new Dictionary<Tile2i, Tile2i>();
-            queue.Enqueue(start);
-            visited.Add(start);
-            RelTile2i[] directions =
-            {
-                new RelTile2i(-1, 0), new RelTile2i(1, 0),
-                new RelTile2i(0, -1), new RelTile2i(0, 1),
-            };
-            while (queue.Count > 0)
-            {
-                Tile2i current = queue.Dequeue();
-                for (int index = 0; index < directions.Length; index++)
-                {
-                    Tile2i next = current + directions[index];
-                    bool insideHandoffV = IsInsideVFootprint(next, origin);
-                    bool insideAdjacentV = IsInsideVFootprint(next, adjacentVOrigin);
-                    if (!IsExperimentalAccessGroundOrCleanupNode(
-                            groundNodes, propCleanupByOrigin, next))
-                        continue;
-                    if (!insideHandoffV && !insideAdjacentV)
-                    {
-                        parent[next] = current;
-                        var path = new List<Tile2i> { next };
-                        Tile2i pathTile = next;
-                        while (pathTile != start)
-                        {
-                            pathTile = parent[pathTile];
-                            path.Add(pathTile);
-                        }
-                        path.Reverse();
-                        return path;
-                    }
-                    if (insideAdjacentV)
-                        continue;
-                    if (!visited.Add(next))
-                        continue;
-                    parent[next] = current;
-                    queue.Enqueue(next);
-                }
-            }
-            return null;
-        }
-
         private static bool IsInsideVFootprint(Tile2i tile, Tile2i origin)
             => tile.X >= origin.X && tile.X < origin.X + 4
                 && tile.Y >= origin.Y && tile.Y < origin.Y + 4;
@@ -3702,7 +3592,7 @@ namespace AutoTerrainDesignations
                     : Math.Abs(targetHeight - groundHeight) > epsilon;
         }
 
-        private static RelTile2i GetHandoffOutwardDirection(int handoffEdge)
+        internal static RelTile2i GetHandoffOutwardDirection(int handoffEdge)
             => handoffEdge == 0
                 ? new RelTile2i(-1, 0)
                 : handoffEdge == 1
@@ -3752,7 +3642,7 @@ namespace AutoTerrainDesignations
         // with at least one mask-pathable bridge tile. Mining and dumping use
         // the corner-crest crossing rule. The G graph and width-two pairing
         // subsequently prove the usable exit for non-leveling operations.
-        private static bool TrySelectV2CornerCrestHandoff(
+        internal static bool TrySelectV2CornerCrestHandoff(
             Tile2i incomingOrigin,
             AccessHeightProfile incomingProfile,
             Tile2i outgoingOrigin,
@@ -3862,7 +3752,7 @@ namespace AutoTerrainDesignations
             return false;
         }
 
-        private static bool TryGetDirectionalHandoff(
+        internal static bool TryGetDirectionalHandoff(
             Tile2i origin,
             AccessHeightProfile profile,
             Tile2i predecessorPosition,
@@ -3887,37 +3777,10 @@ namespace AutoTerrainDesignations
             }
 
             diagnostic = string.Empty;
-            if (s_enableVerboseHandoffDiagnostics)
-            {
-                Tile2i[] corners =
-                {
-                    origin,
-                    origin + new RelTile2i(4, 0),
-                    origin + new RelTile2i(4, 4),
-                    origin + new RelTile2i(0, 4),
-                };
-                int[] heights = { profile.Nw2, profile.Ne2, profile.Se2, profile.Sw2 };
-                var heightDeltas = new float[corners.Length];
-                for (int i = 0; i < corners.Length; i++)
-                {
-                    if (!terrainHeights.TryGetValue(
-                            corners[i], out float groundHeight))
-                        continue;
-                    heightDeltas[i] = heights[i] * 0.5f - groundHeight;
-                }
-                diagnostic =
-                    "deltas=[" + string.Join(",", heightDeltas.Select(
-                        delta => delta.ToString("0.##", CultureInfo.InvariantCulture))) + "]"
-                    + " connectedCorners=" + connectedA + "," + connectedB
-                    + " groundCorners=" + handoffA + "," + handoffB;
-            }
 
             int[] handoffSigns = GetEdgeHeightSigns(
                 origin, profile, handoffEdge, terrainHeights,
-                s_enableVerboseHandoffDiagnostics, out float[] handoffDeltas);
-            if (s_enableVerboseHandoffDiagnostics)
-                diagnostic +=
-                    " groundEdgeDeltas=[" + FormatHeightDeltas(handoffDeltas) + "]";
+                false, out _);
 
             if (vehicleClearance > 0)
                 return TrySelectCornerSeamHandoff(
@@ -3928,7 +3791,7 @@ namespace AutoTerrainDesignations
                 && IsProfileExactTerrain(origin, profile, terrainHeights))
             {
                 operation = AccessHandoffOperation.None;
-                fulfilledBitmap = ALL_DESIGNATION_TILES_MASK;
+                fulfilledBitmap = AllDesignationTilesMask;
                 return true;
             }
 
@@ -4113,24 +3976,6 @@ namespace AutoTerrainDesignations
         private static int OppositeEdge(int edge)
             => edge == 0 ? 1 : edge == 1 ? 0 : edge == 2 ? 3 : 2;
 
-        private static IReadOnlyDictionary<Tile2i, float>
-            CaptureAccessHandoffTerrainHeights(
-                TerrainManager terrMgr,
-                params Tile2i[] origins)
-        {
-            var heights = new Dictionary<Tile2i, float>();
-            foreach (Tile2i origin in origins)
-                for (int y = 0; y <= 4; y++)
-                    for (int x = 0; x <= 4; x++)
-                    {
-                        Tile2i tile = origin + new RelTile2i(x, y);
-                        if (!heights.ContainsKey(tile))
-                            heights[tile] = terrMgr.GetHeight(tile)
-                                .Value.ToFloat();
-                    }
-            return heights;
-        }
-
         private static string FormatHeightDeltas(IEnumerable<float> deltas)
             => string.Join(",", deltas.Select(
                 delta => delta.ToString("0.##", CultureInfo.InvariantCulture)));
@@ -4144,7 +3989,7 @@ namespace AutoTerrainDesignations
             return Math.Abs(delta) <= exactLevelEpsilon ? 0 : Math.Sign(delta);
         }
 
-        private static bool TryGetConnectedAndHandoffCorners(
+        internal static bool TryGetConnectedAndHandoffCorners(
             Tile2i origin,
             Tile2i predecessorPosition,
             out int connectedA,
@@ -4199,7 +4044,8 @@ namespace AutoTerrainDesignations
         {
             if (groundNodes.Contains(tile))
                 return true;
-            return propCleanupByOrigin.TryGetValue(TerrainDesignation.GetOrigin(tile), out AccessPropCleanupInfo info)
+            return propCleanupByOrigin.TryGetValue(
+                    GetDesignationOrigin(tile), out AccessPropCleanupInfo info)
                 && info.IsEligible
                 && (info.Samples.Count == 0 || info.Samples.Any(sample => sample.Tile == tile));
         }
@@ -4237,10 +4083,83 @@ namespace AutoTerrainDesignations
                 && info.IsEligibleWithinGeneratedV;
         }
 
+        internal static bool TrySelectHandoffOperationFromEdge(
+            IReadOnlyList<int> handoffEdgeSigns,
+            out AccessHandoffOperation operation)
+        {
+            if (handoffEdgeSigns.Count == 0)
+            {
+                operation = AccessHandoffOperation.None;
+                return false;
+            }
+
+            bool allAtOrBelow = handoffEdgeSigns.All(sign => sign <= 0);
+            bool anyBelow = handoffEdgeSigns.Any(sign => sign < 0);
+            if (allAtOrBelow && anyBelow)
+            {
+                operation = AccessHandoffOperation.Mining;
+                return true;
+            }
+
+            if (handoffEdgeSigns.All(sign => sign >= 0))
+            {
+                operation = AccessHandoffOperation.Dumping;
+                return true;
+            }
+
+            operation = AccessHandoffOperation.None;
+            return false;
+        }
+
+        private static uint GetDesignationMask(int x, int y)
+            => (uint)(1 << (x + y * 5));
+
+        private static HeightTilesF GetDesignationTargetHeightAt(
+            DesignationData data,
+            int x,
+            int y)
+        {
+            HeightTilesF west = data.OriginTargetHeight.HeightTilesF.Lerp(
+                data.PlusYTargetHeight.HeightTilesF, y, 4);
+            HeightTilesF east = data.PlusXTargetHeight.HeightTilesF.Lerp(
+                data.PlusXyTargetHeight.HeightTilesF, y, 4);
+            return west.Lerp(east, x, 4);
+        }
+
+        private static int ToHeight2(float height)
+            => (int)Math.Round(height * 2f);
+
+        private static Tile2i GetDesignationOrigin(Tile2i tile)
+            => new Tile2i(
+                (int)Math.Floor(tile.X / 4.0) * 4,
+                (int)Math.Floor(tile.Y / 4.0) * 4);
+
     }
 
+}
+
+namespace AutoTerrainDesignations
+{
     public static partial class AutoDepthDesignation
     {
+
+        private static IReadOnlyDictionary<Tile2i, float>
+            CaptureAccessHandoffTerrainHeights(
+                TerrainManager terrMgr,
+                params Tile2i[] origins)
+        {
+            var heights = new Dictionary<Tile2i, float>();
+            foreach (Tile2i origin in origins)
+                for (int y = 0; y <= 4; y++)
+                    for (int x = 0; x <= 4; x++)
+                    {
+                        Tile2i tile = origin + new RelTile2i(x, y);
+                        if (!heights.ContainsKey(tile))
+                            heights[tile] = terrMgr.GetHeight(tile)
+                                .Value.ToFloat();
+                    }
+            return heights;
+        }
 
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
             AccessSearchResult result,
@@ -4642,7 +4561,7 @@ namespace AutoTerrainDesignations
                     || !TryGetV2RouteProfile(
                         result.V2Route, terminalOrigin,
                         out AccessHeightProfile terminalProfile)
-                    || !TryGetConnectedAndHandoffCorners(
+                    || !AccessHandoffEvaluator.TryGetConnectedAndHandoffCorners(
                         terminalOrigin,
                         new Tile2i(
                             terminalOrigin.X - exitDirection.X,
@@ -4659,7 +4578,7 @@ namespace AutoTerrainDesignations
                     operation == AccessHandoffOperation.Leveling
                     && !groundEntries.Contains(contact);
                 if (requiresCrest && !levelingCompanion
-                    && (!TrySelectV2CornerCrestHandoff(
+                    && (!AccessHandoffEvaluator.TrySelectV2CornerCrestHandoff(
                         incomingOrigin, incomingProfile,
                         terminalOrigin, terminalProfile,
                         handoffEdge,

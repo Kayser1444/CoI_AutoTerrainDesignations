@@ -187,7 +187,7 @@ namespace AutoTerrainDesignations.Access
             AccessHeightProfile profile,
             Tile2i predecessorOrigin,
             AccessHeightProfile predecessorProfile)
-            => AutoDepthDesignation.BuildProspectiveWorkableHandoffs(
+            => AccessHandoffEvaluator.BuildProspectiveWorkableHandoffs(
                 origin,
                 profile,
                 predecessorOrigin,
@@ -204,7 +204,7 @@ namespace AutoTerrainDesignations.Access
 
         public IReadOnlyList<AccessGroundHandoff> GetWorkableHandoffSpans(
             IReadOnlyList<AccessHandoffSpanCell> cells)
-            => AutoDepthDesignation.BuildProspectiveWorkableHandoffSpan(
+            => AccessHandoffEvaluator.BuildProspectiveWorkableHandoffSpan(
                 cells,
                 m_snapshot.PreciseTerrainHeights,
                 m_snapshot.DesignationReadinessFacts,
@@ -222,7 +222,7 @@ namespace AutoTerrainDesignations.Access
             AccessHeightProfile profile,
             Tile2i predecessorOrigin,
             AccessHeightProfile predecessorProfile)
-            => AutoDepthDesignation.BuildProspectiveWorkableHandoffs(
+            => AccessHandoffEvaluator.BuildProspectiveWorkableHandoffs(
                 origin,
                 profile,
                 predecessorOrigin,
@@ -240,7 +240,7 @@ namespace AutoTerrainDesignations.Access
 
         public IReadOnlyList<AccessGroundHandoff> GetV2WorkableHandoffSpans(
             IReadOnlyList<AccessHandoffSpanCell> cells)
-            => AutoDepthDesignation.BuildProspectiveWorkableHandoffSpan(
+            => AccessHandoffEvaluator.BuildProspectiveWorkableHandoffSpan(
                 cells,
                 m_snapshot.PreciseTerrainHeights,
                 m_snapshot.DesignationReadinessFacts,

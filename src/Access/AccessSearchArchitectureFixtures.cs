@@ -27,6 +27,14 @@ namespace AutoTerrainDesignations.Access
                 failure = "snapshot retains forbidden execution reference: " + snapshotField;
                 return false;
             }
+            if (typeof(AccessHandoffEvaluator).DeclaringType != null
+                || typeof(AccessHandoffEvaluator).Namespace
+                    != typeof(AccessSearchWorkspace).Namespace)
+            {
+                failure =
+                    "pure handoff evaluator must be a top-level module at the access-search seam";
+                return false;
+            }
 
             var snapshot = new AccessSearchSnapshot(
                 Tile2i.Zero, new Tile2i(8, 8), new Tile2i(8, 8),

@@ -25,7 +25,9 @@ v0.6.2 [unreleased]
 * Improved: Production access snapshots now create their search workspace from
   captured facts and policy; caller-built handoff evaluator closures are
   retained only by synthetic fixtures, and the immutable snapshot no longer
-  accepts callback-shaped compatibility inputs.
+  accepts callback-shaped compatibility inputs. Single-cell and span handoff
+  evaluation now lives in a pure access-search module instead of the runtime
+  designation type.
 
 v0.6.1 [released]
 
