@@ -263,37 +263,37 @@ namespace AutoTerrainDesignations.Access
                     32, 16.1f, out AccessHandoffOperation flatOperation)
                 || flatOperation != AccessHandoffOperation.None)
             { failure = "a profile matching quantized ground height must not create a topology handoff"; return false; }
-            if (!AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+            if (!AccessHandoffEvaluator.TrySelectHandoffOperationFromEdge(
                     new[] { -1, -1, 0, -1, -1 },
                     out AccessHandoffOperation edgeMining)
                 || edgeMining != AccessHandoffOperation.Mining
-                || !AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                || !AccessHandoffEvaluator.TrySelectHandoffOperationFromEdge(
                     new[] { 0, 1, 1, 1, 0 },
                     out AccessHandoffOperation edgeDumping)
                 || edgeDumping != AccessHandoffOperation.Dumping
-                || !AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                || !AccessHandoffEvaluator.TrySelectHandoffOperationFromEdge(
                     new[] { 0, 0, 0, 0, 0 },
                     out AccessHandoffOperation levelEdgeDumping)
                 || levelEdgeDumping != AccessHandoffOperation.Dumping
-                || AutoDepthDesignation.TrySelectHandoffOperationFromEdge(
+                || AccessHandoffEvaluator.TrySelectHandoffOperationFromEdge(
                     new[] { -1, -1, 0, 1, 1 }, out _))
             { failure = "handoff operation must come only from a single-operation ground-facing edge"; return false; }
-            if (!AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+            if (!AccessHandoffEvaluator.TrySelectV2CornerCrestOperation(
                     new[] { -1, -1 }, new[] { 0, 0 },
                     smoothLevelingAvailable: true,
                     out AccessHandoffOperation smoothLeveling)
                 || smoothLeveling != AccessHandoffOperation.Leveling
-                || !AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                || !AccessHandoffEvaluator.TrySelectV2CornerCrestOperation(
                     new[] { -1, -1 }, new[] { 0, 0 },
                     smoothLevelingAvailable: false,
                     out AccessHandoffOperation roughMining)
                 || roughMining != AccessHandoffOperation.Mining
-                || !AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                || !AccessHandoffEvaluator.TrySelectV2CornerCrestOperation(
                     new[] { 1, 1 }, new[] { 0, 0 },
                     smoothLevelingAvailable: false,
                     out AccessHandoffOperation roughDumping)
                 || roughDumping != AccessHandoffOperation.Dumping
-                || AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+                || AccessHandoffEvaluator.TrySelectV2CornerCrestOperation(
                     new[] { -1, 1 }, new[] { 0, 0 },
                     smoothLevelingAvailable: false, out _))
             { failure = "V2 corner crests must level only a smooth face and otherwise select coherent mining or dumping"; return false; }
@@ -361,21 +361,21 @@ namespace AutoTerrainDesignations.Access
                 || AutoDepthDesignation.IsHandoffOperationCompatibleWithProfileSigns(
                     new[] { 1, 0, -1, 0 }, AccessHandoffOperation.Dumping))
             { failure = "handoff proto must be able to create every work cell in the terminal profile"; return false; }
-            if (AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 0, 0)
-                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 4, 0)
-                || !AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 2, 0)
-                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(0, 0, 2)
-                || AutoDepthDesignation.IsInteriorHandoffEdgeTile(4, 0, 2)
-                || !AutoDepthDesignation.IsInteriorHandoffEdgeTile(2, 0, 2))
+            if (AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(0, 0, 0)
+                || AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(0, 4, 0)
+                || !AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(0, 2, 0)
+                || AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(0, 0, 2)
+                || AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(4, 0, 2)
+                || !AccessHandoffEvaluator.IsInteriorHandoffEdgeTile(2, 0, 2))
             { failure = "handoff contact must cross the interior of an edge, not touch only a corner"; return false; }
-            if (!AutoDepthDesignation.IsClearanceValidHandoffLane(1, 3)
-                || !AutoDepthDesignation.IsClearanceValidHandoffLane(2, 3)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(0, 3)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(3, 3)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(4, 3)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(2, 5)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(1, 5)
-                || AutoDepthDesignation.IsClearanceValidHandoffLane(3, 5))
+            if (!AccessHandoffEvaluator.IsClearanceValidHandoffLane(1, 3)
+                || !AccessHandoffEvaluator.IsClearanceValidHandoffLane(2, 3)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(0, 3)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(3, 3)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(4, 3)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(2, 5)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(1, 5)
+                || AccessHandoffEvaluator.IsClearanceValidHandoffLane(3, 5))
             { failure = "one-cell handoffs must reject mega vehicle clearance"; return false; }
             if (GetMaxHandoffSpanLength(1) != 2
                 || GetMaxHandoffSpanLength(3) != 2
@@ -468,10 +468,10 @@ namespace AutoTerrainDesignations.Access
                 || replacedSpanHistory.IsGroundDisturbed(spanEscapeTile)
                 || !replacedSpanHistory.IsGroundDisturbed(new Tile2i(10, 10)))
             { failure = "multi-cell handoff history must preserve an escape corridor across every reclassified cell"; return false; }
-            AutoDepthDesignation.GetHandoffLaneCoordinates(
+            AccessHandoffEvaluator.GetHandoffLaneCoordinates(
                 3, 2, out int northEdgeX, out int northEdgeY,
                 out int northInsideX, out int northInsideY);
-            AutoDepthDesignation.GetHandoffLaneCoordinates(
+            AccessHandoffEvaluator.GetHandoffLaneCoordinates(
                 1, 2, out int eastEdgeX, out int eastEdgeY,
                 out int eastInsideX, out int eastInsideY);
             if (northEdgeX != 2 || northEdgeY != 4

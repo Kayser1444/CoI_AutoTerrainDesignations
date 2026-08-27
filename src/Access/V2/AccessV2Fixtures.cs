@@ -868,7 +868,7 @@ namespace AutoTerrainDesignations.Access.V2
                     new Tile2i(20, 20),
                     AccessPropBlockerKind.UnderlyingTerrain);
             if (blockedTreeOrigin.IsEligible
-                || !global::AutoTerrainDesignations.AutoDepthDesignation
+                || !global::AutoTerrainDesignations.Access.AccessHandoffEvaluator
                     .IsExperimentalAccessGroundOrCleanupCenter(
                         new HashSet<Tile2i>(),
                         new Dictionary<Tile2i, AccessPropCleanupInfo>
@@ -4107,7 +4107,7 @@ namespace AutoTerrainDesignations.Access.V2
                 failure = "Deterministic G-to-V proof must accept an exact projected-target adapter and enforce inclusive 0.25 face and 0.5 step limits, including the reached G mask";
                 return false;
             }
-            if (AutoDepthDesignation.TrySelectV2CornerCrestOperation(
+            if (AccessHandoffEvaluator.TrySelectV2CornerCrestOperation(
                     new[] { -1, -1 }, new[] { -1, -1 },
                     smoothLevelingAvailable: false, out _))
             {
