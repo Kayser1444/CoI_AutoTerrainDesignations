@@ -1,3 +1,7 @@
+v0.7.0 | 2026-08-27
+* Added: Ore Sorting Plants now support configurable export routes to compatible storages and Mine Towers, with a vanilla-style export priority and persistent route state
+* Added: Ore Sorting Plants can assign trucks directly and optionally restrict cargo collection and delivery to trucks assigned to the plant or its participating Mine Towers
+
 v0.6.1 | 2026-08-18
 * Added: Per-tower and world dumping priority controls with vanilla active priorities 1–15 and a Passive mode that imports only from active exporters; farmland topsoil still uses active dumping during filling
 * Changed: The default dumping priority is now Passive. Existing towers retain their stored priority; a stored value of 15 now means active low priority, so choose Passive to retain the previous passive behavior
