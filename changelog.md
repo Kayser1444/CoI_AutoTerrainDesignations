@@ -1,4 +1,4 @@
-v0.7.0 [unreleased]
+v0.7.0 [packaged]
 
 * Added: Ore Sorting Plants now support configurable export routes to compatible
   storages and Mine Towers, with a vanilla-style export priority and persistent
