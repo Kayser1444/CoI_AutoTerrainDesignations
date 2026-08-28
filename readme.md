@@ -9,8 +9,8 @@ Kayser’s Automatic Terrain Designations is a quality-of-life mod for Captain o
 - **Generate Ramps** — Generate access ramps to connect new dig areas to the surface
 - **Clear Designations** — Easily clear ATD mining designations within a tower's area
 - See **Ore composition** of the designation
-- **Ore Sorting Plant exports** — Route sorted products to selected destinations with optional assigned-truck enforcement
 - Set **Mining Priority** on tower level
+- **Ore Sorting Plant exports** — Route output to compatible storages and Mine Towers, set export priority, and assign trucks
 - **Settings** to fine tune the designations
 - **Corner Designations** for manual placement
 - **Farmland preparation** for preparing flat level designations into farmable ground

@@ -325,8 +325,7 @@ approach lessons. Bulky failed DLLs and routine traces are disposable.
 
 ### Slice A: Replay seam and single-case round trip
 
-- Finish Ticket 2's large-area capture stress qualification for the worker-safe
-  snapshot contract.
+- Finish Ticket 2's pure-helper isolation and worker-safe snapshot contract.
 - Add the dormant opaque replay facade and versioned case codec.
 - Add `arm next search` recording with terminal provenance and phase timing.
 - Add a development executable that loads the exact `Release` DLL.

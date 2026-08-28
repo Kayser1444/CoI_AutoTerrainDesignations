@@ -13,10 +13,8 @@ Production snapshot capture now constructs its workspace-owned evaluator from
 captured facts and policy; delegate-injected evaluators remain only in
 synthetic fixtures, and the immutable snapshot no longer accepts callback-shaped
 compatibility inputs. Readiness fixtures cover terrain, props, stumps, and exact
-layout-occupancy edge cases. The single-cell/span handoff module is now a
-top-level pure access-search module consuming captured facts and request-local
-caches rather than runtime state. Large-area capture stress evidence remains
-before Ticket 3 can begin.
+layout-occupancy edge cases. Large-area capture stress evidence and final
+pure-helper isolation remain before Ticket 3 can begin.
 
 Related design: [ATD Accessway Manager](../planned/atd-accessway-manager.md),
 [Access Search Laboratory](../planned/access-search-laboratory.md),

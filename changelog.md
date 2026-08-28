@@ -1,8 +1,12 @@
 v0.7.0 [unreleased]
 
-* Added: Ore Sorting Plant export controls with destination routes, per-output
-  priority, and optional assigned-truck enforcement. Routes and plant settings
-  persist with the game state.
+* Added: Ore Sorting Plants now support configurable export routes to compatible
+  storages and Mine Towers, with a vanilla-style export priority and persistent
+  route state.
+
+* Added: Ore Sorting Plants can assign trucks directly and optionally restrict
+  cargo collection and delivery to trucks assigned to the plant or its
+  participating Mine Towers.
 
 * Improved: Cooperative V2 access searches now resume exact ground suffix,
   fixed-navigation path/portal, and handoff-entry work across frame slices

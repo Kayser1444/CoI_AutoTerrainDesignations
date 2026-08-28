@@ -1,5 +1,6 @@
 v0.7.0 | 2026-08-28
-* Added: Ore Sorting Plant export controls for destination routes, export priority, and optional assigned-truck enforcement, with settings saved per plant
+* Added: Ore Sorting Plants now support configurable export routes to compatible storages and Mine Towers, with a vanilla-style export priority and persistent route state
+* Added: Ore Sorting Plants can assign trucks directly and optionally restrict cargo collection and delivery to trucks assigned to the plant or its participating Mine Towers
 * Improved: Large accessway searches now prepare and route work in short cooperative slices, keeping the game responsive while showing progress and cancellation controls
 * Added: Oversized turning-ramp areas now show a clear warning and fail safely before expensive pathfinding work begins
 * Improved: Accessway planning keeps terrain, props, stumps, and building occupancy consistent with the world state captured when the search starts
