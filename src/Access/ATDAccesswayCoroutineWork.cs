@@ -15,6 +15,7 @@ namespace AutoTerrainDesignations.Access
             public int Yields;
             public double ProcessingMilliseconds;
             public double MaxSliceMilliseconds;
+            public string MaxSliceStep = string.Empty;
             public double WallMilliseconds;
         }
 
@@ -30,6 +31,8 @@ namespace AutoTerrainDesignations.Access
         private double m_processingMilliseconds;
         private double m_maxSliceMilliseconds;
         private string m_maxSlicePhase = string.Empty;
+        private string m_maxSliceStep = string.Empty;
+        private string m_atomicStep = string.Empty;
 
         public int SliceBudgetMilliseconds { get; set; } = 2;
         public bool CancellationRequested { get; private set; }
@@ -50,6 +53,9 @@ namespace AutoTerrainDesignations.Access
             m_pendingNodes = pendingNodes;
         }
 
+        public void ReportAtomicStep(string step)
+            => m_atomicStep = step ?? string.Empty;
+
         public void ReportPhase(string phase)
         {
             string nextPhase = string.IsNullOrWhiteSpace(phase)
@@ -62,6 +68,7 @@ namespace AutoTerrainDesignations.Access
             AccumulateCurrentPhaseWallTime(now);
             m_phase = nextPhase;
             m_phaseStartedTimestamp = now;
+            m_atomicStep = string.Empty;
         }
 
         public void RecordAdvance(
@@ -78,7 +85,10 @@ namespace AutoTerrainDesignations.Access
                 timing.Yields++;
             timing.ProcessingMilliseconds += elapsedMilliseconds;
             if (elapsedMilliseconds > timing.MaxSliceMilliseconds)
+            {
                 timing.MaxSliceMilliseconds = elapsedMilliseconds;
+                timing.MaxSliceStep = m_atomicStep;
+            }
 
             m_advanceCount++;
             if (yielded)
@@ -88,6 +98,7 @@ namespace AutoTerrainDesignations.Access
             {
                 m_maxSliceMilliseconds = elapsedMilliseconds;
                 m_maxSlicePhase = recordedPhase;
+                m_maxSliceStep = m_atomicStep;
             }
         }
 
@@ -109,6 +120,10 @@ namespace AutoTerrainDesignations.Access
                 .Append(string.IsNullOrEmpty(m_maxSlicePhase)
                     ? "none"
                     : m_maxSlicePhase)
+                .Append(" maxSliceStep=")
+                .Append(string.IsNullOrEmpty(m_maxSliceStep)
+                    ? "none"
+                    : m_maxSliceStep)
                 .Append(" phases=[");
             for (int index = 0; index < m_phaseOrder.Count; index++)
             {
@@ -136,6 +151,10 @@ namespace AutoTerrainDesignations.Access
                     .Append(",maxSliceMs=")
                     .Append(timing.MaxSliceMilliseconds.ToString(
                         "0.##", CultureInfo.InvariantCulture))
+                    .Append(",maxStep=")
+                    .Append(string.IsNullOrEmpty(timing.MaxSliceStep)
+                        ? "none"
+                        : timing.MaxSliceStep)
                     .Append('}');
             }
             return builder.Append("]]").ToString();

@@ -160,6 +160,92 @@ namespace AutoTerrainDesignations.Access
                 blockerKind == AccessPropBlockerKind.None ? AccessPropBlockerKind.HardBlocker : blockerKind, false);
     }
 
+    internal static class AccessPropCleanupFootprint
+    {
+        internal static IEnumerable<Tile2i> EnumerateBlockedCenters(
+            Tile2i occupiedTile,
+            int clearance,
+            Tile2i boundsMin,
+            Tile2i boundsMax)
+        {
+            clearance = Math.Max(1, clearance);
+            int halfClearance = clearance / 2;
+            int minX = Math.Max(
+                boundsMin.X,
+                occupiedTile.X + halfClearance - clearance + 1);
+            int maxX = Math.Min(
+                boundsMax.X,
+                occupiedTile.X + halfClearance);
+            int minY = Math.Max(
+                boundsMin.Y,
+                occupiedTile.Y + halfClearance - clearance + 1);
+            int maxY = Math.Min(
+                boundsMax.Y,
+                occupiedTile.Y + halfClearance);
+
+            for (int y = minY; y <= maxY; y++)
+                for (int x = minX; x <= maxX; x++)
+                    yield return new Tile2i(x, y);
+        }
+    }
+
+    /// <summary>
+    /// Allocation-light builder for captured samples that have already been
+    /// de-duplicated by cleanup object and vehicle-center tile.
+    /// </summary>
+    internal sealed class AccessCapturedPropCleanupAccumulator
+    {
+        private readonly Tile2i m_origin;
+        private readonly List<AccessPropSample> m_samples =
+            new List<AccessPropSample>();
+        private AccessPropCleanupClass m_classes;
+        private AccessPropBlockerKind m_blockerKind;
+        private bool m_hasNonRemovableSample;
+
+        internal AccessCapturedPropCleanupAccumulator(Tile2i origin)
+        {
+            m_origin = origin;
+        }
+
+        internal void Add(
+            AccessPropSample sample,
+            AccessPropBlockerKind blockerKind)
+        {
+            if (!sample.IsRemovable)
+                m_hasNonRemovableSample = true;
+            m_samples.Add(sample);
+            m_classes |= AccessPropCleanupPolicy.Classify(sample);
+            if (m_blockerKind == AccessPropBlockerKind.None
+                && blockerKind != AccessPropBlockerKind.None)
+                m_blockerKind = blockerKind;
+        }
+
+        internal AccessPropCleanupInfo BuildInfo(
+            bool usesTerrainRemovalPolicy = true)
+        {
+            if (m_hasNonRemovableSample)
+            {
+                return AccessPropCleanupInfo.HardBlocked(
+                    m_origin,
+                    AccessPropBlockerKind.HardBlocker);
+            }
+            if (m_classes == AccessPropCleanupClass.None)
+            {
+                return m_blockerKind == AccessPropBlockerKind.None
+                    ? AccessPropCleanupInfo.Clear(m_origin)
+                    : AccessPropCleanupInfo.HardBlocked(
+                        m_origin,
+                        m_blockerKind);
+            }
+            return new AccessPropCleanupInfo(
+                m_origin,
+                m_classes,
+                m_blockerKind,
+                usesTerrainRemovalPolicy,
+                m_samples);
+        }
+    }
+
     internal static class AccessPropCleanupPolicy
     {
         public const int NonTreeDumpRemovalThresholdHeight2 = 1;

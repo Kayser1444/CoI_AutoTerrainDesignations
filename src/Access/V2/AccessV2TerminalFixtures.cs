@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mafi;
 
 namespace AutoTerrainDesignations.Access.V2
@@ -205,6 +206,7 @@ namespace AutoTerrainDesignations.Access.V2
                 new[] { new Tile2i(32, 16) },
                 new Dictionary<Tile2i, AccessPropCleanupInfo>());
             bool fullCrest = true;
+            bool freezeAtRankTwo = false;
             bool crestApplicable = true;
             int singleHandoffCalls = 0;
             int transitionCalls = 0;
@@ -254,9 +256,13 @@ namespace AutoTerrainDesignations.Access.V2
                     crestApplicable
                         ? new AccessV2TerminalCrestEvidence(
                             AccessHandoffOperation.Mining,
-                            fullCrest
-                                ? AccessV2TerminalCrestState.Full
-                                : AccessV2TerminalCrestState.Partial,
+                            freezeAtRankTwo
+                                ? (next.Anchor == straight.Next.Anchor
+                                    ? AccessV2TerminalCrestState.Partial
+                                    : AccessV2TerminalCrestState.Full)
+                                : fullCrest
+                                    ? AccessV2TerminalCrestState.Full
+                                    : AccessV2TerminalCrestState.Partial,
                             AccessV2TerminalCrestState.Uncrested,
                             "fixture", 0)
                         : new AccessV2TerminalCrestEvidence(
@@ -297,6 +303,36 @@ namespace AutoTerrainDesignations.Access.V2
                     + $" centerClassifications={centerClassifications}";
                 return false;
             }
+            freezeAtRankTwo = true;
+            AccessV2TerminalResult rankTwoResult =
+                AccessV2TerminalEvaluator.Evaluate(in request);
+            AccessV2TerminalCandidate? rankTwoCandidate = rankTwoResult.Candidates
+                .FirstOrDefault(candidate => candidate.RankCount == 2);
+            AccessV2HandoffCandidate? rankTwoHandoff =
+                rankTwoCandidate?.CompatibilityHandoff;
+            AccessV2BandState[] recentNewestFirst = rankTwoCandidate == null
+                ? Array.Empty<AccessV2BandState>()
+                : rankTwoCandidate.Transitions
+                    .Select(transition => transition.Next)
+                    .Reverse()
+                    .ToArray();
+            string rankTwoReason = "CandidateMissing";
+            bool rankTwoMetadataValid = rankTwoHandoff != null
+                && AccessV2Replay.TryValidateBoundedTerminalMetadata(
+                    recentNewestFirst,
+                    rankTwoHandoff,
+                    out rankTwoReason);
+            if (rankTwoCandidate == null
+                || rankTwoHandoff == null
+                || !rankTwoMetadataValid)
+            {
+                failure = "A lane first frozen at rank two must retain replay-compatible rank metadata"
+                    + $": status={rankTwoResult.Status}"
+                    + $" candidates={rankTwoResult.Candidates.Count}"
+                    + $" reason={rankTwoReason}";
+                return false;
+            }
+            freezeAtRankTwo = false;
             fullCrest = false;
             centerClassifications = 0;
             singleHandoffCalls = 0;

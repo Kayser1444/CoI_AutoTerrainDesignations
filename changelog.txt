@@ -1,3 +1,9 @@
+v0.7.0 | 2026-08-28
+* Added: Ore Sorting Plant export controls for destination routes, export priority, and optional assigned-truck enforcement, with settings saved per plant
+* Improved: Large accessway searches now prepare and route work in short cooperative slices, keeping the game responsive while showing progress and cancellation controls
+* Added: Oversized turning-ramp areas now show a clear warning and fail safely before expensive pathfinding work begins
+* Improved: Accessway planning keeps terrain, props, stumps, and building occupancy consistent with the world state captured when the search starts
+
 v0.6.1 | 2026-08-18
 * Added: Per-tower and world dumping priority controls with vanilla active priorities 1–15 and a Passive mode that imports only from active exporters; farmland topsoil still uses active dumping during filling
 * Changed: The default dumping priority is now Passive. Existing towers retain their stored priority; a stored value of 15 now means active low priority, so choose Passive to retain the previous passive behavior

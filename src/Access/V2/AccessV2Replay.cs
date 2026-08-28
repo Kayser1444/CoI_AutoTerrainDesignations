@@ -432,7 +432,7 @@ namespace AutoTerrainDesignations.Access.V2
             return true;
         }
 
-        private static bool TryValidateBoundedTerminalMetadata(
+        internal static bool TryValidateBoundedTerminalMetadata(
             IReadOnlyList<AccessV2BandState> recentNewestFirst,
             AccessV2HandoffCandidate handoff,
             out string reason)
@@ -479,9 +479,16 @@ namespace AutoTerrainDesignations.Access.V2
                 AccessV2OriginProfile actual = lane == 0
                     ? rankDelta.Lane0
                     : rankDelta.Lane1;
-                bool frozen = (rankDelta.FrozenLanes & (1 << lane)) != 0;
-                AccessV2OriginProfile expected = frozen
-                    ? (lane == 0 ? ranks[0].Lane0 : ranks[0].Lane1)
+                bool frozen = (rankDelta.FrozenLanes
+                    & (1 << lane)) != 0;
+                bool frozenBeforeRank = frozen
+                    && rankDelta.Rank > 1
+                    && (ranks[rankDelta.Rank - 2].FrozenLanes
+                        & (1 << lane)) != 0;
+                AccessV2OriginProfile expected = frozenBeforeRank
+                    ? (lane == 0
+                        ? ranks[rankDelta.Rank - 2].Lane0
+                        : ranks[rankDelta.Rank - 2].Lane1)
                     : routeState.GetLane(lane);
                 return actual.Origin == expected.Origin
                     && ProfilesEqual(actual.Profile, expected.Profile);

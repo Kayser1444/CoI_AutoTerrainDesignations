@@ -1,4 +1,8 @@
-v0.6.2 [unreleased]
+v0.7.0 [unreleased]
+
+* Added: Ore Sorting Plant export controls with destination routes, per-output
+  priority, and optional assigned-truck enforcement. Routes and plant settings
+  persist with the game state.
 
 * Improved: Cooperative V2 access searches now resume exact ground suffix,
   fixed-navigation path/portal, and handoff-entry work across frame slices
@@ -28,6 +32,10 @@ v0.6.2 [unreleased]
   accepts callback-shaped compatibility inputs. Single-cell and span handoff
   evaluation now lives in a pure access-search module instead of the runtime
   designation type.
+
+* Added: Debug access-search diagnostics now attribute capture and navigation
+  time, allocation setup, and the largest atomic slice to named steps so future
+  spikes can be investigated without changing the production search result.
 
 v0.6.1 [released]
 

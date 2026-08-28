@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Mafi;
+using Mafi.Core.PathFinding;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -121,6 +123,102 @@ namespace AutoTerrainDesignations.Access
                 return false;
             }
 
+            Tile2i[] oddClearanceCenters =
+                AccessPropCleanupFootprint.EnumerateBlockedCenters(
+                    new Tile2i(10, 10),
+                    clearance: 5,
+                    boundsMin: new Tile2i(8, 8),
+                    boundsMax: new Tile2i(11, 11))
+                .ToArray();
+            Tile2i[] evenClearanceCenters =
+                AccessPropCleanupFootprint.EnumerateBlockedCenters(
+                    new Tile2i(10, 10),
+                    clearance: 4,
+                    boundsMin: new Tile2i(0, 0),
+                    boundsMax: new Tile2i(20, 20))
+                .ToArray();
+            if (oddClearanceCenters.Length != 16
+                || oddClearanceCenters[0] != new Tile2i(8, 8)
+                || oddClearanceCenters[15] != new Tile2i(11, 11)
+                || evenClearanceCenters.Length != 16
+                || evenClearanceCenters[0] != new Tile2i(9, 9)
+                || evenClearanceCenters[15] != new Tile2i(12, 12))
+            {
+                failure =
+                    "Cleanup footprint expansion did not preserve vehicle-center geometry and bounds.";
+                return false;
+            }
+            Tile2i[] footprintFixtureTiles =
+            {
+                new Tile2i(-3, 4),
+                new Tile2i(10, 10),
+                new Tile2i(20, -7),
+            };
+            for (int clearance = 1; clearance <= 8; clearance++)
+            {
+                foreach (Tile2i occupiedTile in footprintFixtureTiles)
+                {
+                    Tile2i[] directCenters =
+                        AccessPropCleanupFootprint.EnumerateBlockedCenters(
+                            occupiedTile,
+                            clearance,
+                            new Tile2i(-5, -5),
+                            new Tile2i(15, 15))
+                        .ToArray();
+                    Tile2i[] referenceCenters =
+                        EnumerateReferenceBlockedCenters(
+                            occupiedTile,
+                            clearance,
+                            new Tile2i(-5, -5),
+                            new Tile2i(15, 15));
+                    if (!directCenters.SequenceEqual(referenceCenters))
+                    {
+                        failure =
+                            "Cleanup footprint expansion diverged from vehicle corner-space conversion.";
+                        return false;
+                    }
+                }
+            }
+
+            Tile2i cleanupOrigin = new Tile2i(8, 8);
+            var cleanupSamples = new[]
+            {
+                new AccessPropSample(
+                    new Tile2i(9, 9), true, false, true,
+                    cleanupObjectKey: "tree:fixture"),
+                new AccessPropSample(
+                    new Tile2i(10, 9), false, true, true,
+                    cleanupObjectKey: "prop:fixture"),
+            };
+            AccessPropCleanupInfo policyCleanup =
+                AccessPropCleanupPolicy.BuildOriginInfo(
+                    cleanupOrigin,
+                    cleanupSamples,
+                    AccessPropBlockerKind.Durability);
+            var cleanupAccumulator =
+                new AccessCapturedPropCleanupAccumulator(cleanupOrigin);
+            cleanupAccumulator.Add(
+                cleanupSamples[0], AccessPropBlockerKind.None);
+            cleanupAccumulator.Add(
+                cleanupSamples[1], AccessPropBlockerKind.Durability);
+            AccessPropCleanupInfo accumulatedCleanup =
+                cleanupAccumulator.BuildInfo();
+            if (accumulatedCleanup.Origin != policyCleanup.Origin
+                || accumulatedCleanup.Classes != policyCleanup.Classes
+                || accumulatedCleanup.BlockerKind != policyCleanup.BlockerKind
+                || accumulatedCleanup.UsesTerrainRemovalPolicy
+                    != policyCleanup.UsesTerrainRemovalPolicy
+                || accumulatedCleanup.Samples.Count != policyCleanup.Samples.Count
+                || accumulatedCleanup.Samples[0].CleanupObjectKey
+                    != policyCleanup.Samples[0].CleanupObjectKey
+                || accumulatedCleanup.Samples[1].CleanupObjectKey
+                    != policyCleanup.Samples[1].CleanupObjectKey)
+            {
+                failure =
+                    "Captured cleanup accumulation changed cleanup policy output.";
+                return false;
+            }
+
             Tile2i readinessTile = new Tile2i(12, 16);
             Tile2i clearTile = new Tile2i(13, 16);
             var readinessFacts = new AccessDesignationReadinessFacts(
@@ -221,6 +319,40 @@ namespace AutoTerrainDesignations.Access
 
             failure = string.Empty;
             return true;
+        }
+
+        private static Tile2i[] EnumerateReferenceBlockedCenters(
+            Tile2i occupiedTile,
+            int clearance,
+            Tile2i boundsMin,
+            Tile2i boundsMax)
+        {
+            var centers = new List<Tile2i>();
+            var requiredClearance = new RelTile1i(clearance);
+            for (int y = occupiedTile.Y - clearance;
+                y <= occupiedTile.Y + clearance;
+                y++)
+            {
+                for (int x = occupiedTile.X - clearance;
+                    x <= occupiedTile.X + clearance;
+                    x++)
+                {
+                    var center = new Tile2i(x, y);
+                    if (center.X < boundsMin.X || center.X > boundsMax.X
+                        || center.Y < boundsMin.Y || center.Y > boundsMax.Y)
+                        continue;
+                    Tile2i corner =
+                        VehiclePathFindingParams.ConvertToCornerTileSpace(
+                            center,
+                            requiredClearance);
+                    if (occupiedTile.X >= corner.X
+                        && occupiedTile.X < corner.X + clearance
+                        && occupiedTile.Y >= corner.Y
+                        && occupiedTile.Y < corner.Y + clearance)
+                        centers.Add(center);
+                }
+            }
+            return centers.ToArray();
         }
     }
 }

@@ -683,6 +683,7 @@ namespace AutoTerrainDesignations
             ExperimentalAccessSnapshotBuildResult output,
             ExperimentalAccessSliceControl? sliceControl)
         {
+            long capturePreambleStart = AtdDiagnostics.Timestamp();
             Stopwatch snapshotTimer = Stopwatch.StartNew();
             AccessSearchSnapshot snapshot = null!;
             string failureReason = string.Empty;
@@ -725,11 +726,17 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
+            long capturePreambleTicks =
+                AtdDiagnostics.ElapsedSince(capturePreambleStart);
+            long captureStepStart = AtdDiagnostics.Timestamp();
             AccessCapturedBuildingFacts buildingFacts =
                 AccessCapturedBuildingFacts.Capture(
                     s_buildingOccupiedTiles,
                     s_buildingFixedHeights2ByTile,
                     s_layoutEntityOccupanciesByTile);
+            long buildingFactsTicks =
+                AtdDiagnostics.ElapsedSince(captureStepStart);
+            captureStepStart = AtdDiagnostics.Timestamp();
 
             generatedAreaMarginTiles = Math.Max(0, generatedAreaMarginTiles);
             Tile2i towerBoundsMin = tower.Area.BoundingBoxMin;
@@ -825,29 +832,94 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            var groundHeight2 = new Dictionary<Tile2i, int>();
-            var preciseTerrainHeights = new Dictionary<Tile2i, float>();
+            int captureTileCapacity = captureTileCount >= int.MaxValue
+                ? int.MaxValue
+                : (int)captureTileCount;
+            int originCapacity = originCount >= int.MaxValue
+                ? int.MaxValue
+                : (int)originCount;
+            int designationCapacity = s_desigManager.Designations.Count;
+            long fixedProfileCapacityLong = Math.Min(
+                originCount,
+                (long)designationCapacity + tileDepths.Count);
+            int fixedProfileCapacity = fixedProfileCapacityLong >= int.MaxValue
+                ? int.MaxValue
+                : (int)fixedProfileCapacityLong;
+
+            long captureSetupTicks =
+                AtdDiagnostics.ElapsedSince(captureStepStart);
+            captureStepStart = AtdDiagnostics.Timestamp();
+            var groundHeight2 =
+                new Dictionary<Tile2i, int>(captureTileCapacity);
+            var preciseTerrainHeights =
+                new Dictionary<Tile2i, float>(captureTileCapacity);
             var readinessPropPlacedHeights =
                 new Dictionary<Tile2i, float>();
             var readinessStumpPlantedHeights =
                 new Dictionary<Tile2i, float>();
-            var terrainColumns = new Dictionary<Tile2i, AccessTerrainColumn>();
-            var terrainCenterHeight2 = new Dictionary<Tile2i, int>();
+            var terrainColumns =
+                new Dictionary<Tile2i, AccessTerrainColumn>(originCapacity);
+            var terrainCenterHeight2 =
+                new Dictionary<Tile2i, int>(originCapacity);
             var oceanTiles = new HashSet<Tile2i>();
-            var fixedProfiles = new Dictionary<Tile2i, AccessHeightProfile>();
+            var fixedProfiles =
+                new Dictionary<Tile2i, AccessHeightProfile>(fixedProfileCapacity);
             var designatedOrigins = new HashSet<Tile2i>();
             var rayDesignationOrigins = new HashSet<Tile2i>();
-            var rayDesignations = new Dictionary<Tile2i, TerrainDesignation>();
-            var projectedRayDesignations = new Dictionary<Tile2i, TerrainDesignation>();
+            var rayDesignations =
+                new Dictionary<Tile2i, TerrainDesignation>(designationCapacity);
+            var projectedRayDesignations =
+                new Dictionary<Tile2i, TerrainDesignation>(designationCapacity);
             var groundExclusionReasons = new Dictionary<Tile2i, string>();
+            long collectionAllocationTicks =
+                AtdDiagnostics.ElapsedSince(captureStepStart);
 
             Stopwatch phaseTimer = Stopwatch.StartNew();
+            captureStepStart = AtdDiagnostics.Timestamp();
+            TerrainDesignation[] capturedDesignations =
+                s_desigManager.Designations.ToArray();
+            long designationSnapshotTicks =
+                AtdDiagnostics.ElapsedSince(captureStepStart);
 
-            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(boundsMin, boundsMax))
+            Tile2i fixedDesignationMin = TerrainDesignation.GetOrigin(boundsMin);
+            Tile2i fixedDesignationMax = TerrainDesignation.GetOrigin(boundsMax);
+            Tile2i rayDesignationMin = TerrainDesignation.GetOrigin(groundCaptureMin);
+            Tile2i rayDesignationMax = TerrainDesignation.GetOrigin(groundCaptureMax);
+            Tile2i projectedDesignationMin =
+                TerrainDesignation.GetOrigin(physicalTerrainMin);
+            Tile2i projectedDesignationMax =
+                TerrainDesignation.GetOrigin(physicalTerrainMax);
+            long designationClassificationTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
+            foreach (TerrainDesignation designation in capturedDesignations)
             {
                 Tile2i origin = designation.OriginTileCoord;
-                designatedOrigins.Add(origin);
-                fixedProfiles[origin] = ProfileFromDesignation(designation);
+                if (origin.X >= fixedDesignationMin.X
+                    && origin.X <= fixedDesignationMax.X
+                    && origin.Y >= fixedDesignationMin.Y
+                    && origin.Y <= fixedDesignationMax.Y)
+                {
+                    designatedOrigins.Add(origin);
+                    fixedProfiles[origin] = ProfileFromDesignation(designation);
+                }
+                if (origin.X >= rayDesignationMin.X
+                    && origin.X <= rayDesignationMax.X
+                    && origin.Y >= rayDesignationMin.Y
+                    && origin.Y <= rayDesignationMax.Y)
+                {
+                    rayDesignationOrigins.Add(origin);
+                    rayDesignations[origin] = designation;
+                }
+                // Projected rays have no artificial distance limit. Include every
+                // designation on the physical map so a remote but sufficiently deep
+                // cut cannot reach the search area without being represented.
+                if (origin.X >= projectedDesignationMin.X
+                    && origin.X <= projectedDesignationMax.X
+                    && origin.Y >= projectedDesignationMin.Y
+                    && origin.Y <= projectedDesignationMax.Y)
+                {
+                    projectedRayDesignations[origin] = designation;
+                }
                 if (sliceControl != null
                     && phaseTimer.ElapsedMilliseconds
                         >= sliceControl.SliceBudgetMilliseconds)
@@ -857,55 +929,20 @@ namespace AutoTerrainDesignations
                         output.FailureReason = "SearchCancelled";
                         yield break;
                     }
+                    designationClassificationTicks +=
+                        AtdDiagnostics.ElapsedSince(captureStepStart);
+                    sliceControl.ReportAtomicStep(
+                        "capture:designation-classification");
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
+                    captureStepStart = AtdDiagnostics.Timestamp();
                 }
             }
-            if (!CaptureStillValid())
-                yield break;
-            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
-                groundCaptureMin, groundCaptureMax))
-            {
-                rayDesignationOrigins.Add(designation.OriginTileCoord);
-                rayDesignations[designation.OriginTileCoord] = designation;
-                if (sliceControl != null
-                    && phaseTimer.ElapsedMilliseconds
-                        >= sliceControl.SliceBudgetMilliseconds)
-                {
-                    if (sliceControl.CancellationRequested)
-                    {
-                        output.FailureReason = "SearchCancelled";
-                        yield break;
-                    }
-                    phaseTimer.Restart();
-                    yield return null;
-                    phaseTimer.Restart();
-                }
-            }
-            if (!CaptureStillValid())
-                yield break;
-            // Projected rays have no artificial distance limit. Include every
-            // designation on the physical map so a remote but sufficiently deep
-            // cut cannot reach the search area without being represented.
-            foreach (TerrainDesignation designation in SelectDesignationsInAreaChunked(
-                physicalTerrainMin, physicalTerrainMax))
-            {
-                projectedRayDesignations[designation.OriginTileCoord] = designation;
-                if (sliceControl != null
-                    && phaseTimer.ElapsedMilliseconds
-                        >= sliceControl.SliceBudgetMilliseconds)
-                {
-                    if (sliceControl.CancellationRequested)
-                    {
-                        output.FailureReason = "SearchCancelled";
-                        yield break;
-                    }
-                    phaseTimer.Restart();
-                    yield return null;
-                    phaseTimer.Restart();
-                }
-            }
+            designationClassificationTicks +=
+                AtdDiagnostics.ElapsedSince(captureStepStart);
+            long designationFinalizeTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
             if (!CaptureStillValid())
                 yield break;
 
@@ -916,11 +953,19 @@ namespace AutoTerrainDesignations
                     output.FailureReason = "SearchCancelled";
                     yield break;
                 }
+                designationFinalizeTicks +=
+                    AtdDiagnostics.ElapsedSince(captureStepStart);
+                sliceControl.ReportAtomicStep("capture:designation-boundary");
                 phaseTimer.Restart();
                 yield return null;
                 phaseTimer.Restart();
+                captureStepStart = AtdDiagnostics.Timestamp();
             }
+            designationFinalizeTicks +=
+                AtdDiagnostics.ElapsedSince(captureStepStart);
 
+            long workProfileTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
             var workOrigins = new HashSet<Tile2i>();
             foreach (var pair in tileDepths)
             {
@@ -943,14 +988,21 @@ namespace AutoTerrainDesignations
                         output.FailureReason = "SearchCancelled";
                         yield break;
                     }
+                    workProfileTicks +=
+                        AtdDiagnostics.ElapsedSince(captureStepStart);
+                    sliceControl.ReportAtomicStep("capture:work-profiles");
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
+                    captureStepStart = AtdDiagnostics.Timestamp();
                 }
             }
+            workProfileTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
 
             int minHeight2 = int.MaxValue;
             int maxHeight2 = int.MinValue;
+            long terrainTileTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
             for (int x = groundCaptureMin.X; x <= groundCaptureMax.X; x++)
             {
                 for (int y = groundCaptureMin.Y; y <= groundCaptureMax.Y; y++)
@@ -989,27 +1041,36 @@ namespace AutoTerrainDesignations
                             output.FailureReason = "SearchCancelled";
                             yield break;
                         }
+                        terrainTileTicks +=
+                            AtdDiagnostics.ElapsedSince(captureStepStart);
+                        sliceControl.ReportAtomicStep("capture:terrain-tiles");
                         phaseTimer.Restart();
                         yield return null;
                         phaseTimer.Restart();
+                        captureStepStart = AtdDiagnostics.Timestamp();
                     }
                 }
             }
+            terrainTileTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
 
             int firstOriginX = boundsMin.X & -4;
             int firstOriginY = boundsMin.Y & -4;
+            long terrainCenterTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
             for (int x = firstOriginX; x <= boundsMax.X; x += 4)
             {
                 for (int y = firstOriginY; y <= boundsMax.Y; y += 4)
                 {
                     Tile2i origin = new Tile2i(x, y);
-                    if (!IsOriginInsideGeneratedArea(
+                    if (IsOriginInsideGeneratedArea(
                             tower, origin, generatedAreaMarginTiles))
-                        continue;
-                    Tile2i center = origin + new RelTile2i(2, 2);
-                    terrainCenterHeight2[origin] = groundHeight2.TryGetValue(center, out int h2)
-                        ? h2
-                        : ToHeight2(terrMgr.GetHeight(center).Value.ToFloat());
+                    {
+                        Tile2i center = origin + new RelTile2i(2, 2);
+                        terrainCenterHeight2[origin] = groundHeight2.TryGetValue(
+                                center, out int h2)
+                            ? h2
+                            : ToHeight2(terrMgr.GetHeight(center).Value.ToFloat());
+                    }
 
                     if (sliceControl != null
                         && phaseTimer.ElapsedMilliseconds
@@ -1020,20 +1081,29 @@ namespace AutoTerrainDesignations
                             output.FailureReason = "SearchCancelled";
                             yield break;
                         }
+                        terrainCenterTicks +=
+                            AtdDiagnostics.ElapsedSince(captureStepStart);
+                        sliceControl.ReportAtomicStep("capture:terrain-centers");
                         phaseTimer.Restart();
                         yield return null;
                         phaseTimer.Restart();
+                        captureStepStart = AtdDiagnostics.Timestamp();
                     }
                 }
             }
+            terrainCenterTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
+            long terrainColumnTicks = 0L;
+            captureStepStart = AtdDiagnostics.Timestamp();
             for (int x = firstOriginX; x <= boundsMax.X + 4; x += 4)
             {
                 for (int y = firstOriginY; y <= boundsMax.Y + 4; y += 4)
                 {
                     Tile2i corner = new Tile2i(x, y);
-                    if (!terrMgr.IsValidCoord(corner))
-                        continue;
-                    terrainColumns[corner] = CaptureAccessTerrainColumn(terrMgr, corner);
+                    if (terrMgr.IsValidCoord(corner))
+                    {
+                        terrainColumns[corner] =
+                            CaptureAccessTerrainColumn(terrMgr, corner);
+                    }
 
                     if (sliceControl != null
                         && phaseTimer.ElapsedMilliseconds
@@ -1044,14 +1114,45 @@ namespace AutoTerrainDesignations
                             output.FailureReason = "SearchCancelled";
                             yield break;
                         }
+                        terrainColumnTicks +=
+                            AtdDiagnostics.ElapsedSince(captureStepStart);
+                        sliceControl.ReportAtomicStep("capture:terrain-columns");
                         phaseTimer.Restart();
                         yield return null;
                         phaseTimer.Restart();
+                        captureStepStart = AtdDiagnostics.Timestamp();
                     }
                 }
             }
+            terrainColumnTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
+            captureStepStart = AtdDiagnostics.Timestamp();
             if (!CaptureStillValid())
                 yield break;
+            long captureFinalizeTicks =
+                AtdDiagnostics.ElapsedSince(captureStepStart);
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+            {
+                string FormatCaptureMilliseconds(long ticks)
+                    => (ticks * 1000d / Stopwatch.Frequency).ToString(
+                        "0.##", CultureInfo.InvariantCulture);
+
+                LogExperimentalAccessDebug(
+                    "[DEBUG-capturetiming-a82c] [ATD Access Capture Timing] "
+                    + $"preambleMs={FormatCaptureMilliseconds(capturePreambleTicks)} "
+                    + $"buildingFactsMs={FormatCaptureMilliseconds(buildingFactsTicks)} "
+                    + $"setupMs={FormatCaptureMilliseconds(captureSetupTicks)} "
+                    + $"collectionAllocationMs={FormatCaptureMilliseconds(collectionAllocationTicks)} "
+                    + $"designationSnapshotMs={FormatCaptureMilliseconds(designationSnapshotTicks)} "
+                    + $"designationClassificationMs={FormatCaptureMilliseconds(designationClassificationTicks)} "
+                    + $"workProfilesMs={FormatCaptureMilliseconds(workProfileTicks)} "
+                    + $"terrainTilesMs={FormatCaptureMilliseconds(terrainTileTicks)} "
+                    + $"terrainCentersMs={FormatCaptureMilliseconds(terrainCenterTicks)} "
+                    + $"terrainColumnsMs={FormatCaptureMilliseconds(terrainColumnTicks)} "
+                    + $"designationFinalizeMs={FormatCaptureMilliseconds(designationFinalizeTicks)} "
+                    + $"captureFinalizeMs={FormatCaptureMilliseconds(captureFinalizeTicks)} "
+                    + $"counts=[designations:{capturedDesignations.Length},captureTiles:{groundHeight2.Count},"
+                    + $"terrainCenters:{terrainCenterHeight2.Count},terrainColumns:{terrainColumns.Count}]");
+            }
             sliceControl?.ReportPhase("Projecting designations");
             ResolveAccessMaterialSlopes(
                 tower,
@@ -1114,6 +1215,8 @@ namespace AutoTerrainDesignations
                 yield break;
             sliceControl?.ReportPhase("Building navigation");
 
+            long fixedProfileTicks = 0L;
+            long navigationStepStart = AtdDiagnostics.Timestamp();
             foreach (AccessHeightProfile profile in fixedProfiles.Values)
             {
                 minHeight2 = Math.Min(minHeight2, Math.Min(Math.Min(profile.Nw2, profile.Ne2), Math.Min(profile.Se2, profile.Sw2)));
@@ -1127,13 +1230,18 @@ namespace AutoTerrainDesignations
                         output.FailureReason = "SearchCancelled";
                         yield break;
                     }
+                    fixedProfileTicks +=
+                        AtdDiagnostics.ElapsedSince(navigationStepStart);
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
+                    navigationStepStart = AtdDiagnostics.Timestamp();
                 }
             }
+            fixedProfileTicks += AtdDiagnostics.ElapsedSince(navigationStepStart);
 
             float landslideRunPerHeight = AutoTerrainDesignationsMod.AccessLandslideRunPerHeight;
+            navigationStepStart = AtdDiagnostics.Timestamp();
             var durabilityCorners = BuildDurabilityCorners(
                 fixedProfiles,
                 buildingFacts.FixedHeights2ByTile,
@@ -1143,14 +1251,21 @@ namespace AutoTerrainDesignations
                 dumpingMaterialSlope,
                 fallbackMiningSlope,
                 landslideRunPerHeight);
+            long durabilityTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
             IPathabilityProvider provider = s_vehiclePathFindingManager.PathabilityProvider;
+            navigationStepStart = AtdDiagnostics.Timestamp();
             RefreshPathabilityAndInvalidateReachability();
+            long pathabilityRefreshTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
             VehiclePathFindingParams t1PathParams = VehiclePathFindingParams.DEFAULT;
             bool hasT1DiagnosticMask = vehicleClearance > 4
                 && TryGetTierExcavatorPathFindingParams(
                     "T1", out t1PathParams);
 
             var groundNodes = new HashSet<Tile2i>();
+            long groundPathabilityTicks = 0L;
+            navigationStepStart = AtdDiagnostics.Timestamp();
             foreach (var pair in groundHeight2)
             {
                 Tile2i tile = pair.Key;
@@ -1188,11 +1303,16 @@ namespace AutoTerrainDesignations
                         output.FailureReason = "SearchCancelled";
                         yield break;
                     }
+                    groundPathabilityTicks +=
+                        AtdDiagnostics.ElapsedSince(navigationStepStart);
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
+                    navigationStepStart = AtdDiagnostics.Timestamp();
                 }
             }
+            groundPathabilityTicks +=
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
 
             Mafi.Numerics.UInt128 terrainOnlyPathabilityMask =
                 pathParams.PathabilityQueryMask;
@@ -1201,6 +1321,8 @@ namespace AutoTerrainDesignations
                 terrainOnlyPathabilityMask &= ~(
                     Mafi.Numerics.UInt128.One << (x * 10));
             var terrainPathableWithoutProps = new HashSet<Tile2i>();
+            long terrainOnlyPathabilityTicks = 0L;
+            navigationStepStart = AtdDiagnostics.Timestamp();
             foreach (Tile2i tile in groundHeight2.Keys)
             {
                 // Pathability is a live-world read, so capture it once here.
@@ -1216,22 +1338,34 @@ namespace AutoTerrainDesignations
                         output.FailureReason = "SearchCancelled";
                         yield break;
                     }
+                    terrainOnlyPathabilityTicks +=
+                        AtdDiagnostics.ElapsedSince(navigationStepStart);
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
+                    navigationStepStart = AtdDiagnostics.Timestamp();
                 }
             }
+            terrainOnlyPathabilityTicks +=
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
 
+            navigationStepStart = AtdDiagnostics.Timestamp();
             List<AccessCapturedProp> capturedProps = CaptureAccessPropFacts(
                 tower,
                 terrMgr,
                 boundsMin,
                 boundsMax);
+            long capturePropsTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
+            navigationStepStart = AtdDiagnostics.Timestamp();
             AccessDesignationReadinessFacts readinessFacts =
                 AccessDesignationReadinessFacts.Capture(
                     readinessPropPlacedHeights,
                     readinessStumpPlantedHeights,
                     buildingFacts);
+            long readinessTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
+            navigationStepStart = AtdDiagnostics.Timestamp();
             Dictionary<Tile2i, AccessPropCleanupInfo> propCleanupByOrigin =
                 BuildAccessPropCleanupByOrigin(
                     tower,
@@ -1247,6 +1381,8 @@ namespace AutoTerrainDesignations
                     buildingFacts,
                     out Dictionary<Tile2i, AccessPropCleanupInfo> propCleanupByTile,
                     out AccessPropCleanupSnapshotDiagnostics cleanupDiagnostics);
+            long cleanupTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
             if (sliceControl != null)
             {
                 if (sliceControl.CancellationRequested)
@@ -1261,6 +1397,9 @@ namespace AutoTerrainDesignations
             HashSet<Tile2i> towerReachableGround;
             Tile2i groundStart;
             int fullTowerGoalCount;
+            long towerFloodTicks = 0L;
+            long goalSelectionTicks;
+            navigationStepStart = AtdDiagnostics.Timestamp();
             if (groundGoalOverride != null && groundGoalOverride.Count > 0)
             {
                 towerReachableGround = groundGoalOverride
@@ -1277,9 +1416,12 @@ namespace AutoTerrainDesignations
                     $"[ATD Access Ground Goal Override] " +
                     $"selected={towerReachableGround.Count} " +
                     $"goals=[{string.Join(",", towerReachableGround)}]");
+                goalSelectionTicks =
+                    AtdDiagnostics.ElapsedSince(navigationStepStart);
             }
             else
             {
+                long towerFloodStart = AtdDiagnostics.Timestamp();
                 if (!TryBuildTowerReachableGround(tower, towerBoundsMin, towerBoundsMax,
                     groundNodes, provider, pathParams,
                     out towerReachableGround, out groundStart))
@@ -1287,11 +1429,14 @@ namespace AutoTerrainDesignations
                     output.FailureReason = "NoTowerGround";
                     yield break;
                 }
+                towerFloodTicks =
+                    AtdDiagnostics.ElapsedSince(towerFloodStart);
                 if (towerReachableGround.Count == 0)
                 {
                     output.FailureReason = "NoTowerReachableGround";
                     yield break;
                 }
+                navigationStepStart = AtdDiagnostics.Timestamp();
                 fullTowerGoalCount = towerReachableGround.Count;
                 if (fullTowerGoalCount <= 16)
                     LogTowerGroundFrontierDiagnostics(
@@ -1314,7 +1459,10 @@ namespace AutoTerrainDesignations
                     output.FailureReason = "NoTowerRadialGroundGoals";
                     yield break;
                 }
+                goalSelectionTicks =
+                    AtdDiagnostics.ElapsedSince(navigationStepStart);
             }
+            navigationStepStart = AtdDiagnostics.Timestamp();
             if (vehicleClearance > 4)
                 LogV2GroundGraphDiagnostics(
                     vehicleClearance,
@@ -1323,7 +1471,35 @@ namespace AutoTerrainDesignations
                     towerReachableGround,
                     propCleanupByTile,
                     groundExclusionReasons);
+            long graphDiagnosticsTicks =
+                AtdDiagnostics.ElapsedSince(navigationStepStart);
             if (minHeight2 == int.MaxValue) { minHeight2 = 0; maxHeight2 = 0; }
+
+            if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
+            {
+                string FormatNavigationMilliseconds(long ticks)
+                    => (ticks * 1000d / Stopwatch.Frequency).ToString(
+                        "0.##", CultureInfo.InvariantCulture);
+
+                LogExperimentalAccessDebug(
+                    "[DEBUG-navtiming-7d2a] [ATD Access Navigation Timing] "
+                    + $"fixedProfilesMs={FormatNavigationMilliseconds(fixedProfileTicks)} "
+                    + $"durabilityMs={FormatNavigationMilliseconds(durabilityTicks)} "
+                    + $"pathabilityRefreshMs={FormatNavigationMilliseconds(pathabilityRefreshTicks)} "
+                    + $"groundPathabilityMs={FormatNavigationMilliseconds(groundPathabilityTicks)} "
+                    + $"terrainOnlyPathabilityMs={FormatNavigationMilliseconds(terrainOnlyPathabilityTicks)} "
+                    + $"capturePropsMs={FormatNavigationMilliseconds(capturePropsTicks)} "
+                    + $"readinessMs={FormatNavigationMilliseconds(readinessTicks)} "
+                    + $"cleanupMs={FormatNavigationMilliseconds(cleanupTicks)} "
+                    + $"towerFloodMs={FormatNavigationMilliseconds(towerFloodTicks)} "
+                    + $"goalSelectionMs={FormatNavigationMilliseconds(goalSelectionTicks)} "
+                    + $"graphDiagnosticsMs={FormatNavigationMilliseconds(graphDiagnosticsTicks)} "
+                    + $"counts=[captureTiles:{groundHeight2.Count},fixedProfiles:{fixedProfiles.Count},"
+                    + $"durabilityCorners:{durabilityCorners.Count},groundNodes:{groundNodes.Count},"
+                    + $"terrainOnlyNodes:{terrainPathableWithoutProps.Count},capturedProps:{capturedProps.Count},"
+                    + $"cleanupOrigins:{propCleanupByOrigin.Count},cleanupTiles:{propCleanupByTile.Count},"
+                    + $"fullTowerGround:{fullTowerGoalCount},selectedGoals:{towerReachableGround.Count}]");
+            }
 
             if (sliceControl != null)
             {
@@ -1869,79 +2045,100 @@ namespace AutoTerrainDesignations
             out AccessPropCleanupSnapshotDiagnostics diagnostics)
         {
             diagnostics = new AccessPropCleanupSnapshotDiagnostics();
-            var samplesByOrigin = new Dictionary<Tile2i, List<AccessPropSample>>();
-            var blockersByOrigin = new Dictionary<Tile2i, AccessPropBlockerKind>();
-            var samplesByTile = new Dictionary<Tile2i, List<AccessPropSample>>();
-            var blockersByTile = new Dictionary<Tile2i, AccessPropBlockerKind>();
+            var cleanupBuildersByOrigin =
+                new Dictionary<Tile2i, AccessCapturedPropCleanupAccumulator>();
+            var cleanupBuildersByTile =
+                new Dictionary<Tile2i, AccessCapturedPropCleanupAccumulator>();
+            var blockerByOrigin =
+                new Dictionary<Tile2i, AccessPropBlockerKind>();
             var buildingBlockedGroundTiles = new HashSet<Tile2i>();
             foreach (Tile2i occupiedTile in buildingFacts.EnumerateOccupiedTiles())
                 foreach (Tile2i blockedCenter in EnumerateBlockedCenterTilesForOccupiedTile(
                     occupiedTile, requiredClearance, boundsMin, boundsMax))
                     buildingBlockedGroundTiles.Add(blockedCenter);
 
+            var affectedCenterSet = new HashSet<Tile2i>();
+            var affectedCenters = new List<Tile2i>();
             foreach (AccessCapturedProp capturedProp in capturedProps)
             {
                 Tile2i[] orderedCleanupOrigins = capturedProp.IsDenseDebris
                     ? capturedProp.OccupiedTiles
                         .Select(occupiedTile => TerrainDesignation.GetOrigin(occupiedTile))
+                        .Distinct()
                         .Where(candidate => IsDenseDebrisCleanupOriginStaticallyFree(
                             tower, candidate, designatedOrigins, buildingFacts))
-                        .Distinct()
                         .OrderBy(item => item.X)
                         .ThenBy(item => item.Y)
                         .ToArray()
                     : Array.Empty<Tile2i>();
+                affectedCenterSet.Clear();
+                affectedCenters.Clear();
                 foreach (Tile2i occupiedTile in capturedProp.OccupiedTiles)
                 {
                     foreach (Tile2i tile in EnumerateBlockedCenterTilesForOccupiedTile(
                         occupiedTile, requiredClearance, boundsMin, boundsMax))
                     {
-                        Tile2i origin = TerrainDesignation.GetOrigin(tile);
-                        AccessPropSample sample = new AccessPropSample(
-                            tile,
-                            capturedProp.IsTree,
-                            capturedProp.IsDenseDebris,
-                            capturedProp.IsRemovable,
-                            cleanupObjectKey: capturedProp.CleanupObjectKey,
-                            eligibleCleanupOrigins: orderedCleanupOrigins,
-                            dumpBurialProbeTile: capturedProp.HasDumpBurialProbe
-                                ? capturedProp.DumpBurialProbeTile
-                                : (Tile2i?)null,
-                            dumpBurialProbeOffsetX: capturedProp.DumpBurialProbeOffsetX,
-                            dumpBurialProbeOffsetY: capturedProp.DumpBurialProbeOffsetY,
-                            placedHeight: capturedProp.PlacedHeight,
-                            dumpBurialThreshold: capturedProp.DumpBurialThreshold,
-                            denseDebrisPropId: capturedProp.DenseDebrisPropId);
-                        AccessPropBlockerKind blocker = AddCleanupSample(
-                            tower,
-                            origin,
-                            tile,
-                            sample,
-                            groundHeight2,
-                            designatedOrigins,
-                            oceanTiles,
-                            buildingBlockedGroundTiles,
-                            projectedDesignationDisturbance,
-                            isTerrainPathableWithoutBlockers,
-                            samplesByOrigin,
-                            blockersByOrigin,
-                            samplesByTile,
-                            blockersByTile);
-                        diagnostics.RecordSample(tile, origin, sample, blocker);
                         if (capturedProp.IsTree)
                             diagnostics.TreeSamples++;
                         else
                             diagnostics.PropSamples++;
+                        if (affectedCenterSet.Add(tile))
+                            affectedCenters.Add(tile);
                     }
+                }
+
+                foreach (Tile2i tile in affectedCenters)
+                {
+                    Tile2i origin = TerrainDesignation.GetOrigin(tile);
+                    AccessPropSample sample = new AccessPropSample(
+                        tile,
+                        capturedProp.IsTree,
+                        capturedProp.IsDenseDebris,
+                        capturedProp.IsRemovable,
+                        cleanupObjectKey: capturedProp.CleanupObjectKey,
+                        eligibleCleanupOrigins: orderedCleanupOrigins,
+                        dumpBurialProbeTile: capturedProp.HasDumpBurialProbe
+                            ? capturedProp.DumpBurialProbeTile
+                            : (Tile2i?)null,
+                        dumpBurialProbeOffsetX: capturedProp.DumpBurialProbeOffsetX,
+                        dumpBurialProbeOffsetY: capturedProp.DumpBurialProbeOffsetY,
+                        placedHeight: capturedProp.PlacedHeight,
+                        dumpBurialThreshold: capturedProp.DumpBurialThreshold,
+                        denseDebrisPropId: capturedProp.DenseDebrisPropId);
+                    if (!blockerByOrigin.TryGetValue(
+                            origin, out AccessPropBlockerKind originBlocker))
+                    {
+                        originBlocker = GetCleanupOriginBlockerKind(
+                            tower, origin, designatedOrigins);
+                        blockerByOrigin[origin] = originBlocker;
+                    }
+                    AccessPropBlockerKind blocker = GetCleanupBlockerKind(
+                        tower,
+                        originBlocker,
+                        tile,
+                        groundHeight2,
+                        oceanTiles,
+                        buildingBlockedGroundTiles,
+                        projectedDesignationDisturbance,
+                        isTerrainPathableWithoutBlockers);
+                    AddCleanupSample(
+                        origin,
+                        tile,
+                        sample,
+                        blocker,
+                        cleanupBuildersByOrigin,
+                        cleanupBuildersByTile);
+                    diagnostics.RecordSample(tile, origin, sample, blocker);
                 }
             }
 
-            var cleanupByOrigin = new Dictionary<Tile2i, AccessPropCleanupInfo>();
-            foreach (KeyValuePair<Tile2i, List<AccessPropSample>> pair in samplesByOrigin)
+            var cleanupByOrigin =
+                new Dictionary<Tile2i, AccessPropCleanupInfo>(
+                    cleanupBuildersByOrigin.Count);
+            foreach (KeyValuePair<Tile2i, AccessCapturedPropCleanupAccumulator>
+                pair in cleanupBuildersByOrigin)
             {
-                blockersByOrigin.TryGetValue(pair.Key, out AccessPropBlockerKind blockerKind);
-                AccessPropCleanupInfo info = AccessPropCleanupPolicy.BuildOriginInfo(
-                    pair.Key, pair.Value, blockerKind);
+                AccessPropCleanupInfo info = pair.Value.BuildInfo();
                 cleanupByOrigin[pair.Key] = info;
                 diagnostics.RecordOrigin(info);
 
@@ -1959,13 +2156,12 @@ namespace AutoTerrainDesignations
                 }
             }
 
-            cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>();
-            foreach (KeyValuePair<Tile2i, List<AccessPropSample>> pair in samplesByTile)
+            cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>(
+                cleanupBuildersByTile.Count);
+            foreach (KeyValuePair<Tile2i, AccessCapturedPropCleanupAccumulator>
+                pair in cleanupBuildersByTile)
             {
-                blockersByTile.TryGetValue(
-                    pair.Key, out AccessPropBlockerKind blockerKind);
-                cleanupByTile[pair.Key] = AccessPropCleanupPolicy.BuildOriginInfo(
-                    TerrainDesignation.GetOrigin(pair.Key), pair.Value, blockerKind);
+                cleanupByTile[pair.Key] = pair.Value.BuildInfo();
             }
 
             return cleanupByOrigin;
@@ -2056,48 +2252,32 @@ namespace AutoTerrainDesignations
             return false;
         }
 
-        private static AccessPropBlockerKind AddCleanupSample(
-            IAreaManagingTower tower,
+        private static void AddCleanupSample(
             Tile2i origin,
             Tile2i tile,
             AccessPropSample sample,
-            IReadOnlyDictionary<Tile2i, int> groundHeight2,
-            ISet<Tile2i> designatedOrigins,
-            ISet<Tile2i> oceanTiles,
-            ISet<Tile2i> buildingBlockedGroundTiles,
-            ProjectedDesignationDisturbance projectedDesignationDisturbance,
-            Func<Tile2i, bool> isTerrainPathableWithoutBlockers,
-            Dictionary<Tile2i, List<AccessPropSample>> samplesByOrigin,
-            Dictionary<Tile2i, AccessPropBlockerKind> blockersByOrigin,
-            Dictionary<Tile2i, List<AccessPropSample>> samplesByTile,
-            Dictionary<Tile2i, AccessPropBlockerKind> blockersByTile)
+            AccessPropBlockerKind blocker,
+            Dictionary<Tile2i, AccessCapturedPropCleanupAccumulator>
+                cleanupBuildersByOrigin,
+            Dictionary<Tile2i, AccessCapturedPropCleanupAccumulator>
+                cleanupBuildersByTile)
         {
-            if (!samplesByOrigin.TryGetValue(origin, out List<AccessPropSample> samples))
+            if (!cleanupBuildersByOrigin.TryGetValue(
+                    origin,
+                    out AccessCapturedPropCleanupAccumulator originBuilder))
             {
-                samples = new List<AccessPropSample>();
-                samplesByOrigin[origin] = samples;
+                originBuilder = new AccessCapturedPropCleanupAccumulator(origin);
+                cleanupBuildersByOrigin[origin] = originBuilder;
             }
-            samples.Add(sample);
-            if (!samplesByTile.TryGetValue(tile, out List<AccessPropSample> tileSamples))
+            originBuilder.Add(sample, blocker);
+            if (!cleanupBuildersByTile.TryGetValue(
+                    tile,
+                    out AccessCapturedPropCleanupAccumulator tileBuilder))
             {
-                tileSamples = new List<AccessPropSample>();
-                samplesByTile[tile] = tileSamples;
+                tileBuilder = new AccessCapturedPropCleanupAccumulator(origin);
+                cleanupBuildersByTile[tile] = tileBuilder;
             }
-            tileSamples.Add(sample);
-
-            AccessPropBlockerKind blocker = GetCleanupBlockerKind(
-                tower, origin, tile, groundHeight2, designatedOrigins,
-                oceanTiles, buildingBlockedGroundTiles, projectedDesignationDisturbance,
-                isTerrainPathableWithoutBlockers);
-            if (blocker != AccessPropBlockerKind.None
-                && (!blockersByOrigin.TryGetValue(origin, out AccessPropBlockerKind existing)
-                    || existing == AccessPropBlockerKind.None))
-                blockersByOrigin[origin] = blocker;
-            if (blocker != AccessPropBlockerKind.None
-                && (!blockersByTile.TryGetValue(tile, out AccessPropBlockerKind tileExisting)
-                    || tileExisting == AccessPropBlockerKind.None))
-                blockersByTile[tile] = blocker;
-            return blocker;
+            tileBuilder.Add(sample, blocker);
         }
 
         private static IEnumerable<Tile2i> EnumerateBlockedCenterTilesForOccupiedTile(
@@ -2106,23 +2286,11 @@ namespace AutoTerrainDesignations
             Tile2i boundsMin,
             Tile2i boundsMax)
         {
-            int clearance = Math.Max(1, requiredClearance.Value);
-            int radius = clearance;
-            for (int y = occupiedTile.Y - radius; y <= occupiedTile.Y + radius; y++)
-            {
-                for (int x = occupiedTile.X - radius; x <= occupiedTile.X + radius; x++)
-                {
-                    Tile2i center = new Tile2i(x, y);
-                    if (center.X < boundsMin.X || center.X > boundsMax.X
-                        || center.Y < boundsMin.Y || center.Y > boundsMax.Y)
-                        continue;
-                    Tile2i corner = VehiclePathFindingParams.ConvertToCornerTileSpace(
-                        center, requiredClearance);
-                    if (occupiedTile.X >= corner.X && occupiedTile.X < corner.X + clearance
-                        && occupiedTile.Y >= corner.Y && occupiedTile.Y < corner.Y + clearance)
-                        yield return center;
-                }
-            }
+            return AccessPropCleanupFootprint.EnumerateBlockedCenters(
+                occupiedTile,
+                requiredClearance.Value,
+                boundsMin,
+                boundsMax);
         }
 
         private static string BuildTreeCleanupKey(TreeId treeId)
@@ -2137,20 +2305,32 @@ namespace AutoTerrainDesignations
             return ClearancePathabilityProvider.ExtractClearanceFromMask(ref mask);
         }
 
-        private static AccessPropBlockerKind GetCleanupBlockerKind(
+        private static AccessPropBlockerKind GetCleanupOriginBlockerKind(
             IAreaManagingTower tower,
             Tile2i origin,
+            ISet<Tile2i> designatedOrigins)
+        {
+            if (!IsOriginInsideTower(tower, origin))
+                return AccessPropBlockerKind.OutOfArea;
+            return designatedOrigins.Contains(origin)
+                ? AccessPropBlockerKind.ActiveTerrainDesignation
+                : AccessPropBlockerKind.None;
+        }
+
+        private static AccessPropBlockerKind GetCleanupBlockerKind(
+            IAreaManagingTower tower,
+            AccessPropBlockerKind originBlocker,
             Tile2i tile,
             IReadOnlyDictionary<Tile2i, int> groundHeight2,
-            ISet<Tile2i> designatedOrigins,
             ISet<Tile2i> oceanTiles,
             ISet<Tile2i> buildingBlockedGroundTiles,
             ProjectedDesignationDisturbance projectedDesignationDisturbance,
             Func<Tile2i, bool> isTerrainPathableWithoutBlockers)
         {
-            if (!IsOriginInsideTower(tower, origin) || !tower.Area.ContainsTile(tile))
+            if (originBlocker == AccessPropBlockerKind.OutOfArea
+                || !tower.Area.ContainsTile(tile))
                 return AccessPropBlockerKind.OutOfArea;
-            if (designatedOrigins.Contains(origin))
+            if (originBlocker == AccessPropBlockerKind.ActiveTerrainDesignation)
                 return AccessPropBlockerKind.ActiveTerrainDesignation;
             if (buildingBlockedGroundTiles.Contains(tile))
                 return AccessPropBlockerKind.Building;

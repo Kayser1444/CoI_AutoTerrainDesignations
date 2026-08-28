@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.6.1*
+*Current as of: v0.7.0*
 
 ## What it does
 
@@ -103,6 +103,17 @@ Use it to:
 - set excavator priority for a chosen product on vanilla mine towers
 
 The panel reads the current designations directly, so it also works with designations that were not created by ATD.
+
+## Ore Sorting Plant exports
+
+ATD adds export controls to **Ore Sorting Plant** inspectors. Use the export
+route panel to assign a destination building for all sorted products or for a
+specific output, then set the plant's export priority alongside the normal
+import controls. Routes are saved per plant.
+
+The optional **assigned trucks only** control limits cargo collection and
+delivery at that plant to its assigned trucks (and trucks assigned to
+participating mine towers). Leave it disabled to keep vanilla truck selection.
 
 ## Excavator priority
 

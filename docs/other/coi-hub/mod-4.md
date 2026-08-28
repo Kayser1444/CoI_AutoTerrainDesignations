@@ -8,7 +8,7 @@
 
 ***Kayser’s Automatic Terrain Designations (ATD)*** is a quality-of-life mod for Captain of Industry that generates tailored mining designations for Mine Towers. Instead of manually maintaining designations across complex deposits, ATD analyzes the terrain and creates a mining plan that follows the ore body.
 
-Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
+Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, Ore Sorting Plant export routing, tower-level mining and dumping priorities, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
@@ -23,6 +23,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 [🧹 **Clear designations**](#clear-designations)
 
 [📊 **Ore composition**](#ore-composition)
+
+[🏭 **Ore Sorting Plant exports**](#ore-sorting-plant-exports)
 
 [🎯 **Mining and dumping priorities**](#mining-and-dumping-priorities)
 
@@ -79,6 +81,12 @@ Use **Clear designations** to remove the selected tower's ATD-generated terrain 
 *Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
 
 The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It reflects the current Ore Mining Yield difficulty setting and works with both ATD-generated and manually placed designations.
+
+### 🏭 Ore Sorting Plant exports
+
+*Route sorted products to selected destinations with explicit priority and vehicle controls.*
+
+ATD adds export controls to Ore Sorting Plant inspectors. Assign a destination for all sorted products or for a specific output, set export priority, and optionally require assigned trucks (including trucks assigned to participating Mine Towers) for the plant's cargo. Routes and plant settings persist with the game state.
 
 ### 🎯 Mining and dumping priorities
 
