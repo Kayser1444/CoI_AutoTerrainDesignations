@@ -64,15 +64,11 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 
 ### 🛣️ Routed accessways
 
-\[insert screenshot here\]
-
 *A routed accessway connecting isolated terrain work to ground the assigned excavators can reach.*
 
 ATD can generate turning accessways sized for T1, T2, or T3/Mega Excavators. **AUTO** selects a suitable clearance from assigned or available excavators, while explicit modes give you direct control. Legacy straight ramps remain available when preferred.
 
 ### 🧹 Clear designations
-
-\[insert screenshot here\]
 
 *The Clear control removes this tower's ATD-generated work, with Shift available for a wider area cleanup.*
 
@@ -80,15 +76,11 @@ Use **Clear designations** to remove the selected tower's ATD-generated terrain 
 
 ### 📊 Ore composition
 
-\[insert screenshot here\]
-
 *Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
 
 The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It reflects the current Ore Mining Yield difficulty setting and works with both ATD-generated and manually placed designations.
 
 ### 🎯 Mining and dumping priorities
-
-\[insert screenshot here\]
 
 *Tower-level product and dumping priorities keep excavation and material delivery focused where you want them.*
 
@@ -96,23 +88,17 @@ Set a preferred mining product once at the tower level and ATD applies it to ass
 
 ### 🏗️ Vehicle ordering
 
-\[insert screenshot here\]
-
 *Order and pre-assign excavators or trucks directly from the Mine Tower inspector.*
 
 Order vehicle construction from the tower's vehicle assignment UI. ATD selects the closest eligible Vehicle Depot, records the pre-assignment, and sends the completed vehicle to the tower automatically. Shift and Ctrl modifiers order 5 or 10 vehicles; Shift+Alt-click orders directly even when a free vehicle is available.
 
 ### 🚚 Idle vehicle management
 
-\[insert screenshot here\]
-
 *Per-tower idle policies keep vehicles nearby, park them normally, or release them for work elsewhere.*
 
 Idle Excavators can be released and automatically recalled when excavation resumes. Trucks offer three policies: **Park at tower**, **Stay put**, and **Soft release**, allowing each Mine Tower to balance responsiveness against fleet sharing.
 
 ### 🪨 Clear debris
-
-\[insert screenshot here\]
 
 *The Clear debris control queues reachable rocks, bushes, and other obstructions for excavator removal.*
 
@@ -132,15 +118,11 @@ Place outer, inner, and planar corner profiles with four rotations using mining,
 
 ### 🌾 Farmland preparation
 
-\[insert screenshot here\]
-
 *Farmland preparation automatically excavates, fills, and reconnects a level area with fertile material.*
 
 Turn flat leveling work into farmable ground with per-tower automation. ATD manages excavation, farmable-material filling, vehicle access, and completion; Farm Placement Assist can hold farm construction until the required terrain cells are ready.
 
 ### ⚙️ Additional settings
-
-\[insert screenshot here\]
 
 *ATD's Mod Settings tabs provide worldwide behavior, reusable defaults, and optional expert controls.*
 
@@ -160,4 +142,3 @@ For mining connoisseurs who enjoy tuning the last grain of ore, ATD also exposes
 Mine away!
 
 PS. Leave a 👍 or a ⭐️ if you found this mod useful.
-
