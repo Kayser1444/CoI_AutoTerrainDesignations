@@ -21,8 +21,10 @@ using Mafi.Localization;
 using Mafi.Unity.UiToolkit;
 using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
+using Mafi.Unity.Ui;
 using AutoTerrainDesignations.Access;
 using AutoTerrainDesignations.Access.V2;
+using AutoTerrainDesignations.Access.Worker;
 
 namespace AutoTerrainDesignations
 {
@@ -451,7 +453,8 @@ namespace AutoTerrainDesignations
             IReadOnlyCollection<Tile2i>? groundGoalOverride,
             int generatedAreaMarginTiles,
             ExperimentalAccessSnapshotBuildResult output,
-            ExperimentalAccessSliceControl? sliceControl)
+            ExperimentalAccessSliceControl? sliceControl,
+            bool createWorkspace = true)
         {
             // Initialize deterministic fixtures before taking the capture
             // slot; the capture fixture itself verifies that the slot is
@@ -482,7 +485,8 @@ namespace AutoTerrainDesignations
                     groundGoalOverride,
                     generatedAreaMarginTiles,
                     output,
-                    sliceControl);
+                    sliceControl,
+                    createWorkspace);
                 while (capture.MoveNext())
                     yield return capture.Current;
             }
@@ -681,7 +685,8 @@ namespace AutoTerrainDesignations
             IReadOnlyCollection<Tile2i>? groundGoalOverride,
             int generatedAreaMarginTiles,
             ExperimentalAccessSnapshotBuildResult output,
-            ExperimentalAccessSliceControl? sliceControl)
+            ExperimentalAccessSliceControl? sliceControl,
+            bool createWorkspace)
         {
             long capturePreambleStart = AtdDiagnostics.Timestamp();
             Stopwatch snapshotTimer = Stopwatch.StartNew();
@@ -1712,6 +1717,106 @@ namespace AutoTerrainDesignations
                 }
             }
 
+            HashSet<Tile2i>? ownedOccupiedTiles = null;
+            HashSet<Tile2i>? prebuiltProjectedFixedGroundNodes = null;
+            Access.V2.AccessV2GroundGraph? prebuiltV2GroundGraph = null;
+            Access.V2.AccessV2FixedNavigationGraph?
+                prebuiltV2FixedNavigationGraph = null;
+            if (sliceControl != null)
+            {
+                sliceControl.ReportPhase("Indexing occupied terrain");
+                ownedOccupiedTiles = new HashSet<Tile2i>();
+                Stopwatch occupiedSlice = Stopwatch.StartNew();
+                foreach (Tile2i occupied in buildingFacts.EnumerateOccupiedTiles())
+                {
+                    ownedOccupiedTiles.Add(occupied);
+                    if (occupiedSlice.ElapsedMilliseconds
+                        < sliceControl.SliceBudgetMilliseconds)
+                        continue;
+                    if (sliceControl.CancellationRequested)
+                    {
+                        output.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    yield return null;
+                    occupiedSlice.Restart();
+                }
+
+                if (vehicleClearance > 4)
+                {
+                    sliceControl.ReportPhase("Projecting fixed V2 ground");
+                    sliceControl.ReportAtomicStep(
+                        "BuildProjectedFixedGroundNodes");
+                    HashSet<Tile2i> projectedGround =
+                        AccessSearchSnapshot.BuildProjectedFixedGroundNodes(
+                            boundsMin,
+                            boundsMax,
+                            physicalTerrainMin,
+                            physicalTerrainMax,
+                            vehicleClearance,
+                            0.5f,
+                            AccessAvoidBuildings,
+                            AccessAvoidOcean,
+                            groundNodes,
+                            fixedProfiles,
+                            terrainPathableWithoutProps,
+                            groundExclusionReasons,
+                            ownedOccupiedTiles,
+                            oceanTiles,
+                            preciseTerrainHeights,
+                            out prebuiltProjectedFixedGroundNodes);
+                    if (sliceControl.CancellationRequested)
+                    {
+                        output.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    yield return null;
+
+                    var v2GroundBuild =
+                        new Access.V2.AccessV2GroundGraph.BuildSession(
+                            projectedGround,
+                            towerReachableGround,
+                            propCleanupByTile,
+                            prebuiltProjectedFixedGroundNodes,
+                            policy.PropCleanupLandscapingCost);
+                    while (!v2GroundBuild.IsComplete)
+                    {
+                        sliceControl.ReportPhase(v2GroundBuild.Phase);
+                        Stopwatch buildSlice = Stopwatch.StartNew();
+                        do
+                        {
+                            v2GroundBuild.Advance(maxWorkItems: 64);
+                        }
+                        while (!v2GroundBuild.IsComplete
+                            && !sliceControl.CancellationRequested
+                            && buildSlice.ElapsedMilliseconds
+                                < sliceControl.SliceBudgetMilliseconds);
+                        if (sliceControl.CancellationRequested)
+                        {
+                            output.FailureReason = "SearchCancelled";
+                            yield break;
+                        }
+                        if (!v2GroundBuild.IsComplete)
+                            yield return null;
+                    }
+                    prebuiltV2GroundGraph = v2GroundBuild.Result;
+                    yield return null;
+
+                    sliceControl.ReportPhase("Building V2 fixed navigation");
+                    sliceControl.ReportAtomicStep(
+                        "AccessV2FixedNavigationGraph.ctor");
+                    prebuiltV2FixedNavigationGraph =
+                        new Access.V2.AccessV2FixedNavigationGraph(
+                            fixedProfiles, prebuiltV2GroundGraph);
+                    if (sliceControl.CancellationRequested)
+                    {
+                        output.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    yield return null;
+                }
+            }
+
             AccessSearchPolicySnapshot completionPolicy =
                 AccessSearchPolicySnapshot.Capture();
             if (completionPolicy.SemanticFingerprint
@@ -1756,6 +1861,7 @@ namespace AutoTerrainDesignations
                     completionPolicy.SemanticFingerprint));
 
             sliceControl?.ReportPhase("Constructing snapshot");
+            sliceControl?.ReportAtomicStep("AccessSearchSnapshot.ctor");
             snapshot = new AccessSearchSnapshot(
                 boundsMin,
                 boundsMax,
@@ -1773,7 +1879,8 @@ namespace AutoTerrainDesignations
                 workOrigins,
                 groundNodes,
                 towerReachableGround,
-                buildingFacts.EnumerateOccupiedTiles(),
+                ownedOccupiedTiles
+                    ?? buildingFacts.EnumerateOccupiedTiles(),
                 oceanTiles,
                 sliceControl != null
                     ? durabilityCorners.ToArray()
@@ -1822,10 +1929,17 @@ namespace AutoTerrainDesignations
                 policy: policy,
                 captureDiagnostics: captureDiagnostics,
                 requestSettingsRevision: captureSettingsRevision,
-                designationReadinessFacts: readinessFacts);
+                designationReadinessFacts: readinessFacts,
+                prebuiltProjectedFixedGroundNodes:
+                    prebuiltProjectedFixedGroundNodes,
+                prebuiltV2GroundGraph: prebuiltV2GroundGraph,
+                prebuiltV2FixedNavigationGraph:
+                    prebuiltV2FixedNavigationGraph);
             snapshotTimer.Stop();
             output.Snapshot = snapshot;
-            output.Workspace = new AccessSearchWorkspace(snapshot);
+            output.Workspace = createWorkspace
+                ? new AccessSearchWorkspace(snapshot)
+                : null;
             output.FailureReason = string.Empty;
             LogExperimentalAccessDebug(
                 $"[ATD Access Timing] phase=snapshot algorithm={(snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -2444,9 +2558,10 @@ namespace AutoTerrainDesignations
                 v2Endpoints);
         }
 
-        internal static void SetUiRoot(UiRoot uiRoot)
+        internal static void SetUiRoot(UiRoot uiRoot, UiContext uiContext)
         {
             s_uiRoot = uiRoot;
+            s_uiContext = uiContext;
         }
 
         private static AccessSearchResult RunExperimentalAccessDryRun(
@@ -2466,8 +2581,181 @@ namespace AutoTerrainDesignations
                 searchTimer.Elapsed,
                 1,
                 searchTimer.Elapsed,
-                workspace);
+                workspace,
+                preparationMilliseconds: 0d,
+                out _);
             return result;
+        }
+
+        private static IEnumerator RunExperimentalAccessDryRunWorker(
+            AccessPathRequest request,
+            AccessOriginCluster cluster,
+            ExperimentalAccessDryRunResult output,
+            ExperimentalAccessSliceControl? sliceControl)
+        {
+            ReportAccessClusterFocus(sliceControl, cluster);
+            int worldGeneration = CurrentWorldGeneration;
+            long jobId = System.Threading.Interlocked.Increment(
+                ref s_nextAccessSearchWorkerJobId);
+            bool captureOverlay = ShowExperimentalAccessSearchOverlay;
+            if (captureOverlay)
+                BeginExperimentalAccessSearchOverlay();
+            var job = new AccessSearchWorkerJob(
+                jobId, worldGeneration, request, captureOverlay);
+            AccessSearchWorker worker = AccessSearchWorker.Shared;
+            worker.SetCurrentWorld(worldGeneration);
+            var overlaySamples =
+                new List<AccessSearchWorkerOverlaySample>(512);
+
+            void DrainOverlay(int maxSamples)
+            {
+                if (!captureOverlay) return;
+                overlaySamples.Clear();
+                worker.DrainOverlay(jobId, overlaySamples, maxSamples);
+                foreach (AccessSearchWorkerOverlaySample sample
+                    in overlaySamples)
+                {
+                    RecordExperimentalAccessSearchNode(
+                        sample.Tile,
+                        sample.Height2,
+                        sample.IsGround,
+                        sample.Priority);
+                }
+            }
+
+            sliceControl?.RegisterDisposalCancellation(
+                reason => worker.Abandon(jobId, reason));
+            try
+            {
+                string submitFailure;
+                while (!worker.TrySubmit(job, out submitFailure))
+                {
+                    if (!string.Equals(
+                            submitFailure, "WorkerBusy",
+                            StringComparison.Ordinal))
+                    {
+                        CompleteWorkerFailure(
+                            request, output,
+                            "WorkerUnavailable:" + submitFailure);
+                        yield break;
+                    }
+                    if (sliceControl?.CancellationRequested == true
+                        || !IsWorldGenerationActive(worldGeneration))
+                    {
+                        CompleteWorkerFailure(
+                            request, output, "SearchCancelled");
+                        yield break;
+                    }
+                    sliceControl?.ReportWorkerProgress(
+                        "Waiting for access search worker",
+                        0, 0, 0d);
+                    yield return null;
+                }
+
+                LogExperimentalAccessDebug(
+                    $"[ATD Access Worker] job={jobId} request={request.RequestId} "
+                    + $"world={worldGeneration} state=submitted");
+                bool cancellationSent = false;
+                while (true)
+                {
+                    bool cancelled = sliceControl?.CancellationRequested == true
+                        || !IsWorldGenerationActive(worldGeneration);
+                    if (cancelled && !cancellationSent)
+                    {
+                        cancellationSent = true;
+                        worker.Cancel(
+                            jobId,
+                            IsWorldGenerationActive(worldGeneration)
+                                ? "ManagerCancelled"
+                                : "WorldGenerationChanged");
+                    }
+
+                    DrainOverlay(512);
+
+                    if (worker.TryConsumeTerminal(
+                            jobId, worldGeneration,
+                            out AccessSearchWorkerTerminal? terminal)
+                        && terminal != null)
+                    {
+                        if (terminal.IsFaulted || terminal.Outcome == null)
+                        {
+                            LogInfo(
+                                $"[ATD Access Worker Fault] job={jobId} "
+                                + $"request={request.RequestId} "
+                                + $"fault={terminal.Fault} stack={terminal.Stack}");
+                            CompleteWorkerFailure(
+                                request, output, "WorkerJobFaulted");
+                            yield break;
+                        }
+
+                        AccessSearchExecutionOutcome outcome = terminal.Outcome;
+                        DrainOverlay(int.MaxValue);
+                        AccessDesignationPlan? plan =
+                            RecordExperimentalAccessDryRun(
+                                request,
+                                cluster,
+                                request.Snapshot,
+                                outcome.SearchResult,
+                                outcome.ProcessingTime,
+                                frames: 1,
+                                maxSlice: TimeSpan.Zero,
+                                workspace: null,
+                                preparationMilliseconds:
+                                    outcome.Timing.PreparationMilliseconds,
+                                out AccessReplayPhaseTiming replayTiming,
+                                materializedPlan: outcome.Plan,
+                                completedTiming: outcome.Timing);
+                        output.Complete(
+                            outcome.SearchResult, plan, replayTiming);
+                        LogExperimentalAccessDebug(
+                            $"[ATD Access Worker] job={jobId} "
+                            + $"request={request.RequestId} state=acknowledged "
+                            + $"phase={outcome.TerminalPhase} "
+                            + $"success={outcome.SearchResult.Success} "
+                            + $"reason={outcome.SearchResult.FailureReason} "
+                            + $"droppedOverlaySamples={terminal.DroppedOverlaySamples} "
+                            + $"processingMs={outcome.ProcessingTime.TotalMilliseconds.ToString(
+                                "0.##", CultureInfo.InvariantCulture)}");
+                        yield break;
+                    }
+
+                    if (worker.TryReadProgress(
+                            jobId, out AccessSearchWorkerProgress? progress)
+                        && progress != null)
+                    {
+                        sliceControl?.ReportWorkerProgress(
+                            progress.Phase,
+                            progress.VisitedNodes,
+                            progress.PendingNodes,
+                            progress.ProcessingMilliseconds);
+                    }
+                    yield return null;
+                }
+            }
+            finally
+            {
+                sliceControl?.ClearDisposalCancellation();
+            }
+        }
+
+        private static void CompleteWorkerFailure(
+            AccessPathRequest request,
+            ExperimentalAccessDryRunResult output,
+            string reason)
+        {
+            var result = new AccessSearchResult(
+                false,
+                reason,
+                request.Start.Nodes.Count > 0
+                    ? request.Start.Nodes[0]
+                    : default,
+                Array.Empty<AccessSearchNode>(),
+                0f,
+                0,
+                new Dictionary<string, int>(StringComparer.Ordinal));
+            output.Complete(
+                result,
+                AccessDesignationPlan.Invalid(reason, result.StartOrigin));
         }
 
         private static IEnumerator RunExperimentalAccessDryRunSliced(
@@ -2495,6 +2783,7 @@ namespace AutoTerrainDesignations
             ExperimentalAccessDryRunResult output,
             ExperimentalAccessSliceControl? sliceControl = null)
         {
+            ReportAccessClusterFocus(sliceControl, cluster);
             AccessSearchSnapshot snapshot = request.Snapshot;
             sliceControl?.ReportPhase("Preparing search request");
             if (sliceControl != null)
@@ -2611,7 +2900,9 @@ namespace AutoTerrainDesignations
                         preparationElapsed,
                         frames,
                         maxSlice,
-                        workspace);
+                        workspace,
+                        sessionDiagnostics.TotalMilliseconds,
+                        out AccessReplayPhaseTiming preparationTiming);
                 if (sliceControl != null)
                 {
                     LogExperimentalAccessDebug(
@@ -2620,7 +2911,8 @@ namespace AutoTerrainDesignations
                         + $"cluster={cluster.ClusterId} "
                         + sliceControl.FormatDiagnostics());
                 }
-                output.Complete(preparationFailure, preparationPlan);
+                output.Complete(
+                    preparationFailure, preparationPlan, preparationTiming);
                 yield break;
             }
             AccessPathSearch.AccessPathSearchSession session =
@@ -2765,7 +3057,9 @@ namespace AutoTerrainDesignations
                 : managedProcessingElapsed;
             AccessDesignationPlan? plan = RecordExperimentalAccessDryRun(
                 request, cluster, snapshot, result, recordedElapsed,
-                frames, maxSlice, workspace);
+                frames, maxSlice, workspace,
+                sessionDiagnostics.TotalMilliseconds,
+                out AccessReplayPhaseTiming replayTiming);
             if (sliceControl != null)
             {
                 LogExperimentalAccessDebug(
@@ -2773,7 +3067,25 @@ namespace AutoTerrainDesignations
                     + $"request={request.RequestId} cluster={cluster.ClusterId} "
                     + sliceControl.FormatDiagnostics());
             }
-            output.Complete(result, plan);
+            output.Complete(result, plan, replayTiming);
+        }
+
+        private static void ReportAccessClusterFocus(
+            ExperimentalAccessSliceControl? sliceControl,
+            AccessOriginCluster cluster)
+        {
+            if (sliceControl == null || cluster.Origins.Count == 0)
+                return;
+            long x = 0;
+            long y = 0;
+            foreach (AccessWorkOrigin origin in cluster.Origins)
+            {
+                x += origin.Origin.X;
+                y += origin.Origin.Y;
+            }
+            sliceControl.ReportFocusTile(new Tile2i(
+                (int)(x / cluster.Origins.Count),
+                (int)(y / cluster.Origins.Count)));
         }
 
         private static void ShowTerrainAnalysisProgressToast(
@@ -2881,8 +3193,14 @@ namespace AutoTerrainDesignations
             TimeSpan elapsed,
             int frames,
             TimeSpan maxSlice,
-            AccessSearchWorkspace? workspace = null)
+            AccessSearchWorkspace? workspace,
+            double preparationMilliseconds,
+            out AccessReplayPhaseTiming replayTiming,
+            AccessDesignationPlan? materializedPlan = null,
+            AccessReplayPhaseTiming? completedTiming = null)
         {
+            double materializationMilliseconds =
+                completedTiming?.MaterializationMilliseconds ?? 0d;
             LastExperimentalAccessSearch = result;
             RecordV2PathabilityOverlay(snapshot, result);
             AccessSearchDiagnostics diag = result.Diagnostics;
@@ -2940,14 +3258,10 @@ namespace AutoTerrainDesignations
                     $"escapeComponents:{diag.V2PotentialGroundComponents},buildMs:{(diag.V2PotentialBuildTicks * ticksToMs).ToString("0.##", CultureInfo.InvariantCulture)}] " +
                     $"v2StartTiers=[attempted:{diag.V2StartTiersAttempted},redundantSkipped:{diag.V2RedundantStartTiersSkipped},seedsSkipped:{diag.V2RedundantStartSeedsSkipped}] " +
                     $"v2LabelDominance=[early:{diag.V2EarlyLabelDominancePrunes},exact:{diag.V2ExactLabelDominancePrunes}] " +
-                    $"[DEBUG-v2-frontier] v2ExpansionLabels=[first:{diag.V2LabelFirstExpansions},reopen:{diag.V2LabelReexpansions}," +
-                    $"queueAgeAvg:{(diag.V2LabelFirstExpansions + diag.V2LabelReexpansions > 0 ? (double)diag.V2ExpansionQueueAgeTotal / (diag.V2LabelFirstExpansions + diag.V2LabelReexpansions) : 0d).ToString("0.##", CultureInfo.InvariantCulture)}," +
-                    $"queueAgeMax:{diag.V2ExpansionQueueAgeMax},uniqueVCenters:{diag.V2UniqueExpansionCenters},centerAliases:{diag.V2CenterAliasedFirstExpansions}," +
-                    $"initialV:{diag.V2InitialVExpansions},groundRelaunchedV:{diag.V2GroundRelaunchedVExpansions}] " +
-                    $"[DEBUG-v2-frontier] v2ShallowV=[expanded:{diag.V2ShallowVExpansions},reopen:{diag.V2ShallowVReexpansions}," +
-                    $"groundRelaunched:{diag.V2ShallowGroundRelaunchedVExpansions}," +
-                    $"queueAgeAvg:{(diag.V2ShallowVExpansions > 0 ? (double)diag.V2ShallowVQueueAgeTotal / diag.V2ShallowVExpansions : 0d).ToString("0.##", CultureInfo.InvariantCulture)}," +
-                    $"queueAgeMax:{diag.V2ShallowVQueueAgeMax}] " +
+                    $"v2HandoffGroundDominance=[checks:{diag.V2HandoffGroundDominanceChecks},prunes:{diag.V2HandoffGroundDominancePrunes}] " +
+                    $"v2HandoffGroundEntryDominance=[checks:{diag.V2HandoffGroundEntryDominanceChecks},prunes:{diag.V2HandoffGroundEntryDominancePrunes}] " +
+                    $"v2HandoffGroundToVDominance=[checks:{diag.V2HandoffGroundToVDominanceChecks},prunes:{diag.V2HandoffGroundToVDominancePrunes}] " +
+                    $"v2GroundReplacement=[checks:{diag.V2OrdinaryGroundReplacementChecks},candidates:{diag.V2OrdinaryGroundReplacementCandidates},prunes:{diag.V2OrdinaryGroundReplacementPrunes}] " +
                     $"v2RayOverlay=[hit:{diag.V2RayOverlayCacheHits},miss:{diag.V2RayOverlayCacheMisses}," +
                     $"parentSteps:{diag.V2RayOverlayParentSteps},cacheEntries:{diag.V2RayOverlayCacheEntries}," +
                     $"maxRaw:{diag.V2RayOverlayMaxRawConstraints},maxCollapsed:{diag.V2RayOverlayMaxCollapsedEntries}] " +
@@ -3011,9 +3325,10 @@ namespace AutoTerrainDesignations
                 $"[ATD Access] request={request.RequestId} " +
                 $"{FormatAccessPathRequest(request)} cluster={cluster.ClusterId} " +
                 $"algorithm={(request.RequiredWidth == 2
-                    ? AccessPathSearch.ShouldUseV2AStar(
-                        request,
-                        workspace ?? new AccessSearchWorkspace(snapshot))
+                    ? (workspace != null
+                        ? AccessPathSearch.ShouldUseV2AStar(
+                            request, workspace)
+                        : snapshot.UseAStar)
                         ? "A*"
                         : "Dijkstra"
                     : snapshot.UseAStar ? "A*" : "Dijkstra")} " +
@@ -3062,14 +3377,20 @@ namespace AutoTerrainDesignations
                 LogExperimentalSelectedVToGHandoffDiagnostics(
                     snapshot, result, cluster.ClusterId, workspace);
                 long materializeStart = AtdDiagnostics.Timestamp();
-                AccessDesignationPlan plan = AccessPathMaterializer.Materialize(
-                    workspace ?? new AccessSearchWorkspace(snapshot), result);
+                AccessDesignationPlan plan = materializedPlan
+                    ?? AccessPathMaterializer.Materialize(
+                        workspace ?? new AccessSearchWorkspace(snapshot), result);
+                if (materializedPlan == null)
+                {
+                    materializationMilliseconds = AtdDiagnostics.ElapsedSince(
+                        materializeStart) * 1000d / Stopwatch.Frequency;
+                }
                 completedPlan = plan;
                 LastExperimentalAccessPlan = plan;
                 if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Debug))
                 {
-                    string materializeMs = (AtdDiagnostics.ElapsedSince(materializeStart)
-                        * 1000d / Stopwatch.Frequency).ToString("0.##", CultureInfo.InvariantCulture);
+                    string materializeMs = materializationMilliseconds.ToString(
+                        "0.##", CultureInfo.InvariantCulture);
                     float selectedSideRayCost = result.LeftSideRayCost
                         + result.RightSideRayCost
                         + result.SideRayUnresolvedPenalty;
@@ -3112,6 +3433,11 @@ namespace AutoTerrainDesignations
                     if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
                         LogExperimentalAccessTrace($"[ATD Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
+            replayTiming = completedTiming ?? new AccessReplayPhaseTiming(
+                preparationMilliseconds,
+                Math.Max(0d, elapsed.TotalMilliseconds
+                    - preparationMilliseconds),
+                materializationMilliseconds);
             return completedPlan;
         }
 
@@ -4322,6 +4648,7 @@ namespace AutoTerrainDesignations
 {
     public static partial class AutoDepthDesignation
     {
+        private static long s_nextAccessSearchWorkerJobId;
 
         private static IReadOnlyDictionary<Tile2i, float>
             CaptureAccessHandoffTerrainHeights(
@@ -4344,6 +4671,8 @@ namespace AutoTerrainDesignations
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
             AccessSearchResult result,
             AccessDesignationPlan? plan,
+            AccessPathRequest request,
+            AccessReplayPhaseTiming replayTiming,
             Tile2i towerPosition,
             TerrainManager terrMgr)
         {
@@ -4382,7 +4711,8 @@ namespace AutoTerrainDesignations
                 designationCount: plan.Designations.Count
                     + plan.CleanupOrigins.Count,
                 stableOrder: int.MaxValue,
-                sourceCandidate: new ExperimentalAccessCandidate(result, plan));
+                sourceCandidate: new ExperimentalAccessCandidate(
+                    result, plan, request, replayTiming));
         }
 
         private static bool TryPlaceExperimentalAccessCandidate(
@@ -4685,6 +5015,19 @@ namespace AutoTerrainDesignations
                         == AccessHandoffOperation.Leveling
                     && handoff.CleanupKeys.Count == 0)
                     continue;
+                if (handoff.IsBoundedTerminal
+                    && (handoff.Lane0Operation
+                            != handoff.Lane1Operation
+                        || (handoff.Lane0Operation
+                                != AccessHandoffOperation.Mining
+                            && handoff.Lane0Operation
+                                != AccessHandoffOperation.Dumping)))
+                {
+                    reason = "LiveBoundedTerminalOperationMismatch:"
+                        + handoff.Lane0Operation + "/"
+                        + handoff.Lane1Operation;
+                    return false;
+                }
                 if (!ValidateLiveLane(
                         handoff.Lane0TerminalOrigins,
                         handoff.Lane0Operation,
@@ -4692,9 +5035,11 @@ namespace AutoTerrainDesignations
                         handoff.GroundEntryCenters,
                         handoff.ExitDirection,
                         lane: 0,
-                        requiresCrest:
-                            !placedHandoffs[index].IsGroundToV
-                            && handoff.Lane0RequiresCrest,
+                        requiresCrest: AccessPlacementAcceptancePolicy
+                            .RequiresIndependentLaneCornerCrest(
+                                handoff.IsBoundedTerminal,
+                                placedHandoffs[index].IsGroundToV,
+                                handoff.Lane0RequiresCrest),
                         out string laneReason)
                     || !ValidateLiveLane(
                         handoff.Lane1TerminalOrigins,
@@ -4703,9 +5048,11 @@ namespace AutoTerrainDesignations
                         handoff.GroundEntryCenters,
                         handoff.ExitDirection,
                         lane: 1,
-                        requiresCrest:
-                            !placedHandoffs[index].IsGroundToV
-                            && handoff.Lane1RequiresCrest,
+                        requiresCrest: AccessPlacementAcceptancePolicy
+                            .RequiresIndependentLaneCornerCrest(
+                                handoff.IsBoundedTerminal,
+                                placedHandoffs[index].IsGroundToV,
+                                handoff.Lane1RequiresCrest),
                         out laneReason))
                 {
                     reason = laneReason;
@@ -4757,22 +5104,29 @@ namespace AutoTerrainDesignations
                 bool levelingCompanion =
                     operation == AccessHandoffOperation.Leveling
                     && !groundEntries.Contains(contact);
-                if (requiresCrest && !levelingCompanion
-                    && (!AccessHandoffEvaluator.TrySelectV2CornerCrestHandoff(
-                        incomingOrigin, incomingProfile,
-                        terminalOrigin, terminalProfile,
-                        handoffEdge,
-                        CaptureAccessHandoffTerrainHeights(
-                            terrMgr, incomingOrigin, terminalOrigin),
-                        tile => tile == contact,
-                        out AccessHandoffOperation selectedOperation,
-                        out _, out _)
-                    || selectedOperation != operation))
+                if (requiresCrest && !levelingCompanion)
                 {
-                    laneReason =
-                        $"LiveHandoffCornerCrestMismatch:{operation}:lane={lane}" +
-                        $"@{incomingOrigin}..{terminalOrigin}";
-                    return false;
+                    bool selected =
+                        AccessHandoffEvaluator.TrySelectV2CornerCrestHandoff(
+                            incomingOrigin, incomingProfile,
+                            terminalOrigin, terminalProfile,
+                            handoffEdge,
+                            CaptureAccessHandoffTerrainHeights(
+                                terrMgr, incomingOrigin, terminalOrigin),
+                            tile => AccessPlacementAcceptancePolicy
+                                .AllowsSmoothLevelingReclassification(operation)
+                                && tile == contact,
+                            out AccessHandoffOperation selectedOperation,
+                            out _, out string crestDiagnostic);
+                    if (!selected || selectedOperation != operation)
+                    {
+                        laneReason =
+                            $"LiveHandoffCornerCrestMismatch:{operation}:lane={lane}" +
+                            $"@{incomingOrigin}..{terminalOrigin}" +
+                            $":selected={(selected ? selectedOperation.ToString() : "none")}" +
+                            $":{crestDiagnostic}";
+                        return false;
+                    }
                 }
 
                 var plannedTerrainOrigins = new HashSet<Tile2i>(
@@ -5038,10 +5392,10 @@ namespace AutoTerrainDesignations
                     continue;
                 }
                 bool firstRequestAtOrigin = placedCleanupOrigins.Add(origin);
-                if (!quickRemove
-                    && firstRequestAtOrigin
-                    && plannedPlacements.TryGetValue(origin,
-                        out PlannedExperimentalDesignation planned))
+                bool hasPlannedWork = plannedPlacements.TryGetValue(
+                    origin, out PlannedExperimentalDesignation planned);
+                if (ATDPropRemovalLifecyclePolicy.ShouldPreplacePlannedWork(
+                        quickRemove, firstRequestAtOrigin, hasPlannedWork))
                 {
                     if (s_desigManager.GetDesignationAt(origin).HasValue
                         || !s_desigManager.AddOrReplaceDesignation(
@@ -5265,6 +5619,130 @@ namespace AutoTerrainDesignations
         {
             s_lastExperimentalCleanupTreeSelections.Clear();
             s_lastExperimentalPropRemovalRequests.Clear();
+        }
+
+        private enum ExperimentalCleanupCompletionState
+        {
+            Accepted,
+            Pending,
+            Rejected,
+        }
+
+        private delegate bool ReplayLiveValidator(out string reason);
+
+        private static ATDPropRemovalRequestHandle[]
+            SnapshotLastExperimentalPropRemovalRequests()
+            => s_lastExperimentalPropRemovalRequests.ToArray();
+
+        private static ExperimentalCleanupCompletionState
+            GetExperimentalCleanupCompletion(
+                IReadOnlyList<ATDPropRemovalRequestHandle> requests,
+                out string reason)
+        {
+            ATDPropRemovalRequestHandle? pending = requests
+                .FirstOrDefault(request => !request.IsCompleted);
+            if (pending != null)
+            {
+                reason = "cleanup request " + pending.RequestId
+                    + " is still pending";
+                return ExperimentalCleanupCompletionState.Pending;
+            }
+
+            ATDPropRemovalRequestHandle? rejected = requests
+                .FirstOrDefault(request =>
+                    request.Result.Outcome != ATDPropRemovalOutcome.Removed
+                    && request.Result.Outcome
+                        != ATDPropRemovalOutcome.AlreadyAbsent);
+            if (rejected != null)
+            {
+                reason = "cleanup request " + rejected.RequestId
+                    + " completed as " + rejected.Result.Outcome;
+                return ExperimentalCleanupCompletionState.Rejected;
+            }
+
+            ATDPropRemovalRequestHandle? unrestored = requests
+                .FirstOrDefault(request =>
+                    !request.Result.OriginalDesignationRestored);
+            if (unrestored != null)
+            {
+                reason = "cleanup request " + unrestored.RequestId
+                    + " did not restore its original designation";
+                return ExperimentalCleanupCompletionState.Rejected;
+            }
+
+            reason = requests.Count == 0
+                ? "no cleanup requests"
+                : requests.Count + " cleanup request(s) accepted";
+            return ExperimentalCleanupCompletionState.Accepted;
+        }
+
+        private static IEnumerator CompleteReplayCaptureAfterLiveAcceptance(
+            AccessReplayCaptureOperation replayCapture,
+            IReadOnlyList<ATDPropRemovalRequestHandle> cleanupRequests,
+            ReplayLiveValidator validateLive,
+            ExperimentalAccessSliceControl? sliceControl)
+        {
+            sliceControl?.BeginPostCommitCancellation(replayCapture.Cancel);
+            bool authoritativeAcceptance = false;
+            string acceptanceReason = "Replay capture did not reach live acceptance.";
+            try
+            {
+                while (!replayCapture.IsComplete)
+                {
+                    if (sliceControl == null
+                        && s_cancelExperimentalAccessSearch)
+                    {
+                        replayCapture.Cancel();
+                        s_cancelExperimentalAccessSearch = false;
+                    }
+                    sliceControl?.ReportPhase(
+                        replayCapture.Stage + " ("
+                        + replayCapture.Percent.ToString(
+                            CultureInfo.InvariantCulture)
+                        + "%)");
+                    yield return null;
+                }
+
+                if (!replayCapture.IsFaulted
+                    && !replayCapture.IsCanceled
+                    && !replayCapture.IsAbortRequested)
+                {
+                    ExperimentalCleanupCompletionState cleanupState;
+                    do
+                    {
+                        cleanupState = GetExperimentalCleanupCompletion(
+                            cleanupRequests, out acceptanceReason);
+                        if (cleanupState
+                            != ExperimentalCleanupCompletionState.Pending)
+                            break;
+                        if (sliceControl == null
+                            && s_cancelExperimentalAccessSearch)
+                        {
+                            replayCapture.Cancel();
+                            s_cancelExperimentalAccessSearch = false;
+                            break;
+                        }
+                        sliceControl?.ReportPhase(
+                            "Recording access replay: Waiting for authoritative cleanup acceptance (99%)");
+                        yield return null;
+                    }
+                    while (!replayCapture.IsAbortRequested);
+
+                    if (!replayCapture.IsAbortRequested
+                        && cleanupState
+                            == ExperimentalCleanupCompletionState.Accepted)
+                    {
+                        authoritativeAcceptance = validateLive(
+                            out acceptanceReason);
+                    }
+                }
+            }
+            finally
+            {
+                sliceControl?.EndPostCommitCancellation();
+            }
+            replayCapture.CompleteOnMainThread(
+                authoritativeAcceptance, acceptanceReason);
         }
 
         private static bool HasPendingExperimentalPropRemovalRequests()
@@ -5556,22 +6034,50 @@ namespace AutoTerrainDesignations
                         output.Disturbance = result;
                         yield break;
                     }
+                    sliceControl.ReportAtomicStep(
+                        "projection:designation-boundary");
                     phaseTimer.Restart();
                     yield return null;
                     phaseTimer.Restart();
                 }
 
                 if (westExposed && northExposed)
-                    TraceOutsideCorner(origin, profile.Nw2 / 2f, -1, -1);
+                {
+                    IEnumerator cornerRoutine = TraceOutsideCorner(
+                        origin, profile.Nw2 / 2f, -1, -1);
+                    while (cornerRoutine.MoveNext())
+                        yield return cornerRoutine.Current;
+                }
                 if (eastExposed && northExposed)
-                    TraceOutsideCorner(
-                        origin + new RelTile2i(4, 0), profile.Ne2 / 2f, 1, -1);
+                {
+                    IEnumerator cornerRoutine = TraceOutsideCorner(
+                        origin + new RelTile2i(4, 0),
+                        profile.Ne2 / 2f, 1, -1);
+                    while (cornerRoutine.MoveNext())
+                        yield return cornerRoutine.Current;
+                }
                 if (eastExposed && southExposed)
-                    TraceOutsideCorner(
-                        origin + new RelTile2i(4, 4), profile.Se2 / 2f, 1, 1);
+                {
+                    IEnumerator cornerRoutine = TraceOutsideCorner(
+                        origin + new RelTile2i(4, 4),
+                        profile.Se2 / 2f, 1, 1);
+                    while (cornerRoutine.MoveNext())
+                        yield return cornerRoutine.Current;
+                }
                 if (westExposed && southExposed)
-                    TraceOutsideCorner(
-                        origin + new RelTile2i(0, 4), profile.Sw2 / 2f, -1, 1);
+                {
+                    IEnumerator cornerRoutine = TraceOutsideCorner(
+                        origin + new RelTile2i(0, 4),
+                        profile.Sw2 / 2f, -1, 1);
+                    while (cornerRoutine.MoveNext())
+                        yield return cornerRoutine.Current;
+                }
+                if (sliceControl?.CancellationRequested == true)
+                {
+                    output.FailureReason = "SearchCancelled";
+                    output.Disturbance = result;
+                    yield break;
+                }
 
                 bool IsBoundaryExposed(Tile2i neighborOffset)
                     => !designations.ContainsKey(new Tile2i(
@@ -5685,7 +6191,7 @@ namespace AutoTerrainDesignations
 
                 }
 
-                void TraceOutsideCorner(
+                IEnumerator TraceOutsideCorner(
                     Tile2i corner,
                     float plannedHeight,
                     int outwardX,
@@ -5695,7 +6201,7 @@ namespace AutoTerrainDesignations
                         corner, plannedHeight,
                         out AccessSideRayOperation operation,
                         out float materialSlope))
-                        return;
+                        yield break;
 
                     int scanMinX = Math.Max(
                         physicalTerrainMin.X,
@@ -5722,7 +6228,7 @@ namespace AutoTerrainDesignations
                         ? scanMaxY
                         : Math.Min(scanMaxY, corner.Y - 1);
                     if (firstX > lastX || firstY > lastY)
-                        return;
+                        yield break;
                     for (int y = firstY; y <= lastY; y++)
                     {
                         int dy = (y - corner.Y) * outwardY;
@@ -5731,7 +6237,10 @@ namespace AutoTerrainDesignations
                             int dx = (x - corner.X) * outwardX;
                             int slopeDistance = Math.Max(dx, dy);
                             Tile2i tile = new Tile2i(x, y);
-                            float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
+                            float sampledHeight = terrainHeights.TryGetValue(
+                                    tile, out float capturedHeight)
+                                ? capturedHeight
+                                : terrMgr.GetHeight(tile).Value.ToFloat();
                             float projectedHeight = operation == AccessSideRayOperation.Fill
                                 ? plannedHeight - slopeDistance * materialSlope
                                 : plannedHeight + slopeDistance * materialSlope;
@@ -5740,6 +6249,28 @@ namespace AutoTerrainDesignations
                                 : sampledHeight - projectedHeight;
                             if (gap > 0f)
                                 AddProjected(operation, tile, projectedHeight);
+                            if (sliceControl != null
+                                && phaseTimer.ElapsedMilliseconds
+                                    >= sliceControl.SliceBudgetMilliseconds)
+                            {
+                                if (sliceControl.CancellationRequested)
+                                    yield break;
+                                sliceControl.ReportAtomicStep(
+                                    "projection:outside-corner-row-chunk");
+                                phaseTimer.Restart();
+                                yield return null;
+                                phaseTimer.Restart();
+                            }
+                        }
+                        if (sliceControl != null
+                            && phaseTimer.ElapsedMilliseconds
+                                >= sliceControl.SliceBudgetMilliseconds)
+                        {
+                            if (sliceControl.CancellationRequested)
+                                yield break;
+                            phaseTimer.Restart();
+                            yield return null;
+                            phaseTimer.Restart();
                         }
                     }
                 }

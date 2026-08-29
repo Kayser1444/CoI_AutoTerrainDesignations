@@ -9,6 +9,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
@@ -46,6 +47,22 @@ namespace AutoTerrainDesignations
                 LaneAttachmentDepths = laneAttachmentDepths;
                 Score = score;
             }
+        }
+
+        private sealed class LegacyAccessCandidateBuildResult
+        {
+            public EvaluatedAccessCandidate? Best { get; set; }
+            public List<EvaluatedAccessCandidate> AllEvaluated { get; set; } =
+                new List<EvaluatedAccessCandidate>();
+        }
+
+        private sealed class RampPlacementBuildResult
+        {
+            public RampPlacementOutcome Outcome { get; set; } =
+                RampPlacementOutcome.Failed;
+            public Tile2i TopRowTile { get; set; }
+            public List<RampTilePlan> PlannedTiles { get; set; } =
+                new List<RampTilePlan>();
         }
 
         private struct RampStep
@@ -517,7 +534,8 @@ namespace AutoTerrainDesignations
             IReadOnlyList<Tile2i>? groundGoalOverride = null,
             bool emitNoCandidateWarnings = true,
             bool newPlannerOnly = false,
-            ExperimentalAccessSliceControl? sliceControl = null)
+            ExperimentalAccessSliceControl? sliceControl = null,
+            bool useWorkerSearch = false)
         {
             result.TopRowTile = default;
             result.Outcome = RampPlacementOutcome.Failed;
@@ -846,7 +864,8 @@ namespace AutoTerrainDesignations
                             groundGoalOverride,
                             generatedAreaMarginTiles: 0,
                             snapshotBuild,
-                            sliceControl);
+                            sliceControl,
+                            createWorkspace: !useWorkerSearch);
                     while (snapshotPreparation.MoveNext())
                         yield return snapshotPreparation.Current;
                     string refreshFailure = snapshotBuild.FailureReason;
@@ -854,8 +873,6 @@ namespace AutoTerrainDesignations
                     {
                         AccessSearchSnapshot refreshedSnapshot =
                             snapshotBuild.Snapshot;
-                        AccessSearchWorkspace refreshedWorkspace =
-                            snapshotBuild.Workspace!;
                         experimentalSnapshot = refreshedSnapshot;
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
@@ -892,9 +909,15 @@ namespace AutoTerrainDesignations
                             $"resolvedVehicleWidth={refreshedSnapshot.VehicleWidth} " +
                             $"requiredWidth={request.RequiredWidth}");
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
-                        IEnumerator mergedSearch = RunExperimentalAccessDryRunSliced(
-                            request, refreshedWorkspace, cluster, currentClusterOrdinal, unreachableClusterCount,
-                            experimentalDryRun, sliceControl);
+                        IEnumerator mergedSearch = useWorkerSearch
+                            ? RunExperimentalAccessDryRunWorker(
+                                request, cluster, experimentalDryRun,
+                                sliceControl)
+                            : RunExperimentalAccessDryRunSliced(
+                                request, snapshotBuild.Workspace!, cluster,
+                                currentClusterOrdinal,
+                                unreachableClusterCount,
+                                experimentalDryRun, sliceControl);
                         while (mergedSearch.MoveNext())
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.SearchResult!;
@@ -923,7 +946,8 @@ namespace AutoTerrainDesignations
                                     groundGoalOverride,
                                     OUTSIDE_TOWER_RAMP_FALLBACK_TILES,
                                     outsideSnapshotBuild,
-                                    sliceControl);
+                                    sliceControl,
+                                    createWorkspace: !useWorkerSearch);
                             while (outsideSnapshotPreparation.MoveNext())
                                 yield return outsideSnapshotPreparation.Current;
                             string outsideSnapshotFailure =
@@ -932,8 +956,6 @@ namespace AutoTerrainDesignations
                             {
                                 AccessSearchSnapshot outsideSnapshot =
                                     outsideSnapshotBuild.Snapshot;
-                                AccessSearchWorkspace outsideWorkspace =
-                                    outsideSnapshotBuild.Workspace!;
                                 experimentalSnapshot = outsideSnapshot;
                                 sliceControl?.ReportPhase("Preparing search request");
                                 long outsideRequestBuildStart =
@@ -951,11 +973,16 @@ namespace AutoTerrainDesignations
                                         "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
                                 var outsideDryRun =
                                     new ExperimentalAccessDryRunResult();
-                                IEnumerator outsideSearch =
-                                    RunExperimentalAccessDryRunSliced(
-                                        request, outsideWorkspace, cluster, currentClusterOrdinal,
-                                        unreachableClusterCount, outsideDryRun,
-                                        sliceControl);
+                                IEnumerator outsideSearch = useWorkerSearch
+                                    ? RunExperimentalAccessDryRunWorker(
+                                        request, cluster, outsideDryRun,
+                                        sliceControl)
+                                    : RunExperimentalAccessDryRunSliced(
+                                        request,
+                                        outsideSnapshotBuild.Workspace!,
+                                        cluster, currentClusterOrdinal,
+                                        unreachableClusterCount,
+                                        outsideDryRun, sliceControl);
                                 while (outsideSearch.MoveNext())
                                     yield return outsideSearch.Current;
                                 experimentalResult = outsideDryRun.SearchResult!;
@@ -1061,7 +1088,9 @@ namespace AutoTerrainDesignations
                         if (string.IsNullOrEmpty(experimentalFailureSummary))
                         {
                             experimentalCandidate = EvaluateExperimentalAccessCandidate(
-                                experimentalResult, experimentalPlan, towerPos, terrMgr);
+                                experimentalResult, experimentalPlan, request,
+                                experimentalDryRun.ReplayTiming,
+                                towerPos, terrMgr);
                         }
                     }
                     else
@@ -1078,9 +1107,12 @@ namespace AutoTerrainDesignations
                 List<EvaluatedAccessCandidate> allEvaluated = new List<EvaluatedAccessCandidate>();
                 
                 // Retry 1: Configured width, no offset
-                EvaluatedAccessCandidate? bestCandidate = containsExternalTerrainEndpoint || suppressLegacyAccessRamps
-                    ? null
-                    : FindBestCandidateForCluster(
+                EvaluatedAccessCandidate? bestCandidate = null;
+                if (!containsExternalTerrainEndpoint && !suppressLegacyAccessRamps)
+                {
+                    var legacyBuild = new LegacyAccessCandidateBuildResult();
+                    IEnumerator legacyRoutine =
+                        FindBestCandidateForClusterSliced(
                         tower,
                         towerPos,
                         clusterTileDepths,
@@ -1092,14 +1124,28 @@ namespace AutoTerrainDesignations
                         reservedRampTiles,
                         useLocalSurfaceReference,
                         forbiddenApproachClusterOrigins,
-                        out allEvaluated);
+                        legacyBuild,
+                        sliceControl);
+                    while (legacyRoutine.MoveNext())
+                        yield return legacyRoutine.Current;
+                    if (sliceControl?.CancellationRequested == true)
+                    {
+                        result.Outcome = RampPlacementOutcome.Failed;
+                        result.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    bestCandidate = legacyBuild.Best;
+                    allEvaluated = legacyBuild.AllEvaluated;
+                }
 
                 // Retry 2: Configured width, lateral offset
                 if (!containsExternalTerrainEndpoint && !suppressLegacyAccessRamps && bestCandidate == null && rampWidth > 1)
                 {
                     int lateralRetryOffset = rampWidth / 2;
                     LogDebug($"Retrying ramp search for cluster {cluster.ClusterId} with sideways offset of {lateralRetryOffset}.");
-                    bestCandidate = FindBestCandidateForCluster(
+                    var legacyBuild = new LegacyAccessCandidateBuildResult();
+                    IEnumerator legacyRoutine =
+                        FindBestCandidateForClusterSliced(
                         tower,
                         towerPos,
                         clusterTileDepths,
@@ -1111,14 +1157,27 @@ namespace AutoTerrainDesignations
                         reservedRampTiles,
                         useLocalSurfaceReference,
                         forbiddenApproachClusterOrigins,
-                        out allEvaluated);
+                        legacyBuild,
+                        sliceControl);
+                    while (legacyRoutine.MoveNext())
+                        yield return legacyRoutine.Current;
+                    if (sliceControl?.CancellationRequested == true)
+                    {
+                        result.Outcome = RampPlacementOutcome.Failed;
+                        result.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    bestCandidate = legacyBuild.Best;
+                    allEvaluated = legacyBuild.AllEvaluated;
                 }
 
                 // Retry 3: Width 1, no offset
                 if (!containsExternalTerrainEndpoint && !suppressLegacyAccessRamps && bestCandidate == null && rampWidth > 1)
                 {
                     LogDebug($"Retrying ramp search for cluster {cluster.ClusterId} with width 1.");
-                    bestCandidate = FindBestCandidateForCluster(
+                    var legacyBuild = new LegacyAccessCandidateBuildResult();
+                    IEnumerator legacyRoutine =
+                        FindBestCandidateForClusterSliced(
                         tower,
                         towerPos,
                         clusterTileDepths,
@@ -1130,7 +1189,18 @@ namespace AutoTerrainDesignations
                         reservedRampTiles,
                         useLocalSurfaceReference,
                         forbiddenApproachClusterOrigins,
-                        out allEvaluated);
+                        legacyBuild,
+                        sliceControl);
+                    while (legacyRoutine.MoveNext())
+                        yield return legacyRoutine.Current;
+                    if (sliceControl?.CancellationRequested == true)
+                    {
+                        result.Outcome = RampPlacementOutcome.Failed;
+                        result.FailureReason = "SearchCancelled";
+                        yield break;
+                    }
+                    bestCandidate = legacyBuild.Best;
+                    allEvaluated = legacyBuild.AllEvaluated;
                 }
 
                 bool preferExperimental = experimentalCandidate != null
@@ -1186,8 +1256,11 @@ namespace AutoTerrainDesignations
                                 Tile2i neighbor = new Tile2i(origin.X + direction.X, origin.Y + direction.Y);
                                 return TryClusterEdgeConnectsToAccess(origin, neighbor, direction, accessWorkDepths, accesswayProto, terrMgr, out _);
                             });
+                        ATDPropRemovalRequestHandle[] replayCleanupRequests =
+                            SnapshotLastExperimentalPropRemovalRequests();
                         string v2ValidationReason = "NotV2";
-                        bool pendingPropRemoval = HasPendingExperimentalPropRemovalRequests();
+                        bool pendingPropRemoval = replayCleanupRequests.Any(
+                            request => !request.IsCompleted);
                         if (pendingPropRemoval)
                             v2ValidationReason = "AcceptedPendingPropRemoval";
                         bool v2ProviderValid = pendingPropRemoval
@@ -1211,8 +1284,11 @@ namespace AutoTerrainDesignations
                         if (v2ProviderValid || overrideProviderValid)
                             states[cluster] = AccessClusterState.AccessibleViaProvider;
                         RecordAccessClusterOverlay(originClusters, states);
-                        if (states[cluster] == AccessClusterState.AccessibleViaProvider
-                            || states[cluster] == AccessClusterState.AccessibleDirect)
+                        if (AccessPlacementAcceptancePolicy.ShouldCommit(
+                                source.SearchResult.V2Route != null,
+                                v2ProviderValid,
+                                overrideProviderValid,
+                                states[cluster]))
                         {
                             result.TopRowTile = experimentalTopTile;
                             placedAny = true;
@@ -1220,6 +1296,35 @@ namespace AutoTerrainDesignations
                                 result.SuppressWarningNotification = true;
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
+                            AccessReplayCaptureOperation? replayCapture =
+                                AccessSearchReplayRecorder.BeginRecordAccepted(
+                                source,
+                                $"ramp-generation:cluster-{cluster.ClusterId}");
+                            if (replayCapture != null)
+                            {
+                                bool ValidateReplayLive(out string reason)
+                                {
+                                    if (source.SearchResult.V2Route == null)
+                                    {
+                                        reason = "Non-V2 accepted route";
+                                        return true;
+                                    }
+                                    return ValidatePlacedV2Provider(
+                                        source.SearchResult,
+                                        source.Plan,
+                                        accesswayProto,
+                                        terrMgr,
+                                        out reason);
+                                }
+                                IEnumerator replayCompletion =
+                                    CompleteReplayCaptureAfterLiveAcceptance(
+                                        replayCapture,
+                                        replayCleanupRequests,
+                                        ValidateReplayLive,
+                                        sliceControl);
+                                while (replayCompletion.MoveNext())
+                                    yield return replayCompletion.Current;
+                            }
                             ClearLastExperimentalCleanupMaterialization();
                             LogExperimentalAccessDebug($"[ATD Access] cluster={cluster.ClusterId} selected=true designations={localPlacedOrigins.Count} decidedBy={decidedBy}");
                             AccessDiagnostics.LogAccessProvided(
@@ -1441,7 +1546,7 @@ namespace AutoTerrainDesignations
                 ? string.Empty
                 : $"; routed={failureSummary}";
 
-        private static EvaluatedAccessCandidate? FindBestCandidateForCluster(
+        private static IEnumerator FindBestCandidateForClusterSliced(
             IAreaManagingTower tower,
             Tile2i towerPos,
             Dict<Tile2i, int> clusterTileDepths,
@@ -1453,25 +1558,31 @@ namespace AutoTerrainDesignations
             HashSet<Tile2i>? reservedRampTiles,
             bool useLocalSurfaceReference,
             HashSet<Tile2i>? forbiddenApproachClusterOrigins,
-            out List<EvaluatedAccessCandidate> allEvaluated)
+            LegacyAccessCandidateBuildResult output,
+            ExperimentalAccessSliceControl? sliceControl)
         {
-            allEvaluated = new List<EvaluatedAccessCandidate>();
+            var allEvaluated = new List<EvaluatedAccessCandidate>();
+            output.Best = null;
+            output.AllEvaluated = allEvaluated;
 
             List<RampCandidate> candidates = CollectRampCandidates(tower, clusterTileDepths, rampWidth, lateralRetryOffset, reservedRampTiles);
             if (candidates.Count == 0)
             {
-                return null;
+                yield break;
             }
 
             RefreshPathabilityAndInvalidateReachability();
 
             var testedMouthReachability = new Dictionary<Tile2i, bool>();
             int reachabilityChecks = 0;
+            Stopwatch sliceTimer = Stopwatch.StartNew();
+            sliceControl?.ReportPhase("Evaluating legacy access candidates");
 
             for (int candidateOrder = 0; candidateOrder < candidates.Count; candidateOrder++)
             {
                 RampCandidate candidate = candidates[candidateOrder];
-                RampPlacementOutcome dryOutcome = TryPlaceRamp(
+                var placementBuild = new RampPlacementBuildResult();
+                IEnumerator placementRoutine = TryPlaceRampSliced(
                     tower,
                     candidate,
                     clusterTileDepths,
@@ -1482,12 +1593,23 @@ namespace AutoTerrainDesignations
                     reservedRampTiles,
                     useLocalSurfaceReference,
                     dryRun: true,
-                    out Tile2i dryTopRowTile,
-                    out List<RampTilePlan> plannedTiles);
+                    placementBuild,
+                    sliceControl);
+                while (placementRoutine.MoveNext())
+                {
+                    yield return placementRoutine.Current;
+                    sliceTimer.Restart();
+                }
+                if (sliceControl?.CancellationRequested == true)
+                    yield break;
+                RampPlacementOutcome dryOutcome = placementBuild.Outcome;
+                Tile2i dryTopRowTile = placementBuild.TopRowTile;
+                List<RampTilePlan> plannedTiles =
+                    placementBuild.PlannedTiles;
 
                 if (dryOutcome == RampPlacementOutcome.Failed)
                 {
-                    continue;
+                    goto CandidateComplete;
                 }
 
                 // Real placement normalizes shared vertices before writing designations.
@@ -1496,14 +1618,14 @@ namespace AutoTerrainDesignations
                 NormalizeRampPlan(plannedTiles, clusterTileDepths, cornerHeights);
                 if (!RampPlanMatchesDesignationOperation(plannedTiles, terrMgr, rampProto))
                 {
-                    continue;
+                    goto CandidateComplete;
                 }
                 if (plannedTiles.Count == 0)
                 {
                     // This cluster was classified NeedsAccessway. A candidate that emits no
                     // designation cannot provide the missing connection and must not win as
                     // a zero-work legacy candidate.
-                    continue;
+                    goto CandidateComplete;
                 }
 
                 bool approachMismatch = RampMouthApproachTargetMismatches(terrMgr, dryTopRowTile, candidate.Direction, candidate.OreTiles.Length, rampProto);
@@ -1549,15 +1671,29 @@ namespace AutoTerrainDesignations
                     sourceCandidate: candidate);
 
                 allEvaluated.Add(evaluated);
+
+            CandidateComplete:
+                if (sliceControl != null
+                    && sliceTimer.ElapsedMilliseconds
+                        >= sliceControl.SliceBudgetMilliseconds)
+                {
+                    if (sliceControl.CancellationRequested)
+                        yield break;
+                    sliceControl.ReportAtomicStep(
+                        "legacy-candidate:" + candidateOrder.ToString());
+                    sliceTimer.Restart();
+                    yield return null;
+                    sliceTimer.Restart();
+                }
             }
 
             if (allEvaluated.Count == 0)
             {
-                return null;
+                yield break;
             }
 
             allEvaluated.Sort(EvaluatedAccessCandidate.Compare);
-            return allEvaluated.FirstOrDefault(c => c.IsValid);
+            output.Best = allEvaluated.FirstOrDefault(c => c.IsValid);
         }
 
         private static bool IsUsefulProduct(LooseProductProto product)
@@ -2050,10 +2186,59 @@ namespace AutoTerrainDesignations
             return bestDepthSpread <= maxAllowedDepthSpread;
         }
 
-        private static RampPlacementOutcome TryPlaceRamp(IAreaManagingTower tower, RampCandidate candidate, Dict<Tile2i, int> tileDepths, Dict<Tile2i, int> cornerHeights, TerrainManager terrMgr, TerrainDesignationProto rampProto, List<Tile2i>? placedRampOrigins, HashSet<Tile2i>? reservedRampTiles, bool useLocalSurfaceReference, bool dryRun, out Tile2i topRowTile, out List<RampTilePlan> plannedTiles)
+        private static RampPlacementOutcome TryPlaceRamp(
+            IAreaManagingTower tower,
+            RampCandidate candidate,
+            Dict<Tile2i, int> tileDepths,
+            Dict<Tile2i, int> cornerHeights,
+            TerrainManager terrMgr,
+            TerrainDesignationProto rampProto,
+            List<Tile2i>? placedRampOrigins,
+            HashSet<Tile2i>? reservedRampTiles,
+            bool useLocalSurfaceReference,
+            bool dryRun,
+            out Tile2i topRowTile,
+            out List<RampTilePlan> plannedTiles)
         {
-            topRowTile = default;
-            plannedTiles = new List<RampTilePlan>();
+            var output = new RampPlacementBuildResult();
+            IEnumerator routine = TryPlaceRampSliced(
+                tower,
+                candidate,
+                tileDepths,
+                cornerHeights,
+                terrMgr,
+                rampProto,
+                placedRampOrigins,
+                reservedRampTiles,
+                useLocalSurfaceReference,
+                dryRun,
+                output,
+                sliceControl: null);
+            while (routine.MoveNext()) { }
+            topRowTile = output.TopRowTile;
+            plannedTiles = output.PlannedTiles;
+            return output.Outcome;
+        }
+
+        private static IEnumerator TryPlaceRampSliced(
+            IAreaManagingTower tower,
+            RampCandidate candidate,
+            Dict<Tile2i, int> tileDepths,
+            Dict<Tile2i, int> cornerHeights,
+            TerrainManager terrMgr,
+            TerrainDesignationProto rampProto,
+            List<Tile2i>? placedRampOrigins,
+            HashSet<Tile2i>? reservedRampTiles,
+            bool useLocalSurfaceReference,
+            bool dryRun,
+            RampPlacementBuildResult output,
+            ExperimentalAccessSliceControl? sliceControl)
+        {
+            output.Outcome = RampPlacementOutcome.Failed;
+            output.TopRowTile = default;
+            output.PlannedTiles = new List<RampTilePlan>();
+            List<RampTilePlan> plannedTiles = output.PlannedTiles;
+            Stopwatch sliceTimer = Stopwatch.StartNew();
             int laneCount = candidate.OreTiles.Length;
             int[] laneFirstEdgeHeights = new int[laneCount];
             int[] laneSecondEdgeHeights = new int[laneCount];
@@ -2073,7 +2258,7 @@ namespace AutoTerrainDesignations
                 if (!TryGetOreLaneEdgeHeights(faceTile, candidate.Direction, cornerHeights,
                     out int firstEdgeHeight, out int secondEdgeHeight))
                 {
-                    return RampPlacementOutcome.Failed;
+                    yield break;
                 }
 
                 laneFirstEdgeHeights[lane] = firstEdgeHeight;
@@ -2154,8 +2339,9 @@ namespace AutoTerrainDesignations
                     {
                         ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
-                    topRowTile = candidate.RampTiles[0];
-                    return RampPlacementOutcome.Crested;
+                    output.TopRowTile = candidate.RampTiles[0];
+                    output.Outcome = RampPlacementOutcome.Crested;
+                    yield break;
                 }
             }
 
@@ -2167,7 +2353,7 @@ namespace AutoTerrainDesignations
                     int rampDepth = Math.Max(1, laneBaseDepth - rampStepIndex);
                     if (!IsFreeRampTile(tower, currentTiles[lane], tileDepths, rampDepth, candidate.Direction, reservedRampTiles))
                     {
-                        return RampPlacementOutcome.Failed;
+                        yield break;
                     }
                 }
 
@@ -2272,8 +2458,9 @@ namespace AutoTerrainDesignations
                         ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
 
-                    topRowTile = currentTiles[0];
-                    return RampPlacementOutcome.Crested;
+                    output.TopRowTile = currentTiles[0];
+                    output.Outcome = RampPlacementOutcome.Crested;
+                    yield break;
                 }
 
                 Tile2i[] nextTiles = new Tile2i[laneCount];
@@ -2296,8 +2483,9 @@ namespace AutoTerrainDesignations
                         ApplyRampPlan(tower, plannedTiles, tileDepths, cornerHeights, rampProto, placedRampOrigins);
                     }
 
-                    topRowTile = currentTiles[0];
-                    return RampPlacementOutcome.Truncated;
+                    output.TopRowTile = currentTiles[0];
+                    output.Outcome = RampPlacementOutcome.Truncated;
+                    yield break;
                 }
 
                 for (int lane = 0; lane < laneCount; lane++)
@@ -2306,15 +2494,28 @@ namespace AutoTerrainDesignations
                     int rampDepth = Math.Max(1, laneBaseDepth - (rampStepIndex + 1));
                     if (!IsFreeRampTile(tower, nextTiles[lane], tileDepths, rampDepth, candidate.Direction, reservedRampTiles))
                     {
-                        return RampPlacementOutcome.Failed;
+                        yield break;
                     }
                 }
 
                 currentBoundaryHeights = nextBoundaryHeights;
                 currentTiles = nextTiles;
+
+                if (sliceControl != null
+                    && sliceTimer.ElapsedMilliseconds
+                        >= sliceControl.SliceBudgetMilliseconds)
+                {
+                    if (sliceControl.CancellationRequested)
+                        yield break;
+                    sliceControl.ReportAtomicStep(
+                        "legacy-ramp-step:" + rampStepIndex.ToString());
+                    sliceTimer.Restart();
+                    yield return null;
+                    sliceTimer.Restart();
+                }
             }
 
-            return RampPlacementOutcome.Failed;
+            yield break;
         }
 
         private static bool BoundaryHeightsMatch(int[] left, int[] right)

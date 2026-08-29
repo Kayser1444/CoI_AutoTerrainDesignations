@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using AutoTerrainDesignations.Access.Worker;
 using Mafi;
 
 namespace AutoTerrainDesignations.Access
@@ -25,6 +26,16 @@ namespace AutoTerrainDesignations.Access
                     out string snapshotField))
             {
                 failure = "snapshot retains forbidden execution reference: " + snapshotField;
+                return false;
+            }
+            if (ContainsForbiddenField(typeof(AccessSearchWorkerJob),
+                    out string workerJobField)
+                || typeof(AccessSearchWorkerJob).Namespace
+                    != "AutoTerrainDesignations.Access.Worker")
+            {
+                failure = "worker job retains forbidden execution reference "
+                    + "or escaped the dedicated worker namespace: "
+                    + workerJobField;
                 return false;
             }
             if (typeof(AccessHandoffEvaluator).DeclaringType != null

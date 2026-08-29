@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -33,6 +34,10 @@ namespace AutoTerrainDesignations.Access
         private string m_maxSlicePhase = string.Empty;
         private string m_maxSliceStep = string.Empty;
         private string m_atomicStep = string.Empty;
+        private Action? m_postCommitCancellation;
+        private Action<string>? m_disposalCancellation;
+        private ATDAccesswayExecutionBackend m_executionBackend;
+        private double m_workerElapsedMilliseconds;
 
         public int SliceBudgetMilliseconds { get; set; } = 2;
         public bool CancellationRequested { get; private set; }
@@ -40,12 +45,52 @@ namespace AutoTerrainDesignations.Access
         public string Phase => m_phase;
         public int VisitedNodes => m_visitedNodes;
         public int PendingNodes => m_pendingNodes;
+        public bool IsPostCommit => m_postCommitCancellation != null;
+        public ATDAccesswayExecutionBackend ExecutionBackend
+            => m_executionBackend;
+        public double WorkerElapsedMilliseconds
+            => m_workerElapsedMilliseconds;
+        public Tile2i? FocusTile { get; private set; }
+
+        public void ReportFocusTile(Tile2i focusTile)
+            => FocusTile = focusTile;
 
         public void RequestCancellation(string reason)
         {
+            if (m_postCommitCancellation != null)
+            {
+                m_postCommitCancellation();
+                return;
+            }
             CancellationRequested = true;
             CancellationReason = reason ?? string.Empty;
         }
+
+        public void RegisterDisposalCancellation(Action<string> cancellation)
+            => m_disposalCancellation = cancellation
+                ?? throw new ArgumentNullException(nameof(cancellation));
+
+        public void ClearDisposalCancellation()
+            => m_disposalCancellation = null;
+
+        public void RequestDisposalCancellation(string reason)
+        {
+            if (m_postCommitCancellation != null)
+            {
+                m_postCommitCancellation();
+                return;
+            }
+            CancellationRequested = true;
+            CancellationReason = reason ?? string.Empty;
+            m_disposalCancellation?.Invoke(CancellationReason);
+        }
+
+        public void BeginPostCommitCancellation(Action cancellation)
+            => m_postCommitCancellation = cancellation
+                ?? throw new ArgumentNullException(nameof(cancellation));
+
+        public void EndPostCommitCancellation()
+            => m_postCommitCancellation = null;
 
         public void ReportProgress(int visitedNodes, int pendingNodes)
         {
@@ -53,10 +98,29 @@ namespace AutoTerrainDesignations.Access
             m_pendingNodes = pendingNodes;
         }
 
+        public void ReportWorkerProgress(
+            string phase,
+            int visitedNodes,
+            int pendingNodes,
+            double elapsedMilliseconds)
+        {
+            m_executionBackend = ATDAccesswayExecutionBackend.Worker;
+            m_workerElapsedMilliseconds = Math.Max(
+                0d, elapsedMilliseconds);
+            ChangePhase(phase);
+            ReportProgress(visitedNodes, pendingNodes);
+        }
+
         public void ReportAtomicStep(string step)
             => m_atomicStep = step ?? string.Empty;
 
         public void ReportPhase(string phase)
+        {
+            m_executionBackend = ATDAccesswayExecutionBackend.Cooperative;
+            ChangePhase(phase);
+        }
+
+        private void ChangePhase(string phase)
         {
             string nextPhase = string.IsNullOrWhiteSpace(phase)
                 ? "Preparing"
@@ -207,7 +271,16 @@ namespace AutoTerrainDesignations.Access
         public int VisitedNodes => m_sliceControl.VisitedNodes;
         public int PendingNodes => m_sliceControl.PendingNodes;
         public string Phase => m_sliceControl.Phase;
+        public bool IsPostCommit => m_sliceControl.IsPostCommit;
         public double ProcessingMilliseconds => m_processingMilliseconds;
+        public double StatusElapsedMilliseconds
+            => m_sliceControl.ExecutionBackend
+                    == ATDAccesswayExecutionBackend.Worker
+                ? m_sliceControl.WorkerElapsedMilliseconds
+                : m_processingMilliseconds;
+        public ATDAccesswayExecutionBackend ExecutionBackend
+            => m_sliceControl.ExecutionBackend;
+        public Tile2i? FocusTile => m_sliceControl.FocusTile;
 
         public bool Advance()
         {
@@ -241,6 +314,10 @@ namespace AutoTerrainDesignations.Access
         }
 
         public void Dispose()
-            => (m_routine as IDisposable)?.Dispose();
+        {
+            if (!m_terminal)
+                m_sliceControl.RequestDisposalCancellation("Disposed");
+            (m_routine as IDisposable)?.Dispose();
+        }
     }
 }

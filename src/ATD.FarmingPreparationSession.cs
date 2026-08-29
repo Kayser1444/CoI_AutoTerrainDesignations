@@ -85,6 +85,8 @@ namespace AutoTerrainDesignations
                 new AccessFailureRetryState();
             public ATDAccesswayRequestHandle? PreparationAccessRequest { get; set; }
             public ATDAccesswayRequestHandle? FillingAccessRequest { get; set; }
+            public long PreparationSaveInterruptedAccessRequestId { get; set; }
+            public long FillingSaveInterruptedAccessRequestId { get; set; }
             public bool PreparationAccessSuppressedByUser { get; set; }
             public bool FillingAccessSuppressedByUser { get; set; }
             public float? FillingAllDoneSinceRealtime { get; set; }
@@ -881,7 +883,8 @@ namespace AutoTerrainDesignations
 
             foreach (FarmingPreparationSession session in s_farmingPreparationSessions.Values.ToList())
             {
-                CancelAllFarmingAccessRequests(session, "SaveBoundary");
+                CancelAllFarmingAccessRequests(
+                    session, FARMING_ACCESS_SAVE_BOUNDARY_REASON);
                 IAreaManagingTower? tower = session.Tower;
                 if (tower != null)
                 {

@@ -197,8 +197,8 @@ Approved initial policy:
 
 - exactly one active access request; other requests remain queued rather than
   round-robin interleaving live search sessions;
-- managed work adapts within a 1-15 ms range while simulation is running and a
-  1-30 ms range while paused, backing down when frame timing deteriorates;
+- managed work adapts within a 1-150 ms range while simulation is running and a
+  1-300 ms range while paused, backing down when frame timing deteriorates;
 - direct interactive work retains strict scheduling priority when it migrates
   to the manager, but uses the same adaptive envelope once selected;
 - a node quantum larger than the current `Step(1)`, adjusted downward/upward
@@ -220,9 +220,10 @@ Approved initial policy:
 - at most one commit transaction per frame.
 
 The legacy `accessSearchFrameBudgetMs` setting is deprecated rather than mapped
-from its unsafe 30 ms default. Until adaptive scheduling is revisited in step
-10, the automated manager retains its fixed 10 ms running budget and 30 ms
-paused budget. The interactive 15 ms setting is retained for compatibility
+into the manager. Until adaptive scheduling is revisited in step 10, the
+automated manager retains its fixed 10 ms running default and 30 ms paused
+default. Expert settings may raise those manager budgets to 150 ms running or
+300 ms paused. The interactive 15 ms setting is retained for compatibility
 while interactive migration is pending.
 
 The time budget must be checked between bounded node quanta. A stopwatch around
@@ -245,8 +246,8 @@ Approved operating envelope:
 
 - never allocate less than 1 ms to an eligible active request; continued slow
   progress under load is intentional;
-- cap unpaused work at 15 ms per rendered frame;
-- cap paused work at 30 ms per rendered frame, accepting approximately 30 FPS
+- cap unpaused work at 150 ms per rendered frame;
+- cap paused work at 300 ms per rendered frame, accepting approximately 3 FPS
   UI responsiveness while long paths run and using otherwise idle CPU;
 - reduce the budget quickly after frame-time deterioration or an ATD overrun,
   but restore it gradually and with hysteresis when sustained headroom returns;
@@ -266,7 +267,7 @@ make callback intervals look cheap or expensive for different reasons. Its
 rolling estimate should favor recent slow frames, react asymmetrically (fast
 decrease, slow increase), and be verified against fixed-budget mode. The exact
 filter, safety margin, increase rate, and decrease factor remain tuning details;
-the 1/15/30 ms envelope and prompt backoff under stress are policy.
+the 1/150/300 ms envelope and prompt backoff under stress are policy.
 
 ### Preparation and commit budgets
 
@@ -616,7 +617,7 @@ The implemented farming slice has one active request, owner/fingerprint
 coalescing, strict priority/FIFO queue selection, request-scoped cooperative
 cancellation, and runtime-only reset behavior. Preparation and filling keep
 separate owner keys. It advances from the rendered-frame ticker under the
-fixed 10/30 ms running/paused scheduling envelope, accumulates actual processing time for
+fixed 10/30 ms running/paused defaults within configurable 150/300 ms ceilings, accumulates actual processing time for
 timeout accounting, and shows the selected budget in a work-type-specific
 progress toast. The toast's stop action suppresses its farming phase until
 automation is explicitly disabled and re-enabled.
@@ -664,8 +665,8 @@ overruns.
 - Save/load reconstructs access demand from live/runtime-derived workflow state;
   no manager state is serialized.
 - Existing access-search fixtures still choose the same routes and costs.
-- Eligible managed work receives at least 1 ms, adapts no higher than 15 ms
-  unpaused or 30 ms paused, and backs down promptly when non-ATD frame cost or
+- Eligible managed work receives at least 1 ms, adapts no higher than 150 ms
+  unpaused or 300 ms paused, and backs down promptly when non-ATD frame cost or
   ATD overruns rise, apart from a separately measured small atomic commit.
 - Managed requests use only the new planner and never invoke legacy generation
   or candidate comparison as a fallback. Existing legacy-created designations
@@ -687,7 +688,7 @@ overruns.
    incremental cursors?
 2. What initial values should be used for queue capacity, toast delay, adaptive
    budget safety margin/filter/increase/decrease rates, stall-quanta detection,
-   and warning thresholds within the approved 1/15/30 ms envelope?
+   and warning thresholds within the approved 1/150/300 ms envelope?
 3. Which reliable tree/prop/entity events can augment the required spatial
    retry triggers without global invalidation churn?
 4. What measured snapshot-memory ceiling and diagnostic transport bounds remain

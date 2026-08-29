@@ -473,8 +473,10 @@ namespace AutoTerrainDesignations
             Loc.Str("vehicle_order.confirm.plural", "Order {0} new {1}s for {3} at {2}?", "Vehicle construction confirmation. Count, vehicle, depot, tower.");
         public static LocStr EnqueueConfirmBtnText =
             Loc.Str("vehicle_order.confirm.button", "Order", "Vehicle construction confirmation button.");
-        public static LocStr ZoomToDepotTooltip =
-            Loc.Str("vehicle_order.zoom.tooltip", "Zoom to {0}", "Tooltip for zooming to the selected vehicle depot.");
+         public static LocStr ZoomToDepotTooltip =
+              Loc.Str("vehicle_order.zoom.tooltip", "Zoom to {0}", "Tooltip for zooming to the selected vehicle depot.");
+         public static LocStr ZoomToAccessActionTooltip =
+              Loc.Str("access_search.zoom.tooltip", "Zoom to access action", "Tooltip for zooming to the active access-search area.");
         public static LocStr PreAssignedTooltipFmt =
             Loc.Str("vehicle_order.preassigned.tooltip", "Pre-assigned to {0}", "Tooltip for a queued vehicle pre-assigned to a tower.");
         public static LocStr OrderConstructionShortcutHint =

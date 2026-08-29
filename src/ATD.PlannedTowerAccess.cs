@@ -161,6 +161,8 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
+            TerrainDesignationProto levelingProto = s_levelingProto;
+
             VehiclePathFindingParams pathParams =
                 GetExcavatorPathFindingParamsForTower(tower, out _);
             IPathabilityProvider pathability =
@@ -360,9 +362,9 @@ namespace AutoTerrainDesignations
 
             var placedOrigins = new List<Tile2i>();
             var candidate = new ExperimentalAccessCandidate(
-                best.SearchResult, best.Plan);
+                best.SearchResult, best.Plan, request, dryRun.ReplayTiming);
             if (!TryPlaceExperimentalAccessCandidate(
-                    best.Snapshot, s_levelingProto, candidate, tower,
+                    best.Snapshot, levelingProto, candidate, tower,
                     placedOrigins, reservedRampTiles: null,
                     out Tile2i topRowTile,
                     out string placementFailure))
@@ -375,21 +377,24 @@ namespace AutoTerrainDesignations
 
             AccessDesignationPlan placedPlan = LastExperimentalAccessPlan
                 ?? best.Plan;
+            ATDPropRemovalRequestHandle[] replayCleanupRequests =
+                SnapshotLastExperimentalPropRemovalRequests();
             string validationReason = "NotV2";
-            bool pendingPropRemoval = HasPendingExperimentalPropRemovalRequests();
+            bool pendingPropRemoval = replayCleanupRequests.Any(
+                request => !request.IsCompleted);
             if (pendingPropRemoval)
                 validationReason = "AcceptedPendingPropRemoval";
             bool valid = pendingPropRemoval
                 || best.SearchResult.V2Route == null
                 || ValidatePlacedV2Provider(
-                    best.SearchResult, placedPlan, s_levelingProto, terrMgr,
+                    best.SearchResult, placedPlan, levelingProto, terrMgr,
                     out validationReason);
             bool ghostStillUnstarted =
                 IsUnstartedMiningTowerGhost(best.Approach.Ghost);
             if (!valid || !ghostStillUnstarted)
             {
                 RollBackExperimentalDesignations(
-                    placedOrigins, tower, s_levelingProto,
+                    placedOrigins, tower, levelingProto,
                     reservedRampTiles: null);
                 RollBackLastExperimentalCleanupMaterialization(
                     tower, reservedRampTiles: null);
@@ -402,6 +407,39 @@ namespace AutoTerrainDesignations
             }
 
             RegisterGeneratedAccesswayOrigins(tower, placedOrigins);
+            AccessReplayCaptureOperation? replayCapture =
+                AccessSearchReplayRecorder.BeginRecordAccepted(
+                    candidate, "planned-tower-access");
+            if (replayCapture != null)
+            {
+                bool ValidateReplayLive(out string reason)
+                {
+                    if (!IsUnstartedMiningTowerGhost(best.Approach.Ghost))
+                    {
+                        reason = "Planned mining tower started before replay acceptance.";
+                        return false;
+                    }
+                    if (best.SearchResult.V2Route == null)
+                    {
+                        reason = "Non-V2 accepted route";
+                        return true;
+                    }
+                    return ValidatePlacedV2Provider(
+                        best.SearchResult,
+                        placedPlan,
+                        levelingProto,
+                        terrMgr,
+                        out reason);
+                }
+                IEnumerator replayCompletion =
+                    CompleteReplayCaptureAfterLiveAcceptance(
+                        replayCapture,
+                        replayCleanupRequests,
+                        ValidateReplayLive,
+                        sliceControl);
+                while (replayCompletion.MoveNext())
+                    yield return replayCompletion.Current;
+            }
             ClearLastExperimentalCleanupMaterialization();
             LastExperimentalAccessSearch = best.SearchResult;
             SetTowerLastRampOutcome(tower, RampPlacementOutcome.Crested);

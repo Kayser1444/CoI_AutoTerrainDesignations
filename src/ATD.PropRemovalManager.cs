@@ -42,6 +42,69 @@ namespace AutoTerrainDesignations
         OriginalDesignationRestoreFailed,
     }
 
+    internal enum ATDTemporaryDesignationState
+    {
+        Owned,
+        Missing,
+        Replaced,
+    }
+
+    internal static class ATDPropRemovalLifecyclePolicy
+    {
+        internal static ATDTemporaryDesignationState ClassifyTemporary(
+            bool liveHasValue,
+            bool liveMatchesTemporary)
+            => !liveHasValue
+                ? ATDTemporaryDesignationState.Missing
+                : liveMatchesTemporary
+                    ? ATDTemporaryDesignationState.Owned
+                    : ATDTemporaryDesignationState.Replaced;
+
+        internal static bool ShouldPreplacePlannedWork(
+            bool quickRemove,
+            bool firstRequestAtOrigin,
+            bool hasPlannedWork)
+            => firstRequestAtOrigin && hasPlannedWork;
+
+        internal static bool ValidateFixtures(out string failure)
+        {
+            failure = string.Empty;
+            if (ClassifyTemporary(
+                    liveHasValue: false,
+                    liveMatchesTemporary: false)
+                != ATDTemporaryDesignationState.Missing)
+            {
+                failure = "An absent owned preview must be retried, not treated as player override.";
+                return false;
+            }
+            if (ClassifyTemporary(
+                    liveHasValue: true,
+                    liveMatchesTemporary: false)
+                != ATDTemporaryDesignationState.Replaced)
+            {
+                failure = "A replaced owned preview must remain a player override.";
+                return false;
+            }
+            if (ClassifyTemporary(
+                    liveHasValue: true,
+                    liveMatchesTemporary: true)
+                != ATDTemporaryDesignationState.Owned)
+            {
+                failure = "A matching temporary designation must remain manager-owned.";
+                return false;
+            }
+            if (!ShouldPreplacePlannedWork(
+                    quickRemove: true,
+                    firstRequestAtOrigin: true,
+                    hasPlannedWork: true))
+            {
+                failure = "Quick cleanup must capture overlapping planned work as its original designation.";
+                return false;
+            }
+            return true;
+        }
+    }
+
     internal readonly struct ATDPropRemovalResult
     {
         public int RequestId { get; }
@@ -540,9 +603,23 @@ namespace AutoTerrainDesignations
                 return false;
             if (operation.HasTemporaryDesignation)
             {
-                if (OwnsLiveTemporaryDesignation(operation))
+                Option<TerrainDesignation> live =
+                    m_designations.GetDesignationAt(operation.Origin);
+                ATDTemporaryDesignationState temporaryState =
+                    ATDPropRemovalLifecyclePolicy.ClassifyTemporary(
+                        live.HasValue,
+                        live.HasValue
+                        && live.Value.Prototype == operation.TemporaryProto
+                        && live.Value.Data.Equals(operation.TemporaryData));
+                if (temporaryState == ATDTemporaryDesignationState.Owned)
                     return false;
-                FinishOperation(operation, ATDPropRemovalOutcome.PlayerOverride,
+                if (temporaryState == ATDTemporaryDesignationState.Missing)
+                {
+                    ForgetMissingTemporaryDesignation(operation);
+                    return true;
+                }
+                FinishOperation(operation,
+                    ATDPropRemovalOutcome.PlayerOverride,
                     restoreOriginal: false);
                 return true;
             }
@@ -589,9 +666,18 @@ namespace AutoTerrainDesignations
             {
                 Option<TerrainDesignation> owned =
                     m_designations.GetDesignationAt(operation.Origin);
-                if (!owned.HasValue
-                    || owned.Value.Prototype != operation.TemporaryProto
-                    || !owned.Value.Data.Equals(operation.TemporaryData))
+                ATDTemporaryDesignationState temporaryState =
+                    ATDPropRemovalLifecyclePolicy.ClassifyTemporary(
+                        owned.HasValue,
+                        owned.HasValue
+                        && owned.Value.Prototype == operation.TemporaryProto
+                        && owned.Value.Data.Equals(operation.TemporaryData));
+                if (temporaryState == ATDTemporaryDesignationState.Missing)
+                {
+                    ForgetMissingTemporaryDesignation(operation);
+                    return true;
+                }
+                if (temporaryState == ATDTemporaryDesignationState.Replaced)
                 {
                     FinishOperation(operation,
                         ATDPropRemovalOutcome.PlayerOverride,
@@ -1156,6 +1242,19 @@ namespace AutoTerrainDesignations
             }
             propTile = default;
             return false;
+        }
+
+        private static void ForgetMissingTemporaryDesignation(
+            Operation operation)
+        {
+            operation.HasTemporaryDesignation = false;
+            operation.TemporaryProto = null;
+            operation.CandidateSearch = null;
+            operation.Stage = ATDPropRemovalStage.QuickPending;
+            AutoDepthDesignation.LogExperimentalAccessDebug(
+                $"[ATD Prop Removal] operation={operation.OperationId} "
+                + $"origin={operation.Origin} temporary-preview=missing "
+                + "action=retry");
         }
 
         private bool RestoreOriginal(Operation operation, bool removeOwnedTemporary,

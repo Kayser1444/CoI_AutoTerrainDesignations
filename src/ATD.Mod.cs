@@ -43,6 +43,7 @@ using CoI.AutoHelpers.Logging;
 using CoI.AutoHelpers.Persistence;
 using CoI.AutoHelpers.Settings;
 using Mafi.Unity;
+using Mafi.Unity.Ui;
 using Mafi.Unity.Ui.Hud;
 using Mafi.Unity.UiToolkit;
 
@@ -616,20 +617,30 @@ public static string Tt(string text) => text;
     public static void SetAccessMaxVisitedNodes(int value) => AccessMaxVisitedNodes = Math.Max(1000, Math.Min(2000000, value));
     public static int AccessSearchTimeoutSeconds { get; private set; } = 60;
     public static void SetAccessSearchTimeoutSeconds(int value) => AccessSearchTimeoutSeconds = Math.Max(5, Math.Min(600, value));
+    private const int AccessSearchFrameBudgetMaximumMs = 1000;
+    private const int AccessManagerAutomatedFrameBudgetMaximumMs = 150;
+    private const int AccessManagerInteractiveFrameBudgetMaximumMs = 300;
+    private const int AccessManagerPausedFrameBudgetMaximumMs = 300;
+
     public static int AccessSearchFrameBudgetMs { get; private set; } = 30;
-    public static void SetAccessSearchFrameBudgetMs(int value) => AccessSearchFrameBudgetMs = Math.Max(1, Math.Min(100, value));
+    public static void SetAccessSearchFrameBudgetMs(int value)
+        => AccessSearchFrameBudgetMs = Math.Max(
+            1, Math.Min(AccessSearchFrameBudgetMaximumMs, value));
     public static int AccessSnapshotMemoryCeilingMiB { get; private set; } = 512;
     public static void SetAccessSnapshotMemoryCeilingMiB(int value)
         => AccessSnapshotMemoryCeilingMiB = Math.Max(128, Math.Min(8192, value));
     public static int AccessManagerAutomatedFrameBudgetMs { get; private set; } = 10;
     public static void SetAccessManagerAutomatedFrameBudgetMs(int value)
-        => AccessManagerAutomatedFrameBudgetMs = Math.Max(1, Math.Min(15, value));
+        => AccessManagerAutomatedFrameBudgetMs = Math.Max(
+            1, Math.Min(AccessManagerAutomatedFrameBudgetMaximumMs, value));
     public static int AccessManagerInteractiveFrameBudgetMs { get; private set; } = 15;
     public static void SetAccessManagerInteractiveFrameBudgetMs(int value)
-        => AccessManagerInteractiveFrameBudgetMs = Math.Max(1, Math.Min(30, value));
+        => AccessManagerInteractiveFrameBudgetMs = Math.Max(
+            1, Math.Min(AccessManagerInteractiveFrameBudgetMaximumMs, value));
     public static int AccessManagerPausedMaxFrameBudgetMs { get; private set; } = 30;
     public static void SetAccessManagerPausedMaxFrameBudgetMs(int value)
-        => AccessManagerPausedMaxFrameBudgetMs = Math.Max(1, Math.Min(30, value));
+        => AccessManagerPausedMaxFrameBudgetMs = Math.Max(
+            1, Math.Min(AccessManagerPausedFrameBudgetMaximumMs, value));
 
     internal static int AccessPlanningSettingsFingerprint
         => Access.AccessSearchPolicySnapshot.Capture().SemanticFingerprint;
@@ -916,7 +927,9 @@ public static string Tt(string text) => text;
                 resolver.Resolve<HudController>(),
                 resolver.Resolve<UiRoot>(),
                 resolver.Resolve<IRootEscapeManager>());
-            AutoDepthDesignation.SetUiRoot(resolver.Resolve<UiRoot>());
+            AutoDepthDesignation.SetUiRoot(
+                resolver.Resolve<UiRoot>(),
+                resolver.Resolve<UiContext>());
 
             ModSettings.RegisterTab(AtdModSettingsTab.BuildDefaultsTab());
             ModSettings.RegisterTab(AtdModSettingsTab.BuildWorldSettingsTab());

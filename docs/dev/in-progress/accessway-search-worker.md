@@ -1,20 +1,36 @@
 # Accessway Search Worker
 
-Status: approved worker design; the worker itself is not implemented. Ticket 1
-is implemented and Ticket 2 is in progress on the cooperative execution seam:
-capture has revision diagnostics, memory backpressure, fail-closed snapshot
-sizing, tower-local ramp/clearance revisions, copied building/prop/tree facts,
-and captured terrain heights. Vanilla designation-readiness callbacks are
-answered from captured primitive facts during pure preparation; no live
-designation-manager callback is retained by the cooperative evaluator.
-Oversized snapshots now fail before initial reachability classification, and
-out-of-area origin checks reuse one bounded tower flood.
-Production snapshot capture now constructs its workspace-owned evaluator from
-captured facts and policy; delegate-injected evaluators remain only in
-synthetic fixtures, and the immutable snapshot no longer accepts callback-shaped
-compatibility inputs. Readiness fixtures cover terrain, props, stumps, and exact
-layout-occupancy edge cases. Large-area capture stress evidence and final
-pure-helper isolation remain before Ticket 3 can begin.
+Status: approved design with Tickets 1, 2, 2A, and foundational 2B complete.
+Ticket 3's dormant worker and Ticket 4's first interactive slice are implemented
+for internal playtesting:
+live snapshot capture, validation, and commit stay on the game thread, while
+workspace preparation, V1/V2 search, and plan materialization execute through
+one canonical pure executor on a lazy below-normal background thread. The
+worker has one job/result slot, latest-value progress, logical cancellation,
+timeout and world-generation handling, non-blocking manager polling, and one
+permitted infrastructure restart. Farming and interactive Create Designations
+select it internally; it is deliberately not a player setting. Synthetic canonical parity and
+cancellation fixtures pass, and all three promoted private replay cases remain
+exact through the shared executor as of 2026-08-29. The first large two-cluster
+farming playtest passed both sequential clusters and led to completion of the
+fixed-capacity, non-blocking sampled-node transport; the game thread now drains
+worker samples into the existing diagnostic overlay without giving the worker
+direct UI access. Deeper cancellation stress, cleanup-bearing farming coverage,
+and the remaining Ticket 3 lifecycle races are still promotion gates rather
+than assumed complete. An in-place-save playtest on 2026-08-29 confirmed that
+the current farming proxy designations are removed for save-removability: the
+manager correctly rejected the active result as `Stale / NearbyDesignationChanged`.
+That source-work invalidation is deferred to the dedicated farming-designation
+model. Until then, the farming session marks the exact request interrupted by a
+save and gives only that unsuccessful terminal a one-shot immediate retry from
+the restored designations; the stale pre-save result never regains commit
+authority. The same test also exposed a separate worker lifecycle defect:
+disposing stale managed work did not reclaim its already-submitted worker job, so the
+automatic retry waited behind an orphaned job. Disposal now explicitly
+abandons the job, cooperatively cancels active computation, discards its
+unowned terminal result, and frees the slot only after the worker has stopped.
+A deterministic fixture observes active execution before disposal and proves
+that a replacement job can then be submitted.
 
 Related design: [ATD Accessway Manager](../planned/atd-accessway-manager.md),
 [Access Search Laboratory](../planned/access-search-laboratory.md),
@@ -471,9 +487,10 @@ closed rather than activated without evidence.
 
 The cooperative backend uses exact, resumable continuations for the pure
 search work that can otherwise hide a large amount of data-dependent work
-inside one visited-node expansion. The existing fixed manager budgets remain
-authoritative (currently 10 ms for automated work, 15 ms for interactive work,
-and up to 30 ms while paused). A slice
+inside one visited-node expansion. The fixed manager defaults remain
+authoritative (10 ms for automated work, 15 ms for interactive work, and 30 ms
+while paused), with expert settings allowing ceilings of 150 ms running and
+300 ms paused. A slice
 may finish an indivisible item after its deadline; the existing slow-step and
 slice diagnostics expose that overrun, and repeated atomic overruns in the
 40-60 ms range promote that helper for a later deeper split.
@@ -489,10 +506,15 @@ atomic initially.
 
 The first implementation slices ground suffix traversal, fixed-navigation path
 and portal traversal, and handoff candidate pairing/entry enumeration. Lane
-candidate generation, ray-overlay internals, fixed-size transition geometry,
-snapshot capture, and live plan materialization remain atomic and separately
-instrumented. Continuation state is data-only, performs no live callbacks or
-game-state mutation, and is discarded on cancellation or invalidation. A
+candidate generation, most ray-overlay internals, fixed-size transition
+geometry, remaining snapshot indexes, and live plan materialization remain
+atomic and separately instrumented. Existing-work outside-corner projection
+now yields within scan rows and reads the captured terrain map before falling
+back to a live query. Mega ground cleanup classification, connected-component
+flooding, and goal-potential construction use an exact incremental build
+session governed by the same active frame budget. Continuation state is
+data-only, performs no live callbacks or game-state mutation, and is discarded
+on cancellation or invalidation. A
 completed continuation publishes no gameplay effect until the complete search
 result reaches the existing commit phase.
 
@@ -508,9 +530,16 @@ Lower-priority farming work is cancelled and restarted when an interactive
 request takes ownership; continuations are not parked across requests. The
 normal toast remains one active search presentation, updated at slice
 boundaries, with aggregate diagnostics for stages, slice counts, total time,
-maximum slice, and slow atomic steps. Capture and materialization retain their
-separate atomic-phase contracts until a later worker or targeted slicing slice
-addresses them.
+maximum slice, and slow atomic steps. The remaining capture indexes and
+materialization retain separate atomic-phase contracts until measurements
+promote them for a later targeted slice.
+
+The post-worker legacy-ramp comparison is also resumable at candidate and ramp
+step boundaries. Each candidate retains the existing dry placement,
+normalization, reachability, material score, stable order, and retry semantics;
+only the pauses within a long dry placement and between candidates are new.
+Diagnostics label this game-thread phase separately from the following
+cluster's snapshot capture.
 
 ## Approved snapshot and workspace separation
 
@@ -586,6 +615,24 @@ subsequent job may overwrite it or begin before the manager has reclaimed the
 previous job's terminal state.
 
 ## Approved capture consistency
+
+### Exact shallow-V ground replacement
+
+The Cluster 2 late backward wave was traced to a ground-relaunched V family
+that became globally owned after merging near `(814,1672)`. A history may make
+later work incrementally cheaper, but the prefix has already paid for that
+credit. Search now applies this conservation rule through an exact local test:
+for a shallow, globally merged V descendant, an already cheaper concrete-G
+label must reproduce the identical V band through the normal G-to-V seam and
+transition evaluators. Failed or more-expensive replacements remain eligible.
+
+The exact replay retained canonical SHA-256
+`c314032209478f01bdecab31401579fab29e1ef3bb80dba15dd3354fbfd96d07`.
+The `(832,1670)` family fell from 4,782 expansions to 320, its post-merge
+descendants from 4,770 to 308, and its shallow post-merge descendants from
+3,166 to 3. The production check is restricted to ground-relaunched global V
+within one level of captured terrain; broader checks proved correct but spent
+more on repeated seam evaluation than they saved.
 
 Cooperative snapshot capture does not restart the entire snapshot merely
 because relevant environmental state changes between slices. Large active areas

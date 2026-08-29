@@ -31,6 +31,8 @@ namespace AutoTerrainDesignations
         private const int FARMING_ACCESS_LARGE_WORK_THRESHOLD = 1000;
         private const int FARMING_ACCESS_MEDIUM_RECHECK_TICKS = 30;
         private const int FARMING_ACCESS_LARGE_RECHECK_TICKS = 90;
+        private const string FARMING_ACCESS_SAVE_BOUNDARY_REASON =
+            "SaveBoundary";
 
         private sealed class FarmingAccessCluster
         {
@@ -383,6 +385,10 @@ namespace AutoTerrainDesignations
 
                 if (snapshot.IsTerminal)
                 {
+                    bool retryImmediatelyAfterSave =
+                        TryConsumeSaveInterruptedFarmingAccessRequest(
+                            session, isFilling, existing.RequestId);
+                    bool retrySaveInterruptedFailure = false;
                     SetFarmingAccessRequest(session, isFilling, null);
                     FarmingManagedAccessResult? payload =
                         snapshot.Result?.Payload as FarmingManagedAccessResult;
@@ -460,6 +466,14 @@ namespace AutoTerrainDesignations
                                 $"Automatic farming access for {mode} was stopped by the user; "
                                 + "disable and re-enable farming automation to resume it.";
                         }
+                        else if (retryImmediatelyAfterSave)
+                        {
+                            failureRetry.Clear();
+                            retrySaveInterruptedFailure = true;
+                            session.LastAccessRampDetail =
+                                $"Managed accessway search for {mode} was interrupted by saving; "
+                                + "retrying immediately.";
+                        }
                         else
                         {
                             failureRetry.RecordFailure(
@@ -481,6 +495,16 @@ namespace AutoTerrainDesignations
                         workKey,
                         ready: false,
                         session.LastAccessRampDetail);
+                    if (retrySaveInterruptedFailure)
+                    {
+                        ClearFarmingAccessCache(session);
+                        LogDebug(
+                            "[ATD Farming Access] Save-interrupted request "
+                            + $"id={existing.RequestId} phase={mode}; "
+                            + "immediately rebuilding from restored designations.");
+                        return EnsureFarmingAccessForCurrentPhase(
+                            tower, session, isFilling);
+                    }
                     return false;
                 }
             }
@@ -697,7 +721,8 @@ namespace AutoTerrainDesignations
                             projectedProviderGoalOrigins,
                         emitNoCandidateWarnings: false,
                         newPlannerOnly: true,
-                        sliceControl: sliceControl),
+                        sliceControl: sliceControl,
+                        useWorkerSearch: true),
                     () =>
                     {
                         var payload = new FarmingManagedAccessResult(
@@ -713,7 +738,8 @@ namespace AutoTerrainDesignations
                                 payload);
                     },
                     GetManagedAccesswaySliceBudgetMilliseconds),
-                ValidateLiveRequest);
+                ValidateLiveRequest,
+                focusTile: cluster.Anchor);
             ATDAccesswayRequestHandle handle = EnqueueAccesswayRequest(request);
             SetFarmingAccessRequest(session, isFilling, handle);
             session.LastAccessRampDetail =
@@ -731,6 +757,18 @@ namespace AutoTerrainDesignations
             bool isFilling,
             ATDAccesswayRequestHandle? handle)
         {
+            if (handle != null)
+            {
+                long interruptedRequestId =
+                    GetSaveInterruptedFarmingAccessRequestId(
+                        session, isFilling);
+                if (interruptedRequestId != 0L
+                    && interruptedRequestId != handle.RequestId)
+                {
+                    SetSaveInterruptedFarmingAccessRequestId(
+                        session, isFilling, 0L);
+                }
+            }
             if (isFilling)
                 session.FillingAccessRequest = handle;
             else
@@ -788,11 +826,27 @@ namespace AutoTerrainDesignations
             ATDAccesswayRequestHandle? handle = isFilling
                 ? session.FillingAccessRequest
                 : session.PreparationAccessRequest;
+            bool interruptedBySave = handle != null
+                && string.Equals(
+                    reason,
+                    FARMING_ACCESS_SAVE_BOUNDARY_REASON,
+                    StringComparison.Ordinal)
+                && !ReadAccesswayRequest(handle).IsTerminal;
+            if (interruptedBySave)
+            {
+                MarkSaveInterruptedFarmingAccessRequest(
+                    session, isFilling, handle!.RequestId);
+            }
             CancelAccesswayRequest(handle, reason);
             if (handle != null)
             {
                 ATDAccesswayHandleSnapshot snapshot =
                     ReadAccesswayRequest(handle);
+                if (interruptedBySave && snapshot.IsTerminal)
+                {
+                    SetSaveInterruptedFarmingAccessRequestId(
+                        session, isFilling, 0L);
+                }
                 int adopted = AdoptTerminalFarmingAccessOwnership(
                     snapshot,
                     GetOwnedFarmingAccessRamps(session, isFilling));
@@ -805,6 +859,48 @@ namespace AutoTerrainDesignations
                 }
             }
             SetFarmingAccessRequest(session, isFilling, null);
+        }
+
+        private static long GetSaveInterruptedFarmingAccessRequestId(
+            FarmingPreparationSession session,
+            bool isFilling)
+            => isFilling
+                ? session.FillingSaveInterruptedAccessRequestId
+                : session.PreparationSaveInterruptedAccessRequestId;
+
+        private static void SetSaveInterruptedFarmingAccessRequestId(
+            FarmingPreparationSession session,
+            bool isFilling,
+            long requestId)
+        {
+            if (isFilling)
+                session.FillingSaveInterruptedAccessRequestId = requestId;
+            else
+                session.PreparationSaveInterruptedAccessRequestId = requestId;
+        }
+
+        private static bool TryConsumeSaveInterruptedFarmingAccessRequest(
+            FarmingPreparationSession session,
+            bool isFilling,
+            long requestId)
+        {
+            if (requestId == 0L
+                || GetSaveInterruptedFarmingAccessRequestId(
+                    session, isFilling) != requestId)
+                return false;
+            SetSaveInterruptedFarmingAccessRequestId(
+                session, isFilling, 0L);
+            return true;
+        }
+
+        private static void MarkSaveInterruptedFarmingAccessRequest(
+            FarmingPreparationSession session,
+            bool isFilling,
+            long requestId)
+        {
+            SetSaveInterruptedFarmingAccessRequestId(
+                session, isFilling, requestId);
+            GetFarmingAccessRetryState(session, isFilling).Clear();
         }
 
         private static void CancelAllFarmingAccessRequests(
@@ -1261,6 +1357,36 @@ namespace AutoTerrainDesignations
         internal static bool ValidateFarmingAccesswayOwnershipFixtures(
             out string failure)
         {
+            var saveInterruptedSession = new FarmingPreparationSession();
+            saveInterruptedSession.PreparationAccessRetry.RecordFailure(
+                "fixture-failure", nowSeconds: 10d, simulationStep: 1);
+            MarkSaveInterruptedFarmingAccessRequest(
+                saveInterruptedSession, isFilling: false, requestId: 41L);
+            MarkSaveInterruptedFarmingAccessRequest(
+                saveInterruptedSession, isFilling: true, requestId: 42L);
+            if (saveInterruptedSession.PreparationAccessRetry.HasFailure
+                || TryConsumeSaveInterruptedFarmingAccessRequest(
+                    saveInterruptedSession,
+                    isFilling: false,
+                    requestId: 99L)
+                || !TryConsumeSaveInterruptedFarmingAccessRequest(
+                    saveInterruptedSession,
+                    isFilling: false,
+                    requestId: 41L)
+                || TryConsumeSaveInterruptedFarmingAccessRequest(
+                    saveInterruptedSession,
+                    isFilling: false,
+                    requestId: 41L)
+                || !TryConsumeSaveInterruptedFarmingAccessRequest(
+                    saveInterruptedSession,
+                    isFilling: true,
+                    requestId: 42L))
+            {
+                failure =
+                    "Save-interrupted farming access markers were not exact, phase-specific, and one-shot.";
+                return false;
+            }
+
             if (!ShouldContinueFarmingAccessAfterTerminalSuccess(
                     placedOriginCount: 8,
                     inaccessibleClusterCount: 2)

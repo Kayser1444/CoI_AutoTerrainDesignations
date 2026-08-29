@@ -1,4 +1,5 @@
 using System;
+using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -37,6 +38,8 @@ namespace AutoTerrainDesignations.Access
             if (!ValidateAdaptiveBudget(out failure))
                 return false;
             if (!ValidateManagerHardening(out failure))
+                return false;
+            if (!ValidateProgressPresentation(out failure))
                 return false;
 
             var manager = new ATDAccesswayManager();
@@ -216,6 +219,49 @@ namespace AutoTerrainDesignations.Access
             return true;
         }
 
+        private static bool ValidateProgressPresentation(out string failure)
+        {
+            var workerSnapshot = new ATDAccesswayHandleSnapshot(
+                ATDAccesswayRequestState.Active,
+                null,
+                33380,
+                11203,
+                processingMilliseconds: 1014d,
+                phase: "Searching",
+                statusElapsedMilliseconds: 26484d,
+                executionBackend: ATDAccesswayExecutionBackend.Worker);
+            string worker = AccesswayProgressPresentation.FormatStats(
+                workerSnapshot, 100000, 15, 120);
+            if (worker.Contains("budget")
+                || worker.Contains("processing")
+                || !worker.Contains("worker elapsed 26.5/120s"))
+            {
+                failure = "Worker progress text exposes cooperative timing: "
+                    + worker;
+                return false;
+            }
+
+            var cooperativeSnapshot = new ATDAccesswayHandleSnapshot(
+                ATDAccesswayRequestState.Active,
+                null,
+                123,
+                45,
+                processingMilliseconds: 2500d,
+                phase: "Searching");
+            string cooperative = AccesswayProgressPresentation.FormatStats(
+                cooperativeSnapshot, 100000, 15, 120);
+            if (!cooperative.Contains("budget 15 ms/frame")
+                || !cooperative.Contains("processing 2")
+                || !cooperative.Contains("/120s"))
+            {
+                failure = "Cooperative progress text lost slice diagnostics: "
+                    + cooperative;
+                return false;
+            }
+            failure = string.Empty;
+            return true;
+        }
+
         private static bool ValidateAdaptiveBudget(out string failure)
         {
             var controller = new ATDAdaptiveFrameBudget();
@@ -382,6 +428,34 @@ namespace AutoTerrainDesignations.Access
                 return false;
             }
 
+            ATDAccesswayValidationResult postCommitValidation =
+                ATDAccesswayValidationResult.Current();
+            var postCommitManager = new ATDAccesswayManager();
+            var postCommitWork = new FixtureWork(
+                steps: 3,
+                postCommitAfterAdvance: 1);
+            ATDAccesswayRequestHandle postCommitHandle =
+                postCommitManager.Enqueue(new ATDAccesswayRequest(
+                    "farm-prep/tower:post-commit",
+                    "a",
+                    ATDAccesswayRequestKind.FarmingPreparation,
+                    ATDAccesswayPriority.Derived,
+                    () => postCommitWork,
+                    () => postCommitValidation));
+            postCommitManager.Tick(suspended: false);
+            postCommitValidation = ATDAccesswayValidationResult.Stale(
+                "SelfAuthoredDesignationChanged");
+            postCommitManager.Tick(suspended: false);
+            postCommitManager.Tick(suspended: false);
+            if (postCommitManager.Read(postCommitHandle).State
+                    != ATDAccesswayRequestState.Succeeded
+                || postCommitWork.AdvanceCount != 3)
+            {
+                failure =
+                    "Post-commit capture finalization was invalidated by the request's self-authored world mutation.";
+                return false;
+            }
+
             int ownerGoneFactories = 0;
             var ownerGoneRequest = new ATDAccesswayRequest(
                 "farm-prep/tower:gone",
@@ -515,18 +589,28 @@ namespace AutoTerrainDesignations.Access
         private sealed class FixtureWork : IATDAccesswayManagedWork
         {
             private readonly int m_steps;
+            private readonly int m_postCommitAfterAdvance;
             private string? m_cancellationReason;
 
-            public FixtureWork(int steps)
+            public FixtureWork(
+                int steps,
+                int postCommitAfterAdvance = int.MaxValue)
             {
                 m_steps = steps;
+                m_postCommitAfterAdvance = postCommitAfterAdvance;
             }
 
             public int AdvanceCount { get; private set; }
             public int VisitedNodes => AdvanceCount;
             public int PendingNodes => Math.Max(0, m_steps - AdvanceCount);
             public string Phase => "Fixture";
+            public bool IsPostCommit
+                => AdvanceCount >= m_postCommitAfterAdvance;
             public double ProcessingMilliseconds => AdvanceCount;
+            public double StatusElapsedMilliseconds => AdvanceCount;
+            public ATDAccesswayExecutionBackend ExecutionBackend
+                => ATDAccesswayExecutionBackend.Cooperative;
+            public Tile2i? FocusTile => null;
 
             public bool Advance()
             {

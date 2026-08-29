@@ -24,6 +24,11 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly IReadOnlyCollection<string> m_cleanupKeyDelta;
         private readonly IReadOnlyCollection<Tile2i>
             m_snapshotSafetyExemptOriginDelta;
+        private readonly bool m_hasRayBounds;
+        private readonly int m_minRayX;
+        private readonly int m_maxRayX;
+        private readonly int m_minRayY;
+        private readonly int m_maxRayY;
         private Dictionary<RayEnvelopeCacheKey, RayEnvelope>? m_rayEnvelopeCache;
         private HashSet<Tile2i>? m_cachedRayTiles;
         private HashSet<Tile2i>? m_cachedHandoffRayTiles;
@@ -65,6 +70,30 @@ namespace AutoTerrainDesignations.Access.V2
                 | DirectionBit(longitudinalDirection));
             m_delta = delta;
             m_rayDelta = BuildRayDelta(rayDelta, m_sequence);
+            bool hasRayBounds = parent.m_hasRayBounds;
+            int minRayX = parent.m_minRayX;
+            int maxRayX = parent.m_maxRayX;
+            int minRayY = parent.m_minRayY;
+            int maxRayY = parent.m_maxRayY;
+            foreach (Tile2i tile in m_rayDelta.Keys)
+            {
+                if (!hasRayBounds)
+                {
+                    hasRayBounds = true;
+                    minRayX = maxRayX = tile.X;
+                    minRayY = maxRayY = tile.Y;
+                    continue;
+                }
+                if (tile.X < minRayX) minRayX = tile.X;
+                if (tile.X > maxRayX) maxRayX = tile.X;
+                if (tile.Y < minRayY) minRayY = tile.Y;
+                if (tile.Y > maxRayY) maxRayY = tile.Y;
+            }
+            m_hasRayBounds = hasRayBounds;
+            m_minRayX = minRayX;
+            m_maxRayX = maxRayX;
+            m_minRayY = minRayY;
+            m_maxRayY = maxRayY;
             m_cleanupKeyDelta = cleanupKeyDelta;
             m_snapshotSafetyExemptOriginDelta =
                 snapshotSafetyExemptOriginDelta;
@@ -104,6 +133,11 @@ namespace AutoTerrainDesignations.Access.V2
                 : parent.m_travelDirectionMask;
             m_delta = Array.Empty<AccessV2OriginProfile>();
             m_rayDelta = s_emptyRayDelta;
+            m_hasRayBounds = parent.m_hasRayBounds;
+            m_minRayX = parent.m_minRayX;
+            m_maxRayX = parent.m_maxRayX;
+            m_minRayY = parent.m_minRayY;
+            m_maxRayY = parent.m_maxRayY;
             m_cleanupKeyDelta = Array.Empty<string>();
             m_snapshotSafetyExemptOriginDelta = Array.Empty<Tile2i>();
             m_cachedSnapshotSafetyExemptOrigins =
@@ -552,6 +586,16 @@ namespace AutoTerrainDesignations.Access.V2
             IReadOnlyCollection<Tile2i>? excludedOwners,
             AccessSearchDiagnostics? diagnostics)
         {
+            if (!m_hasRayBounds
+                || tile.X < m_minRayX
+                || tile.X > m_maxRayX
+                || tile.Y < m_minRayY
+                || tile.Y > m_maxRayY)
+            {
+                if (diagnostics != null)
+                    diagnostics.V2RayOverlayCacheMisses++;
+                return default;
+            }
             bool cacheable = RayEnvelopeCacheKey.TryCreate(
                 tile, excludedOwners, out RayEnvelopeCacheKey cacheKey);
             if (cacheable

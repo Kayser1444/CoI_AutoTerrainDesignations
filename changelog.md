@@ -5,7 +5,111 @@ v0.7.1 [unreleased]
   button can remove an overlapping access terminal instead of leaving an
   orphaned restored designation.
 
-v0.7.0 [packaged]
+* Experimental: Farming access searches now exercise the dormant internal
+  single-thread worker. Snapshot capture, live validation, and designation
+  commit remain on the game thread; pure workspace preparation, route search,
+  and plan materialization run off-thread through the same executor used by the
+  Access Search Laboratory. This is not yet a player-selectable mode.
+
+* Experimental: Interactive Create Designations access searches now use the
+  same internal worker path. Their snapshot capture, live validation, cleanup
+  acceptance, and designation commit remain on the game thread, and the mode
+  is still not player-selectable.
+
+* Improved: Interactive access snapshot preparation now slices existing-work
+  outside-corner projection within scan rows and the Mega ground graph's
+  cleanup, component, and goal-potential construction against the configured
+  frame budget. The projection also reuses captured terrain heights instead of
+  repeatedly querying live terrain; route semantics remain unchanged.
+
+* Improved: The legacy-ramp comparison performed after a routed worker result
+  now yields within long dry placements and between evaluated candidates using
+  the active frame budget. Its geometry, scoring, retry order, and final
+  routed-versus-legacy choice are unchanged.
+
+* Improved: V2 ray-overlay queries now reject tiles outside the immutable
+  history's accumulated ray bounds before scanning ancestry or allocating an
+  empty cache entry. The expensive Laboratory case retained its exact route
+  while reducing search time and peak memory in the initial directional
+  benchmark.
+
+* Improved: History-qualified V2 handoff entries now apply optimistic
+  ordinary-ground label dominance before expensive ray, cleanup, and local
+  escape validation. A successor is skipped only when it cannot beat the
+  existing label even with zero cleanup cost; goal suffixes remain untouched.
+  The expensive Laboratory case retained its exact route while search time
+  fell from 40.2 to 33.6 seconds in the initial directional comparison.
+
+* Improved: Plain physical-ground V2 handoff entries are now rejected before
+  entering the queue when every geometrically possible ordinary-ground and
+  ground-to-V successor is already cheaper even at a zero-additional-cost
+  lower bound, or the exact ground-to-V transition cannot pass its structural
+  and accumulated-history checks. Goal suffixes, projected ground, fixed
+  navigation, and any unmatched successor remain history-qualified. The exact
+  Cluster 2 replay removed 11,147 further dead expansions without changing its
+  route; a three-run search median improved from 37.9 to 34.8 seconds.
+
+* Improved: Shallow V2 frontiers that return over an already cheaper ground
+  component now attempt an exact ordinary-ground replacement. The replacement
+  is accepted only when the real ground-to-V seam and transition evaluators
+  reproduce the identical band for no greater total cost, so prior ray and
+  cleanup credit is repriced instead of discarded optimistically. In the
+  Cluster 2 replay, the late `(832,1670)` family fell from 4,782 expansions to
+  320 and its shallow post-merge wave fell from 3,166 expansions to 3 without
+  changing the selected route.
+
+* Fixed: The diagnostic explored-node overlay now receives bounded sampled
+  events from worker searches. A full visualization buffer drops
+  samples instead of slowing or blocking route search.
+
+* Fixed: Worker-search progress now reports worker elapsed time instead of
+  showing the cooperative frame budget and the coroutine's much smaller
+  polling time. Cooperative capture and search retain their slice diagnostics.
+
+* Fixed: Stale or otherwise disposed farming access work now abandons its
+  submitted worker job, cooperatively cancels active computation, discards the
+  unowned terminal result, and releases the single worker slot for retry.
+
+* Fixed: Saving during an active farming access search now bypasses the normal
+  failure backoff once the save-restored designations are available. The stale
+  pre-save result remains rejected and a fresh search is queued immediately.
+
+* Added: A developer-only Access Search Laboratory foundation can arm and
+  atomically record the next validated routed search, then replay its owned
+  snapshot and exact canonical result outside the game through the selected
+  Release mod DLL. Normal searches remain dormant unless capture is armed.
+
+* Added: The developer-only Laboratory runner can emit an ordered V2 expansion
+  trace with timing, queue age, ground-relaunch, direction, handoff, portal,
+  history, potential-owner, label identity, and accepted-successor outcome
+  fields. Production searches do not collect this trace.
+
+* Improved: Armed access-search replay capture now encodes and compresses its
+  immutable request in a background operation while the progress surface shows
+  the current stage and exact work-unit percentage, avoiding a long opaque
+  main-thread stall. Its stop button aborts only replay capture, removes partial
+  output, and preserves the already accepted access route.
+
+* Fixed: Arming an access-search replay now archives the exact Release DLL by
+  hash in the private Laboratory directory, preventing later builds from
+  orphaning an otherwise valid captured case.
+
+* Fixed: Quick prop cleanup now preserves overlapping pathfinder work as the
+  designation to restore and retries a manager-owned preview that vanilla
+  removed, instead of misclassifying the missing preview as a player override.
+  Replay captures remain staged at 99% until cleanup completes and the live
+  route passes authoritative validation; failed, replaced, or aborted cleanup
+  deletes the staged case rather than publishing a false accepted baseline.
+
+* Fixed: Access replay canonicalization now ignores non-semantic object-sharing
+  differences between sliced in-game route steps and unsliced laboratory route
+  steps. Equal step values therefore reproduce exactly even when one execution
+  reuses an internal transition object and the other creates an equal copy.
+
+* Improved: The authoritative cleanup wait now explicitly displays `99%`
+  alongside its phase text before the recorder publishes the completed case.
+
+v0.7.0 [released]
 
 * Added: Ore Sorting Plants now support configurable export routes to compatible
   storages and Mine Towers, with a vanilla-style export priority and persistent
@@ -47,6 +151,11 @@ v0.7.0 [packaged]
 * Added: Debug access-search diagnostics now attribute capture and navigation
   time, allocation setup, and the largest atomic slice to named steps so future
   spikes can be investigated without changing the production search result.
+
+* Changed: Raised the configurable access-search frame-budget ceilings by 10x:
+  the legacy sliced-search setting now accepts up to 1000 ms, automated manager
+  work up to 150 ms while running, and interactive or paused manager work up to
+  300 ms. Existing defaults remain unchanged.
 
 v0.6.1 [released]
 

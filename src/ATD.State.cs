@@ -1108,6 +1108,8 @@ namespace AutoTerrainDesignations
             s_propRemovalManager = null;
             s_managedDesignationMutationDepth = 0;
             s_worldGeneration++;
+            Access.Worker.AccessSearchWorker.Shared.SetCurrentWorld(
+                s_worldGeneration);
             s_terrainDesignationRevision = 0;
             s_terrainDesignationMutationJournalCount = 0;
             s_terrainDesignationMutationJournalNext = 0;

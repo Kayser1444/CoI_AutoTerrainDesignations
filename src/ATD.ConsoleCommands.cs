@@ -10,6 +10,7 @@
 using System;
 using System.Globalization;
 using System.Text;
+using AutoTerrainDesignations.Access;
 using Mafi;
 using Mafi.Core.Console;
 using UnityEngine;
@@ -23,6 +24,25 @@ namespace AutoTerrainDesignations;
 [GlobalDependency(RegistrationMode.AsSelf, false, false)]
 public sealed class AtdConsoleCommands
 {
+    [ConsoleCommand(false, false, "Arms a one-shot developer capture of the next accepted access search for standalone replay.", "atd_access_replay_arm")]
+    private string atdAccessReplayArm(
+        string? caseName = null,
+        string? scenarioFamily = null)
+    {
+        string message = AccessSearchReplayRecorder.Arm(
+            caseName, scenarioFamily);
+        AutoDepthDesignation.s_log.Info("[ATD Access Replay] " + message);
+        return "[ATD] " + message;
+    }
+
+    [ConsoleCommand(false, false, "Cancels an armed access-search replay capture.", "atd_access_replay_cancel")]
+    private string atdAccessReplayCancel()
+    {
+        string message = AccessSearchReplayRecorder.Cancel();
+        AutoDepthDesignation.s_log.Info("[ATD Access Replay] " + message);
+        return "[ATD] " + message;
+    }
+
     [ConsoleCommand(false, false, "Prints all current ATD global settings.", null)]
     private string atdGetSettings()
     {

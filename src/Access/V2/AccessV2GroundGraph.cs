@@ -12,6 +12,254 @@ namespace AutoTerrainDesignations.Access.V2
     /// </summary>
     internal sealed class AccessV2GroundGraph
     {
+        internal sealed class BuildSession
+        {
+            private readonly HashSet<Tile2i> m_groundNodes;
+            private readonly HashSet<Tile2i> m_projectedFixedNodes;
+            private readonly Dictionary<Tile2i, AccessPropCleanupInfo>
+                m_cleanupByTile = new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            private readonly Dictionary<Tile2i, AccessPropCleanupInfo>
+                m_generatedClearableByTile =
+                    new Dictionary<Tile2i, AccessPropCleanupInfo>();
+            private readonly HashSet<Tile2i> m_goals;
+            private readonly float m_cleanupUnitCost;
+            private readonly IEnumerator<KeyValuePair<Tile2i,
+                AccessPropCleanupInfo>> m_cleanupEnumerator;
+            private IEnumerator<Tile2i>? m_groundSeedEnumerator;
+            private IEnumerator<Tile2i>? m_cleanupSeedEnumerator;
+            private readonly Queue<Tile2i> m_componentQueue =
+                new Queue<Tile2i>();
+            private readonly Dictionary<Tile2i, int> m_componentByTile =
+                new Dictionary<Tile2i, int>();
+            private readonly HashSet<int> m_goalComponents =
+                new HashSet<int>();
+            private int m_component;
+            private bool m_hasActiveComponent;
+            private bool m_componentContainsGoal;
+            private readonly Dictionary<Tile2i, float> m_goalDistanceByTile =
+                new Dictionary<Tile2i, float>();
+            private readonly SortedDictionary<float, Queue<Tile2i>>
+                m_distanceQueue = new SortedDictionary<float, Queue<Tile2i>>();
+            private IEnumerator<Tile2i>? m_goalEnumerator;
+            private int m_phase;
+
+            public bool IsComplete { get; private set; }
+            public string Phase => m_phase <= 0
+                ? "Classifying V2 ground cleanup"
+                : m_phase == 1
+                    ? "Building V2 ground components"
+                    : "Building V2 ground potential";
+            public AccessV2GroundGraph Result { get; private set; } = null!;
+
+            public BuildSession(
+                HashSet<Tile2i> groundNodes,
+                IEnumerable<Tile2i> goals,
+                IReadOnlyDictionary<Tile2i, AccessPropCleanupInfo>
+                    cleanupByTile,
+                HashSet<Tile2i> projectedFixedNodes,
+                float cleanupUnitCost = 8f)
+            {
+                m_groundNodes = groundNodes
+                    ?? throw new ArgumentNullException(nameof(groundNodes));
+                m_projectedFixedNodes = projectedFixedNodes
+                    ?? throw new ArgumentNullException(nameof(projectedFixedNodes));
+                m_goals = goals as HashSet<Tile2i>
+                    ?? new HashSet<Tile2i>(goals);
+                m_cleanupUnitCost = cleanupUnitCost;
+                m_cleanupEnumerator = cleanupByTile.GetEnumerator();
+            }
+
+            public void Advance(int maxWorkItems)
+            {
+                if (IsComplete)
+                    return;
+                int remaining = Math.Max(1, maxWorkItems);
+                while (remaining-- > 0 && !IsComplete)
+                {
+                    if (m_phase == 0)
+                        AdvanceCleanup();
+                    else if (m_phase == 1)
+                        AdvanceComponents();
+                    else
+                        AdvanceDistances();
+                }
+            }
+
+            private void AdvanceCleanup()
+            {
+                if (m_cleanupEnumerator.MoveNext())
+                {
+                    KeyValuePair<Tile2i, AccessPropCleanupInfo> pair =
+                        m_cleanupEnumerator.Current;
+                    if (!m_groundNodes.Contains(pair.Key)
+                        && pair.Value.IsEligible)
+                        m_cleanupByTile.Add(pair.Key, pair.Value);
+                    else if (!m_groundNodes.Contains(pair.Key)
+                        && pair.Value.IsEligibleWithinGeneratedV
+                        && pair.Value.HasDenseDebrisCleanup)
+                        m_generatedClearableByTile.Add(pair.Key, pair.Value);
+                    return;
+                }
+                m_cleanupEnumerator.Dispose();
+                m_groundSeedEnumerator = m_groundNodes.GetEnumerator();
+                m_phase = 1;
+            }
+
+            private void AdvanceComponents()
+            {
+                if (m_componentQueue.Count > 0)
+                {
+                    Tile2i current = m_componentQueue.Dequeue();
+                    if (m_goals.Contains(current))
+                        m_componentContainsGoal = true;
+                    for (int index = 0; index < s_cardinalDirections.Length;
+                        index++)
+                    {
+                        Tile2i next = current + s_cardinalDirections[index];
+                        if (m_componentByTile.ContainsKey(next)
+                            || !IsTraversable(next))
+                            continue;
+                        m_componentByTile.Add(next, m_component);
+                        m_componentQueue.Enqueue(next);
+                    }
+                    return;
+                }
+                if (m_hasActiveComponent)
+                {
+                    if (m_componentContainsGoal)
+                        m_goalComponents.Add(m_component);
+                    m_hasActiveComponent = false;
+                    m_componentContainsGoal = false;
+                    m_component++;
+                }
+                while (TryMoveNextSeed(out Tile2i seed))
+                {
+                    if (m_componentByTile.ContainsKey(seed))
+                        continue;
+                    m_hasActiveComponent = true;
+                    m_componentByTile.Add(seed, m_component);
+                    m_componentQueue.Enqueue(seed);
+                    return;
+                }
+                m_goalEnumerator = m_goals.GetEnumerator();
+                m_phase = 2;
+            }
+
+            private bool TryMoveNextSeed(out Tile2i seed)
+            {
+                if (m_groundSeedEnumerator != null)
+                {
+                    if (m_groundSeedEnumerator.MoveNext())
+                    {
+                        seed = m_groundSeedEnumerator.Current;
+                        return true;
+                    }
+                    m_groundSeedEnumerator.Dispose();
+                    m_groundSeedEnumerator = null;
+                    m_cleanupSeedEnumerator =
+                        m_cleanupByTile.Keys.GetEnumerator();
+                }
+                if (m_cleanupSeedEnumerator != null
+                    && m_cleanupSeedEnumerator.MoveNext())
+                {
+                    seed = m_cleanupSeedEnumerator.Current;
+                    return true;
+                }
+                m_cleanupSeedEnumerator?.Dispose();
+                m_cleanupSeedEnumerator = null;
+                seed = default;
+                return false;
+            }
+
+            private void AdvanceDistances()
+            {
+                if (m_goalEnumerator != null)
+                {
+                    if (m_goalEnumerator.MoveNext())
+                    {
+                        Tile2i goal = m_goalEnumerator.Current;
+                        if (IsTraversable(goal)
+                            && !m_goalDistanceByTile.ContainsKey(goal))
+                        {
+                            m_goalDistanceByTile.Add(goal, 0f);
+                            Enqueue(goal, 0f);
+                        }
+                        return;
+                    }
+                    m_goalEnumerator.Dispose();
+                    m_goalEnumerator = null;
+                }
+                if (m_distanceQueue.Count == 0)
+                {
+                    Result = new AccessV2GroundGraph(
+                        m_groundNodes,
+                        m_projectedFixedNodes,
+                        m_cleanupByTile,
+                        m_generatedClearableByTile,
+                        m_goals,
+                        m_componentByTile,
+                        m_goalComponents,
+                        m_goalDistanceByTile,
+                        m_cleanupUnitCost);
+                    IsComplete = true;
+                    return;
+                }
+                KeyValuePair<float, Queue<Tile2i>> first =
+                    m_distanceQueue.First();
+                Tile2i current = first.Value.Dequeue();
+                if (first.Value.Count == 0)
+                    m_distanceQueue.Remove(first.Key);
+                if (!m_goalDistanceByTile.TryGetValue(
+                        current, out float currentDistance)
+                    || Math.Abs(currentDistance - first.Key) > 0.0001f)
+                    return;
+                for (int index = 0; index < s_allDirections.Length; index++)
+                {
+                    Tile2i next = current + s_allDirections[index];
+                    if (!CanTraverse(current, next))
+                        continue;
+                    float nextDistance = currentDistance
+                        + GetStepCost(current, next);
+                    if (m_goalDistanceByTile.TryGetValue(next, out float old)
+                        && old <= nextDistance + 0.0001f)
+                        continue;
+                    m_goalDistanceByTile[next] = nextDistance;
+                    Enqueue(next, nextDistance);
+                }
+            }
+
+            private bool IsTraversable(Tile2i tile)
+                => m_groundNodes.Contains(tile)
+                    || m_cleanupByTile.ContainsKey(tile);
+
+            private bool CanTraverse(Tile2i from, Tile2i to)
+            {
+                int dx = Math.Abs(from.X - to.X);
+                int dy = Math.Abs(from.Y - to.Y);
+                if (dx + dy == 1)
+                    return IsTraversable(from) && IsTraversable(to);
+                if (dx != 1 || dy != 1)
+                    return false;
+                Tile2i sideX = new Tile2i(to.X, from.Y);
+                Tile2i sideY = new Tile2i(from.X, to.Y);
+                return IsTraversable(from)
+                    && IsTraversable(sideX)
+                    && IsTraversable(sideY)
+                    && IsTraversable(to);
+            }
+
+            private void Enqueue(Tile2i tile, float cost)
+            {
+                if (!m_distanceQueue.TryGetValue(
+                        cost, out Queue<Tile2i> bucket))
+                {
+                    bucket = new Queue<Tile2i>();
+                    m_distanceQueue.Add(cost, bucket);
+                }
+                bucket.Enqueue(tile);
+            }
+        }
+
         private static readonly RelTile2i[] s_cardinalDirections =
         {
             new RelTile2i(1, 0),
@@ -72,6 +320,28 @@ namespace AutoTerrainDesignations.Access.V2
                     m_generatedClearableByTile.Add(pair.Key, pair.Value);
             BuildComponents(out m_componentByTile, out m_goalComponents);
             m_goalDistanceByTile = BuildGoalDistances();
+        }
+
+        private AccessV2GroundGraph(
+            HashSet<Tile2i> groundNodes,
+            HashSet<Tile2i> projectedFixedNodes,
+            Dictionary<Tile2i, AccessPropCleanupInfo> cleanupByTile,
+            Dictionary<Tile2i, AccessPropCleanupInfo> generatedClearableByTile,
+            HashSet<Tile2i> goals,
+            Dictionary<Tile2i, int> componentByTile,
+            HashSet<int> goalComponents,
+            Dictionary<Tile2i, float> goalDistanceByTile,
+            float cleanupUnitCost)
+        {
+            m_groundNodes = groundNodes;
+            m_projectedFixedNodes = projectedFixedNodes;
+            m_cleanupByTile = cleanupByTile;
+            m_generatedClearableByTile = generatedClearableByTile;
+            m_goals = goals;
+            m_componentByTile = componentByTile;
+            m_goalComponents = goalComponents;
+            m_goalDistanceByTile = goalDistanceByTile;
+            m_cleanupUnitCost = cleanupUnitCost;
         }
 
         private AccessV2GroundGraph(

@@ -18,6 +18,7 @@ namespace AutoTerrainDesignations.Access.V2
             if (!ValidateTurns(out failure)) return false;
             if (!ValidateHistory(out failure)) return false;
             if (!ValidateGroundGraph(out failure)) return false;
+            if (!ValidateSlicedGroundGraphBuild(out failure)) return false;
             if (!ValidateFixedNavigationGraph(out failure)) return false;
             if (!ValidateHandoffs(out failure)) return false;
             if (!ValidateFrontages(out failure)) return false;
@@ -1455,6 +1456,77 @@ namespace AutoTerrainDesignations.Access.V2
                     out AccessV2BandProfile band, out failure))
                 return false;
             state = new AccessV2BandState(anchor, band, direction);
+            failure = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateSlicedGroundGraphBuild(out string failure)
+        {
+            var ground = new HashSet<Tile2i>();
+            for (int y = 0; y < 40; y++)
+                for (int x = 0; x < 40; x++)
+                    if (x != 19 || y < 12 || y > 27)
+                        ground.Add(new Tile2i(x, y));
+            var goals = new[]
+            {
+                new Tile2i(39, 39),
+                new Tile2i(39, 0),
+            };
+            var cleanup = new Dictionary<Tile2i, AccessPropCleanupInfo>
+            {
+                [new Tile2i(19, 20)] = new AccessPropCleanupInfo(
+                    new Tile2i(19, 20),
+                    AccessPropCleanupClass.DenseDebris,
+                    AccessPropBlockerKind.None,
+                    true),
+            };
+            var projected = new HashSet<Tile2i>
+            {
+                new Tile2i(10, 10),
+                new Tile2i(11, 10),
+            };
+            var expected = new AccessV2GroundGraph(
+                ground, goals, cleanup, projected, 8f);
+            var build = new AccessV2GroundGraph.BuildSession(
+                ground, goals, cleanup, projected, 8f);
+            int advances = 0;
+            while (!build.IsComplete)
+            {
+                build.Advance(1);
+                advances++;
+            }
+            AccessV2GroundGraph actual = build.Result;
+            if (advances <= ground.Count
+                || actual.GroundNodeCount != expected.GroundNodeCount
+                || actual.CleanupNodeCount != expected.CleanupNodeCount
+                || actual.GoalCount != expected.GoalCount)
+            {
+                failure = "sliced V2 ground build did not retain incremental cardinality";
+                return false;
+            }
+            var probes = new HashSet<Tile2i>(ground)
+            {
+                new Tile2i(19, 20),
+            };
+            foreach (Tile2i tile in probes)
+            {
+                bool expectedDistance = expected.TryGetGoalDistance(
+                    tile, out float expectedValue);
+                bool actualDistance = actual.TryGetGoalDistance(
+                    tile, out float actualValue);
+                if (expectedDistance != actualDistance
+                    || expectedDistance
+                        && Math.Abs(expectedValue - actualValue) > 0.0001f
+                    || expected.IsGoalConnected(tile)
+                        != actual.IsGoalConnected(tile)
+                    || expected.TryGetComponentId(tile, out int expectedComponent)
+                        != actual.TryGetComponentId(tile, out int actualComponent)
+                    || expectedComponent != actualComponent)
+                {
+                    failure = "sliced V2 ground build diverged from synchronous graph";
+                    return false;
+                }
+            }
             failure = string.Empty;
             return true;
         }
@@ -3111,6 +3183,20 @@ namespace AutoTerrainDesignations.Access.V2
                 failure = "V2 ray overlay must collapse owner extrema, retain work across safety waivers, and memoize repeated tile queries";
                 return false;
             }
+            var outsideRayBoundsDiagnostics =
+                new AccessSearchDiagnostics();
+            if (collapsedRayHistory.HasRayAt(
+                    new Tile2i(200, 200),
+                    AccessSideRayOperation.Cut,
+                    diagnostics: outsideRayBoundsDiagnostics)
+                || outsideRayBoundsDiagnostics
+                    .V2RayOverlayParentSteps != 0
+                || outsideRayBoundsDiagnostics
+                    .V2RayOverlayCacheEntries != 0)
+            {
+                failure = "V2 ray overlay must reject tiles outside the accumulated ray bounds without scanning or caching ancestry";
+                return false;
+            }
             Tile2i safetyTile = new Tile2i(22, 22);
             var eastScopeTransition = new AccessV2Transition(
                 AccessV2TransitionKind.SourceLaunch,
@@ -3639,6 +3725,97 @@ namespace AutoTerrainDesignations.Access.V2
                     + $" ground=[{string.Join(",", historyQualifiedGroundSession.Result.GroundPath)}]";
                 return false;
             }
+
+            // A later history-qualified arrival may be retained at its entry
+            // center while every ordinary-G successor is already cheaper.
+            // Cost dominance must reject that successor before invoking the
+            // history-sensitive validator, while the earlier productive
+            // arrival still exercises the real ground-expansion seam.
+            Tile2i dominanceGround = new Tile2i(24, 20);
+            Tile2i dominanceNeighbor = new Tile2i(25, 20);
+            Tile2i isolatedDominanceGoal = new Tile2i(30, 30);
+            var dominanceGroundGraph = new AccessV2GroundGraph(
+                new[]
+                {
+                    dominanceGround,
+                    dominanceNeighbor,
+                    isolatedDominanceGoal,
+                },
+                new[] { isolatedDominanceGoal },
+                new Dictionary<Tile2i, AccessPropCleanupInfo>());
+            AccessV2HandoffCandidate DominanceHandoff(
+                AccessV2BandState state,
+                float cleanupCost,
+                string historyKey)
+                => new AccessV2HandoffCandidate(
+                    state.EntryDirection, 1,
+                    new AccessGroundHandoff(
+                        state.GetLaneOrigin(0),
+                        AccessHandoffOperation.Leveling),
+                    new AccessGroundHandoff(
+                        state.GetLaneOrigin(1),
+                        AccessHandoffOperation.Leveling),
+                    new[] { state.GetLaneOrigin(0) },
+                    new[] { state.GetLaneOrigin(1) },
+                    new[] { dominanceGround },
+                    new[] { dominanceGround },
+                    new[] { historyKey }, cleanupCost,
+                    centerSpokeCost: 2f);
+            int firstGroundValidationCalls = 0;
+            int dominatedGroundValidationCalls = 0;
+            int handoffGroundExpansions = 0;
+            var optimisticDominanceSession = new AccessV2SearchSession(
+                endpoints,
+                Tile2i.Zero, new Tile2i(32, 32),
+                UnitEvaluator,
+                1000, float.MaxValue,
+                (states, history, requiredGroundEntry) =>
+                    states[0].Equals(first)
+                        ? new[]
+                        {
+                            DominanceHandoff(
+                                first, 0f, "first-dominance-history"),
+                        }
+                        : states[0].Equals(validHistoryState)
+                            ? new[]
+                            {
+                                DominanceHandoff(
+                                    validHistoryState, 10f,
+                                    "dominated-history"),
+                            }
+                            : Array.Empty<AccessV2HandoffCandidate>(),
+                groundGraph: dominanceGroundGraph,
+                groundValidator: (center, history) =>
+                {
+                    if (center != dominanceNeighbor)
+                        return true;
+                    if (history.ContainsCleanupKey("dominated-history"))
+                        dominatedGroundValidationCalls++;
+                    else if (history.ContainsCleanupKey(
+                        "first-dominance-history"))
+                        firstGroundValidationCalls++;
+                    return true;
+                });
+            optimisticDominanceSession.ExpansionTraced = trace =>
+            {
+                if (trace.IsGround
+                    && trace.HasHandoff
+                    && trace.Center == dominanceGround)
+                    handoffGroundExpansions++;
+            };
+            while (!optimisticDominanceSession.IsComplete)
+                optimisticDominanceSession.Step(7);
+            if (firstGroundValidationCalls == 0
+                || dominatedGroundValidationCalls != 0
+                || handoffGroundExpansions != 1)
+            {
+                failure =
+                    "V2 history-qualified ground entries must be rejected before expansion when every possible ordinary-G consequence is optimistically dominated"
+                    + $": first={firstGroundValidationCalls}"
+                    + $" dominated={dominatedGroundValidationCalls}"
+                    + $" handoffExpansions={handoffGroundExpansions}";
+                return false;
+            }
             var wrappedV2Session =
                 new AccessPathSearch.AccessPathSearchSession(
                     session, first.GetLaneOrigin(0),
@@ -3720,6 +3897,7 @@ namespace AutoTerrainDesignations.Access.V2
                     Array.Empty<string>(), cleanupCost,
                     centerSpokeCost: 2f);
             }
+            var cheaperRelaunchDiagnostics = new AccessSearchDiagnostics();
             var cheaperRelaunchSession = new AccessV2SearchSession(
                 endpoints, Tile2i.Zero, new Tile2i(32, 32),
                 (current, transition, history, connectedFixedOrigin) =>
@@ -3753,6 +3931,8 @@ namespace AutoTerrainDesignations.Access.V2
                 terrainCenterHeightProvider: _ => 0,
                 preciseTerrainHeightProvider: _ => 0.25f,
                 generatedOriginValidator: _ => true,
+                diagnostics: cheaperRelaunchDiagnostics,
+                evaluateDirectGroundReplacementDominance: true,
                 groundToVHandoffEvaluator:
                     (state, groundEntry, operation, history) =>
                     {
@@ -3769,13 +3949,16 @@ namespace AutoTerrainDesignations.Access.V2
             if (!cheaperRelaunchSession.Result.Success
                 || cheaperRelaunchSession.Result.Cost >= 20f
                 || !cheaperRelaunchSession.Result.GroundPath.Contains(
-                    cheapGround))
+                    cheapGround)
+                || cheaperRelaunchDiagnostics
+                    .V2OrdinaryGroundReplacementPrunes == 0)
             {
                 failure =
                     "V2 G-to-V dominance must allow a later cheaper ground arrival to replace an earlier expensive arrival at the same concrete V state"
                     + $": success={cheaperRelaunchSession.Result.Success}"
                     + $" reason={cheaperRelaunchSession.Result.FailureReason}"
                     + $" cost={cheaperRelaunchSession.Result.Cost}"
+                    + $" replacements={cheaperRelaunchDiagnostics.V2OrdinaryGroundReplacementPrunes}"
                     + $" ground=[{string.Join(",", cheaperRelaunchSession.Result.GroundPath)}]";
                 return false;
             }

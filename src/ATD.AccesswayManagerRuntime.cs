@@ -6,6 +6,7 @@ using System.Diagnostics;
 using AutoTerrainDesignations.Access;
 using Mafi;
 using Mafi.Localization;
+using Mafi.Unity.Ui;
 using Mafi.Unity.UiToolkit;
 using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
@@ -21,11 +22,15 @@ namespace AutoTerrainDesignations
         private static double s_accesswayManagerNextHealthLogSeconds;
         private static bool s_accesswayManagerToastVisible;
         private static long s_accesswayManagerToastRequestId;
+        private static bool s_accesswayManagerToastCaptureMode;
         private static Label? s_accesswayManagerProgressLabel;
         private static Label? s_accesswayManagerStatsLabel;
+        private static UiContext? s_uiContext;
 
         private static void InitializeAccesswayManagerRuntime()
         {
+            Access.Worker.AccessSearchWorker.Shared.SetCurrentWorld(
+                CurrentWorldGeneration);
             s_accesswayManager?.Reset("WorldReinitialized");
             s_accesswayManager = new ATDAccesswayManager(
                 terminalObserver: LogAccesswayTerminalDiagnostic);
@@ -43,6 +48,7 @@ namespace AutoTerrainDesignations
             s_accesswayManagerNextHealthLogSeconds = 0d;
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
+            s_accesswayManagerToastCaptureMode = false;
             s_accesswayManagerProgressLabel = null;
             s_accesswayManagerStatsLabel = null;
         }
@@ -177,7 +183,6 @@ namespace AutoTerrainDesignations
         internal static void PrepareAccesswayManagerForSave()
         {
             s_accesswayManagerSuspendedForSave = true;
-            s_accesswayManager?.Reset("SaveBoundary");
             HideAccesswayManagerToast();
         }
 
@@ -232,7 +237,13 @@ namespace AutoTerrainDesignations
                         => "construction leveling access",
                     _ => "terrain access"
                 };
-                string stopWork = handle.Kind switch
+                bool captureMode = snapshot.Phase.StartsWith(
+                    "Recording access replay", StringComparison.Ordinal)
+                    || snapshot.Phase.StartsWith(
+                        "Cancelling access replay", StringComparison.Ordinal);
+                string stopWork = captureMode
+                    ? "Abort replay capture"
+                    : handle.Kind switch
                 {
                     ATDAccesswayRequestKind.CreateDesignations
                         => "Stop interactive mining access",
@@ -243,18 +254,18 @@ namespace AutoTerrainDesignations
                 var progressText = new LocStrFormatted(
                     $"[ATD] {snapshot.Phase}; finding {workType}");
                 var statsText = new LocStrFormatted(
-                    $"visited {snapshot.VisitedNodes:N0}/"
-                    + $"{AutoTerrainDesignationsMod.AccessMaxVisitedNodes:N0} · "
-                    + $"queue {snapshot.PendingNodes:N0} · "
-                    + $"budget {GetManagedAccesswaySliceBudgetMilliseconds()} ms/frame · "
-                    + $"processing {snapshot.ProcessingMilliseconds / 1000d:0.0}/"
-                    + $"{AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds}s");
+                    AccesswayProgressPresentation.FormatStats(
+                        snapshot,
+                        AutoTerrainDesignationsMod.AccessMaxVisitedNodes,
+                        GetManagedAccesswaySliceBudgetMilliseconds(),
+                        AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds));
                 if (s_terrainAnalysisToastHidden)
                     return;
 
                 var notification = s_uiRoot.ToastNotifProvider.m_notification;
                 if (!s_accesswayManagerToastVisible
                     || s_accesswayManagerToastRequestId != handle.RequestId
+                    || s_accesswayManagerToastCaptureMode != captureMode
                     || s_accesswayManagerProgressLabel == null
                     || s_accesswayManagerStatsLabel == null)
                 {
@@ -279,6 +290,23 @@ namespace AutoTerrainDesignations
                         s_accesswayManagerStatsLabel);
                     notification.Body.SetChildren(
                         progressColumn,
+                        new ButtonIcon(
+                            Button.General,
+                            "Assets/Unity/UserInterface/Toolbar/MapPin.svg",
+                            () =>
+                            {
+                                if (handle.FocusTile.HasValue)
+                                {
+                                    s_uiContext?.CameraController.PanTo(
+                                        handle.FocusTile.Value.CenterTile2f);
+                                }
+                            })
+                            .IconSize(16.px())
+                            .Padding(2.pt())
+                            .MarginLeft(8.pt())
+                            .Tooltip(
+                                AtdLocalization
+                                    .ZoomToAccessActionTooltip.AsFormatted),
                         new ButtonText(
                             Button.General,
                             new LocStrFormatted(stopWork),
@@ -290,6 +318,7 @@ namespace AutoTerrainDesignations
                             HideAccesswayManagerToastUntilComplete)
                             .MarginLeft(8.pt()));
                     s_accesswayManagerToastRequestId = handle.RequestId;
+                    s_accesswayManagerToastCaptureMode = captureMode;
                     s_accesswayManagerToastVisible = true;
                 }
                 else
@@ -320,6 +349,7 @@ namespace AutoTerrainDesignations
             }
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
+            s_accesswayManagerToastCaptureMode = false;
             s_accesswayManagerProgressLabel = null;
         }
 

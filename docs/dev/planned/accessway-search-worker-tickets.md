@@ -1,9 +1,9 @@
 # Accessway search worker implementation tickets
 
-Status: approved sequential implementation queue; Ticket 1 is implemented,
-Ticket 2 is in progress, the cooperative search-slicing sub-slice is approved
-and in progress, the Access Search Laboratory replay foundation is approved
-between Tickets 2 and 3, and Ticket 3 remains queued.
+Status: approved sequential implementation queue; Tickets 1, 2, 2A, and
+foundational 2B are implemented and qualified. Ticket 3's dormant farming
+worker is implemented for internal runtime qualification; its larger lifecycle,
+cancellation-stress, and fault-injection gates remain open.
 
 These tickets implement the approved
 [accessway search worker design](../in-progress/accessway-search-worker.md) and
@@ -155,6 +155,41 @@ atomic frame unit.
 
 ## Ticket 2A: Replay seam and single-case round trip
 
+Implementation status: complete and qualified on 2026-08-29. The dormant
+one-shot recorder, stable atomic inbox,
+versioned compressed graph codec, canonical outcome boundary, exact-DLL replay
+facade, Release runner mode, identity checks, and synthetic codec round-trip
+fixture are implemented. The first diagnostic real capture exposed a slow
+reflection-encoding path; capture now transfers the immutable request to a
+background operation while the coroutine yields and reports exact work-unit
+progress. Post-commit cancellation aborts only capture and removes temporary
+output without invalidating the accepted route. Arming also archives the exact
+Release DLL by hash so later builds cannot orphan the case. The accepted real
+case `manual-64e6888f229b9a47` reproduced canonical SHA-256
+`753c52145ea5959d17a77850b48bf0e448cbd78b4dbf4a66a13b1219eea84587`
+exactly in two fresh processes through archived DLL SHA-256
+`2cd8c175df1e30b080aa7303583a4972a777ea68bf264275faed1591699af10b`.
+After a later diagnostic cluster-2 capture exposed pending cleanup as a false
+acceptance boundary, capture publication was gated on completed cleanup plus a
+fresh live-route validation. Missing manager-owned Quick previews are retried,
+overlapping planned work is restored, and rejected or aborted cases remain
+unpublished. Runtime qualification confirmed all six removals and original
+designation restorations before publication.
+The corrected case subsequently proved that raw graph reference aliasing could
+differ between sliced in-game and unsliced standalone route-step records even
+when every value was equal. Canonical encoding now detaches route steps and
+normalizes schema-1 records before comparison. The corrected case reproduced
+normalized canonical SHA-256
+`c314032209478f01bdecab31401579fab29e1ef3bb80dba15dd3354fbfd96d07`
+in two fresh candidate processes. Final normalized case
+`expensive-v2-01-3a322d4481323a82.atd-access-case` then reproduced that hash in
+two fresh processes through its exact archived Release DLL. The case is
+promoted as `semantic-performance`; the complete two-case semantic corpus and
+synthetic fixture gate pass. Its quiet-machine benchmark subsequently passed
+all five exact-semantic repetitions with 42.583-second median total time and
+970 MB peak working set, completing the foundational Ticket 2B performance
+slice.
+
 Depends on Ticket 2, including pure-helper isolation and the worker-safe
 snapshot contract.
 
@@ -191,6 +226,33 @@ outside the game through the exact built `AutoTerrainDesignations.dll`.
 Ticket 3 depends on this slice.
 
 ## Ticket 2B: Corpus regression and benchmark runner
+
+Implementation status: complete and qualified on 2026-08-29. Candidate-DLL
+replay, semantic diffs, repeated pure-pipeline benchmarking, immutable
+promotion, content deduplication, explicit migration rejection, compatibility
+attestations, the synthetic-first bounded child-process gate, watchdogs, and
+JSON/Markdown reports are implemented. The semantic-only
+`trivial/trivial-ground-handoff` case and semantic-performance
+`expensive/expensive-v2-01` case pass the complete serial corpus regression.
+The expensive case reproduced exactly through its archived DLL in two fresh
+processes. Its sequential quiet-machine five-run benchmark retained exact
+semantics with median timings of 30.568 ms preparation, 42.542 seconds search,
+8.269 ms materialization, and 42.583 seconds total; totals ranged from 42.491 to
+42.920 seconds, peak working set was 970 MB, and managed-heap delta was about
+697 MB. Reports are `20260829-120441-regression` and
+`20260829-122404-benchmark`.
+
+The first expensive candidate, `expensive-v2-01-239be895ea35503f`, is retained
+as diagnostic inbox material and must not be promoted. Its cluster-2 search
+found 35 cleanup origins (including six dense-debris removal requests), but
+live validation accepted the route while those requests were merely pending.
+All six later completed as `PlayerOverride`; no Quick Remove executed, so the
+game-visible route was incomplete. Exact-DLL desktop replay was stable across
+fresh processes but differed from the Unity result in only the redundant V2
+route-step representation; route states, generated profiles, handoffs, ground
+path, terminal goals, cost, and materialized plan matched. A replacement
+performance capture therefore waits on authoritative post-cleanup acceptance
+and the prop-removal preview/ownership lifecycle fix.
 
 Depends on Ticket 2A.
 
@@ -243,6 +305,44 @@ the worker thread itself:
 
 ## Ticket 3: Dormant farming worker
 
+Implementation status: internal farming path implemented on 2026-08-29. One
+lazy process-lifetime below-normal thread owns a single job/result mailbox and
+executes the same canonical preparation/search/materialization core used by the
+standalone replay facade. Farming capture creates no game-thread workspace;
+the manager coroutine submits and polls without waiting, publishes worker
+progress through the existing toast, cancels logically, rejects stale world
+generations, and formats terminal diagnostics before existing live validation
+and commit. In-place saves suspend consumption without cancelling pure work.
+The synthetic suite proves exact worker/cooperative canonical parity, sampled
+overlay delivery, and a sub-250-ms pending cancellation acknowledgment; the
+three promoted private cases remain exact through the shared core. The first
+two-cluster farming playtest passed with both final routes correct and exposed
+the missing visualization transport, which is now a fixed-capacity lock-free
+single-producer buffer drained by the game thread. Large active-search
+cancellation, fault/restart injection, world-reset races, and a cleanup-bearing
+farming playtest remain before this ticket is qualified. An in-place-save test
+on 2026-08-29 ended the active farming request as
+`Stale / NearbyDesignationChanged` because save-removability temporarily
+removes the current farming proxy designations. Preserving the farming
+obligation across that teardown is deferred to dedicated farming designations.
+As an interim runtime policy, the farming session marks the exact request
+interrupted by save teardown and bypasses failure backoff once for that
+unsuccessful terminal, immediately rebuilding from restored designations. The
+pre-save result remains stale and cannot commit.
+The test also found a distinct Ticket 3 defect: disposal of that stale managed
+work failed to cancel and reclaim the submitted worker job, leaving the
+60-second automatic retry waiting on `WorkerBusy`. Disposal now uses an
+explicit abandon operation that cooperatively cancels active computation,
+discards the unowned terminal result, and releases the single slot only after
+the worker stops. A deterministic active-search fixture proves replacement-job
+submission after disposal. Broader stale, superseded, and world-reset runtime
+qualification remains open.
+
+The worker progress snapshot now also carries an explicit execution backend and
+worker elapsed time. Its toast omits cooperative `ms/frame` and polling-time
+fields while worker execution is active, avoiding backend inference from phase
+text and preserving the existing cooperative presentation during capture.
+
 Depends on Tickets 2, 2A, and the foundational Ticket 2B regression runner.
 
 ### Outcome
@@ -279,6 +379,26 @@ without exposing a player-selectable or default production mode.
 ## Ticket 4: Complete manager integration
 
 Depends on Ticket 3.
+
+Implementation status: the first internal slice is implemented on 2026-08-29.
+Interactive Create Designations now selects the same worker adapter as farming,
+while its live capture, validation, cleanup acceptance, and commit remain on the
+game thread. Its outer debug/cancellation gate explicitly abandons the inner
+worker job before disposing it, with a focused fixture protecting Stop and
+stale-disposal recovery. The Release DLL passes all three promoted Laboratory
+cases plus the synthetic suite. The first classic Cluster 2 runtime check kept
+the final route correct while moving the roughly 73-second search off-thread;
+the remaining main-thread evidence exposed 117 ms designation-projection and
+358 ms snapshot-construction slices. Existing-work outside-corner projection
+now yields within scan rows and reuses captured heights, while the V2 ground graph's
+cleanup classification, component flood, and goal potential use a budgeted
+incremental builder with synchronous/incremental parity coverage. Repair,
+The remaining 255 ms two-cluster advance crossed the synchronous legacy-ramp
+comparison after worker acceptance and was misleadingly attributed to the next
+capture phase. That comparison now yields at candidate and ramp-step
+boundaries under the same active budget and reports its own phase. Repair,
+existing-terrain access, ghost-tower access, and broader mixed-caller lifecycle
+qualification remain open.
 
 ### Outcome
 

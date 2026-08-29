@@ -156,8 +156,40 @@ namespace AutoTerrainDesignations
             }
             finally
             {
+                if (sliceControl.CancellationRequested)
+                {
+                    sliceControl.RequestDisposalCancellation(
+                        string.IsNullOrEmpty(sliceControl.CancellationReason)
+                            ? "CreateDesignationsCancelled"
+                            : sliceControl.CancellationReason);
+                }
                 (routine as IDisposable)?.Dispose();
             }
+        }
+
+        internal static bool
+            ValidateCreateDesignationsWorkerCancellationFixture(
+                out string failure)
+        {
+            var control = new ExperimentalAccessSliceControl();
+            bool abandonmentForwarded = false;
+            control.RegisterDisposalCancellation(
+                _ => abandonmentForwarded = true);
+            control.RequestCancellation("FixtureInteractiveStop");
+            IEnumerator gate =
+                RunCreateDesignationsAccessRampWithDebugGate(
+                    control,
+                    Array.Empty<object>().GetEnumerator());
+            bool continued = gate.MoveNext();
+            (gate as IDisposable)?.Dispose();
+            if (continued || !abandonmentForwarded)
+            {
+                failure =
+                    "Interactive cancellation gate did not abandon its inner worker routine.";
+                return false;
+            }
+            failure = string.Empty;
+            return true;
         }
 
         private static string BuildCreateDesignationsAccessOwnerKey(
@@ -249,7 +281,8 @@ namespace AutoTerrainDesignations
                     workFactory,
                     resultFactory,
                     GetManagedAccesswaySliceBudgetMilliseconds),
-                BuildInteractiveAccessValidation(tower, towerSettings));
+                BuildInteractiveAccessValidation(tower, towerSettings),
+                focusTile: tower.Area.BoundingBoxCenter);
             ATDAccesswayRequestHandle? handle = null;
             bool reachedTerminalState = false;
             try
@@ -807,7 +840,8 @@ namespace AutoTerrainDesignations
                                     useLocalSurfaceReference: false,
                                     allowExistingPlannedRampShortcut: true,
                                     result: rampResult,
-                                    sliceControl: sliceControl)),
+                                    sliceControl: sliceControl,
+                                    useWorkerSearch: true)),
                         () =>
                         {
                             var payload =
@@ -827,7 +861,8 @@ namespace AutoTerrainDesignations
                                     payload);
                         },
                         GetManagedAccesswaySliceBudgetMilliseconds),
-                    BuildInteractiveAccessValidation(tower, towerSettings));
+                    BuildInteractiveAccessValidation(tower, towerSettings),
+                    focusTile: tower.Area.BoundingBoxCenter);
                 ATDAccesswayRequestHandle accessHandle =
                     EnqueueAccesswayRequest(accessRequest);
                 s_createDesignationsAccessRequest = accessHandle;

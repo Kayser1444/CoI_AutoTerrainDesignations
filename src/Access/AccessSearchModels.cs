@@ -466,7 +466,11 @@ namespace AutoTerrainDesignations.Access
             AccessSearchPolicySnapshot? policy = null,
             AccessCaptureDiagnostics? captureDiagnostics = null,
             AccessRequestSettingsRevision requestSettingsRevision = default,
-            AccessDesignationReadinessFacts? designationReadinessFacts = null)
+            AccessDesignationReadinessFacts? designationReadinessFacts = null,
+            HashSet<Tile2i>? prebuiltProjectedFixedGroundNodes = null,
+            V2.AccessV2GroundGraph? prebuiltV2GroundGraph = null,
+            V2.AccessV2FixedNavigationGraph?
+                prebuiltV2FixedNavigationGraph = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
@@ -553,7 +557,10 @@ namespace AutoTerrainDesignations.Access
                 && goalGroundNodes is HashSet<Tile2i> ownedGoalGroundNodes
                     ? ownedGoalGroundNodes
                     : new HashSet<Tile2i>(goalGroundNodes);
-            m_occupiedTiles = new HashSet<Tile2i>(occupiedTiles);
+            m_occupiedTiles = takeOwnership
+                && occupiedTiles is HashSet<Tile2i> ownedOccupiedTiles
+                    ? ownedOccupiedTiles
+                    : new HashSet<Tile2i>(occupiedTiles);
             m_terrainPathableWithoutBlockers =
                 terrainPathableWithoutBlockers == null
                     ? new HashSet<Tile2i>()
@@ -563,7 +570,7 @@ namespace AutoTerrainDesignations.Access
                         ? ownedTerrainPathableWithoutBlockers
                         : new HashSet<Tile2i>(terrainPathableWithoutBlockers);
             m_expandedBuildingRayBlockers = BuildExpandedBuildingRayBlockers(
-                occupiedTiles, boundsMin, boundsMax);
+                m_occupiedTiles, boundsMin, boundsMax);
             m_cutDesignationRayBlockers = BuildDesignationRayBlockers(
                 rayMiningDesignationOrigins ?? Array.Empty<Tile2i>());
             m_fillDesignationRayBlockers = BuildDesignationRayBlockers(
@@ -654,17 +661,32 @@ namespace AutoTerrainDesignations.Access
                 : null;
             if (VehicleWidth > 4)
             {
-                HashSet<Tile2i> projectedGround =
-                    BuildProjectedFixedGroundNodes(
-                        out m_projectedFixedGroundNodes);
-                V2GroundGraph = new V2.AccessV2GroundGraph(
-                    projectedGround, m_goalGroundNodes,
-                    m_propCleanupByTile,
-                    m_projectedFixedGroundNodes,
-                    Policy.PropCleanupLandscapingCost);
-                V2FixedNavigationGraph =
-                    new V2.AccessV2FixedNavigationGraph(
-                        m_fixedProfiles, V2GroundGraph);
+                if (prebuiltV2GroundGraph != null)
+                {
+                    m_projectedFixedGroundNodes =
+                        prebuiltProjectedFixedGroundNodes
+                        ?? throw new ArgumentException(
+                            "Prebuilt V2 ground graph requires its projected fixed-node set.",
+                            nameof(prebuiltProjectedFixedGroundNodes));
+                    V2GroundGraph = prebuiltV2GroundGraph;
+                    V2FixedNavigationGraph = prebuiltV2FixedNavigationGraph
+                        ?? new V2.AccessV2FixedNavigationGraph(
+                            m_fixedProfiles, V2GroundGraph);
+                }
+                else
+                {
+                    HashSet<Tile2i> projectedGround =
+                        BuildProjectedFixedGroundNodes(
+                            out m_projectedFixedGroundNodes);
+                    V2GroundGraph = new V2.AccessV2GroundGraph(
+                        projectedGround, m_goalGroundNodes,
+                        m_propCleanupByTile,
+                        m_projectedFixedGroundNodes,
+                        Policy.PropCleanupLandscapingCost);
+                    V2FixedNavigationGraph =
+                        new V2.AccessV2FixedNavigationGraph(
+                            m_fixedProfiles, V2GroundGraph);
+                }
             }
             else
             {
@@ -1558,17 +1580,52 @@ namespace AutoTerrainDesignations.Access
         /// </summary>
         private HashSet<Tile2i> BuildProjectedFixedGroundNodes(
             out HashSet<Tile2i> projectedFixedNodes)
+            => BuildProjectedFixedGroundNodes(
+                BoundsMin,
+                BoundsMax,
+                PhysicalTerrainMin,
+                PhysicalTerrainMax,
+                VehicleWidth,
+                VehicleMaxSteepnessDelta,
+                AvoidBuildings,
+                AvoidOcean,
+                m_groundNodes,
+                m_fixedProfiles,
+                m_terrainPathableWithoutBlockers,
+                m_groundExclusionReasons,
+                m_occupiedTiles,
+                m_oceanTiles,
+                m_preciseTerrainHeights,
+                out projectedFixedNodes);
+
+        internal static HashSet<Tile2i> BuildProjectedFixedGroundNodes(
+            Tile2i boundsMin,
+            Tile2i boundsMax,
+            Tile2i physicalTerrainMin,
+            Tile2i physicalTerrainMax,
+            int vehicleWidth,
+            float vehicleMaxSteepnessDelta,
+            bool avoidBuildings,
+            bool avoidOcean,
+            HashSet<Tile2i> groundNodes,
+            IReadOnlyDictionary<Tile2i, AccessHeightProfile> fixedProfiles,
+            HashSet<Tile2i> terrainPathableWithoutBlockers,
+            IReadOnlyDictionary<Tile2i, string> groundExclusionReasons,
+            HashSet<Tile2i> occupiedTiles,
+            HashSet<Tile2i> oceanTiles,
+            IReadOnlyDictionary<Tile2i, float> preciseTerrainHeights,
+            out HashSet<Tile2i> projectedFixedNodes)
         {
-            var result = new HashSet<Tile2i>(m_groundNodes);
+            var result = new HashSet<Tile2i>(groundNodes);
             projectedFixedNodes = new HashSet<Tile2i>();
-            if (m_fixedProfiles.Count == 0)
+            if (fixedProfiles.Count == 0)
                 return result;
 
             const float epsilon = 0.0001f;
             var fixedHeightBySample = new Dictionary<Tile2i, float>();
             var conflictingSamples = new HashSet<Tile2i>();
             foreach (KeyValuePair<Tile2i, AccessHeightProfile> pair
-                in m_fixedProfiles)
+                in fixedProfiles)
             {
                 for (int y = 0; y <= 4; y++)
                     for (int x = 0; x <= 4; x++)
@@ -1585,10 +1642,10 @@ namespace AutoTerrainDesignations.Access
                     }
             }
 
-            int clearance = Math.Max(1, VehicleWidth);
+            int clearance = Math.Max(1, vehicleWidth);
             int half = clearance / 2;
             var affectedCenters = new HashSet<Tile2i>();
-            foreach (Tile2i origin in m_fixedProfiles.Keys)
+            foreach (Tile2i origin in fixedProfiles.Keys)
             {
                 // A center is affected when its clearance mask, including the
                 // +X/+Y slope samples, can touch this 4x4 target surface.
@@ -1600,10 +1657,10 @@ namespace AutoTerrainDesignations.Access
                     for (int x = minX; x <= maxX; x++)
                     {
                         var center = new Tile2i(x, y);
-                        if (center.X >= BoundsMin.X
-                            && center.Y >= BoundsMin.Y
-                            && center.X <= BoundsMax.X
-                            && center.Y <= BoundsMax.Y)
+                        if (center.X >= boundsMin.X
+                            && center.Y >= boundsMin.Y
+                            && center.X <= boundsMax.X
+                            && center.Y <= boundsMax.Y)
                             affectedCenters.Add(center);
                     }
             }
@@ -1630,9 +1687,9 @@ namespace AutoTerrainDesignations.Access
                 // Fixed height projection must not silently remove it. An
                 // eligible prop remains available through the graph's cleanup
                 // node rather than becoming free projected ground.
-                if (!m_groundNodes.Contains(center)
-                    && m_terrainPathableWithoutBlockers.Contains(center)
-                    && m_groundExclusionReasons.TryGetValue(
+                if (!groundNodes.Contains(center)
+                    && terrainPathableWithoutBlockers.Contains(center)
+                    && groundExclusionReasons.TryGetValue(
                         center, out string exclusion)
                     && (exclusion == "NotPathable"
                         || exclusion == "T1Only"))
@@ -1643,9 +1700,9 @@ namespace AutoTerrainDesignations.Access
                     for (int x = 0; x < clearance; x++)
                     {
                         Tile2i tile = corner + new RelTile2i(x, y);
-                        if (AvoidBuildings && m_occupiedTiles.Contains(tile))
+                        if (avoidBuildings && occupiedTiles.Contains(tile))
                             return false;
-                        if (AvoidOcean && m_oceanTiles.Contains(tile))
+                        if (avoidOcean && oceanTiles.Contains(tile))
                             return false;
                         if (!TryGetHeight(tile, out float height)
                             || !TryGetHeight(
@@ -1658,7 +1715,7 @@ namespace AutoTerrainDesignations.Access
                         if (Math.Max(
                                 Math.Abs(height - plusX),
                                 Math.Abs(height - plusY))
-                            > VehicleMaxSteepnessDelta + epsilon)
+                            > vehicleMaxSteepnessDelta + epsilon)
                             return false;
                     }
                 return true;
@@ -1666,17 +1723,17 @@ namespace AutoTerrainDesignations.Access
 
             bool TryGetHeight(Tile2i tile, out float height)
             {
-                if (tile.X < PhysicalTerrainMin.X
-                    || tile.Y < PhysicalTerrainMin.Y
-                    || tile.X > PhysicalTerrainMax.X
-                    || tile.Y > PhysicalTerrainMax.Y
+                if (tile.X < physicalTerrainMin.X
+                    || tile.Y < physicalTerrainMin.Y
+                    || tile.X > physicalTerrainMax.X
+                    || tile.Y > physicalTerrainMax.Y
                     || conflictingSamples.Contains(tile))
                 {
                     height = 0f;
                     return false;
                 }
                 return fixedHeightBySample.TryGetValue(tile, out height)
-                    || m_preciseTerrainHeights.TryGetValue(tile, out height);
+                    || preciseTerrainHeights.TryGetValue(tile, out height);
             }
         }
 
@@ -2679,6 +2736,9 @@ namespace AutoTerrainDesignations.Access
         public int V2GroundToVDirectLevelingAccepts;
         public int V2GroundToVRoughAccepts;
         public int V2GroundToVCacheHits;
+        public int V2OrdinaryGroundReplacementChecks;
+        public int V2OrdinaryGroundReplacementCandidates;
+        public int V2OrdinaryGroundReplacementPrunes;
         public int V2GroundToVCacheInsertions;
         public int V2GroundToVFaceChecks;
         public int V2GroundToVFaceRejects;
@@ -2689,6 +2749,12 @@ namespace AutoTerrainDesignations.Access
         public int V2QuickHandoffAccepts;
         public int V2HandoffDominanceSuccesses;
         public int V2HandoffDominancePrunes;
+        public int V2HandoffGroundDominanceChecks;
+        public int V2HandoffGroundDominancePrunes;
+        public int V2HandoffGroundEntryDominanceChecks;
+        public int V2HandoffGroundEntryDominancePrunes;
+        public int V2HandoffGroundToVDominanceChecks;
+        public int V2HandoffGroundToVDominancePrunes;
         public int V2HandoffPairChecks;
         public int V2MixedLanePairRejects;
         public int V2LevelingBridgeAccepts;

@@ -7,6 +7,142 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Access.V2
 {
+    internal readonly struct AccessV2ExpansionTrace
+    {
+        public int Ordinal { get; }
+        public Tile2i Center { get; }
+        public int Height2 { get; }
+        public int? GroundHeight2 { get; }
+        public bool IsGround { get; }
+        public bool FirstExpansion { get; }
+        public int QueueAge { get; }
+        public int EnqueuedAtVisited { get; }
+        public float Cost { get; }
+        public bool IsGroundRelaunchedV { get; }
+        public AccessV2TravelAxis? Axis { get; }
+        public Tile2i? EntryDirection { get; }
+        public bool HasHandoff { get; }
+        public Tile2i? FixedNavigationPortalRoot { get; }
+        public bool IsGroundToVAdapter { get; }
+        public bool IsProjectedGroundEntry { get; }
+        public int HistorySignature { get; }
+        public int HistoryOrigins { get; }
+        public int HistoryRayConstraints { get; }
+        public int HistoryCleanupKeys { get; }
+        public bool PotentialOwnerIsGlobal { get; }
+        public int PotentialOwnerId { get; }
+        public Tile2i? GroundLaunchCenter { get; }
+        public int? GroundLaunchComponent { get; }
+        public Tile2i? PotentialMergeCenter { get; }
+        public int? GroundComponent { get; }
+        public float? OrdinaryGroundBestCost { get; }
+        public int LaunchHistoryOrigins { get; }
+        public int LaunchHistoryRayConstraints { get; }
+        public int LaunchHistoryCleanupKeys { get; }
+        public int LabelKeyHash { get; }
+
+        public AccessV2ExpansionTrace(
+            int ordinal,
+            Tile2i center,
+            int height2,
+            int? groundHeight2,
+            bool isGround,
+            bool firstExpansion,
+            int queueAge,
+            int enqueuedAtVisited,
+            float cost,
+            bool isGroundRelaunchedV,
+            AccessV2TravelAxis? axis,
+            Tile2i? entryDirection,
+            bool hasHandoff,
+            Tile2i? fixedNavigationPortalRoot,
+            bool isGroundToVAdapter,
+            bool isProjectedGroundEntry,
+            int historySignature,
+            int historyOrigins,
+            int historyRayConstraints,
+            int historyCleanupKeys,
+            bool potentialOwnerIsGlobal,
+            int potentialOwnerId,
+            Tile2i? groundLaunchCenter,
+            int? groundLaunchComponent,
+            Tile2i? potentialMergeCenter,
+            int? groundComponent,
+            float? ordinaryGroundBestCost,
+            int launchHistoryOrigins,
+            int launchHistoryRayConstraints,
+            int launchHistoryCleanupKeys,
+            int labelKeyHash)
+        {
+            Ordinal = ordinal;
+            Center = center;
+            Height2 = height2;
+            GroundHeight2 = groundHeight2;
+            IsGround = isGround;
+            FirstExpansion = firstExpansion;
+            QueueAge = queueAge;
+            EnqueuedAtVisited = enqueuedAtVisited;
+            Cost = cost;
+            IsGroundRelaunchedV = isGroundRelaunchedV;
+            Axis = axis;
+            EntryDirection = entryDirection;
+            HasHandoff = hasHandoff;
+            FixedNavigationPortalRoot = fixedNavigationPortalRoot;
+            IsGroundToVAdapter = isGroundToVAdapter;
+            IsProjectedGroundEntry = isProjectedGroundEntry;
+            HistorySignature = historySignature;
+            HistoryOrigins = historyOrigins;
+            HistoryRayConstraints = historyRayConstraints;
+            HistoryCleanupKeys = historyCleanupKeys;
+            PotentialOwnerIsGlobal = potentialOwnerIsGlobal;
+            PotentialOwnerId = potentialOwnerId;
+            GroundLaunchCenter = groundLaunchCenter;
+            GroundLaunchComponent = groundLaunchComponent;
+            PotentialMergeCenter = potentialMergeCenter;
+            GroundComponent = groundComponent;
+            OrdinaryGroundBestCost = ordinaryGroundBestCost;
+            LaunchHistoryOrigins = launchHistoryOrigins;
+            LaunchHistoryRayConstraints = launchHistoryRayConstraints;
+            LaunchHistoryCleanupKeys = launchHistoryCleanupKeys;
+            LabelKeyHash = labelKeyHash;
+        }
+    }
+
+    internal readonly struct AccessV2GroundExpansionOutcomeTrace
+    {
+        public int Ordinal { get; }
+        public bool HasHandoff { get; }
+        public bool GoalAtPop { get; }
+        public bool SuffixAttempted { get; }
+        public bool SuffixSucceeded { get; }
+        public int GroundEnqueueAttempts { get; }
+        public int GroundEnqueueAccepted { get; }
+        public int VEnqueueAttempts { get; }
+        public int VEnqueueAccepted { get; }
+
+        public AccessV2GroundExpansionOutcomeTrace(
+            int ordinal,
+            bool hasHandoff,
+            bool goalAtPop,
+            bool suffixAttempted,
+            bool suffixSucceeded,
+            int groundEnqueueAttempts,
+            int groundEnqueueAccepted,
+            int vEnqueueAttempts,
+            int vEnqueueAccepted)
+        {
+            Ordinal = ordinal;
+            HasHandoff = hasHandoff;
+            GoalAtPop = goalAtPop;
+            SuffixAttempted = suffixAttempted;
+            SuffixSucceeded = suffixSucceeded;
+            GroundEnqueueAttempts = groundEnqueueAttempts;
+            GroundEnqueueAccepted = groundEnqueueAccepted;
+            VEnqueueAttempts = vEnqueueAttempts;
+            VEnqueueAccepted = vEnqueueAccepted;
+        }
+    }
+
     internal readonly struct AccessV2TransitionEvaluation
     {
         public bool IsValid { get; }
@@ -288,12 +424,16 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly Func<Tile2i, AccessV2History, bool>? m_groundValidator;
         private readonly float m_cleanupCostScale;
         private readonly float m_groundToVCenterSpokeCost;
+        private readonly bool m_evaluateDirectGroundReplacementDominance;
         private readonly int m_maxVisited;
         private readonly float m_maxCost;
         private readonly SortedDictionary<SearchPriority, Queue<SearchNode>> m_queue =
             new SortedDictionary<SearchPriority, Queue<SearchNode>>();
         private readonly Dictionary<SearchKey, float> m_best =
             new Dictionary<SearchKey, float>();
+        private readonly Dictionary<Tile2i, SearchNode>
+            m_bestGroundNodesByCenter =
+                new Dictionary<Tile2i, SearchNode>();
         private readonly HashSet<SearchKey> m_exploredStartTierKeys =
             new HashSet<SearchKey>();
         private readonly HashSet<SearchKey> m_expandedKeys =
@@ -314,6 +454,10 @@ namespace AutoTerrainDesignations.Access.V2
         private int m_quickHandoffAccepts;
         private IAccessV2SearchContinuation? m_continuation;
         private ContinuationResumeStage m_continuationResumeStage;
+        private GroundExpansionTraceState? m_activeGroundExpansionTrace;
+        private Dictionary<SearchNode, ExpansionTraceProvenance>?
+            m_expansionTraceProvenance;
+        private bool m_emittingOrdinaryGroundReplacement;
 
         public bool IsComplete { get; private set; }
         public int Visited => m_visited;
@@ -323,6 +467,9 @@ namespace AutoTerrainDesignations.Access.V2
         internal Dictionary<string, int> LiveRejections => m_rejections;
         // Diagnostic-only hook used by the access search overlay.
         internal Action<Tile2i, int, bool, int?>? NodeExplored { get; set; }
+        internal Action<AccessV2ExpansionTrace>? ExpansionTraced { get; set; }
+        internal Action<AccessV2GroundExpansionOutcomeTrace>?
+            GroundExpansionOutcomeTraced { get; set; }
         internal IReadOnlyList<AccessV2PotentialSample> PotentialSamples
             => m_potentialField?.GetDiagnosticSamples()
                 ?? Array.Empty<AccessV2PotentialSample>();
@@ -369,7 +516,8 @@ namespace AutoTerrainDesignations.Access.V2
                 fixedNavigationGraph = null,
             Func<Tile2i, bool>? generatedVPrimeOriginValidator = null,
             int vehicleWidth = 5,
-            AccessV2TerminalCrestEvaluator? terminalCrestEvaluator = null)
+            AccessV2TerminalCrestEvaluator? terminalCrestEvaluator = null,
+            bool evaluateDirectGroundReplacementDominance = false)
         {
             m_boundsMin = boundsMin;
             m_boundsMax = boundsMax;
@@ -420,6 +568,8 @@ namespace AutoTerrainDesignations.Access.V2
             m_groundValidator = groundValidator;
             m_cleanupCostScale = cleanupCostScale;
             m_groundToVCenterSpokeCost = groundToVCenterSpokeCost;
+            m_evaluateDirectGroundReplacementDominance =
+                evaluateDirectGroundReplacementDominance;
             VehicleWidth = Math.Max(1, vehicleWidth);
             m_maxVisited = Math.Max(1, maxVisited);
             m_maxCost = maxCost;
@@ -474,12 +624,18 @@ namespace AutoTerrainDesignations.Access.V2
                     if (continuationResult.Outcome
                         == ContinuationOutcome.Cancelled)
                     {
+                        CompleteActiveGroundExpansionTrace();
                         CompleteFailure("SearchCancelled");
                         break;
                     }
                     if (continuationResult.Outcome
                         == ContinuationOutcome.Succeeded)
                     {
+                        if (resumeStage
+                            == ContinuationResumeStage.ExpandGround
+                            && m_activeGroundExpansionTrace != null)
+                            m_activeGroundExpansionTrace.SuffixSucceeded = true;
+                        CompleteActiveGroundExpansionTrace();
                         CompleteSuccess(continuationResult.Terminal!);
                         break;
                     }
@@ -492,6 +648,9 @@ namespace AutoTerrainDesignations.Access.V2
                                 completedContinuation.Current);
                         continue;
                     }
+                    if (completedContinuation
+                        is GroundExpansionContinuation)
+                        CompleteActiveGroundExpansionTrace();
                     if (resumeStage
                         == ContinuationResumeStage.ExpandBand)
                     {
@@ -599,6 +758,65 @@ namespace AutoTerrainDesignations.Access.V2
                 }
 
                 m_visited++;
+                if (ExpansionTraced != null)
+                {
+                    int? exploredGroundComponent = null;
+                    float? ordinaryGroundBestCost = null;
+                    if (current.GroundCenter.HasValue
+                        && m_groundGraph != null
+                        && m_groundGraph.TryGetComponentId(
+                            current.GroundCenter.Value,
+                            out int foundGroundComponent))
+                        exploredGroundComponent = foundGroundComponent;
+                    if (current.GroundCenter.HasValue
+                        && current.Handoff != null
+                        && m_best.TryGetValue(
+                            new SearchKey(
+                                current.GroundCenter.Value,
+                                current.FixedNavigationAxis,
+                                current.FixedNavigationPortalRoot),
+                            out float foundOrdinaryGroundCost))
+                        ordinaryGroundBestCost = foundOrdinaryGroundCost;
+                    ExpansionTraceProvenance provenance = default;
+                    m_expansionTraceProvenance?.TryGetValue(
+                        current, out provenance);
+                    ExpansionTraced.Invoke(new AccessV2ExpansionTrace(
+                        m_visited,
+                        exploredCenter,
+                        exploredHeight2,
+                        exploredGroundHeight2,
+                        current.GroundCenter.HasValue,
+                        firstExpansion,
+                        queueAge,
+                        current.EnqueuedAtVisited,
+                        current.Cost,
+                        current.IsGroundRelaunchedV,
+                        current.GroundCenter.HasValue
+                            ? current.FixedNavigationAxis
+                            : current.State.Axis,
+                        current.GroundCenter.HasValue
+                            ? null
+                            : current.State.EntryDirection,
+                        current.Handoff != null,
+                        current.FixedNavigationPortalRoot,
+                        current.IsGroundToVAdapter,
+                        current.IsProjectedGroundEntry,
+                        current.History.Signature,
+                        current.History.OriginCount,
+                        current.History.RayConstraintCount,
+                        current.History.CleanupKeyCount,
+                        current.PotentialOwner.IsGlobal,
+                        current.PotentialOwner.GetHashCode(),
+                        provenance.GroundLaunchCenter,
+                        current.PotentialOwner.SourceGroundComponent,
+                        provenance.PotentialMergeCenter,
+                        exploredGroundComponent,
+                        ordinaryGroundBestCost,
+                        provenance.LaunchHistoryOrigins,
+                        provenance.LaunchHistoryRayConstraints,
+                        provenance.LaunchHistoryCleanupKeys,
+                        currentKey.GetHashCode()));
+                }
                 if (NodeExplored != null)
                 {
                     long nodeCallbackStart = AtdDiagnostics.Timestamp();
@@ -615,9 +833,17 @@ namespace AutoTerrainDesignations.Access.V2
                 }
                 if (current.GroundCenter.HasValue)
                 {
+                    if (GroundExpansionOutcomeTraced != null)
+                        m_activeGroundExpansionTrace =
+                            new GroundExpansionTraceState(
+                                m_visited,
+                                current.Handoff != null);
                     if (m_groundGraph != null
                         && m_groundGraph.IsGoal(current.GroundCenter.Value))
                     {
+                        if (m_activeGroundExpansionTrace != null)
+                            m_activeGroundExpansionTrace.GoalAtPop = true;
+                        CompleteActiveGroundExpansionTrace();
                         CompleteSuccess(current);
                         break;
                     }
@@ -628,6 +854,9 @@ namespace AutoTerrainDesignations.Access.V2
                             CreateGroundSuffixContinuation(current);
                         if (suffix != null)
                         {
+                            if (m_activeGroundExpansionTrace != null)
+                                m_activeGroundExpansionTrace.SuffixAttempted =
+                                    true;
                             m_continuation = suffix;
                             m_continuationResumeStage =
                                 ContinuationResumeStage.ExpandGround;
@@ -718,6 +947,7 @@ namespace AutoTerrainDesignations.Access.V2
                 m_queue.Clear();
                 m_queueCount = 0;
                 m_best.Clear();
+                m_bestGroundNodesByCenter.Clear();
                 m_handoffDominance =
                     new AccessV2HandoffDominanceCache();
                 int redundantSeedsBefore =
@@ -1388,7 +1618,14 @@ namespace AutoTerrainDesignations.Access.V2
                         EnqueueTerminalEntry(axes[axisIndex]);
 
                 void EnqueueTerminalEntry(AccessV2TravelAxis? axis)
-                    => Enqueue(new SearchNode(
+                {
+                    Tile2i? portalRoot = axis.HasValue
+                        ? null
+                        : GetFixedNavigationPortalRoot(entry);
+                    if (ShouldPruneHistoryQualifiedGroundEntry(
+                            entry, cost, history, axis, portalRoot))
+                        return;
+                    Enqueue(new SearchNode(
                         parent.State,
                         history,
                         cost,
@@ -1403,10 +1640,8 @@ namespace AutoTerrainDesignations.Access.V2
                         handoff,
                         entry,
                         fixedNavigationAxis: axis,
-                        fixedNavigationPortalRoot:
-                            axis.HasValue
-                                ? null
-                                : GetFixedNavigationPortalRoot(entry)));
+                        fixedNavigationPortalRoot: portalRoot));
+                }
             }
         }
 
@@ -2216,6 +2451,34 @@ namespace AutoTerrainDesignations.Access.V2
                                     continue;
                                 }
                             }
+                            m_neighborNext = next;
+                            m_neighborPortalRoot = nextIsProjected
+                                ? portalRoot
+                                : null;
+                            m_neighborFixedNavigationAxis = nextIsProjected
+                                ? m_current.FixedNavigationAxis
+                                : null;
+                            m_neighborStepCost =
+                                AccessV2GroundGraph.GetStepCost(
+                                    m_from, next);
+                            m_neighborAxes = m_owner.m_fixedNavigationGraph
+                                    != null && nextIsProjected
+                                ? m_owner.m_fixedNavigationGraph.GetNodeAxes(
+                                    next)
+                                : Array.Empty<AccessV2TravelAxis>();
+                            if (m_current.Handoff != null
+                                && m_owner
+                                    .AreAllGroundSuccessorsOptimisticallyDominated(
+                                        next,
+                                        m_neighborAxes,
+                                        m_neighborFixedNavigationAxis,
+                                        m_neighborPortalRoot,
+                                        m_current.Cost
+                                            + m_neighborStepCost))
+                            {
+                                m_neighborIndex++;
+                                continue;
+                            }
                             IReadOnlyList<Tile2i> sweptCenters =
                                 AccessV2GroundGraph.GetSweptCenters(
                                     m_from, next);
@@ -2247,16 +2510,6 @@ namespace AutoTerrainDesignations.Access.V2
                             }
                             m_neighborHistory = m_current.History
                                 .ApplyCleanupKeys(neighborCleanupKeys);
-                            m_neighborNext = next;
-                            m_neighborPortalRoot = nextIsProjected
-                                ? portalRoot
-                                : null;
-                            m_neighborFixedNavigationAxis = nextIsProjected
-                                ? m_current.FixedNavigationAxis
-                                : null;
-                            m_neighborStepCost =
-                                AccessV2GroundGraph.GetStepCost(
-                                    m_from, next);
                             float nextCost = m_current.Cost
                                 + m_neighborStepCost
                                 + m_neighborCleanupCost;
@@ -2266,11 +2519,6 @@ namespace AutoTerrainDesignations.Access.V2
                                 m_neighborIndex++;
                                 continue;
                             }
-                            m_neighborAxes = m_owner.m_fixedNavigationGraph
-                                    != null && nextIsProjected
-                                ? m_owner.m_fixedNavigationGraph.GetNodeAxes(
-                                    next)
-                                : Array.Empty<AccessV2TravelAxis>();
                             m_neighborAxisIndex = 0;
                             m_stage =
                                 GroundExpansionStage.EnqueueNeighborAxes;
@@ -2508,6 +2756,13 @@ namespace AutoTerrainDesignations.Access.V2
 
                 void EnqueueEntry(AccessV2TravelAxis? axis)
                 {
+                    Tile2i? portalRoot = axis.HasValue
+                        ? null
+                        : m_owner.GetFixedNavigationPortalRoot(m_entry);
+                    if (m_owner.ShouldPruneHistoryQualifiedGroundEntry(
+                            m_entry, m_cost, m_handoffHistory!,
+                            axis, portalRoot))
+                        return;
                     m_owner.Enqueue(new SearchNode(
                         m_current.State,
                         m_handoffHistory!,
@@ -2525,11 +2780,7 @@ namespace AutoTerrainDesignations.Access.V2
                         m_handoff,
                         m_entry,
                         fixedNavigationAxis: axis,
-                        fixedNavigationPortalRoot:
-                            axis.HasValue
-                                ? null
-                                : m_owner.GetFixedNavigationPortalRoot(
-                                    m_entry)));
+                        fixedNavigationPortalRoot: portalRoot));
                 }
             }
         }
@@ -3835,8 +4086,49 @@ namespace AutoTerrainDesignations.Access.V2
             SearchNode node,
             bool isStartTierSeed = false)
         {
+            if (m_activeGroundExpansionTrace != null)
+            {
+                if (node.GroundCenter.HasValue)
+                    m_activeGroundExpansionTrace.GroundEnqueueAttempts++;
+                else
+                    m_activeGroundExpansionTrace.VEnqueueAttempts++;
+            }
             node.PotentialOwner = GetPotentialOwnerForV(
                 node.Parent, node.State, node.Transition);
+            if (!m_emittingOrdinaryGroundReplacement
+                && ShouldPruneByOrdinaryGroundReplacement(node))
+                return false;
+            if (ExpansionTraced != null)
+            {
+                m_expansionTraceProvenance ??=
+                    new Dictionary<SearchNode, ExpansionTraceProvenance>();
+                ExpansionTraceProvenance provenance = default;
+                if (!node.GroundCenter.HasValue
+                    && node.Parent?.GroundCenter.HasValue == true)
+                {
+                    provenance.GroundLaunchCenter =
+                        node.Parent.GroundCenter;
+                    provenance.LaunchHistoryOrigins =
+                        node.Parent.History.OriginCount;
+                    provenance.LaunchHistoryRayConstraints =
+                        node.Parent.History.RayConstraintCount;
+                    provenance.LaunchHistoryCleanupKeys =
+                        node.Parent.History.CleanupKeyCount;
+                }
+                else if (node.Parent != null)
+                    m_expansionTraceProvenance.TryGetValue(
+                        node.Parent, out provenance);
+                if (provenance.GroundLaunchCenter.HasValue
+                    && !provenance.PotentialMergeCenter.HasValue
+                    && node.Parent != null
+                    && !node.Parent.PotentialOwner.IsGlobal
+                    && node.PotentialOwner.IsGlobal)
+                    provenance.PotentialMergeCenter = node.GroundCenter
+                        ?? AccessV2PotentialField.GetCanonicalCenter(
+                            node.State);
+                if (provenance.GroundLaunchCenter.HasValue)
+                    m_expansionTraceProvenance[node] = provenance;
+            }
             var key = new SearchKey(node);
             if (isStartTierSeed
                 && m_startTierIndex > 0
@@ -3849,6 +4141,13 @@ namespace AutoTerrainDesignations.Access.V2
                 && old <= node.Cost + 0.0001f)
                 return false;
             m_best[key] = node.Cost;
+            if (node.GroundCenter.HasValue
+                && node.Handoff == null
+                && (!m_bestGroundNodesByCenter.TryGetValue(
+                        node.GroundCenter.Value,
+                        out SearchNode knownGround)
+                    || node.Cost < knownGround.Cost - 0.0001f))
+                m_bestGroundNodesByCenter[node.GroundCenter.Value] = node;
             node.EnqueuedAtVisited = m_visited;
             float heuristic = 0f;
             if (m_potentialField != null || m_heuristicEvaluator != null)
@@ -3880,12 +4179,441 @@ namespace AutoTerrainDesignations.Access.V2
                 m_queue.Add(queuePriority, bucket);
             }
             bucket.Enqueue(node);
+            if (m_activeGroundExpansionTrace != null)
+            {
+                if (node.GroundCenter.HasValue)
+                    m_activeGroundExpansionTrace.GroundEnqueueAccepted++;
+                else
+                    m_activeGroundExpansionTrace.VEnqueueAccepted++;
+            }
             m_queueCount++;
             m_maxHistoryOrigins = Math.Max(
                 m_maxHistoryOrigins, node.History.OriginCount);
             m_maxRayConstraints = Math.Max(
                 m_maxRayConstraints, node.History.RayConstraintCount);
             return true;
+        }
+
+        /// <summary>
+        /// A V label reached through a detour cannot be made cheaper by work
+        /// credited from that detour: the credited work was already charged
+        /// to the prefix.  Before retaining the label, ask whether an already
+        /// cheaper concrete-G label can generate the identical V interface
+        /// through the real seam and transition evaluators.  Successful
+        /// regeneration is an exact cheapest-arrival replacement; failed or
+        /// more expensive regeneration proves nothing and remains untouched.
+        /// </summary>
+        private bool ShouldPruneByOrdinaryGroundReplacement(SearchNode node)
+        {
+            if (node.GroundCenter.HasValue
+                || node.Parent == null
+                || node.IsGroundToVAdapter
+                || (node.Parent.GroundCenter.HasValue
+                    && !m_evaluateDirectGroundReplacementDominance)
+                || (!node.PotentialOwner.IsGlobal
+                    && !node.Parent.GroundCenter.HasValue)
+                || m_groundGraph == null
+                || m_groundToVHandoffEvaluator == null
+                || m_terrainCenterHeightProvider == null)
+                return false;
+
+            if (!node.Parent.GroundCenter.HasValue)
+            {
+                if (!node.IsGroundRelaunchedV
+                    || m_groundHeightProvider == null)
+                    return false;
+                Tile2i center =
+                    AccessV2PotentialField.GetCanonicalCenter(node.State);
+                int? groundHeight2 = m_groundHeightProvider(center);
+                if (!groundHeight2.HasValue
+                    || Math.Abs(
+                        groundHeight2.Value
+                            - node.State.Band.Lane0.Center2) > 2)
+                    return false;
+            }
+
+            m_diagnostics.V2OrdinaryGroundReplacementChecks++;
+            Tile2i anchor = node.State.Anchor;
+            Tile2i travel = node.State.EntryDirection;
+            AccessV2TravelAxis axis = node.State.Axis;
+
+            // A containing band has exactly sixteen canonical vehicle-center
+            // launch positions. Projected G may additionally launch through
+            // the immediately outward fringe, giving at most 32 dictionary
+            // probes instead of scanning a component or a bounding square.
+            for (int fringe = 0; fringe <= 1; fringe++)
+            {
+                Tile2i containingAnchor = fringe == 0
+                    ? anchor
+                    : new Tile2i(
+                        anchor.X - travel.X,
+                        anchor.Y - travel.Y);
+                for (int longitudinal = 0; longitudinal < 4; longitudinal++)
+                {
+                    for (int transverse = 0; transverse < 4; transverse++)
+                    {
+                        Tile2i ground = axis == AccessV2TravelAxis.X
+                            ? new Tile2i(
+                                containingAnchor.X + (travel.X > 0
+                                    ? longitudinal
+                                    : longitudinal + 1),
+                                containingAnchor.Y + transverse + 2)
+                            : new Tile2i(
+                                containingAnchor.X + transverse + 2,
+                                containingAnchor.Y + (travel.Y > 0
+                                    ? longitudinal
+                                    : longitudinal + 1));
+                        if (!m_bestGroundNodesByCenter.TryGetValue(
+                                ground, out SearchNode groundNode)
+                            || groundNode.Cost > node.Cost + 0.0001f
+                            || (fringe != 0
+                                && !m_groundGraph.IsProjectedFixedGround(ground))
+                            || !CanUseCanonicalGroundToVLaunchPosition(
+                                ground, travel))
+                            continue;
+
+                        bool matchingAnchor = false;
+                        foreach (Tile2i candidateAnchor in
+                            EnumerateGroundToVBandAnchors(
+                                ground, travel,
+                                includeOutwardFringe:
+                                    m_groundGraph.IsProjectedFixedGround(ground)))
+                        {
+                            if (candidateAnchor == anchor)
+                            {
+                                matchingAnchor = true;
+                                break;
+                            }
+                        }
+                        if (!matchingAnchor)
+                            continue;
+
+                        AccessV2PotentialOwner replacementOwner =
+                            GetPotentialOwnerForV(
+                                groundNode, node.State, transition: null);
+                        if (IsVBandCostKnownNoWorse(
+                                node.State, node.Cost,
+                                strictSelfDisruption: false,
+                                replacementOwner))
+                        {
+                            m_diagnostics.V2OrdinaryGroundReplacementPrunes++;
+                            return true;
+                        }
+
+                        float terrainHeight =
+                            m_preciseTerrainHeightProvider?.Invoke(ground)
+                            ?? m_terrainCenterHeightProvider(ground) / 2f;
+                        bool emitted = false;
+                        m_emittingOrdinaryGroundReplacement = true;
+                        try
+                        {
+                            if (Math.Abs(
+                                    terrainHeight - Math.Round(terrainHeight))
+                                <= 0.0001f)
+                            {
+                                foreach (GroundToVProfileCandidate candidate in
+                                    EnumerateDirectLevelingProfiles(
+                                        (int)Math.Round(terrainHeight),
+                                        axis, travel))
+                                {
+                                    if (!IsExactBand(node.State, candidate))
+                                        continue;
+                                    m_diagnostics
+                                        .V2OrdinaryGroundReplacementCandidates++;
+                                    emitted |= TryEmitGroundToV(
+                                        groundNode, ground, anchor, axis, travel,
+                                        candidate, directLeveling: true);
+                                }
+                            }
+
+                            foreach (GroundToVProfileCandidate candidate in
+                                EnumerateGroundToVBandProfiles(
+                                    anchor, terrainHeight, axis, travel,
+                                    m_fixedProfileProvider,
+                                    m_generatedVPrimeOriginValidator))
+                            {
+                                if (!IsExactBand(node.State, candidate))
+                                    continue;
+                                m_diagnostics
+                                    .V2OrdinaryGroundReplacementCandidates++;
+                                emitted |= TryEmitGroundToV(
+                                    groundNode, ground, anchor, axis, travel,
+                                    candidate, directLeveling: false);
+                            }
+                        }
+                        finally
+                        {
+                            m_emittingOrdinaryGroundReplacement = false;
+                        }
+
+                        if (!emitted)
+                            continue;
+                        if (!IsVBandCostKnownNoWorse(
+                                node.State, node.Cost,
+                                strictSelfDisruption: false,
+                                replacementOwner))
+                            continue;
+
+                        m_diagnostics.V2OrdinaryGroundReplacementPrunes++;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool IsExactBand(
+            AccessV2BandState state,
+            GroundToVProfileCandidate candidate)
+            => AccessV2BandProfile.TryCreate(
+                    state.Axis,
+                    candidate.Lane0,
+                    candidate.Lane1,
+                    includeDeferred: true,
+                    out AccessV2BandProfile band,
+                    out _)
+                && band.Equals(state.Band);
+
+        private bool AreAllGroundSuccessorsOptimisticallyDominated(
+            Tile2i center,
+            IReadOnlyList<AccessV2TravelAxis> axes,
+            AccessV2TravelAxis? fallbackAxis,
+            Tile2i? portalRoot,
+            float optimisticCost)
+        {
+            m_diagnostics.V2HandoffGroundDominanceChecks++;
+            if (axes.Count == 0)
+            {
+                if (!IsGroundSuccessorOptimisticallyDominated(
+                        center, fallbackAxis, portalRoot, optimisticCost))
+                    return false;
+            }
+            else
+            {
+                for (int index = 0; index < axes.Count; index++)
+                    if (!IsGroundSuccessorOptimisticallyDominated(
+                            center, axes[index], null, optimisticCost))
+                        return false;
+            }
+            m_diagnostics.V2HandoffGroundDominancePrunes++;
+            return true;
+        }
+
+        /// <summary>
+        /// A history-qualified handoff entry is useful only through its first
+        /// consequence. For plain physical ground, if every geometrically
+        /// possible ordinary-G successor already has an equal or cheaper
+        /// history-free label even at zero cleanup cost, the entry cannot
+        /// improve the search. Goal-connected, G-to-V-capable, projected, and
+        /// fixed-navigation entries remain conservative because their
+        /// consequences can depend on the handoff history or navigation seam.
+        /// </summary>
+        private bool ShouldPruneHistoryQualifiedGroundEntry(
+            Tile2i center,
+            float cost,
+            AccessV2History history,
+            AccessV2TravelAxis? fixedNavigationAxis,
+            Tile2i? fixedNavigationPortalRoot)
+        {
+            if (m_groundGraph == null
+                || fixedNavigationAxis.HasValue
+                || fixedNavigationPortalRoot.HasValue
+                || m_groundGraph.IsProjectedFixedGround(center)
+                || m_groundGraph.TryGetGoalDistance(center, out _))
+                return false;
+
+            if (HasCanonicalGroundToVLaunchPosition(center)
+                && !AreAllGroundToVSuccessorsOptimisticallyDominated(
+                    center, cost, history))
+                return false;
+
+            m_diagnostics.V2HandoffGroundEntryDominanceChecks++;
+            for (int index = 0; index < s_groundDirections.Length; index++)
+            {
+                Tile2i next = center + s_groundDirections[index];
+                if (!m_groundGraph.CanTraverse(center, next))
+                    continue;
+                if (m_groundGraph.IsProjectedFixedGround(next))
+                    return false;
+                float optimisticCost = cost
+                    + AccessV2GroundGraph.GetStepCost(center, next);
+                if (!IsGroundSuccessorOptimisticallyDominated(
+                        next, null, null, optimisticCost))
+                    return false;
+            }
+
+            m_diagnostics.V2HandoffGroundEntryDominancePrunes++;
+            return true;
+        }
+
+        private bool AreAllGroundToVSuccessorsOptimisticallyDominated(
+            Tile2i ground,
+            float optimisticCost,
+            AccessV2History history)
+        {
+            m_diagnostics.V2HandoffGroundToVDominanceChecks++;
+            if (m_groundGraph == null
+                || m_groundToVHandoffEvaluator == null
+                || m_terrainCenterHeightProvider == null)
+            {
+                m_diagnostics.V2HandoffGroundToVDominancePrunes++;
+                return true;
+            }
+
+            for (int directionIndex = 0;
+                directionIndex < s_groundToVTravelDirections.Length;
+                directionIndex++)
+            {
+                Tile2i travel =
+                    s_groundToVTravelDirections[directionIndex];
+                if (!CanUseCanonicalGroundToVLaunchPosition(
+                        ground, travel))
+                    continue;
+                AccessV2TravelAxis axis = travel.X != 0
+                    ? AccessV2TravelAxis.X
+                    : AccessV2TravelAxis.Y;
+                foreach (Tile2i anchor in EnumerateGroundToVBandAnchors(
+                    ground, travel,
+                    includeOutwardFringe:
+                        m_groundGraph.IsProjectedFixedGround(ground)))
+                {
+                    bool directBandResolvable =
+                        AreGroundToVBandOriginsResolvable(
+                            anchor, axis,
+                            m_generatedOriginValidator,
+                            origin => m_fixedProfileProvider?.Invoke(
+                                origin).HasValue == true);
+                    bool hasFixedAdapter =
+                        TryCreateFixedGroundToVAdapter(
+                            anchor, axis, travel,
+                            m_fixedProfileProvider,
+                            out AccessV2Transition fixedAdapter)
+                        && HasGeneratedGroundToVSuccessor(
+                            fixedAdapter.Next,
+                            m_fixedProfileProvider,
+                            m_generatedOriginValidator);
+                    if (hasFixedAdapter
+                        && !IsGroundToVStateOptimisticallyDominated(
+                            ground, fixedAdapter.Next, optimisticCost))
+                        return false;
+                    if (!directBandResolvable)
+                        continue;
+
+                    float terrainHeight =
+                        m_preciseTerrainHeightProvider?.Invoke(ground)
+                        ?? m_terrainCenterHeightProvider(ground) / 2f;
+                    if (Math.Abs(
+                            terrainHeight - Math.Round(terrainHeight))
+                        <= 0.0001f)
+                    {
+                        foreach (GroundToVProfileCandidate candidate in
+                            EnumerateDirectLevelingProfiles(
+                                (int)Math.Round(terrainHeight),
+                                axis, travel))
+                            if (!IsGroundToVProfileOptimisticallyDominated(
+                                    ground, anchor, axis, travel,
+                                    candidate, optimisticCost, history))
+                                return false;
+                    }
+
+                    foreach (GroundToVProfileCandidate candidate in
+                        EnumerateGroundToVBandProfiles(
+                            anchor, terrainHeight, axis, travel,
+                            m_fixedProfileProvider,
+                            m_generatedVPrimeOriginValidator))
+                        if (!IsGroundToVProfileOptimisticallyDominated(
+                                ground, anchor, axis, travel,
+                                candidate, optimisticCost, history))
+                            return false;
+                }
+            }
+
+            m_diagnostics.V2HandoffGroundToVDominancePrunes++;
+            return true;
+        }
+
+        private bool IsGroundToVProfileOptimisticallyDominated(
+            Tile2i ground,
+            Tile2i anchor,
+            AccessV2TravelAxis axis,
+            Tile2i travel,
+            GroundToVProfileCandidate candidate,
+            float optimisticCost,
+            AccessV2History history)
+        {
+            if (!AccessV2BandProfile.TryCreate(
+                    axis, candidate.Lane0, candidate.Lane1,
+                    includeDeferred: true,
+                    out AccessV2BandProfile band, out _))
+                return true;
+            var state = new AccessV2BandState(anchor, band, travel);
+            if (IsGroundToVStateOptimisticallyDominated(
+                    ground, state, optimisticCost))
+                return true;
+            if (!TryResolveGroundToVTransition(
+                    state, m_fixedProfileProvider,
+                    m_generatedOriginValidator,
+                    out AccessV2Transition transition)
+                || !IsTransitionWithinUsefulHeightEnvelope(
+                    m_usefulHeightEnvelope, transition, out _)
+                || !history.ResetDirectionScope().TryApply(
+                    transition, out _, out _))
+                return true;
+            return false;
+        }
+
+        private bool IsGroundToVStateOptimisticallyDominated(
+            Tile2i ground,
+            AccessV2BandState state,
+            float optimisticCost)
+        {
+            if (!AccessV2Geometry.IsInsideBounds(
+                    state, m_boundsMin, m_boundsMax))
+                return true;
+            AccessV2PotentialOwner owner =
+                AccessV2PotentialOwner.FromGround(
+                    m_groundGraph!, ground)
+                .Advance(
+                    m_groundGraph!, ground,
+                    AccessV2PotentialField.GetCanonicalCenter(state));
+            return IsVBandCostKnownNoWorse(
+                state, optimisticCost,
+                strictSelfDisruption: false,
+                owner);
+        }
+
+        private bool IsGroundSuccessorOptimisticallyDominated(
+            Tile2i center,
+            AccessV2TravelAxis? fixedNavigationAxis,
+            Tile2i? fixedNavigationPortalRoot,
+            float optimisticCost)
+        {
+            var key = new SearchKey(
+                center,
+                fixedNavigationAxis,
+                fixedNavigationPortalRoot);
+            return m_best.TryGetValue(key, out float old)
+                && old <= optimisticCost + 0.0001f;
+        }
+
+        private void CompleteActiveGroundExpansionTrace()
+        {
+            GroundExpansionTraceState? state =
+                m_activeGroundExpansionTrace;
+            if (state == null)
+                return;
+            m_activeGroundExpansionTrace = null;
+            GroundExpansionOutcomeTraced?.Invoke(
+                new AccessV2GroundExpansionOutcomeTrace(
+                    state.Ordinal,
+                    state.HasHandoff,
+                    state.GoalAtPop,
+                    state.SuffixAttempted,
+                    state.SuffixSucceeded,
+                    state.GroundEnqueueAttempts,
+                    state.GroundEnqueueAccepted,
+                    state.VEnqueueAttempts,
+                    state.VEnqueueAccepted));
         }
 
         private AccessV2PotentialOwner GetPotentialOwnerForV(
@@ -4084,6 +4812,36 @@ namespace AutoTerrainDesignations.Access.V2
                 IsGroundRelaunchedV = !groundCenter.HasValue
                     && (parent?.GroundCenter.HasValue == true
                         || parent?.IsGroundRelaunchedV == true);
+            }
+        }
+
+        private struct ExpansionTraceProvenance
+        {
+            public Tile2i? GroundLaunchCenter;
+            public Tile2i? PotentialMergeCenter;
+            public int LaunchHistoryOrigins;
+            public int LaunchHistoryRayConstraints;
+            public int LaunchHistoryCleanupKeys;
+        }
+
+        private sealed class GroundExpansionTraceState
+        {
+            public int Ordinal { get; }
+            public bool HasHandoff { get; }
+            public bool GoalAtPop;
+            public bool SuffixAttempted;
+            public bool SuffixSucceeded;
+            public int GroundEnqueueAttempts;
+            public int GroundEnqueueAccepted;
+            public int VEnqueueAttempts;
+            public int VEnqueueAccepted;
+
+            public GroundExpansionTraceState(
+                int ordinal,
+                bool hasHandoff)
+            {
+                Ordinal = ordinal;
+                HasHandoff = hasHandoff;
             }
         }
 
@@ -4286,6 +5044,22 @@ namespace AutoTerrainDesignations.Access.V2
                 m_state = node.GroundCenter.HasValue
                     ? default
                     : node.State;
+            }
+
+            public SearchKey(
+                Tile2i groundCenter,
+                AccessV2TravelAxis? fixedNavigationAxis,
+                Tile2i? fixedNavigationPortalRoot)
+            {
+                m_state = default;
+                m_groundCenter = groundCenter;
+                m_groundHistorySignature = 0;
+                m_fixedNavigationAxis = fixedNavigationAxis;
+                m_fixedNavigationPortalRoot =
+                    fixedNavigationPortalRoot;
+                m_isGroundToVAdapter = false;
+                m_strictSelfDisruption = false;
+                m_potentialOwner = AccessV2PotentialOwner.Global;
             }
 
             public bool Equals(SearchKey other)

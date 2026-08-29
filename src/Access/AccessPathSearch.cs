@@ -2469,6 +2469,23 @@ namespace AutoTerrainDesignations.Access
                         m_v2Session.NodeExplored = value;
                 }
             }
+            internal Action<AccessV2ExpansionTrace>? ExpansionTraced
+            {
+                set
+                {
+                    if (m_v2Session != null)
+                        m_v2Session.ExpansionTraced = value;
+                }
+            }
+            internal Action<AccessV2GroundExpansionOutcomeTrace>?
+                GroundExpansionOutcomeTraced
+            {
+                set
+                {
+                    if (m_v2Session != null)
+                        m_v2Session.GroundExpansionOutcomeTraced = value;
+                }
+            }
             public Dictionary<string, int> Rejections => m_rejections;
             internal AccessSearchDiagnostics Diagnostics => m_diagnostics;
             internal IReadOnlyList<AccessV2PotentialSample> V2PotentialSamples

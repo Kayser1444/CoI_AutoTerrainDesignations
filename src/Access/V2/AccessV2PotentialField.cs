@@ -17,6 +17,10 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly int m_sourceGroundComponent;
 
         public bool IsGlobal { get; }
+        public int? SourceGroundComponent
+            => m_sourceGroundComponent >= 0
+                ? m_sourceGroundComponent
+                : (int?)null;
 
         private AccessV2PotentialOwner(
             bool isGlobal,
@@ -44,7 +48,8 @@ namespace AutoTerrainDesignations.Access.V2
             if (IsGlobal || from == to)
                 return this;
             if (!ground.IsInComponent(from, m_sourceGroundComponent))
-                return Global;
+                return new AccessV2PotentialOwner(
+                    true, m_sourceGroundComponent);
 
             int dx = to.X - from.X;
             int dy = to.Y - from.Y;
@@ -54,7 +59,8 @@ namespace AutoTerrainDesignations.Access.V2
             if (length == 0)
                 return this;
             if (dx != 0 && dy != 0 && Math.Abs(dx) != Math.Abs(dy))
-                return Global;
+                return new AccessV2PotentialOwner(
+                    true, m_sourceGroundComponent);
 
             Tile2i current = from;
             for (int index = 0; index < length; index++)
@@ -68,7 +74,8 @@ namespace AutoTerrainDesignations.Access.V2
                     || ground.IsCleanupGround(next)
                     || !ground.IsInComponent(next, m_sourceGroundComponent)
                     || !ground.CanTraverse(current, next))
-                    return Global;
+                    return new AccessV2PotentialOwner(
+                        true, m_sourceGroundComponent);
                 current = next;
             }
             return this;

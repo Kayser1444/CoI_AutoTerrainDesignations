@@ -1,8 +1,11 @@
 # Access Search Laboratory
 
-Status: approved design; implementation is queued after the primitive capture
-pipeline and before the dormant farming worker. Shared understanding was
-confirmed on 2026-08-24.
+Status: approved design; Tickets 2A and foundational 2B are implemented and
+qualified. Real trivial and representative expensive searches reproduce their
+canonical outcomes exactly through their manifest-pinned Release DLLs. The
+complete two-case semantic regression and sequential five-run expensive
+benchmark pass. Collaborative route review and autonomous conformance tuning
+remain optional follow-ons. Shared understanding was confirmed on 2026-08-24.
 
 Related design: [Accessway Search Worker](../in-progress/accessway-search-worker.md),
 [worker implementation tickets](accessway-search-worker-tickets.md), and
@@ -164,6 +167,113 @@ The promoted corpus is read-only to ordinary replay and tuning commands. Only
 dedicated capture, promote, migrate, compatibility-attest, and re-baseline
 commands may mutate it.
 
+### Ticket 2A operator workflow
+
+Build and install the Release DLL, then arm one capture in the in-game console:
+
+```text
+atd_access_replay_arm <case-name> <scenario-family>
+```
+
+Arming archives the exact currently installed DLL under the private Laboratory
+`binaries/<sha256>` directory before accepting a search. The manifest points to
+that immutable cached binary, so later development builds cannot make a valid
+case unreplayable.
+
+The arm remains dormant until a routed candidate is accepted by authoritative
+post-placement validation. A dirty, rejected, cancelled, or timed-out search
+does not produce a validated case. The completed directory is written
+atomically beneath:
+
+```text
+%APPDATA%\Captain of Industry\AccessSearchLaboratory\AutoTerrainDesignations\inbox
+```
+
+Encoding and compression run on a background capture operation after ownership
+of the immutable request has transferred from the accepted search. A lightweight
+sizing pass gives the encoder an exact work-unit denominator; the calling
+coroutine remains alive and yields while the progress surface reports the
+current capture stage and percentage. During this post-commit interval, the
+button is relabeled **Abort replay capture** and cancels only the recorder. It
+does not invalidate or roll back the already accepted access route. Cancellation
+is checked during sizing, encoding, payload hashing, and chunked compression;
+temporary output is removed and no completed case is published. No live game
+object is accessed by the background operation.
+
+The first medium-area capture visibly paused around 10, 16, 23, 31, 33, 41,
+47, 56, 61, and 68 percent. Treat those plateaus as capture-codec evidence,
+not search benchmark samples: they likely identify uneven graph sections,
+sorting, or buffer growth within otherwise exact work-unit progress. The pure
+benchmark deliberately excludes this encoding and file-loading work.
+
+An expensive cluster-2 capture on 2026-08-29 exposed an acceptance boundary:
+`AcceptedPendingPropRemoval` is not authoritative live validation. The recorded
+plan contained its cleanup origins, but all six dense-debris operations later
+ended as `PlayerOverride`, leaving the visible route incomplete. The manager had
+treated a vanilla-removed temporary preview as a player replacement, and Quick
+cleanup had not first registered overlapping pathfinder work as the original
+designation to restore. Both lifecycle faults now have focused fixtures. The
+recorder also keeps the encoded case staged at 99 percent until every cleanup
+request succeeds, its original designation is restored, and the live V2 route
+passes validation. Rejected or aborted staging is deleted. The original case
+remains diagnostic inbox evidence and is not eligible for semantic or
+performance promotion; a fresh in-game cluster-2 run must qualify the fix.
+
+The corrected live run published
+`expensive-v2-01-14f13de0700549b8.atd-access-case` only after all six cleanup
+requests completed as `Removed` with their original designations restored.
+Replay then identified a separate canonical-codec defect: the sliced in-game
+route and unsliced standalone route contained identical step values but
+different reference aliasing between equal internal transition objects. Object
+identity is not pathfinder semantics. Canonical route-step encoding now detaches
+each step before graph serialization, and schema-1 readers normalize stored
+canonical records the same way. A focused fixture proves that shared and copied
+reference topologies normalize to identical, idempotent bytes. Two fresh-process
+candidate replays of the corrected case produced normalized SHA-256
+`c314032209478f01bdecab31401579fab29e1ef3bb80dba15dd3354fbfd96d07`
+with no semantic difference. Final normalized capture
+`expensive-v2-01-3a322d4481323a82.atd-access-case` binds that canonical form to
+exact archived Release DLL SHA-256
+`d61dbd376d4ce9675914aa412018b9cc32d4e861ca3d19ff45b934c151f48af8`.
+Two fresh exact-DLL processes reproduced it with `diff=none`. It is promoted as
+`semantic-performance`, and the serial two-case corpus regression plus all
+synthetic fixtures passed in report `20260829-120441-regression`.
+The quiet-machine five-repetition benchmark passed in report
+`20260829-122404-benchmark`: exact semantics on every run, median pure search
+42.542 seconds, median total 42.583 seconds, 42.491--42.920 second total range,
+970 MB peak working set, and about 697 MB retained managed-heap delta. These
+desktop .NET Framework timings are directional evidence; the recorded in-game
+Mono search took 73.438 seconds.
+
+The first Laboratory-only conformance optimization pass on 2026-08-29 used a
+fresh busy-machine baseline (`20260829-165957-benchmark`) of 42.107 seconds pure
+search and 967 MB peak working set. Reusing cached ray envelopes from parent
+histories was rejected after it regressed the same exact case to 45.351 seconds
+without reducing memory. An exact accumulated-ray-bounds rejection was retained:
+report `20260829-171217-benchmark` reproduced the canonical outcome at 40.218
+seconds pure search, 885 MB peak working set, and about 697 MB managed-heap
+growth. This single-repetition comparison is directional rather than a new
+quiet-machine baseline. All three promoted private cases plus synthetic
+fixtures subsequently passed report `20260829-171407-regression`.
+
+Replay the case with the existing development runner and an explicit Release
+DLL plus the matching installed game `Managed` directory:
+
+```text
+AccessV2FixtureRunner replay <AutoTerrainDesignations.dll> <Managed> <case-directory>
+```
+
+`codec-benchmark` reports decompression, deserialization, serialization, and
+compression separately for capture-format investigations.
+
+`qualify-replay.ps1` invokes that mode in two fresh processes and requires both
+to reproduce the same approved canonical hash. Its `AssemblyPath` argument may
+be omitted; the script then uses the archived DLL named by the case manifest.
+
+The replay rejects mismatched schemas, semantic policy, payload hashes, ATD
+binary identity, build configuration, or Mafi assembly fingerprints before it
+executes the request. `atd_access_replay_cancel` clears an unused arm.
+
 ## Corpus ownership
 
 The initial scope is local collaboration between the sole maintainer and an
@@ -181,6 +291,28 @@ Promoted cases are grouped into named scenario families. Aggregate performance
 weights families rather than raw file count so near-duplicate recordings cannot
 silently dominate. Trivial cases may remain semantic-only, while representative
 expensive cases form the performance corpus.
+
+The local operator entry point is
+`tools/AccessV2FixtureRunner/access-lab.ps1`. Typical Release commands are:
+
+```powershell
+./tools/AccessV2FixtureRunner/access-lab.ps1 -Mode promote `
+    -CaseDirectory <inbox-case> -Name <case-name> -Family <family> `
+    -Role semantic-only
+./tools/AccessV2FixtureRunner/access-lab.ps1 -Mode list
+./tools/AccessV2FixtureRunner/access-lab.ps1 -Mode regress
+./tools/AccessV2FixtureRunner/access-lab.ps1 -Mode benchmark `
+    -BaselineAssemblyPath <baseline-dll> -Repetitions 5
+```
+
+Promotion copies a content-addressed case into the private corpus, attaches
+required family and suite-role metadata, and makes its files read-only.
+Regression runs synthetic fixtures first, then semantic cases in bounded fresh
+child processes. Benchmarking selects performance cases, remains sequential,
+and defers while Captain of Industry is running unless an explicitly
+directional busy-machine smoke run is requested. Both commands write readable
+Markdown and machine-queryable JSON reports beneath the laboratory `reports`
+directory; parsed key/value observations accompany the original child output.
 
 ## Regression execution
 
@@ -260,6 +392,100 @@ An autonomous iteration uses a staged funnel:
 Bounded performance trade-offs are allowed when the aggregate gain is
 substantial, no case crosses its regression guard, and every consistent
 slowdown is reported. Target and guard families are reported separately.
+
+## Ordered expansion traces
+
+The development runner's `trace-candidate` mode replays one candidate case and
+writes every V2 expansion in exact execution order to CSV. It is opt-in and is
+not enabled by either production worker mode. Each row records elapsed time,
+ground or generated kind, center and displayed height, enqueue age and cost,
+ground-relaunch status, axis and entry direction, handoff qualification,
+fixed-navigation portal identity, adapter state, history identity and size,
+potential owner, and search-key hash. The canonical result is still compared
+before the trace command succeeds. Ground rows additionally record whether a
+goal or suffix succeeded and how many G and V child enqueue attempts survived
+normal label dominance.
+
+Trace rows also retain diagnostic-only G-relaunch provenance: the launch
+ground center and component, the center where component-conditioned potential
+ownership first weakened to global, the component of a returned handoff G
+entry, and any already validated ordinary-G cost at that same concrete key.
+This bookkeeping is allocated only when Laboratory expansion tracing is
+enabled; production workers do not carry it.
+
+The first trace of `expensive-v2-01` on 2026-08-29 reproduced the visually
+observed late backward wave. Between 30 seconds and completion, 4,713 of 4,776
+ground-colored expansions were history-qualified V-to-G handoff entries, all
+newly enqueued by generated V labels rather than neighboring ground labels.
+They covered 790 ground centers under 3,885 distinct histories. The concurrent
+generated wave contained 6,552 ground-relaunched labels out of 6,569 and had
+already returned to global potential ownership. Thus the overlay was not
+showing an exact-label reopen or an ordinary ground flood: it was collapsing a
+large family of distinct shallow generated states and their repeated handoff
+probes onto previously painted centers. The behavior follows the current
+modeled-rule-preserving search, but the volume is a credible dominance or
+heuristic optimization target.
+
+A consequence trace of the same exact replay then showed that 12,757 of the
+12,768 history-qualified ground entries produced no accepted G child, no
+accepted V child, and no successful suffix. Those entries performed 55,494
+ground enqueue attempts, of which only 21 survived; no history-qualified ground
+entry attempted a G-to-V launch. In the late backward wave, 4,713 of 4,715
+entries were completely dead, while one accepted a ground child and one found
+the winning suffix.
+
+The first conservative optimization applies an optimistic ordinary-G
+cost-dominance check before history, cleanup, and local-escape validation of a
+handoff-derived ground successor. It rejects only when every concrete successor
+key is already cheaper even with zero cleanup cost; entries with a possible
+goal suffix are unchanged. A focused fixture proves that the dominated history
+no longer invokes its ground validator while an earlier productive history
+still traverses the same seam, and the existing fixture continues to prove that
+a later history remains eligible when it alone can validate the goal suffix.
+The exact expensive case improved from 40.218 seconds pure search and about
+697 MB managed-heap growth to 33.636 seconds and about 604 MB in report
+`20260829-175240-benchmark`. All three promoted private cases plus synthetic
+fixtures passed report `20260829-175422-regression`.
+
+A second exact gate moves the same proof to handoff-entry enumeration for
+plain physical G. If the entry has no ground goal distance, is not at a
+canonical G-to-V launch coordinate, does not involve projected or fixed
+navigation, and every geometrically traversable ordinary-G neighbor already
+has an equal or cheaper label at the zero-cleanup lower bound, the
+history-qualified entry is not queued. Cluster 2 retained canonical SHA-256
+`c314032209478f01bdecab31401579fab29e1ef3bb80dba15dd3354fbfd96d07`
+while expansion count fell from 75,643 to 74,053; the 1,590 removed rows were
+all G handoff entries and V expansions remained 44,578. A broader exact
+tower-area precheck removed only one additional entry and was discarded as
+insufficient benefit for added hot-path work. A three-run timing comparison
+was noisy (34.5--38.1 seconds, 37.9-second median), so this slice claims the
+measured frontier reduction but no independent wall-clock improvement. The
+final retained DLL passed all three promoted private cases plus the synthetic
+suite in report `20260829-181937-regression`.
+
+The screenshot-correlated provenance trace then identified one dominant loop:
+3,207 same-component handoff returns descended from G launch `(832,1670)` in
+component 27, and 3,202 crossed the global-ownership merge fringe at
+`(814,1672)` before returning. Across the case, 5,858 handoff entries returned
+to their launch component and every one was consequence-free. A previously
+validated ordinary-G label already reached 5,854 of their exact centers more
+cheaply; the late loop cost roughly 4,300--5,000 while those labels cost about
+170--180. Cost alone was not used to prune because the generated history can
+theoretically enable a different future continuation.
+
+Instead, entry dominance now enumerates the exact possible G-to-V label keys at
+a zero-additional-cost lower bound and applies the same bounds, transition
+resolution, useful-height-envelope, and accumulated-origin-history checks as
+real G-to-V expansion. The entry is skipped only when all ordinary-G and
+G-to-V consequences are already dominated or structurally impossible; any
+possible unique successor retains the history-qualified entry. The Cluster 2
+canonical hash remained unchanged while expansions fell from 74,053 to 62,906,
+handoff-G expansions fell from 11,178 to 31, same-launch-component returns
+fell from 5,858 to 3, and the `(832,1670)` family emitted no G returns. V
+expansions remained 44,578. A three-run benchmark improved from the preceding
+37.905-second median to 34.833 seconds with a 34.818--34.900-second range.
+All three promoted private cases plus the synthetic suite passed report
+`20260829-191517-regression` against the retained DLL.
 
 ## Route-change review
 

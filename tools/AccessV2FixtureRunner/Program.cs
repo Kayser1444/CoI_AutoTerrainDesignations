@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 
 namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
 {
@@ -11,20 +13,102 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
 
         private static int Main(string[] args)
         {
-            if (args.Length != 2)
+            bool replay = args.Length == 4
+                && string.Equals(args[0], "replay", StringComparison.OrdinalIgnoreCase);
+            bool benchmarkCodec = args.Length == 4
+                && string.Equals(args[0], "codec-benchmark", StringComparison.OrdinalIgnoreCase);
+            bool candidateReplay = args.Length == 4
+                && string.Equals(args[0], "candidate-replay", StringComparison.OrdinalIgnoreCase);
+            bool compatibleReplay = args.Length == 4
+                && string.Equals(args[0], "compatible-replay", StringComparison.OrdinalIgnoreCase);
+            bool traceCandidate = args.Length == 5
+                && string.Equals(args[0], "trace-candidate", StringComparison.OrdinalIgnoreCase);
+            bool benchmark = args.Length == 5
+                && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase);
+            bool caseMode = replay || benchmarkCodec || candidateReplay
+                || compatibleReplay || traceCandidate || benchmark;
+            if (!caseMode && args.Length != 2)
             {
                 Console.Error.WriteLine(
-                    "Usage: AccessV2FixtureRunner <ATD assembly> <CoI Managed directory>");
+                    "Usage:\n"
+                    + "  AccessV2FixtureRunner <ATD assembly> <CoI Managed directory>\n"
+                    + "  AccessV2FixtureRunner replay <ATD assembly> <CoI Managed directory> <case directory>\n"
+                    + "  AccessV2FixtureRunner candidate-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
+                    + "  AccessV2FixtureRunner compatible-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
+                    + "  AccessV2FixtureRunner trace-candidate <ATD assembly> <CoI Managed directory> <case directory> <trace.csv>\n"
+                    + "  AccessV2FixtureRunner benchmark <ATD assembly> <CoI Managed directory> <case directory> <repetitions>\n"
+                    + "  AccessV2FixtureRunner codec-benchmark <ATD assembly> <CoI Managed directory> <case directory>");
                 return 2;
             }
 
-            string assemblyPath = Path.GetFullPath(args[0]);
+            string assemblyPath = Path.GetFullPath(args[caseMode ? 1 : 0]);
             s_modDirectory = Path.GetDirectoryName(assemblyPath) ?? string.Empty;
-            s_managedDirectory = Path.GetFullPath(args[1]);
+            s_managedDirectory = Path.GetFullPath(args[caseMode ? 2 : 1]);
             AppDomain.CurrentDomain.AssemblyResolve += ResolveAssembly;
             try
             {
                 Assembly assembly = Assembly.LoadFrom(assemblyPath);
+                if (replay)
+                    return ReplayCase(assembly, Path.GetFullPath(args[3]));
+                if (candidateReplay || compatibleReplay)
+                    return ReplayCandidate(
+                        assembly,
+                        Path.GetFullPath(args[3]),
+                        allowGameAssemblyMismatch: compatibleReplay);
+                if (traceCandidate)
+                    return TraceCandidate(
+                        assembly,
+                        Path.GetFullPath(args[3]),
+                        Path.GetFullPath(args[4]));
+                if (benchmarkCodec)
+                    return BenchmarkCodec(
+                        assembly, Path.GetFullPath(args[3]));
+                if (benchmark)
+                {
+                    if (!int.TryParse(args[4], out int repetitions))
+                    {
+                        Console.Error.WriteLine(
+                            "Benchmark repetitions must be an integer.");
+                        return 2;
+                    }
+                    return BenchmarkCase(
+                        assembly, Path.GetFullPath(args[3]), repetitions);
+                }
+                Type replayFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.AccessSearchReplayFixtures", true);
+                MethodInfo validateReplay = replayFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        replayFixtures.FullName, "ValidateAll");
+                object[] replayFixtureArgs = { string.Empty };
+                bool replayFixtureSuccess = (bool)(
+                    validateReplay.Invoke(null, replayFixtureArgs) ?? false);
+                string replayFixtureFailure =
+                    replayFixtureArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Access replay codec fixtures: "
+                    + $"success={replayFixtureSuccess} "
+                    + $"failure={replayFixtureFailure}");
+                if (!replayFixtureSuccess) return 1;
+                Type propRemovalPolicy = assembly.GetType(
+                    "AutoTerrainDesignations.ATDPropRemovalLifecyclePolicy", true);
+                MethodInfo validatePropRemoval = propRemovalPolicy.GetMethod(
+                    "ValidateFixtures",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        propRemovalPolicy.FullName, "ValidateFixtures");
+                object[] propRemovalArgs = { string.Empty };
+                bool propRemovalSuccess = (bool)(
+                    validatePropRemoval.Invoke(null, propRemovalArgs) ?? false);
+                string propRemovalFailure =
+                    propRemovalArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Prop-removal lifecycle fixtures: "
+                    + $"success={propRemovalSuccess} "
+                    + $"failure={propRemovalFailure}");
+                if (!propRemovalSuccess) return 1;
                 Type fixtures = assembly.GetType(
                     "AutoTerrainDesignations.Access.V2.AccessV2Fixtures", true);
                 MethodInfo validate = fixtures.GetMethod(
@@ -169,7 +253,46 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     "Accessway manager fixtures: "
                     + $"success={managerSuccess} "
                     + $"failure={managerFailure}");
-                return managerSuccess ? 0 : 1;
+                if (!managerSuccess) return 1;
+
+                Type workerFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.Worker.AccessSearchWorkerFixtures",
+                    true);
+                MethodInfo validateWorker = workerFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        workerFixtures.FullName, "ValidateAll");
+                object[] workerArgs = { string.Empty };
+                bool workerSuccess = (bool)(
+                    validateWorker.Invoke(null, workerArgs) ?? false);
+                string workerFailure =
+                    workerArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Access search worker fixtures: "
+                    + $"success={workerSuccess} failure={workerFailure}");
+                if (!workerSuccess) return 1;
+
+                Type acceptanceFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.AccessPlacementAcceptancePolicyFixtures",
+                    true);
+                MethodInfo validateAcceptance = acceptanceFixtures.GetMethod(
+                    "ValidateAll",
+                    BindingFlags.Static | BindingFlags.Public
+                        | BindingFlags.NonPublic)
+                    ?? throw new MissingMethodException(
+                        acceptanceFixtures.FullName, "ValidateAll");
+                object[] acceptanceArgs = { string.Empty };
+                bool acceptanceSuccess = (bool)(
+                    validateAcceptance.Invoke(null, acceptanceArgs) ?? false);
+                string acceptanceFailure =
+                    acceptanceArgs[0] as string ?? string.Empty;
+                Console.WriteLine(
+                    "Access placement acceptance fixtures: "
+                    + $"success={acceptanceSuccess} "
+                    + $"failure={acceptanceFailure}");
+                return acceptanceSuccess ? 0 : 1;
             }
             catch (TargetInvocationException ex)
             {
@@ -185,6 +308,146 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
             {
                 AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
             }
+        }
+
+        private static int ReplayCase(Assembly assembly, string caseDirectory)
+        {
+            string assemblyPath = assembly.Location;
+            string assemblyHash;
+            using (SHA256 sha = SHA256.Create())
+                assemblyHash = string.Concat(sha.ComputeHash(
+                    File.ReadAllBytes(assemblyPath)).Select(
+                        value => value.ToString("x2")));
+            string buildTimestamp = assembly
+                .GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(item => item.Key == "BuildTimestamp")?.Value
+                ?? string.Empty;
+            Console.WriteLine(
+                $"ATD binary: path={assemblyPath} sha256={assemblyHash} "
+                + $"buildTimestamp={buildTimestamp}");
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo replay = facade.GetMethod(
+                "TryReplayCase",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(facade.FullName, "TryReplayCase");
+            object[] replayArgs = { caseDirectory, string.Empty };
+            bool success = (bool)(replay.Invoke(null, replayArgs) ?? false);
+            string report = replayArgs[1] as string ?? string.Empty;
+            Console.WriteLine("Access search replay: " + report);
+            return success ? 0 : 1;
+        }
+
+        private static int BenchmarkCodec(
+            Assembly assembly, string caseDirectory)
+        {
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo benchmark = facade.GetMethod(
+                "TryBenchmarkCaseCodec",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(
+                    facade.FullName, "TryBenchmarkCaseCodec");
+            object[] invokeArgs = { caseDirectory, string.Empty };
+            bool success = (bool)(benchmark.Invoke(null, invokeArgs) ?? false);
+            Console.WriteLine("Access replay codec benchmark: "
+                + (invokeArgs[1] as string ?? string.Empty));
+            return success ? 0 : 1;
+        }
+
+        private static int TraceCandidate(
+            Assembly assembly,
+            string caseDirectory,
+            string tracePath)
+        {
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo trace = facade.GetMethod(
+                "TryTraceCandidate",
+                BindingFlags.Static | BindingFlags.Public
+                    | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(
+                    facade.FullName, "TryTraceCandidate");
+            object[] traceArgs =
+            {
+                caseDirectory,
+                false,
+                tracePath,
+                string.Empty,
+            };
+            bool success = (bool)(trace.Invoke(null, traceArgs) ?? false);
+            Console.WriteLine(
+                "Access search expansion trace: "
+                + (traceArgs[3] as string ?? string.Empty));
+            return success ? 0 : 1;
+        }
+
+        private static int ReplayCandidate(
+            Assembly assembly,
+            string caseDirectory,
+            bool allowGameAssemblyMismatch)
+        {
+            PrintAssemblyIdentity(assembly);
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo replay = facade.GetMethod(
+                "TryReplayCandidate",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(
+                    facade.FullName, "TryReplayCandidate");
+            object[] invokeArgs =
+            {
+                caseDirectory,
+                allowGameAssemblyMismatch,
+                string.Empty,
+            };
+            bool success = (bool)(replay.Invoke(null, invokeArgs) ?? false);
+            Console.WriteLine("Access search candidate replay: "
+                + (invokeArgs[2] as string ?? string.Empty));
+            return success ? 0 : 1;
+        }
+
+        private static int BenchmarkCase(
+            Assembly assembly,
+            string caseDirectory,
+            int repetitions)
+        {
+            PrintAssemblyIdentity(assembly);
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo benchmark = facade.GetMethod(
+                "TryBenchmarkCase",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(
+                    facade.FullName, "TryBenchmarkCase");
+            object[] invokeArgs =
+            {
+                caseDirectory,
+                repetitions,
+                false,
+                string.Empty,
+            };
+            bool success = (bool)(benchmark.Invoke(null, invokeArgs) ?? false);
+            Console.WriteLine("Access search benchmark: "
+                + (invokeArgs[3] as string ?? string.Empty));
+            return success ? 0 : 1;
+        }
+
+        private static void PrintAssemblyIdentity(Assembly assembly)
+        {
+            string assemblyPath = assembly.Location;
+            string assemblyHash;
+            using (SHA256 sha = SHA256.Create())
+                assemblyHash = string.Concat(sha.ComputeHash(
+                    File.ReadAllBytes(assemblyPath)).Select(
+                        value => value.ToString("x2")));
+            string buildTimestamp = assembly
+                .GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(item => item.Key == "BuildTimestamp")?.Value
+                ?? string.Empty;
+            Console.WriteLine(
+                $"ATD binary: path={assemblyPath} sha256={assemblyHash} "
+                + $"buildTimestamp={buildTimestamp}");
         }
 
         private static Assembly? ResolveAssembly(object sender, ResolveEventArgs args)

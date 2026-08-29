@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Mafi;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -18,6 +19,12 @@ namespace AutoTerrainDesignations.Access
         Maintenance = 0,
         Derived = 1,
         Interactive = 2
+    }
+
+    internal enum ATDAccesswayExecutionBackend
+    {
+        Cooperative,
+        Worker
     }
 
     internal enum ATDAccesswayRequestState
@@ -131,9 +138,13 @@ namespace AutoTerrainDesignations.Access
         void RequestCancellation(string reason);
         ATDAccesswayRequestResult GetTerminalResult();
         string Phase { get; }
+        bool IsPostCommit { get; }
         int VisitedNodes { get; }
         int PendingNodes { get; }
         double ProcessingMilliseconds { get; }
+        double StatusElapsedMilliseconds { get; }
+        ATDAccesswayExecutionBackend ExecutionBackend { get; }
+        Tile2i? FocusTile { get; }
     }
 
     internal sealed class ATDAccesswayRequest
@@ -142,6 +153,7 @@ namespace AutoTerrainDesignations.Access
         public string WorkFingerprint { get; }
         public ATDAccesswayRequestKind Kind { get; }
         public ATDAccesswayPriority Priority { get; }
+        public Tile2i? FocusTile { get; }
         public Func<IATDAccesswayManagedWork> WorkFactory { get; }
         public Func<ATDAccesswayValidationResult>? Validation { get; }
 
@@ -151,7 +163,8 @@ namespace AutoTerrainDesignations.Access
             ATDAccesswayRequestKind kind,
             ATDAccesswayPriority priority,
             Func<IATDAccesswayManagedWork> workFactory,
-            Func<ATDAccesswayValidationResult>? validation = null)
+            Func<ATDAccesswayValidationResult>? validation = null,
+            Tile2i? focusTile = null)
         {
             OwnerKey = string.IsNullOrWhiteSpace(ownerKey)
                 ? throw new ArgumentException("Owner key is required.", nameof(ownerKey))
@@ -159,6 +172,7 @@ namespace AutoTerrainDesignations.Access
             WorkFingerprint = workFingerprint ?? string.Empty;
             Kind = kind;
             Priority = priority;
+            FocusTile = focusTile;
             WorkFactory = workFactory
                 ?? throw new ArgumentNullException(nameof(workFactory));
             Validation = validation;
@@ -174,6 +188,7 @@ namespace AutoTerrainDesignations.Access
             WorkFingerprint = request.WorkFingerprint;
             Kind = request.Kind;
             Priority = request.Priority;
+            FocusTile = request.FocusTile;
             State = ATDAccesswayRequestState.Queued;
         }
 
@@ -182,12 +197,15 @@ namespace AutoTerrainDesignations.Access
         public string WorkFingerprint { get; }
         public ATDAccesswayRequestKind Kind { get; }
         public ATDAccesswayPriority Priority { get; }
+        public Tile2i? FocusTile { get; internal set; }
         internal ATDAccesswayRequestState State { get; set; }
         internal ATDAccesswayRequestResult? Result { get; set; }
         internal IATDAccesswayManagedWork? Work { get; set; }
         internal int LastVisitedNodes { get; set; }
         internal int LastPendingNodes { get; set; }
         internal double LastProcessingMilliseconds { get; set; }
+        internal double LastStatusElapsedMilliseconds { get; set; }
+        internal ATDAccesswayExecutionBackend LastExecutionBackend { get; set; }
         internal string LastPhase { get; set; } = "Queued";
     }
 
@@ -199,6 +217,8 @@ namespace AutoTerrainDesignations.Access
         public int VisitedNodes { get; }
         public int PendingNodes { get; }
         public double ProcessingMilliseconds { get; }
+        public double StatusElapsedMilliseconds { get; }
+        public ATDAccesswayExecutionBackend ExecutionBackend { get; }
 
         public bool IsTerminal
             => State == ATDAccesswayRequestState.Succeeded
@@ -213,7 +233,10 @@ namespace AutoTerrainDesignations.Access
             int visitedNodes,
             int pendingNodes,
             double processingMilliseconds,
-            string phase = "Preparing")
+            string phase = "Preparing",
+            double? statusElapsedMilliseconds = null,
+            ATDAccesswayExecutionBackend executionBackend =
+                ATDAccesswayExecutionBackend.Cooperative)
         {
             State = state;
             Result = result;
@@ -221,6 +244,9 @@ namespace AutoTerrainDesignations.Access
             VisitedNodes = visitedNodes;
             PendingNodes = pendingNodes;
             ProcessingMilliseconds = processingMilliseconds;
+            StatusElapsedMilliseconds = Math.Max(
+                0d, statusElapsedMilliseconds ?? processingMilliseconds);
+            ExecutionBackend = executionBackend;
         }
     }
 
@@ -419,7 +445,11 @@ namespace AutoTerrainDesignations.Access
                     work?.PendingNodes ?? handle.LastPendingNodes,
                     work?.ProcessingMilliseconds
                         ?? handle.LastProcessingMilliseconds,
-                    work?.Phase ?? handle.LastPhase);
+                    work?.Phase ?? handle.LastPhase,
+                    work?.StatusElapsedMilliseconds
+                        ?? handle.LastStatusElapsedMilliseconds,
+                    work?.ExecutionBackend
+                        ?? handle.LastExecutionBackend);
             }
         }
 
@@ -444,7 +474,11 @@ namespace AutoTerrainDesignations.Access
                     work?.PendingNodes ?? handle.LastPendingNodes,
                     work?.ProcessingMilliseconds
                         ?? handle.LastProcessingMilliseconds,
-                    work?.Phase ?? handle.LastPhase);
+                    work?.Phase ?? handle.LastPhase,
+                    work?.StatusElapsedMilliseconds
+                        ?? handle.LastStatusElapsedMilliseconds,
+                    work?.ExecutionBackend
+                        ?? handle.LastExecutionBackend);
                 return true;
             }
         }
@@ -493,7 +527,15 @@ namespace AutoTerrainDesignations.Access
                     return managerWorkPerformed;
 
                 Entry active = m_active;
-                if (!TryValidate(active, out ATDAccesswayRequestResult? invalid))
+                // Once this request has committed its candidate to the live
+                // world, those self-authored mutations necessarily make its
+                // original fingerprint stale. They must not cancel recorder
+                // publication or other post-commit finalization. The owner
+                // will rescan and enqueue any subsequent obligation (for
+                // example farming cluster 2) from the newly changed world.
+                if (!active.Handle.Work!.IsPostCommit
+                    && !TryValidate(
+                        active, out ATDAccesswayRequestResult? invalid))
                 {
                     Complete(active, invalid!);
                     return true;
@@ -644,7 +686,11 @@ namespace AutoTerrainDesignations.Access
             handle.LastPendingNodes = handle.Work.PendingNodes;
             handle.LastProcessingMilliseconds =
                 handle.Work.ProcessingMilliseconds;
+            handle.LastStatusElapsedMilliseconds =
+                handle.Work.StatusElapsedMilliseconds;
+            handle.LastExecutionBackend = handle.Work.ExecutionBackend;
             handle.LastPhase = handle.Work.Phase;
+            handle.FocusTile = handle.Work.FocusTile ?? handle.FocusTile;
         }
 
         private void NotifyTerminal(
