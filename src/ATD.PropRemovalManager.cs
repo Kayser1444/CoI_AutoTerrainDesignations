@@ -234,6 +234,19 @@ namespace AutoTerrainDesignations
             m_propsRemovalProcessor = propsRemovalProcessor;
         }
 
+        private bool AddOrReplaceDesignation(DesignationData data,
+            TerrainDesignationProto proto)
+        {
+            using (AutoDepthDesignation.BeginManagedDesignationMutation())
+                return m_designations.AddOrReplaceDesignation(proto, data);
+        }
+
+        private void RemoveDesignation(Tile2i origin)
+        {
+            using (AutoDepthDesignation.BeginManagedDesignationMutation())
+                m_designations.RemoveDesignation(origin);
+        }
+
         public ATDPropRemovalRequestHandle RequestRemoval(TerrainPropId propId,
             Tile2i cleanupOrigin, string ownerToken,
             bool quickRemove)
@@ -490,7 +503,7 @@ namespace AutoTerrainDesignations
                     if (operation.TemporaryProto == m_miningProto
                         && live.Value.NumberOfJobsAssigned > 0)
                         return false;
-                    m_designations.RemoveDesignation(operation.Origin);
+                    RemoveDesignation(operation.Origin);
                     operation.HasTemporaryDesignation = false;
                     operation.TemporaryProto = null;
                     operation.CandidateSearch = null;
@@ -500,7 +513,7 @@ namespace AutoTerrainDesignations
                 if (!IsTemporaryFulfilled(operation, live.Value)
                     || live.Value.NumberOfJobsAssigned > 0)
                     return false;
-                m_designations.RemoveDesignation(operation.Origin);
+                RemoveDesignation(operation.Origin);
                 operation.HasTemporaryDesignation = false;
                 operation.TemporaryProto = null;
                 operation.CandidateSearch = null;
@@ -543,7 +556,7 @@ namespace AutoTerrainDesignations
 
             DesignationData preview = GetLegacyQuickRemovalPreview(
                 operation.Origin);
-            if (!m_designations.AddOrReplaceDesignation(m_miningProto, preview))
+            if (!AddOrReplaceDesignation(preview, m_miningProto))
                 return false;
 
             operation.OriginalSuspendedByManager = operation.Original != null;
@@ -587,7 +600,7 @@ namespace AutoTerrainDesignations
                 }
                 if (owned.Value.NumberOfJobsAssigned > 0)
                     return false;
-                m_designations.RemoveDesignation(operation.Origin);
+                RemoveDesignation(operation.Origin);
                 operation.HasTemporaryDesignation = false;
                 operation.TemporaryProto = null;
                 operation.Stage = ATDPropRemovalStage.QuickPending;
@@ -607,7 +620,7 @@ namespace AutoTerrainDesignations
                 }
                 if (live.HasValue)
                 {
-                    m_designations.RemoveDesignation(operation.Origin);
+                    RemoveDesignation(operation.Origin);
                     operation.OriginalSuspendedByManager = true;
                 }
                 operation.Stage = ATDPropRemovalStage.QuickPending;
@@ -763,8 +776,7 @@ namespace AutoTerrainDesignations
             }
 
             TerrainCandidate candidate = PopCandidate(search.Candidates);
-            if (!m_designations.AddOrReplaceDesignation(
-                    candidate.Proto, candidate.Data))
+            if (!AddOrReplaceDesignation(candidate.Data, candidate.Proto))
                 return CandidateAdvanceResult.Progress;
             operation.OriginalSuspendedByManager =
                 operation.Original != null;
@@ -788,7 +800,7 @@ namespace AutoTerrainDesignations
                 if (placed.HasValue
                     && placed.Value.Prototype == candidate.Proto
                     && placed.Value.Data.Equals(candidate.Data))
-                    m_designations.RemoveDesignation(operation.Origin);
+                    RemoveDesignation(operation.Origin);
                 return CandidateAdvanceResult.Progress;
             }
 
@@ -1158,7 +1170,7 @@ namespace AutoTerrainDesignations
                 && live.Value.Data.Equals(operation.TemporaryData);
             if (removeOwnedTemporary && ownsLive)
             {
-                m_designations.RemoveDesignation(operation.Origin);
+                RemoveDesignation(operation.Origin);
                 operation.HasTemporaryDesignation = false;
                 operation.TemporaryProto = null;
                 operation.OriginalSuspendedByManager =
@@ -1184,8 +1196,7 @@ namespace AutoTerrainDesignations
             if (!m_protosDb.TryGetProto(new Proto.ID(operation.Original.ProtoId),
                     out TerrainDesignationProto proto))
                 return false;
-            restored = m_designations.AddOrReplaceDesignation(proto,
-                operation.Original.Data);
+            restored = AddOrReplaceDesignation(operation.Original.Data, proto);
             if (restored)
                 operation.OriginalSuspendedByManager = false;
             return restored;

@@ -1,3 +1,10 @@
+v0.7.1 [unreleased]
+
+* Fixed: Prop-removal's temporary designation suspend/restore cycle no longer
+  revokes the owning tower's generated-designation bookkeeping, so the clear
+  button can remove an overlapping access terminal instead of leaving an
+  orphaned restored designation.
+
 v0.7.0 [packaged]
 
 * Added: Ore Sorting Plants now support configurable export routes to compatible

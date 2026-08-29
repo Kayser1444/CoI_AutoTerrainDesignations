@@ -287,6 +287,11 @@ namespace AutoTerrainDesignations
         private static int s_dumpingPriorityWorldDefault =
             AutoDepthDesignation.DumpingPriorityPassive;
         private static ATDPropRemovalManager? s_propRemovalManager;
+        // Prop-removal temporarily removes and restores terrain work while it
+        // operates on a prop. Those internal mutations must not revoke the
+        // owning tower's generated-designation bookkeeping; a player mutation
+        // remains outside this scope and still revokes ownership normally.
+        private static int s_managedDesignationMutationDepth;
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
@@ -298,6 +303,26 @@ namespace AutoTerrainDesignations
             s_accessQuickRemoveDebrisPolicy;
         internal static int DumpingPriorityWorldDefault => s_dumpingPriorityWorldDefault;
         internal static ATDPropRemovalManager? PropRemovalManager => s_propRemovalManager;
+
+        internal static IDisposable BeginManagedDesignationMutation()
+        {
+            s_managedDesignationMutationDepth++;
+            return new ManagedDesignationMutationScope();
+        }
+
+        private sealed class ManagedDesignationMutationScope : IDisposable
+        {
+            private bool m_disposed;
+
+            public void Dispose()
+            {
+                if (m_disposed)
+                    return;
+                m_disposed = true;
+                if (s_managedDesignationMutationDepth > 0)
+                    s_managedDesignationMutationDepth--;
+            }
+        }
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
@@ -573,6 +598,8 @@ namespace AutoTerrainDesignations
         {
             origin = TerrainDesignation.GetOrigin(origin);
             RecordTerrainDesignationMutation(origin);
+            if (s_managedDesignationMutationDepth > 0)
+                return;
             var affectedTowers = new HashSet<EntityId>();
             RemoveOwnership(
                 s_generatedDesignationOriginsByTowerEntityId);
@@ -644,6 +671,7 @@ namespace AutoTerrainDesignations
             var unrelatedTowerId = new EntityId(987654321);
             var origin = new Tile2i(124, 456);
             var replacementOrigin = new Tile2i(128, 456);
+            var managedMutationOrigin = new Tile2i(132, 456);
             var settings = new ATDTowerSettings(
                 1, 2, 1, null, 0, 1);
             settings.MarkMiningPlanClean("fixture-clean");
@@ -655,9 +683,15 @@ namespace AutoTerrainDesignations
             s_towerSettingsByEntityId[unrelatedTowerId] =
                 unrelatedSettings;
             s_generatedDesignationOriginsByTowerEntityId[towerId] =
-                new HashSet<Tile2i> { origin, replacementOrigin };
+                new HashSet<Tile2i>
+                {
+                    origin, replacementOrigin, managedMutationOrigin
+                };
             s_generatedAccesswayOriginsByTowerEntityId[towerId] =
-                new HashSet<Tile2i> { origin, replacementOrigin };
+                new HashSet<Tile2i>
+                {
+                    origin, replacementOrigin, managedMutationOrigin
+                };
             var farmingSession = new FarmingPreparationSession();
             farmingSession.PreparationAccessRampOrigins.Add(origin);
             farmingSession.FillingAccessRampOrigins.Add(origin);
@@ -665,9 +699,50 @@ namespace AutoTerrainDesignations
                 replacementOrigin);
             farmingSession.FillingAccessRampOrigins.Add(
                 replacementOrigin);
+            farmingSession.PreparationAccessRampOrigins.Add(
+                managedMutationOrigin);
+            farmingSession.FillingAccessRampOrigins.Add(
+                managedMutationOrigin);
             s_farmingPreparationSessions[towerId] = farmingSession;
             try
             {
+                using (BeginManagedDesignationMutation())
+                {
+                    OnTerrainDesignationRemoved(managedMutationOrigin);
+                    AddOrReplaceDesignationPostfix(
+                        new DesignationData(
+                            managedMutationOrigin, new HeightTilesI(0)),
+                        __result: true);
+                }
+                bool managedMutationStillOwned =
+                    s_generatedDesignationOriginsByTowerEntityId[towerId]
+                        .Contains(managedMutationOrigin)
+                    && s_generatedAccesswayOriginsByTowerEntityId[towerId]
+                        .Contains(managedMutationOrigin)
+                    && farmingSession.PreparationAccessRampOrigins.Contains(
+                        managedMutationOrigin)
+                    && farmingSession.FillingAccessRampOrigins.Contains(
+                        managedMutationOrigin)
+                    && !settings.MiningPlanDirty;
+                if (!managedMutationStillOwned)
+                {
+                    failure =
+                        "Manager-owned designation mutations must preserve ordinary/accessway/farming ownership and avoid dirtying the tower plan.";
+                    return false;
+                }
+
+                // Remove the fixture-only origin directly so the following
+                // assertions continue to exercise the ordinary external
+                // replacement/removal paths.
+                s_generatedDesignationOriginsByTowerEntityId[towerId]
+                    .Remove(managedMutationOrigin);
+                s_generatedAccesswayOriginsByTowerEntityId[towerId]
+                    .Remove(managedMutationOrigin);
+                farmingSession.PreparationAccessRampOrigins.Remove(
+                    managedMutationOrigin);
+                farmingSession.FillingAccessRampOrigins.Remove(
+                    managedMutationOrigin);
+
                 AddOrReplaceDesignationPostfix(
                     new DesignationData(
                         replacementOrigin, new HeightTilesI(0)),
@@ -1031,6 +1106,7 @@ namespace AutoTerrainDesignations
             ResetAccesswayManagerRuntime("WorldReset");
             s_propRemovalManager?.Dispose(restoreOriginals: true);
             s_propRemovalManager = null;
+            s_managedDesignationMutationDepth = 0;
             s_worldGeneration++;
             s_terrainDesignationRevision = 0;
             s_terrainDesignationMutationJournalCount = 0;
