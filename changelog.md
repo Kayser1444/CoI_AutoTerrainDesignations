@@ -1,4 +1,4 @@
-v0.7.1 [unreleased]
+v0.7.1 [packaged]
 
 * Changed: Routed experimental accessways are now always enabled for eligible accessway modes. The old `turningRampsExperimental` settings toggle has been removed; legacy straight-only modes and the explicit legacy fallback remain unchanged.
 
