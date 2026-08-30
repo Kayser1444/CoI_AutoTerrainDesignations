@@ -8,7 +8,7 @@
 
 ***Kayser’s Automatic Terrain Designations (ATD)*** is a quality-of-life mod for Captain of Industry that generates tailored mining designations for Mine Towers. Instead of manually maintaining designations across complex deposits, ATD analyzes the terrain and creates a mining plan that follows the ore body.
 
-Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
+Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
@@ -25,6 +25,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 [📊 **Ore composition**](#ore-composition)
 
 [🎯 **Mining and dumping priorities**](#mining-and-dumping-priorities)
+
+[🚛 **Ore Sorting Plant exports**](#ore-sorting-plant-exports)
 
 [🏗️ **Vehicle ordering**](#vehicle-ordering)
 
@@ -64,7 +66,7 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 
 ### 🛣️ Routed accessways
 
-*A routed accessway connecting isolated terrain work to ground the assigned excavators can reach.*
+![image.png](/content-images/2abe8a41147dc6cde9ff42a475bc0b237150b61b8d8d7b86e9a587ee3ef474e6/image.png)*A routed accessway connecting isolated terrain work to ground the assigned excavators can reach.*
 
 ATD can generate turning accessways sized for T1, T2, or T3/Mega Excavators. **AUTO** selects a suitable clearance from assigned or available excavators, while explicit modes give you direct control. Legacy straight ramps remain available when preferred.
 
@@ -76,39 +78,43 @@ Use **Clear designations** to remove the selected tower's ATD-generated terrain 
 
 ### 📊 Ore composition
 
-*Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
+![image.png](/content-images/006b3e17740b08334a9fcdbcbc0dd0424499217939153f9322497b80bb48c0bd/image.png)*Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
 
 The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It reflects the current Ore Mining Yield difficulty setting and works with both ATD-generated and manually placed designations.
 
 ### 🎯 Mining and dumping priorities
 
-*Tower-level product and dumping priorities keep excavation and material delivery focused where you want them.*
+![image.png](/content-images/0de84c857f6e8394b66368e049bbb1640af6cb414c2cc8681013b9aea507e1fe/image.png)*Tower-level product and dumping priorities keep excavation and material delivery focused where you want them.*
 
 Set a preferred mining product once at the tower level and ATD applies it to assigned excavators. Dumping can remain **Passive** or use vanilla-style active priorities from 1 to 15; farmland topsoil filling is activated automatically when required.
 
+### 🚛 Ore Sorting Plant exports
+
+![image.png](/content-images/875cd1e0a758d3cea39fd5d1809df0cc56cbba8beb26e2c3baed5ea918dfeb7a/image.png)*Control where Ore Sorting Plants send their output and which trucks may handle it.*
+
+ATD adds vanilla-style export controls to Ore Sorting Plants: configure compatible storage and Mine Tower destinations, set an export priority, and assign trucks directly. Enable **Assigned trucks only** to restrict cargo collection and delivery to trucks assigned to the plant or its participating Mine Towers. Routes and settings are saved with the game.
+
 ### 🏗️ Vehicle ordering
 
-*Order and pre-assign excavators or trucks directly from the Mine Tower inspector.*
+![image.png](/content-images/f6de06a7d560d26012c3563b6fce2626a64f903dc024729dabc4ad7a160bd7b6/image.png)*Order and pre-assign excavators or trucks directly from the Mine Tower inspector.*
 
 Order vehicle construction from the tower's vehicle assignment UI. ATD selects the closest eligible Vehicle Depot, records the pre-assignment, and sends the completed vehicle to the tower automatically. Shift and Ctrl modifiers order 5 or 10 vehicles; Shift+Alt-click orders directly even when a free vehicle is available.
 
 ### 🚚 Idle vehicle management
 
-*Per-tower idle policies keep vehicles nearby, park them normally, or release them for work elsewhere.*
+![image.png](/content-images/250d2f34115bee61432e5ed3579594e03212fe239b6b4ea548ad4af99ddc89ae/image.png)*Per-tower idle policies keep vehicles nearby, park them normally, or release them for work elsewhere.*
 
-Idle Excavators can be released and automatically recalled when excavation resumes. Trucks offer three policies: **Park at tower**, **Stay put**, and **Soft release**, allowing each Mine Tower to balance responsiveness against fleet sharing.
+Idle Excavators can be released and automatically recalled when excavation resumes. Trucks offer three policies: **Park at tower** (the vanilla behavior), **Stay put**, and **Soft release**, allowing each Mine Tower to balance responsiveness against fleet sharing.
 
 ### 🪨 Clear debris
 
-*The Clear debris control queues reachable rocks, bushes, and other obstructions for excavator removal.*
+![image.png](/content-images/c5b64645afee979bb1282c1e028f9790e9529ba971aa590c744c17eb1c3250db/image.png)*The Clear debris control queues reachable rocks, bushes, and other obstructions for excavator removal.*
 
 Request removal of reachable debris in the tower area without spending Unity on Quick remove. ATD temporarily works around conflicting terrain designations and restores them after cleanup. Ctrl-click also includes debris that is not currently reachable.
 
 ### 📐 Corner designations
 
-![image.png](/content-images/387110dae50968b187eee298630af077574e4ef713e056036985f5acc6febace/image.png)
-
-*Outer, inner, and planar corner tools integrated into the terrain-designation toolbar.*
+![image.png](/content-images/111cee97faf31168bf46bb5daf4b83e39f5fc49b1a67f55fe935e594840aa306/image.png)*Outer, inner, and planar corner tools integrated into the terrain-designation toolbar.*
 
 ![image.png](/content-images/9eeea6d2981ef065349816ec0b9b8acf77dc57f3aef4e6647a91b62a5a9c2c2f/image.png)
 
