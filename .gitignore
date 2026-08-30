@@ -14,6 +14,7 @@ archive/
 ATDsettings.json
 
 # Local/editor state
+.scratch/
 .vs/
 .vscode/*
 !.vscode/tasks.json

@@ -655,11 +655,19 @@ namespace AutoTerrainDesignations.Access
                 new HeightTilesI(2));
             var buriedProp = new DesignationData(Tile2i.Zero,
                 new HeightTilesI(3));
+            var cutProp = new DesignationData(Tile2i.Zero,
+                new HeightTilesI(1));
             if (AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
                     AccessHandoffOperation.Mining, flatAtProp,
                     exactPropSample)
                 || AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
                     AccessHandoffOperation.Leveling, buriedProp,
+                    exactPropSample)
+                || !AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Mining, cutProp,
+                    exactPropSample)
+                || !AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
+                    AccessHandoffOperation.Leveling, cutProp,
                     exactPropSample)
                 || AccessPropCleanupPolicy.PlannedOperationRemovesNonTreeProp(
                     AccessHandoffOperation.Dumping, flatAtProp,
@@ -671,24 +679,34 @@ namespace AutoTerrainDesignations.Access
             if (AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
                     QuickRemoveDebrisPolicy.Always,
                     buriedByPlannedDumping: true,
+                    removedByPlannedExcavation: false,
                     out _)
                 || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
                     QuickRemoveDebrisPolicy.Always,
                     buriedByPlannedDumping: false,
+                    removedByPlannedExcavation: true,
                     out bool alwaysQuick)
                 || !alwaysQuick
                 || AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
                     QuickRemoveDebrisPolicy.Restrictive,
                     buriedByPlannedDumping: true,
+                    removedByPlannedExcavation: false,
+                    out _)
+                || AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
+                    QuickRemoveDebrisPolicy.Restrictive,
+                    buriedByPlannedDumping: false,
+                    removedByPlannedExcavation: true,
                     out _)
                 || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
                     QuickRemoveDebrisPolicy.Restrictive,
                     buriedByPlannedDumping: false,
+                    removedByPlannedExcavation: false,
                     out bool restrictiveQuick)
                 || !restrictiveQuick
                 || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
                     QuickRemoveDebrisPolicy.Never,
                     buriedByPlannedDumping: false,
+                    removedByPlannedExcavation: false,
                     out bool neverQuick)
                 || neverQuick)
             { failure = "non-buried prop-removal strategy policy failed"; return false; }
@@ -5787,7 +5805,13 @@ namespace AutoTerrainDesignations.Access
                                     tile, null, diagnostics));
                         return projected;
                         });
-                        fixedCost += snapshot.Policy.GeneratedVFixedCost;
+                bool reusesExactSourceTerrain =
+                    transition.ScoreOnlyGeneratedExteriorRays
+                    && !AccessPathMaterializer
+                        .ProfileHasTerrainDelta(
+                            snapshot, item.Origin, item.Profile);
+                if (!reusesExactSourceTerrain)
+                    fixedCost += snapshot.Policy.GeneratedVFixedCost;
 
                 CalculateGeneratedPropCleanupCost(
                     snapshot, item.Origin, item.Profile,

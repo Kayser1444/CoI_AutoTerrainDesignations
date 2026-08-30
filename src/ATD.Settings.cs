@@ -29,8 +29,7 @@ namespace AutoTerrainDesignations
         // Increment when a built-in setting default changes in a way that must
         // migrate an older generated settings file. This is separate from the
         // mod version because packages can be rebuilt without changing it.
-        private const int SETTINGS_DEFAULTS_REVISION = 4;
-        private const int TURNING_RAMPS_DEFAULTS_REVISION = 3;
+        private const int SETTINGS_DEFAULTS_REVISION = 5;
 
         private static bool s_settingsLoadAttempted;
         private static string? s_loadedSettingsPath;
@@ -526,26 +525,9 @@ namespace AutoTerrainDesignations
                         AutoTerrainDesignationsMod.DumpingPriorityDefault))
                     AutoTerrainDesignationsMod.SetDumpingPriority(dumpingPriority.Value);
 
-                bool? turningRampsExperimental = ParseBool(json, "turningRampsExperimental");
-                if (turningRampsExperimental.HasValue)
-                {
-                    // The old file format cannot distinguish the generated
-                    // false from a user's explicit false. Promote both legacy
-                    // states to the new true default, but preserve the value
-                    // once the setting has passed this one-time migration.
-                    AutoTerrainDesignationsMod.SetTurningRampsEnabled(
-                        ResolveTurningRampsValue(
-                            turningRampsExperimental.Value,
-                            parsedDefaultsRevision));
-                }
-
                 bool? suppressLegacyAccessRamps = ParseBool(json, "suppressLegacyAccessRamps");
                 if (suppressLegacyAccessRamps.HasValue && ShouldPreserveBool(suppressLegacyAccessRamps.Value, migrateGeneratedDefaults, false))
                     AutoTerrainDesignationsMod.SetSuppressLegacyAccessRamps(suppressLegacyAccessRamps.Value);
-
-                bool? experimentalAccessUseAStar = ParseBool(json, "experimentalAccessUseAStar");
-                if (experimentalAccessUseAStar.HasValue && ShouldPreserveBool(experimentalAccessUseAStar.Value, migrateGeneratedDefaults, false))
-                    AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(experimentalAccessUseAStar.Value);
 
                 bool? cursorOverlayEnabled = ParseBool(json, "cursorOverlayEnabled");
                 if (cursorOverlayEnabled.HasValue
@@ -692,7 +674,17 @@ namespace AutoTerrainDesignations
                 ApplyInt("accessMaxVisitedNodes", 250000, AutoTerrainDesignationsMod.SetAccessMaxVisitedNodes);
                 ApplyInt("accessSearchTimeoutSeconds", 60, AutoTerrainDesignationsMod.SetAccessSearchTimeoutSeconds);
                 ApplyInt("accessSearchFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs);
-                ApplyInt("accessSnapshotMemoryCeilingMiB", 512, AutoTerrainDesignationsMod.SetAccessSnapshotMemoryCeilingMiB);
+                int? accessSnapshotMemoryCeilingMiB = ParseInt(
+                    json, "accessSnapshotMemoryCeilingMiB");
+                if (accessSnapshotMemoryCeilingMiB.HasValue
+                    && ShouldPreserveInt(
+                        accessSnapshotMemoryCeilingMiB.Value,
+                        migrateGeneratedDefaults,
+                        512,
+                        AutoTerrainDesignationsMod
+                            .AccessSnapshotMemoryCeilingDefaultMiB))
+                    AutoTerrainDesignationsMod.SetAccessSnapshotMemoryCeilingMiB(
+                        accessSnapshotMemoryCeilingMiB.Value);
                 ApplyInt("accessManagerAutomatedFrameBudgetMs", 10, AutoTerrainDesignationsMod.SetAccessManagerAutomatedFrameBudgetMs);
                 ApplyInt("accessManagerInteractiveFrameBudgetMs", 15, AutoTerrainDesignationsMod.SetAccessManagerInteractiveFrameBudgetMs);
                 ApplyInt("accessManagerPausedMaxFrameBudgetMs", 30, AutoTerrainDesignationsMod.SetAccessManagerPausedMaxFrameBudgetMs);
@@ -728,38 +720,48 @@ namespace AutoTerrainDesignations
         private static bool ShouldPreserveBool(bool value, bool migrateGeneratedDefaults, params bool[] knownDefaults)
             => !migrateGeneratedDefaults || Array.IndexOf(knownDefaults, value) < 0;
 
-        private static bool ResolveTurningRampsValue(
-            bool value,
-            int parsedDefaultsRevision)
-            => parsedDefaultsRevision < TURNING_RAMPS_DEFAULTS_REVISION
-                ? true
-                : value;
-
-        internal static bool ValidateTurningRampsMigrationFixtures(
+        internal static bool ValidateSettingsMigrationFixtures(
             out string failure)
         {
-            if (!ResolveTurningRampsValue(true, 0))
+            if (ShouldPreserveInt(
+                    512,
+                    true,
+                    512,
+                    AutoTerrainDesignationsMod
+                        .AccessSnapshotMemoryCeilingDefaultMiB))
             {
-                failure = "A legacy true turning-ramp value was not preserved.";
+                failure = "The previous generated 512 MiB snapshot default was not migrated.";
                 return false;
             }
 
-            if (!ResolveTurningRampsValue(false, 0))
+            if (!ShouldPreserveInt(
+                    2048,
+                    true,
+                    512,
+                    AutoTerrainDesignationsMod
+                        .AccessSnapshotMemoryCeilingDefaultMiB))
             {
-                failure = "A legacy generated false turning-ramp value was not promoted.";
+                failure = "A custom snapshot memory ceiling was not preserved.";
                 return false;
             }
 
-            if (!ResolveTurningRampsValue(false, 2))
+            string json = BuildSettingsJson();
+            if (json.IndexOf(
+                    "turningRampsExperimental",
+                    StringComparison.Ordinal) >= 0
+                || json.IndexOf(
+                    "experimentalAccessUseAStar",
+                    StringComparison.Ordinal) >= 0)
             {
-                failure = "A revision-2 downgraded false turning-ramp value was not repaired.";
+                failure = "Removed accessway settings were still emitted to JSON.";
                 return false;
             }
 
-            if (ResolveTurningRampsValue(false, 3)
-                || !ResolveTurningRampsValue(true, 3))
+            if (json.IndexOf(
+                    "\"accessSnapshotMemoryCeilingMiB\": 1024",
+                    StringComparison.Ordinal) < 0)
             {
-                failure = "Current-revision turning-ramp values were not preserved.";
+                failure = "The generated snapshot memory ceiling was not 1024 MiB.";
                 return false;
             }
 
@@ -1105,14 +1107,8 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_dumpingPriority\": \"Default Dumping priority for new worlds and previously unconfigured Mine Towers. Priorities 1-15 actively request tower-approved terrain products; lower numbers are more urgent. Passive uses vanilla dumping and only imports from active exporters. During ATD farmland fill, Passive temporarily uses active priority 14 while farmable dump rules are active. Existing towers retain their concrete priority. Default: Passive.\",");
             sb.AppendLine($"  \"dumpingPriority\": {AutoTerrainDesignationsMod.DumpingPriority},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_turningRampsExperimental\": \"When enabled, AUTO and T1-T3 may use routed turning or switchback accessways. Legacy 3-5 remain straight-only. Default: true.\",");
-            sb.AppendLine($"  \"turningRampsExperimental\": {BoolToJsonStr(AutoTerrainDesignationsMod.TurningRampsEnabled)},");
-            sb.AppendLine();
             sb.AppendLine("  \"_comment_suppressLegacyAccessRamps\": \"Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave false for normal fallback behavior. Default: false.\",");
             sb.AppendLine($"  \"suppressLegacyAccessRamps\": {BoolToJsonStr(AutoTerrainDesignationsMod.SuppressLegacyAccessRamps)},");
-            sb.AppendLine();
-            sb.AppendLine("  \"_comment_experimentalAccessUseAStar\": \"Use paired-goal height-aware A* instead of reference Dijkstra for access search. Set false for route and cost comparison. Default: true.\",");
-            sb.AppendLine($"  \"experimentalAccessUseAStar\": {BoolToJsonStr(AutoTerrainDesignationsMod.ExperimentalAccessUseAStar)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_cursorOverlayEnabled\": \"Whether to show the bottom-left terrain cursor coordinates at game start. Coordinates are displayed as (x, y, z). The atd_cursor_overlay console command can still override this for the current session. Default: false.\",");
             sb.AppendLine($"  \"cursorOverlayEnabled\": {BoolToJsonStr(ShowCursorOverlay)},");
@@ -1184,7 +1180,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("  \"_comment_accessSearchFrameBudgetMs\": \"Time budget in milliseconds per frame allocated to sliced background access search. Range: 1-1000. Default: 30.\",");
             sb.AppendLine($"  \"accessSearchFrameBudgetMs\": {AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs},");
             sb.AppendLine();
-            sb.AppendLine("  \"_comment_accessSnapshotMemoryCeilingMiB\": \"Conservative estimated retained-memory ceiling for one access snapshot. Capture fails closed as SnapshotTooLarge above this value. Advanced users may raise it after profiling. Default: 512.\",");
+            sb.AppendLine("  \"_comment_accessSnapshotMemoryCeilingMiB\": \"Conservative estimated retained-memory ceiling for one access snapshot. Capture fails closed as SnapshotTooLarge above this value. Advanced users may raise it after profiling. Range: 128-8192 MiB. Default: 1024.\",");
             sb.AppendLine($"  \"accessSnapshotMemoryCeilingMiB\": {AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessManagerAutomatedFrameBudgetMs\": \"Managed farming and Construction Assist search budget per rendered frame during normal play. Range: 1-150. Default: 10.\",");

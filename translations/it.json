@@ -416,28 +416,12 @@
     "Penalità quando un raggio non incontra il terreno all'interno del suo raggio di traccia."
   ],
   [
-    "settings.experimental_access.turning_ramps.label",
-    "Rampe di svolta"
-  ],
-  [
-    "settings.experimental_access.turning_ramps.tooltip",
-    "Se abilitato, ATD può selezionare e posizionare accessi a tornanti o svolte su percorso utilizzando designazioni piatte e in pendenza. AUTO e T1-T3 utilizzano accessi percorsi; Legacy 3-5 utilizza solo il generatore di rampa dritta. Le designazioni degli angoli e delle selle non sono incluse."
-  ],
-  [
     "settings.experimental_access.suppress_legacy_ramps.label",
     "Elimina le rampe legacy"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
     "Disattiva il generatore legacy di rampe diritte per testare direttamente risultati ed errori degli accessi instradati. Lascia disattivato per il normale comportamento di fallback."
-  ],
-  [
-    "settings.experimental_access.astar.label",
-    "Utilizza la ricerca A*"
-  ],
-  [
-    "settings.experimental_access.astar.tooltip",
-    "Usa A* invece del Dijkstra di riferimento per le prove a secco degli accessi instradati. Dijkstra è la base di convalida più sicura. A* è più veloce."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -640,6 +624,10 @@
     "Imposta la priorità di estrazione della torre su {0}."
   ],
   [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Solo i camion assegnati (e i camion assegnati alle torri minerarie partecipanti) potranno prelevare o consegnare carichi qui."
+  ],
+  [
     "panel.farming.title",
     "Preparazione dei terreni agricoli"
   ],
@@ -780,15 +768,15 @@
     "Zoom su {0}"
   ],
   [
+    "access_search.zoom.tooltip",
+    "Zoom sull'azione di accesso"
+  ],
+  [
     "vehicle_order.preassigned.tooltip",
     "Preassegnato a {0}"
   ],
   [
     "vehicle_order.shortcut.tooltip",
     "Fai clic tenendo premuto Maiusc-Alt per ordinare un nuovo {0} per {2} presso {1}"
-  ],
-  [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
-    "Solo i camion assegnati (e i camion assegnati alle torri minerarie partecipanti) potranno prelevare o consegnare carichi qui."
   ]
 ]

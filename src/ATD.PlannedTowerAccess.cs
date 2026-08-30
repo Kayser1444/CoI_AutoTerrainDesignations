@@ -57,17 +57,20 @@ namespace AutoTerrainDesignations
             public AccessSearchSnapshot Snapshot { get; }
             public AccessSearchResult SearchResult { get; }
             public AccessDesignationPlan Plan { get; }
+            public AccessReplayMemoryEvidence? MemoryEvidence { get; }
 
             public PlannedTowerCandidate(
                 PlannedTowerApproach approach,
                 AccessSearchSnapshot snapshot,
                 AccessSearchResult searchResult,
-                AccessDesignationPlan plan)
+                AccessDesignationPlan plan,
+                AccessReplayMemoryEvidence? memoryEvidence)
             {
                 Approach = approach;
                 Snapshot = snapshot;
                 SearchResult = searchResult;
                 Plan = plan;
+                MemoryEvidence = memoryEvidence;
             }
         }
 
@@ -149,7 +152,6 @@ namespace AutoTerrainDesignations
             }
 
             if (!generateRamps
-                || !AutoTerrainDesignationsMod.TurningRampsEnabled
                 || (towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2)
                 || s_miningProto == null
                 || s_levelingProto == null
@@ -236,7 +238,8 @@ namespace AutoTerrainDesignations
                 groundGoalOverride: ghostGroundGoals,
                 generatedAreaMarginTiles: 0,
                 snapshotBuild,
-                sliceControl);
+                sliceControl,
+                createWorkspace: false);
             while (snapshotPreparation.MoveNext())
                 yield return snapshotPreparation.Current;
 
@@ -244,9 +247,8 @@ namespace AutoTerrainDesignations
                 yield break;
 
             AccessSearchSnapshot? snapshot = snapshotBuild.Snapshot;
-            AccessSearchWorkspace? workspace = snapshotBuild.Workspace;
             string snapshotFailure = snapshotBuild.FailureReason;
-            if (snapshot == null || workspace == null)
+            if (snapshot == null)
             {
                 LogExperimentalAccessDebug(
                     $"[ATD Planned Tower Access] snapshotFailed={snapshotFailure}");
@@ -266,8 +268,8 @@ namespace AutoTerrainDesignations
                 fixedGoalOrigins: Array.Empty<Tile2i>(),
                 groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
-            IEnumerator search = RunExperimentalAccessDryRunSliced(
-                request, workspace, cluster, 1, 1, dryRun, sliceControl);
+            IEnumerator search = RunExperimentalAccessDryRunWorker(
+                request, cluster, dryRun, sliceControl);
             while (search.MoveNext())
                 yield return search.Current;
             if (sliceControl?.CancellationRequested
@@ -309,7 +311,8 @@ namespace AutoTerrainDesignations
                 && plan.IsValid
                 && selectedApproach != null
                     ? new PlannedTowerCandidate(
-                        selectedApproach, snapshot, searchResult, plan)
+                        selectedApproach, snapshot, searchResult, plan,
+                        snapshotBuild.MemoryEvidence)
                     : null;
             if (best != null)
             {
@@ -362,7 +365,8 @@ namespace AutoTerrainDesignations
 
             var placedOrigins = new List<Tile2i>();
             var candidate = new ExperimentalAccessCandidate(
-                best.SearchResult, best.Plan, request, dryRun.ReplayTiming);
+                best.SearchResult, best.Plan, request, dryRun.ReplayTiming,
+                best.MemoryEvidence);
             if (!TryPlaceExperimentalAccessCandidate(
                     best.Snapshot, levelingProto, candidate, tower,
                     placedOrigins, reservedRampTiles: null,

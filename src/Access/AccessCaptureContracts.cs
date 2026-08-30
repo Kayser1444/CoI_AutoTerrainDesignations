@@ -348,6 +348,7 @@ namespace AutoTerrainDesignations.Access
     /// </summary>
     internal static class AccessSnapshotMemoryEstimator
     {
+        internal const string Version = "retained-v1";
         private const long BaseBytes = 8L * 1024L * 1024L;
 
         internal static long EstimateRetainedBytes(

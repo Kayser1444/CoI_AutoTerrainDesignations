@@ -136,6 +136,7 @@ namespace AutoTerrainDesignations
             public AccessSearchSnapshot? Snapshot { get; set; }
             public AccessSearchWorkspace? Workspace { get; set; }
             public AccessCaptureDiagnostics? CaptureDiagnostics { get; set; }
+            public AccessReplayMemoryEvidence? MemoryEvidence { get; set; }
             public string FailureReason { get; set; } = string.Empty;
         }
 
@@ -644,34 +645,34 @@ namespace AutoTerrainDesignations
                 : new Tile2i(
                     (towerBoundsMin.X + towerBoundsMax.X) / 2,
                     (towerBoundsMin.Y + towerBoundsMax.Y) / 2);
+            // The G flood and V side rays are independent consumers of the
+            // outer terrain capture. Their margins form a union, not a sum:
+            // G needs the fixed outside-area margin, while V needs its ray
+            // reach from an in-area origin.
+            int outerCaptureMargin = Math.Max(
+                RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    + AutoTerrainDesignationsMod.AccessRayEndBuffer);
             groundCaptureMin = new Tile2i(
                 Math.Min(boundsMin.X, towerCenter.X)
-                    - RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                    - outerCaptureMargin,
                 Math.Min(boundsMin.Y, towerCenter.Y)
-                    - RAMP_ACCESS_SEARCH_MARGIN_TILES);
+                    - outerCaptureMargin);
             groundCaptureMax = new Tile2i(
                 Math.Max(boundsMax.X, towerCenter.X)
-                    + RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                    + outerCaptureMargin,
                 Math.Max(boundsMax.Y, towerCenter.Y)
-                    + RAMP_ACCESS_SEARCH_MARGIN_TILES);
+                    + outerCaptureMargin);
             Tile2i physicalTerrainMin = Tile2i.Zero;
             Tile2i physicalTerrainMax = new Tile2i(
                 terrMgr.TerrainSize.X - 1,
                 terrMgr.TerrainSize.Y - 1);
             groundCaptureMin = new Tile2i(
-                Math.Max(physicalTerrainMin.X, groundCaptureMin.X
-                    - AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
-                    - AutoTerrainDesignationsMod.AccessRayEndBuffer),
-                Math.Max(physicalTerrainMin.Y, groundCaptureMin.Y
-                    - AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
-                    - AutoTerrainDesignationsMod.AccessRayEndBuffer));
+                Math.Max(physicalTerrainMin.X, groundCaptureMin.X),
+                Math.Max(physicalTerrainMin.Y, groundCaptureMin.Y));
             groundCaptureMax = new Tile2i(
-                Math.Min(physicalTerrainMax.X, groundCaptureMax.X
-                    + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
-                    + AutoTerrainDesignationsMod.AccessRayEndBuffer),
-                Math.Min(physicalTerrainMax.Y, groundCaptureMax.Y
-                    + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
-                    + AutoTerrainDesignationsMod.AccessRayEndBuffer));
+                Math.Min(physicalTerrainMax.X, groundCaptureMax.X),
+                Math.Min(physicalTerrainMax.Y, groundCaptureMax.Y));
         }
 
         private static IEnumerator BuildExperimentalAccessSnapshotCore(
@@ -690,6 +691,8 @@ namespace AutoTerrainDesignations
         {
             long capturePreambleStart = AtdDiagnostics.Timestamp();
             Stopwatch snapshotTimer = Stopwatch.StartNew();
+            AccessReplayMemoryProbe? memoryProbe =
+                AccessSearchReplayRecorder.BeginMemoryProbe();
             AccessSearchSnapshot snapshot = null!;
             string failureReason = string.Empty;
             AccessSearchPolicySnapshot policy =
@@ -1937,6 +1940,9 @@ namespace AutoTerrainDesignations
                     prebuiltV2FixedNavigationGraph);
             snapshotTimer.Stop();
             output.Snapshot = snapshot;
+            output.MemoryEvidence = memoryProbe?.Complete(
+                snapshot.EstimatedRetainedMemoryBytes,
+                snapshot.CaptureMemoryCeilingBytes);
             output.Workspace = createWorkspace
                 ? new AccessSearchWorkspace(snapshot)
                 : null;
@@ -3268,6 +3274,7 @@ namespace AutoTerrainDesignations
                     $"v2Suffix=[attempts:{diag.V2GroundSuffixAttempts},success:{diag.V2GroundSuffixSuccesses}," +
                     $"fallback:{diag.V2GroundSuffixFallbacks},steps:{diag.V2GroundSuffixSteps}] " +
                     $"v2G2V=[calls:{diag.V2GroundToVCalls},areaReject:{diag.V2GroundToVTowerAreaRejects},seeds:{diag.V2GroundToVSeedCalls}," +
+                    $"firstEnqueueVisited:{diag.V2GroundToVFirstEnqueueVisited}," +
                     $"extensions:{diag.V2GroundToVSeedExtensions},anchors:{diag.V2GroundToVAnchorCandidates}," +
                     $"profiles:{diag.V2GroundToVProfileCandidates}," +
                     $"directLevel:{diag.V2GroundToVDirectLevelingAccepts}," +
@@ -4673,6 +4680,7 @@ namespace AutoTerrainDesignations
             AccessDesignationPlan? plan,
             AccessPathRequest request,
             AccessReplayPhaseTiming replayTiming,
+            AccessReplayMemoryEvidence? memoryEvidence,
             Tile2i towerPosition,
             TerrainManager terrMgr)
         {
@@ -4712,7 +4720,7 @@ namespace AutoTerrainDesignations
                     + plan.CleanupOrigins.Count,
                 stableOrder: int.MaxValue,
                 sourceCandidate: new ExperimentalAccessCandidate(
-                    result, plan, request, replayTiming));
+                    result, plan, request, replayTiming, memoryEvidence));
         }
 
         private static bool TryPlaceExperimentalAccessCandidate(
@@ -5343,23 +5351,29 @@ namespace AutoTerrainDesignations
                 }
                 Tile2i propOrigin = TerrainDesignation.GetOrigin(
                     liveProp.Position.Tile2i);
-                bool defaultOperationRemoves = plannedPlacements.Values.Any(
+                bool buriedByPlannedDumping = plannedPlacements.Values.Any(
                     planned => AccessPropCleanupPolicy
                         .PlannedOperationRemovesNonTreeProp(
                             planned.Proto == s_dumpingProto
                                 ? AccessHandoffOperation.Dumping
-                                : planned.Proto == s_miningProto
-                                    ? AccessHandoffOperation.Mining
-                                    : planned.Proto == s_levelingProto
-                                        ? AccessHandoffOperation.Leveling
-                                        : AccessHandoffOperation.None,
+                                : AccessHandoffOperation.None,
+                            planned.Data, sample));
+                bool removedByPlannedExcavation = plannedPlacements.Values.Any(
+                    planned => AccessPropCleanupPolicy
+                        .PlannedOperationRemovesNonTreeProp(
+                            planned.Proto == s_miningProto
+                                ? AccessHandoffOperation.Mining
+                                : planned.Proto == s_levelingProto
+                                    ? AccessHandoffOperation.Leveling
+                                    : AccessHandoffOperation.None,
                             planned.Data, sample));
 
                 QuickRemoveDebrisPolicy policy =
                     AccessQuickRemoveDebrisPolicy;
                 if (!AccessPropCleanupPolicy
                     .TryGetNonBuriedPropRemovalStrategy(
-                        policy, defaultOperationRemoves,
+                        policy, buriedByPlannedDumping,
+                        removedByPlannedExcavation,
                         out bool quickRemove))
                 {
                     handledByDefaultOperation++;
@@ -5415,7 +5429,7 @@ namespace AutoTerrainDesignations
                 ATDPropRemovalRequestHandle request = PropRemovalManager.RequestRemoval(
                     pair.Key, origin,
                     $"accessway:{origin.X},{origin.Y}",
-                    quickRemove);
+                    quickRemove, tower.Id);
                 if (request.IsCompleted
                     && request.Result.Outcome != ATDPropRemovalOutcome.Removed
                     && request.Result.Outcome != ATDPropRemovalOutcome.AlreadyAbsent)

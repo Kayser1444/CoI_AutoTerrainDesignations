@@ -64,17 +64,20 @@ namespace AutoTerrainDesignations.Access
         public AccessDesignationPlan Plan { get; }
         public AccessPathRequest? Request { get; }
         public AccessReplayPhaseTiming Timing { get; }
+        public AccessReplayMemoryEvidence? MemoryEvidence { get; }
 
         public ExperimentalAccessCandidate(
             AccessSearchResult searchResult,
             AccessDesignationPlan plan,
             AccessPathRequest? request = null,
-            AccessReplayPhaseTiming timing = default)
+            AccessReplayPhaseTiming timing = default,
+            AccessReplayMemoryEvidence? memoryEvidence = null)
         {
             SearchResult = searchResult;
             Plan = plan;
             Request = request;
             Timing = timing;
+            MemoryEvidence = memoryEvidence;
         }
     }
 }

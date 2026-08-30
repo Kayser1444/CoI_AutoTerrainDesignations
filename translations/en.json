@@ -416,28 +416,12 @@
     "Penalty when a ray does not meet terrain inside its trace range."
   ],
   [
-    "settings.experimental_access.turning_ramps.label",
-    "Turning ramps"
-  ],
-  [
-    "settings.experimental_access.turning_ramps.tooltip",
-    "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included."
-  ],
-  [
     "settings.experimental_access.suppress_legacy_ramps.label",
     "Suppress legacy ramps"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
     "Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave off for normal fallback behavior."
-  ],
-  [
-    "settings.experimental_access.astar.label",
-    "Use A* search"
-  ],
-  [
-    "settings.experimental_access.astar.tooltip",
-    "Use A* instead of reference Dijkstra for accessway dry runs. Dijkstra is the safer validation baseline. A* is faster."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -640,6 +624,10 @@
     "Set tower mining priority to {0}."
   ],
   [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here."
+  ],
+  [
     "panel.farming.title",
     "Farmland preparation"
   ],
@@ -780,15 +768,15 @@
     "Zoom to {0}"
   ],
   [
+    "access_search.zoom.tooltip",
+    "Zoom to access action"
+  ],
+  [
     "vehicle_order.preassigned.tooltip",
     "Pre-assigned to {0}"
   ],
   [
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-click to order a new {0} for {2} at {1}"
-  ],
-  [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
-    "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here."
   ]
 ]

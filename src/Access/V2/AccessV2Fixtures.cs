@@ -5248,13 +5248,21 @@ namespace AutoTerrainDesignations.Access.V2
                 first,
                 new[] { first.GetLane(1) },
                 new[] { first.GetLaneOrigin(0) });
+            var reusableExactSourceTransition = new AccessV2Transition(
+                AccessV2TransitionKind.SourceLaunch,
+                first,
+                new[] { first.GetLane(1) },
+                new[] { first.GetLaneOrigin(0) },
+                scoreOnlyGeneratedExteriorRays: true);
             AccessV2TransitionEvaluation exactStartCompanion =
                 AccessPathSearch.EvaluateV2Transition(
-                    replaySnapshot, null, syntheticTransition,
+                    replaySnapshot, null, reusableExactSourceTransition,
                     AccessV2History.Empty, first.GetLaneOrigin(0));
-            if (!exactStartCompanion.IsValid)
+            if (!exactStartCompanion.IsValid
+                || Math.Abs(exactStartCompanion.DirectWorkCost) > 0.0001f
+                || Math.Abs(exactStartCompanion.GeneratedFixedCost) > 0.0001f)
             {
-                failure = "V2 exact-terrain synthetic start companion must remain admissible: "
+                failure = "V2 exact-terrain synthetic start companion must reuse natural ground without generated work or fixed cost: "
                     + exactStartCompanion.RejectionReason;
                 return false;
             }
@@ -5292,7 +5300,13 @@ namespace AutoTerrainDesignations.Access.V2
                     [syntheticOrigin] = first.GetLane(1).Profile,
                 },
                 session.Result.Handoff,
-                session.Result.GroundPath);
+                session.Result.GroundPath,
+                new[]
+                {
+                    new AccessV2RouteStep(
+                        first, reusableExactSourceTransition,
+                        session.Result.Handoff, null),
+                });
             var materializationResult = new AccessSearchResult(
                 true, string.Empty, first.GetLaneOrigin(0),
                 Array.Empty<AccessSearchNode>(),
@@ -5307,12 +5321,11 @@ namespace AutoTerrainDesignations.Access.V2
                     CreateReplayWorkspace(replaySnapshot),
                     materializationResult);
             if (!materialized.IsValid
-                || materialized.Designations.Count != 1
-                || materialized.Designations[0].Origin != syntheticOrigin
+                || materialized.Designations.Count != 0
                 || materialized.CleanupOrigins.Count != 1
                 || materialized.HandoffOperationsByOrigin.Count != 1)
             {
-                failure = "V2 replay must retain exact-terrain owned work together with cleanup and terminal ownership metadata: "
+                failure = "V2 replay must omit an exact-terrain source-launch designation while retaining cleanup and terminal ownership metadata: "
                     + materialized.FailureReason;
                 return false;
             }

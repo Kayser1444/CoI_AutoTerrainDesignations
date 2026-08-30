@@ -600,6 +600,8 @@ namespace AutoTerrainDesignations
             RecordTerrainDesignationMutation(origin);
             if (s_managedDesignationMutationDepth > 0)
                 return;
+            s_propRemovalManager?.OnExternalDesignationMutation(
+                origin, changeKind);
             var affectedTowers = new HashSet<EntityId>();
             RemoveOwnership(
                 s_generatedDesignationOriginsByTowerEntityId);

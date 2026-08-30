@@ -166,7 +166,7 @@ namespace AutoTerrainDesignations
 
         /// <summary>
         /// Absolute world tile coordinates occupied by static buildings near the current tower area.
-        /// The capture extends beyond the area far enough to cover access-search and candidate-ray margins.
+        /// The capture extends beyond the area far enough to cover the union of access-search and candidate-ray margins.
         /// Farming automation may reuse the result briefly; an explicit accessway request forces a refresh.
         /// </summary>
         private static readonly HashSet<Tile2i> s_buildingOccupiedTiles = new HashSet<Tile2i>();
@@ -233,13 +233,16 @@ namespace AutoTerrainDesignations
                 return;
             }
 
-            // Candidate origins can reach outside the tower bounding box through the ground-search margin,
-            // and their terrain rays extend farther again. Capturing only Area.ContainsTile used to omit
-            // nearby buildings (and the outside portion of a footprint straddling the area boundary).
+            // Candidate origins can reach outside the tower bounding box
+            // through the ground-search margin. V side rays are emitted only
+            // from in-area origins, so the two access margins form a union;
+            // the building safety buffer remains additive.
             int buildingRaySafetyBoundary = BuildingSafetyBufferTiles;
-            int captureMargin = RAMP_ACCESS_SEARCH_MARGIN_TILES
-                + AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
-                + AutoTerrainDesignationsMod.AccessRayEndBuffer
+            int accessCaptureMargin = Math.Max(
+                RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance
+                    + AutoTerrainDesignationsMod.AccessRayEndBuffer);
+            int captureMargin = accessCaptureMargin
                 + buildingRaySafetyBoundary;
             Tile2i areaMin = tower.Area.BoundingBoxMin;
             Tile2i areaMax = tower.Area.BoundingBoxMax;
@@ -615,22 +618,19 @@ namespace AutoTerrainDesignations
                     ++nextClusterId, accessOrigins, sourceIntents));
             }
 
-            if (AutoTerrainDesignationsMod.TurningRampsEnabled)
+            foreach (AccessOriginCluster cluster in originClusters)
             {
-                foreach (AccessOriginCluster cluster in originClusters)
-                {
-                    string origins = cluster.Origins.Count <= 32
-                        ? string.Join(",", cluster.Origins.Select(origin => origin.Origin.ToString()))
-                        : $"{cluster.Origins.Count} origins";
-                    int generatedMiningCount = cluster.Origins.Count(
-                        origin => origin.Kind == AccessWorkOriginKind.GeneratedMiningPlan);
-                    int externalEndpointCount = cluster.Origins.Count(
-                        origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
-                    LogExperimentalAccessDebug(
-                        $"[ATD Access Cluster] cluster={cluster.ClusterId} " +
-                        $"count={cluster.Origins.Count} generatedMining={generatedMiningCount} " +
-                        $"externalEndpoints={externalEndpointCount} origins=[{origins}]");
-                }
+                string origins = cluster.Origins.Count <= 32
+                    ? string.Join(",", cluster.Origins.Select(origin => origin.Origin.ToString()))
+                    : $"{cluster.Origins.Count} origins";
+                int generatedMiningCount = cluster.Origins.Count(
+                    origin => origin.Kind == AccessWorkOriginKind.GeneratedMiningPlan);
+                int externalEndpointCount = cluster.Origins.Count(
+                    origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
+                LogExperimentalAccessDebug(
+                    $"[ATD Access Cluster] cluster={cluster.ClusterId} " +
+                    $"count={cluster.Origins.Count} generatedMining={generatedMiningCount} " +
+                    $"externalEndpoints={externalEndpointCount} origins=[{origins}]");
             }
 
             AccessSearchSnapshot? experimentalSnapshot = null;
@@ -640,11 +640,10 @@ namespace AutoTerrainDesignations
                 || AutoTerrainDesignationsMod.SuppressLegacyAccessRamps;
             bool experimentalOperationSupported = TryGetExperimentalOperation(sourceWorkProto, out bool experimentalIsMining);
             bool experimentalWidthSupported = configuredRampWidth > 0;
-            bool experimentalSearchEnabled = AutoTerrainDesignationsMod.TurningRampsEnabled
-                && experimentalWidthSupported
+            bool experimentalSearchEnabled = experimentalWidthSupported
                 && experimentalOperationSupported
                 && !IsLegacyRampMode(GetTowerVehicleClearance(tower));
-            if (AutoTerrainDesignationsMod.TurningRampsEnabled && !experimentalSearchEnabled)
+            if (!experimentalSearchEnabled)
             {
                 string reason = !experimentalWidthSupported
                     ? "tower accessway generation is disabled"
@@ -831,6 +830,7 @@ namespace AutoTerrainDesignations
                     origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
                 EvaluatedAccessCandidate? experimentalCandidate = null;
                 bool experimentalCandidateUsesOutsideArea = false;
+                AccessReplayMemoryEvidence? experimentalMemoryEvidence = null;
                 string experimentalFailureSummary =
                     experimentalSnapshotTooLarge
                         ? "SnapshotTooLarge"
@@ -874,6 +874,8 @@ namespace AutoTerrainDesignations
                         AccessSearchSnapshot refreshedSnapshot =
                             snapshotBuild.Snapshot;
                         experimentalSnapshot = refreshedSnapshot;
+                        experimentalMemoryEvidence =
+                            snapshotBuild.MemoryEvidence;
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
 
@@ -957,6 +959,8 @@ namespace AutoTerrainDesignations
                                 AccessSearchSnapshot outsideSnapshot =
                                     outsideSnapshotBuild.Snapshot;
                                 experimentalSnapshot = outsideSnapshot;
+                                experimentalMemoryEvidence =
+                                    outsideSnapshotBuild.MemoryEvidence;
                                 sliceControl?.ReportPhase("Preparing search request");
                                 long outsideRequestBuildStart =
                                     AtdDiagnostics.Timestamp();
@@ -1090,6 +1094,7 @@ namespace AutoTerrainDesignations
                             experimentalCandidate = EvaluateExperimentalAccessCandidate(
                                 experimentalResult, experimentalPlan, request,
                                 experimentalDryRun.ReplayTiming,
+                                experimentalMemoryEvidence,
                                 towerPos, terrMgr);
                         }
                     }

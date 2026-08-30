@@ -6,16 +6,16 @@ This document describes an alternative accessway **generation** strategy: instea
 
 It is deliberately scoped as an A/B alternative behind the existing `AccessCandidate` interface, not a rewrite. The current generator stays until this one demonstrably wins on real saves.
 
-## Public feature gate
+## Current release behavior
 
-Expose this generator as an experimental public toggle:
+Routed accessways are always enabled for supported accessway modes. The old
+`Turning ramps (experimental)` public setting is no longer exposed or read
+from `ATDsettings.json`; legacy straight-only modes and the explicit legacy
+fallback remain available.
 
-* **Setting:** `Turning ramps (experimental)`
-* **Default:** off
-* **Scope:** enables only the V1 search space today: vanilla flat/slope designations with `accessWayClearance = 1`.
-* **Tooltip:** `When enabled, ATD may select and place experimental V1 turning or switchback accessways using vanilla flat and slope designations. Requires ramp width 1; corridor clearance is independent. Wider ramps and corner or saddle designations are not included.`
-
-When the toggle is off, accessway generation uses the current straight-corridor generator unchanged. When it is on, the framework evaluates V1 alongside the straight generator, compares both through the production candidate ranking, and may place the V1 result. V1 placement is revalidated immediately before mutation and rolled back if placement or the post-placement reachability flood fails; the straight candidate remains the fallback.
+Access searches use A* by default. The persistent A* setting is no longer
+exposed, but `atd_set_access_astar on|off` can select A* or reference Dijkstra
+for the current session when comparing routes.
 
 V1 uses the source work operation only to constrain source work, not to force the whole accessway to be mining or dumping. Generated accessway bodies use leveling designations, allowing a single route to combine excavation and fill where required by the terrain. A generated V-to-G edge selects mining or dumping from the handoff origin's connecting edge, not from the route start or terminal profile center. The handoff edge is the only frontage that must attach to G; if that edge lies below current ground, the final V tile needs a mining proto, and if it lies above current ground, it needs a dumping proto. The terminal center is deliberately not used because it may already have crested or may still lie on either side of uneven ground. The search reconstructs vanilla's operation-specific fulfilled bitmap and admits the edge only through a fulfilled perimeter tile that is also tower-reachable G. That operation is carried through materialization and the final V tile is placed with the matching mining or dumping proto; it may not fall back to leveling. Existing leveling and specialized terminal designations are reusable providers. This keeps corridor geometry independent of whether the source cluster came from mining or dumping work while avoiding leveling overshoot at a ground attachment.
 

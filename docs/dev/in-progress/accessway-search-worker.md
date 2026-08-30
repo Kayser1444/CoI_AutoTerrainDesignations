@@ -347,9 +347,19 @@ retained memory, configured ceiling, and how an advanced user may raise it in
 fingerprint and does not enter the ordinary unconditional 60-second retry. A
 relevant area, work, settings, or configured-ceiling change may reopen it.
 
-The default ceiling is not selected by design guesswork. Phase-one profiling
-must measure the existing 124k-tile scenario and deliberately larger captures,
-then choose and document a default with adequate headroom.
+The default ceiling is 1,024 MiB, chosen to cover the vanilla maximum area
+with headroom while keeping the guard bounded. Advanced users with larger
+modded limits can raise it through `ATDSettings.json` or the
+`atd_set_access_snapshot_memory_ceiling` console command.
+
+The access-search laboratory compares this estimate with process-memory
+evidence without changing the replay payload. Existing captured cases retain
+their embedded estimate and report missing capture-time measurements as
+unavailable. Newly armed captures record optional managed-heap, working-set,
+and private-memory deltas in manifest metadata, tagged with the estimator
+version. These observations are diagnostic only; they do not replace the
+pre-allocation guard or make process-wide memory counters part of search
+semantics.
 
 ## Approved semantic equivalence
 

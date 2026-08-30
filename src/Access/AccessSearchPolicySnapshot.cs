@@ -9,7 +9,10 @@ namespace AutoTerrainDesignations.Access
     /// </summary>
     internal sealed class AccessSearchPolicySnapshot
     {
-        public bool TurningRampsEnabled { get; }
+        // Retained as an internal serialized compatibility field for schema-1
+        // replay cases. Current live behavior is always routed; this value is
+        // no longer a user setting and is intentionally ignored by callers.
+        internal bool TurningRampsEnabled { get; }
         public bool SuppressLegacyAccessRamps { get; }
         public bool UseAStar { get; }
         public bool UseUsefulHeightEnvelope { get; }
@@ -119,7 +122,7 @@ namespace AutoTerrainDesignations.Access
 
         internal static AccessSearchPolicySnapshot Capture()
             => new AccessSearchPolicySnapshot(
-                AutoTerrainDesignationsMod.TurningRampsEnabled,
+                true,
                 AutoTerrainDesignationsMod.SuppressLegacyAccessRamps,
                 AutoTerrainDesignationsMod.ExperimentalAccessUseAStar,
                 AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope,

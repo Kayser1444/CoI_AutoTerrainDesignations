@@ -416,28 +416,12 @@
     "Penalidade quando um raio não encontra terreno dentro de seu alcance de rastreamento."
   ],
   [
-    "settings.experimental_access.turning_ramps.label",
-    "Rampas de viragem"
-  ],
-  [
-    "settings.experimental_access.turning_ramps.tooltip",
-    "Quando ativado, o ATD pode selecionar e posicionar vias de acesso roteadas ou em ziguezague usando designações planas e inclinadas. AUTO e T1-T3 utilizam vias de acesso roteadas; O Legacy 3-5 usa apenas o gerador de rampa direta. As designações de canto e sela não estão incluídas."
-  ],
-  [
     "settings.experimental_access.suppress_legacy_ramps.label",
     "Suprimir rampas legadas"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
     "Desative o gerador legado de rampas retas para que resultados e falhas dos acessos roteados possam ser testados diretamente. Deixe desativado para o comportamento normal de fallback."
-  ],
-  [
-    "settings.experimental_access.astar.label",
-    "Use a pesquisa A*"
-  ],
-  [
-    "settings.experimental_access.astar.tooltip",
-    "Use A* em vez do Dijkstra de referência para testes a seco de acessos roteados. Dijkstra é a base de validação mais segura. A* é mais rápido."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -640,6 +624,10 @@
     "Definir a prioridade de mineração da torre como {0}."
   ],
   [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Apenas os caminhões atribuídos (e os caminhões atribuídos às torres de mineração participantes) poderão coletar ou entregar carga aqui."
+  ],
+  [
     "panel.farming.title",
     "Preparação de Terra Agrícola"
   ],
@@ -780,15 +768,15 @@
     "Ampliar para {0}"
   ],
   [
+    "access_search.zoom.tooltip",
+    "Ampliar para a ação de acesso"
+  ],
+  [
     "vehicle_order.preassigned.tooltip",
     "Pré-atribuído a {0}"
   ],
   [
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-clique para solicitar um novo {0} para {2} em {1}"
-  ],
-  [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
-    "Apenas os caminhões atribuídos (e os caminhões atribuídos às torres de mineração participantes) poderão coletar ou entregar carga aqui."
   ]
 ]

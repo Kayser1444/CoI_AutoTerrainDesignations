@@ -16,6 +16,7 @@ using Mafi.Core.Prototypes;
 using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using Mafi.Core.Terrain.Props;
+using EntityId = Mafi.Core.EntityId;
 
 namespace AutoTerrainDesignations
 {
@@ -66,6 +67,11 @@ namespace AutoTerrainDesignations
             bool hasPlannedWork)
             => firstRequestAtOrigin && hasPlannedWork;
 
+        internal static bool ShouldCancelForTower(
+            bool ownerMatches,
+            bool isRestoredLegacyOwnerUnknown)
+            => ownerMatches || isRestoredLegacyOwnerUnknown;
+
         internal static bool ValidateFixtures(out string failure)
         {
             failure = string.Empty;
@@ -99,6 +105,19 @@ namespace AutoTerrainDesignations
                     hasPlannedWork: true))
             {
                 failure = "Quick cleanup must capture overlapping planned work as its original designation.";
+                return false;
+            }
+            if (!ShouldCancelForTower(
+                    ownerMatches: true,
+                    isRestoredLegacyOwnerUnknown: false)
+                || !ShouldCancelForTower(
+                    ownerMatches: false,
+                    isRestoredLegacyOwnerUnknown: true)
+                || ShouldCancelForTower(
+                    ownerMatches: false,
+                    isRestoredLegacyOwnerUnknown: false))
+            {
+                failure = "Tower clear must cancel matching persisted cleanup and ownerless legacy restored cleanup, but not unrelated live cleanup.";
                 return false;
             }
             return true;
@@ -207,6 +226,7 @@ namespace AutoTerrainDesignations
             public bool OriginalSuspendedByManager;
             public ATDPropRemovalStage Stage;
             public bool KeepAliveWithoutHandles;
+            public EntityId OwnerTowerEntityId;
             public long NextQuickAttemptUtcTicks;
             public CandidateSearchState? CandidateSearch;
             public readonly HashSet<TerrainPropId> TargetProps =
@@ -312,7 +332,7 @@ namespace AutoTerrainDesignations
 
         public ATDPropRemovalRequestHandle RequestRemoval(TerrainPropId propId,
             Tile2i cleanupOrigin, string ownerToken,
-            bool quickRemove)
+            bool quickRemove, EntityId ownerTowerEntityId)
         {
             cleanupOrigin = TerrainDesignation.GetOrigin(cleanupOrigin);
             if (!m_props.TerrainProps.ContainsKey(propId))
@@ -331,6 +351,7 @@ namespace AutoTerrainDesignations
 
             if (m_operations.TryGetValue(propId, out Operation existing))
             {
+                MergeOwnerTower(existing, ownerTowerEntityId);
                 var coalescedHandle = new ATDPropRemovalRequestHandle(++m_nextRequestId,
                     propId, existing.Origin, ownerToken);
                 existing.Handles.Add(coalescedHandle);
@@ -349,6 +370,7 @@ namespace AutoTerrainDesignations
             if (m_operationsByOrigin.TryGetValue(
                     cleanupOrigin, out Operation sameOrigin))
             {
+                MergeOwnerTower(sameOrigin, ownerTowerEntityId);
                 var joinedHandle = new ATDPropRemovalRequestHandle(++m_nextRequestId,
                     propId, sameOrigin.Origin, ownerToken);
                 sameOrigin.TargetProps.Add(propId);
@@ -381,6 +403,7 @@ namespace AutoTerrainDesignations
                 Origin = cleanupOrigin,
                 Original = original,
                 Stage = ATDPropRemovalStage.Queued,
+                OwnerTowerEntityId = ownerTowerEntityId,
             };
             operation.TargetProps.Add(propId);
             if (quickRemove)
@@ -396,6 +419,20 @@ namespace AutoTerrainDesignations
                     $"original={(original == null ? "none" : original.ProtoId)} " +
                     $"quick={quickRemove} owner={ownerToken}");
             return handle;
+        }
+
+        private static void MergeOwnerTower(Operation operation,
+            EntityId ownerTowerEntityId)
+        {
+            if (!operation.OwnerTowerEntityId.IsValid)
+                operation.OwnerTowerEntityId = ownerTowerEntityId;
+            else if (ownerTowerEntityId.IsValid
+                && operation.OwnerTowerEntityId != ownerTowerEntityId)
+            {
+                // A coalesced operation with multiple tower owners must not be
+                // cancelled by clearing either tower alone.
+                operation.OwnerTowerEntityId = EntityId.Invalid;
+            }
         }
 
         private bool TryQuickRemove(TerrainPropId propId)
@@ -446,6 +483,48 @@ namespace AutoTerrainDesignations
                     $"[ATD Prop Removal] cancelled prop={operation.PropId} " +
                     $"origin={operation.Origin} restored={restored}");
             }
+        }
+
+        public void CancelForTower(EntityId towerEntityId)
+        {
+            if (!towerEntityId.IsValid)
+                return;
+            foreach (Operation operation in m_operationsByOrigin.Values
+                .Where(item => ATDPropRemovalLifecyclePolicy
+                    .ShouldCancelForTower(
+                        item.OwnerTowerEntityId == towerEntityId,
+                        item.KeepAliveWithoutHandles
+                            && !item.OwnerTowerEntityId.IsValid))
+                .ToArray())
+            {
+                RestoreOriginal(operation, removeOwnedTemporary: true,
+                    out bool restored);
+                RemoveOperationMappings(operation);
+                CompleteOperationHandles(operation,
+                    ATDPropRemovalOutcome.Cancelled, restored);
+                AutoDepthDesignation.LogExperimentalAccessDebug(
+                    $"[ATD Prop Removal] cancelled tower={towerEntityId.Value} " +
+                    $"operation={operation.OperationId} origin={operation.Origin} " +
+                    $"restored={restored}");
+            }
+            PublishPendingResults();
+        }
+
+        public void OnExternalDesignationMutation(Tile2i origin,
+            string changeKind)
+        {
+            origin = TerrainDesignation.GetOrigin(origin);
+            if (!m_operationsByOrigin.TryGetValue(origin,
+                    out Operation operation))
+                return;
+            RemoveOperationMappings(operation);
+            CompleteOperationHandles(operation,
+                ATDPropRemovalOutcome.PlayerOverride,
+                originalRestored: false);
+            AutoDepthDesignation.LogExperimentalAccessDebug(
+                $"[ATD Prop Removal] operation={operation.OperationId} " +
+                $"origin={origin} external-{changeKind}=cancelled");
+            PublishPendingResults();
         }
 
         public void Tick(bool allowQuickRemoval = true)
@@ -1403,6 +1482,11 @@ namespace AutoTerrainDesignations
                     .Append(",\"quickRemove\":")
                     .Append(operation.QuickTargets.Contains(propId)
                         ? "true" : "false")
+                    .Append(",\"ownerTowerEntityId\":")
+                    .Append(operation.OwnerTowerEntityId.IsValid
+                        ? operation.OwnerTowerEntityId.Value.ToString(
+                            CultureInfo.InvariantCulture)
+                        : "0")
                     .Append(",\"hasOriginal\":")
                     .Append(operation.Original != null ? "true" : "false");
                 if (operation.Original != null)
@@ -1437,6 +1521,11 @@ namespace AutoTerrainDesignations
                     || !TryInt(entry, "originY", out int originY))
                     continue;
                 var propId = new TerrainPropId(propX, propY);
+                EntityId ownerTowerEntityId = EntityId.Invalid;
+                if (TryInt(entry, "ownerTowerEntityId",
+                        out int ownerTowerEntityIdValue)
+                    && ownerTowerEntityIdValue > 0)
+                    ownerTowerEntityId = new EntityId(ownerTowerEntityIdValue);
                 SavedDesignation? original = null;
                 if (TryBool(entry, "hasOriginal", out bool hasOriginal)
                     && hasOriginal
@@ -1463,10 +1552,13 @@ namespace AutoTerrainDesignations
                         Original = original,
                         Stage = ATDPropRemovalStage.SuspendedForSave,
                         KeepAliveWithoutHandles = true,
+                        OwnerTowerEntityId = ownerTowerEntityId,
                     };
                     operationsById.Add(operationId, operation);
                     m_operationsByOrigin[operation.Origin] = operation;
                 }
+                else
+                    MergeOwnerTower(operation, ownerTowerEntityId);
                 operation.TargetProps.Add(propId);
                 if (TryBool(entry, "quickRemove", out bool quickRemove)
                     && quickRemove)

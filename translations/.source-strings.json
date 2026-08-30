@@ -1,4 +1,5 @@
 {
+  "access_search.zoom.tooltip": "Zoom to access action",
   "common.level.high": "High",
   "common.level.low": "Low",
   "common.level.max": "Max",
@@ -87,8 +88,6 @@
   "settings.dumping_priority.tooltip": "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively.",
   "settings.dumping_priority.passive": "Passive",
   "settings.dumping_priority.passive.tooltip": "Only import from active exporters.",
-  "settings.experimental_access.astar.label": "Use A* search",
-  "settings.experimental_access.astar.tooltip": "Use A* instead of reference Dijkstra for accessway dry runs. Dijkstra is the safer validation baseline. A* is faster.",
   "settings.experimental_access.landscaping_cost_scale.label": "Landscaping cost vs. distance",
   "settings.experimental_access.landscaping_cost_scale.tooltip": "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming.",
   "settings.experimental_access.landslide_run.label": "Landslide protection slope factor",
@@ -97,8 +96,6 @@
   "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip": "Landscaping cost charged once per prop cleanup origin used by access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive.",
   "settings.experimental_access.suppress_legacy_ramps.label": "Suppress legacy ramps",
   "settings.experimental_access.suppress_legacy_ramps.tooltip": "Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave off for normal fallback behavior.",
-  "settings.experimental_access.turning_ramps.label": "Turning ramps",
-  "settings.experimental_access.turning_ramps.tooltip": "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included.",
   "settings.heading.designations": "Designations",
   "settings.heading.experimental_access": "Accessways",
   "settings.heading.keyboard_shortcuts": "Keyboard shortcuts",

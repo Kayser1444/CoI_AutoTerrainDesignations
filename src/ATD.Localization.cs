@@ -254,18 +254,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.pathfinder.ray_unresolved.label", "Unresolved-ray penalty", "Pathfinder setting label for unresolved ray penalty.");
         public static LocStr SettingsUnresolvedRayPenaltyTooltip =
             Loc.Str("settings.pathfinder.ray_unresolved.tooltip", "Penalty when a ray does not meet terrain inside its trace range.", "Pathfinder setting tooltip for unresolved ray penalty.");
-        public static LocStr SettingsTurningRampsLabel =
-            Loc.Str("settings.experimental_access.turning_ramps.label", "Turning ramps", "Settings toggle label for turning ramps.");
-        public static LocStr SettingsTurningRampsTooltip =
-            Loc.Str("settings.experimental_access.turning_ramps.tooltip", "When enabled, ATD may select and place routed turning or switchback accessways using vanilla flat and slope designations. AUTO and T1-T3 use routed accessways; Legacy 3-5 use only the straight-ramp generator. Corner and saddle designations are not included.", "Tooltip for turning ramps.");
         public static LocStr SettingsSuppressLegacyRampsLabel =
             Loc.Str("settings.experimental_access.suppress_legacy_ramps.label", "Suppress legacy ramps", "Settings toggle label for suppressing legacy access ramps.");
         public static LocStr SettingsSuppressLegacyRampsTooltip =
             Loc.Str("settings.experimental_access.suppress_legacy_ramps.tooltip", "Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave off for normal fallback behavior.", "Tooltip for suppressing legacy access ramps.");
-        public static LocStr SettingsAccessAStarLabel =
-            Loc.Str("settings.experimental_access.astar.label", "Use A* search", "Settings toggle label for A* access search.");
-        public static LocStr SettingsAccessAStarTooltip =
-            Loc.Str("settings.experimental_access.astar.tooltip", "Use A* instead of reference Dijkstra for accessway dry runs. Dijkstra is the safer validation baseline. A* is faster.", "Tooltip for A* access search.");
         public static LocStr SettingsAccessLandscapingCostScaleLabel =
             Loc.Str("settings.experimental_access.landscaping_cost_scale.label", "Landscaping cost vs. distance", "Settings row label for access landscaping cost scale.");
         public static LocStr SettingsAccessLandscapingCostScaleTooltip =

@@ -522,18 +522,6 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            if (!AutoTerrainDesignationsMod.TurningRampsEnabled)
-            {
-                session.LastAccessRampDetail =
-                    "Managed farming access requires Turning ramps; "
-                    + "legacy generation is not used by the accessway manager.";
-                SetFarmingAccessCache(
-                    session,
-                    workKey,
-                    ready: false,
-                    session.LastAccessRampDetail);
-                return false;
-            }
             if (!TryGetTowerEntityId(tower, out var towerId))
             {
                 session.LastAccessRampDetail =
@@ -647,8 +635,7 @@ namespace AutoTerrainDesignations
 
                 ATDTowerSettings liveSettings =
                     GetOrCreateTowerSettings(tower);
-                if (!AutoTerrainDesignationsMod.TurningRampsEnabled
-                    || AutoTerrainDesignationsMod
+                if (AutoTerrainDesignationsMod
                         .AccessPlanningSettingsFingerprint
                         != expectedPlanningSettings
                     || liveSettings.RampWidth != expectedRampWidth

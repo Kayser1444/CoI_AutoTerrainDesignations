@@ -1,6 +1,6 @@
 # Farmland preparation
 
-*Current as of: v0.6.1*
+*Current as of: v0.7.1*
 
 ## What it does
 

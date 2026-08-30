@@ -1,3 +1,13 @@
+v0.7.1 | 2026-08-30
+* Changed: Routed turning accessways are now enabled automatically for eligible AUTO and T1–T3 modes; legacy straight-only modes and the explicit legacy fallback remain available
+* Changed: Accessway searches now use A* by default; advanced users can switch to Dijkstra for the current session with `atd_set_access_astar`
+* Improved: Large accessway searches now perform more work asynchronously and in short slices, keeping the game more responsive during complex plans
+* Improved: Complex accessway searches now finish with less wasted route exploration while preserving route choices
+* Improved: The default access snapshot memory ceiling is now 1,024 MiB; advanced users can still configure it in `ATDsettings.json`
+* Fixed: Clearing tower designations now correctly removes overlapping access terminals after temporary cleanup
+* Fixed: Accessway searches now recover correctly after world changes or save/load instead of getting stuck
+* Fixed: Saving during active farming access planning now resumes with a fresh search once restored designations are available
+
 v0.7.0 | 2026-08-28
 * Added: Ore Sorting Plants now support configurable export routes to compatible storages and Mine Towers, with a vanilla-style export priority and persistent route state
 * Added: Ore Sorting Plants can assign trucks directly and optionally restrict cargo collection and delivery to trucks assigned to the plant or its participating Mine Towers

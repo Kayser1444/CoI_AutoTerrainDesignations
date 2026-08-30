@@ -25,8 +25,10 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 && string.Equals(args[0], "trace-candidate", StringComparison.OrdinalIgnoreCase);
             bool benchmark = args.Length == 5
                 && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase);
+            bool auditCase = args.Length == 4
+                && string.Equals(args[0], "audit-case", StringComparison.OrdinalIgnoreCase);
             bool caseMode = replay || benchmarkCodec || candidateReplay
-                || compatibleReplay || traceCandidate || benchmark;
+                || compatibleReplay || traceCandidate || benchmark || auditCase;
             if (!caseMode && args.Length != 2)
             {
                 Console.Error.WriteLine(
@@ -35,6 +37,7 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     + "  AccessV2FixtureRunner replay <ATD assembly> <CoI Managed directory> <case directory>\n"
                     + "  AccessV2FixtureRunner candidate-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
                     + "  AccessV2FixtureRunner compatible-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
+                    + "  AccessV2FixtureRunner audit-case <ATD assembly> <CoI Managed directory> <case directory>\n"
                     + "  AccessV2FixtureRunner trace-candidate <ATD assembly> <CoI Managed directory> <case directory> <trace.csv>\n"
                     + "  AccessV2FixtureRunner benchmark <ATD assembly> <CoI Managed directory> <case directory> <repetitions>\n"
                     + "  AccessV2FixtureRunner codec-benchmark <ATD assembly> <CoI Managed directory> <case directory>");
@@ -55,6 +58,9 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                         assembly,
                         Path.GetFullPath(args[3]),
                         allowGameAssemblyMismatch: compatibleReplay);
+                if (auditCase)
+                    return AuditCase(
+                        assembly, Path.GetFullPath(args[3]));
                 if (traceCandidate)
                     return TraceCandidate(
                         assembly,
@@ -157,12 +163,12 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 if (!removalSuccess) return 1;
 
                 MethodInfo validateSettingsMigration = state.GetMethod(
-                    "ValidateTurningRampsMigrationFixtures",
+                    "ValidateSettingsMigrationFixtures",
                     BindingFlags.Static | BindingFlags.Public
                         | BindingFlags.NonPublic)
                     ?? throw new MissingMethodException(
                         state.FullName,
-                        "ValidateTurningRampsMigrationFixtures");
+                        "ValidateSettingsMigrationFixtures");
                 object[] settingsMigrationArgs = { string.Empty };
                 bool settingsMigrationSuccess = (bool)(
                     validateSettingsMigration.Invoke(
@@ -430,6 +436,25 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
             bool success = (bool)(benchmark.Invoke(null, invokeArgs) ?? false);
             Console.WriteLine("Access search benchmark: "
                 + (invokeArgs[3] as string ?? string.Empty));
+            return success ? 0 : 1;
+        }
+
+        private static int AuditCase(
+            Assembly assembly,
+            string caseDirectory)
+        {
+            PrintAssemblyIdentity(assembly);
+            Type facade = assembly.GetType(
+                "AutoTerrainDesignations.Access.AccessSearchReplayFacade", true);
+            MethodInfo audit = facade.GetMethod(
+                "TryAuditCase",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(
+                    facade.FullName, "TryAuditCase");
+            object[] invokeArgs = { caseDirectory, string.Empty };
+            bool success = (bool)(audit.Invoke(null, invokeArgs) ?? false);
+            Console.WriteLine("Access search case audit: "
+                + (invokeArgs[1] as string ?? string.Empty));
             return success ? 0 : 1;
         }
 

@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.7.0*
+*Current as of: v0.7.1*
 
 ## What it does
 
@@ -39,7 +39,10 @@ Controls how much vertical difference ATD allows between neighboring designation
 Controls the width of generated access ramps.
 
 - `0` disables ramp generation.
-- Higher values reserve more width for vehicles but require more free space.
+- `1` (`AUTO`) generates a routed accessway using the largest suitable excavator.
+- `2` (`T3`) generates a two-lane routed accessway for T3/Mega excavators.
+- `3`–`5` use the legacy straight-ramp generator and reserve more width for vehicles.
+- Routed accessways are enabled automatically for eligible modes; the old experimental toggle is no longer needed.
 
 If ramp generation fails or produces a questionable result, ATD shows a warning notification on the tower.
 
@@ -157,6 +160,7 @@ Useful console commands:
 | `atd_set_ramp_notifications on\|off` | Enables or disables ramp access warning notifications on mine towers (Failed, Truncated, NotAccessible icons). |
 | `atd_set_auto_release_when_idle on\|off` | Sets the global default for the **Auto-release when idle** feature; individual towers can override this via the inspector toggle. |
 | `atd_set_dumping_priority 1..15\|Passive` | Sets the current world's default dumping priority. Lower numbers are more urgent; `Passive` uses vanilla dumping and only imports from active exporters. |
+| `atd_set_access_astar on\|off` | Switches the access-search algorithm for the current session. A* is enabled by default and this choice is not saved. |
 | `atd_save_settings` | Writes the current in-memory defaults to `ATDsettings.json`. |
 | `atd_reset_to_defaults` | Resets the in-memory defaults to the built-in values. |
 

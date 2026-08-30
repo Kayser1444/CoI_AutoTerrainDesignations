@@ -250,8 +250,7 @@ namespace AutoTerrainDesignations
                         liveSettings.VehicleClearance,
                         AutoTerrainDesignationsMod
                             .AccessPlanningSettingsFingerprint);
-                if (!AutoTerrainDesignationsMod.TurningRampsEnabled
-                    || liveSettingsRevision != expectedSettingsRevision
+                if (liveSettingsRevision != expectedSettingsRevision
                     || tower.Area.BoundingBoxMin != expectedAreaMin
                     || tower.Area.BoundingBoxMax != expectedAreaMax)
                     return ATDAccesswayValidationResult.Stale(
@@ -1346,13 +1345,11 @@ namespace AutoTerrainDesignations
             }
             string? skipReason = !generateRamps
                 ? "accessway generation disabled"
-                : !AutoTerrainDesignationsMod.TurningRampsEnabled
-                    ? "access search disabled"
-                    : towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2
-                        ? $"unsupported width {towerSettings.RampWidth}"
-                        : s_miningProto == null
-                            ? "mining prototype unavailable"
-                            : null;
+                : towerSettings.RampWidth != 1 && towerSettings.RampWidth != 2
+                    ? $"unsupported width {towerSettings.RampWidth}"
+                    : s_miningProto == null
+                        ? "mining prototype unavailable"
+                        : null;
             if (skipReason != null)
             {
                 LogExperimentalAccessDebug(
@@ -1447,7 +1444,8 @@ namespace AutoTerrainDesignations
                 useLocalSurfaceReference: false,
                 allowExistingPlannedRampShortcut: true,
                 result: rampResult,
-                sliceControl: sliceControl);
+                sliceControl: sliceControl,
+                useWorkerSearch: true);
             while (rampRoutine.MoveNext())
                 yield return rampRoutine.Current;
             if (repairResult != null)
@@ -2328,7 +2326,7 @@ namespace AutoTerrainDesignations
                 ATDPropRemovalRequestHandle request = PropRemovalManager.RequestRemoval(
                     pair.Key, selectedOrigin,
                     $"debris-button:{tower.Id.Value}",
-                    quickRemove: false);
+                    quickRemove: false, ownerTowerEntityId: tower.Id);
                 TrackManualDebrisRemovalRequest(tower, request);
                 requested++;
                 if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
@@ -2433,6 +2431,10 @@ namespace AutoTerrainDesignations
         {
             CancelManualDebrisRemovalRequestsForTower(tower);
             CancelAccesswayPropRemovalRequestsForTower(tower);
+            // Handles are transient, but the manager restores pending requests
+            // from saves. Cancel those restored operations by their persisted
+            // tower owner as well.
+            PropRemovalManager?.CancelForTower(tower.Id);
         }
 
         private static float GetMinSurfaceHeightInDesignatableTile(Tile2i tileOrigin, TerrainManager terrMgr)

@@ -2270,7 +2270,8 @@ namespace AutoTerrainDesignations.Access
             Tile2i boundsMax)
         {
             const int safetyBoundary = AutoDepthDesignation.BuildingSafetyBufferTiles;
-            const int rayDistance = 16;
+            int rayDistance = AutoTerrainDesignationsMod
+                .AccessCandidateRayMaxDistance;
             int minX = boundsMin.X - rayDistance - safetyBoundary;
             int maxX = boundsMax.X + rayDistance + safetyBoundary;
             int minY = boundsMin.Y - rayDistance - safetyBoundary;
@@ -2728,6 +2729,7 @@ namespace AutoTerrainDesignations.Access
         public int V2GroundSuffixFallbacks;
         public int V2GroundSuffixSteps;
         public int V2GroundToVCalls;
+        public int V2GroundToVFirstEnqueueVisited;
         public int V2GroundToVTowerAreaRejects;
         public int V2GroundToVSeedCalls;
         public int V2GroundToVSeedExtensions;

@@ -416,28 +416,12 @@
     "Straff när en stråle inte möter terräng inom sitt spårområde."
   ],
   [
-    "settings.experimental_access.turning_ramps.label",
-    "Svängramper"
-  ],
-  [
-    "settings.experimental_access.turning_ramps.tooltip",
-    "När det är aktiverat kan ATD välja och placera V1-svängnings- eller återkopplingsvägar med vaniljplatt- och sluttningsbeteckningar. Kräver att tornets rampbredd ställs in på 1. Korridorfrigången är oberoende. Bredare ramper och hörn- eller sadelbeteckningar ingår inte."
-  ],
-  [
     "settings.experimental_access.suppress_legacy_ramps.label",
     "Dämpa äldre ramper"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
     "Inaktivera den äldre generatorn för raka ramper så att resultat och fel för tillfarter kan testas direkt. Lämna avstängt för normalt reservbeteende."
-  ],
-  [
-    "settings.experimental_access.astar.label",
-    "Använd A*-sökning"
-  ],
-  [
-    "settings.experimental_access.astar.tooltip",
-    "Använd A* i stället för referens-Dijkstra för torrkörningar av tillfarter. Dijkstra är den säkrare valideringsbasen. A* är snabbare."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -640,6 +624,10 @@
     "Sätt tornets gruvprioritet till {0}."
   ],
   [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Endast tilldelade lastbilar (och lastbilar tilldelade till deltagande gruvtorn) får hämta eller leverera last här."
+  ],
+  [
     "panel.farming.title",
     "Förberedelse av odlingsmark"
   ],
@@ -780,15 +768,15 @@
     "Zooma till {0}"
   ],
   [
+    "access_search.zoom.tooltip",
+    "Zooma till åtkomståtgärden"
+  ],
+  [
     "vehicle_order.preassigned.tooltip",
     "Förtilldelad till {0}"
   ],
   [
     "vehicle_order.shortcut.tooltip",
     "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
-  ],
-  [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
-    "Endast tilldelade lastbilar (och lastbilar tilldelade till deltagande gruvtorn) får hämta eller leverera last här."
   ]
 ]

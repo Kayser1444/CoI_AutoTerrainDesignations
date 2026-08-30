@@ -429,6 +429,7 @@ namespace AutoTerrainDesignations.Access.V2
         private readonly float m_maxCost;
         private readonly SortedDictionary<SearchPriority, Queue<SearchNode>> m_queue =
             new SortedDictionary<SearchPriority, Queue<SearchNode>>();
+        private bool m_groundToVEnqueued;
         private readonly Dictionary<SearchKey, float> m_best =
             new Dictionary<SearchKey, float>();
         private readonly Dictionary<Tile2i, SearchNode>
@@ -3129,6 +3130,7 @@ namespace AutoTerrainDesignations.Access.V2
                 isGroundToVAdapter: true));
             if (!enqueued)
                 return true;
+            RecordGroundToVEnqueue();
             m_diagnostics.V2GroundToVSeedExtensions++;
             m_diagnostics.V2GroundToVCacheInsertions++;
             return true;
@@ -3337,6 +3339,7 @@ namespace AutoTerrainDesignations.Access.V2
             bool enqueued = Enqueue(node);
             if (!enqueued)
                 return true;
+            RecordGroundToVEnqueue();
             if (isVPrime)
             {
                 float heuristic = m_potentialField != null
@@ -4655,6 +4658,14 @@ namespace AutoTerrainDesignations.Access.V2
             if (first.Value.Count == 0) m_queue.Remove(first.Key);
             m_queueCount--;
             return node;
+        }
+
+        private void RecordGroundToVEnqueue()
+        {
+            if (m_groundToVEnqueued)
+                return;
+            m_groundToVEnqueued = true;
+            m_diagnostics.V2GroundToVFirstEnqueueVisited = m_visited;
         }
 
         private void CompleteSuccess(SearchNode goal)

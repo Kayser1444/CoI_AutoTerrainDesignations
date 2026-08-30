@@ -300,6 +300,14 @@ namespace AutoTerrainDesignations.Access
             var cleanupByOrigin = new Dictionary<Tile2i, AccessPropCleanupInfo>();
             var terrainWorkOrigins = new HashSet<Tile2i>();
             var corners = new Dictionary<Tile2i, int>();
+            var exactSourceTerrainOrigins = new HashSet<Tile2i>(
+                route.RouteSteps
+                    .Where(step => step.Transition != null
+                        && step.Transition.ScoreOnlyGeneratedExteriorRays)
+                    .SelectMany(step => step.Transition!.Delta)
+                    .Where(item => !ProfileHasTerrainDelta(
+                        snapshot, item.Origin, item.Profile))
+                    .Select(item => item.Origin));
             for (int index = 0; index < ordered.Count; index++)
             {
                 AccessV2OriginProfile item = ordered[index];
@@ -339,6 +347,8 @@ namespace AutoTerrainDesignations.Access
                 if (!AccessV2BandProfile.TryGetProfileMode(
                         item.Profile, out mode))
                     mode = AccessSearchMode.VPrime;
+                if (exactSourceTerrainOrigins.Contains(item.Origin))
+                    continue;
                 terrainWorkOrigins.Add(item.Origin);
                 designations.Add(new AccessPlannedDesignation(
                     item.Origin, mode, item.Profile));
@@ -426,7 +436,7 @@ namespace AutoTerrainDesignations.Access
             }
         }
 
-        private static bool ProfileHasTerrainDelta(
+        internal static bool ProfileHasTerrainDelta(
             AccessSearchSnapshot snapshot,
             Tile2i origin,
             AccessHeightProfile profile)

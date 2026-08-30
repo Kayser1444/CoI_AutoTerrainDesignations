@@ -66,9 +66,10 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  TruckIdlePolicy       = {AutoTerrainDesignationsMod.TruckIdlePolicy}");
         sb.AppendLine($"  DumpingPriorityDefault = {FormatDumpingPriority(AutoTerrainDesignationsMod.DumpingPriority)}");
         sb.AppendLine($"  DumpingPriorityWorldDefault = {FormatDumpingPriority(AutoDepthDesignation.DumpingPriorityWorldDefault)}");
-        sb.AppendLine($"  TurningRampsEnabled     = {AutoTerrainDesignationsMod.TurningRampsEnabled}");
+        sb.AppendLine("  ExperimentalAccessways = always on");
         sb.AppendLine($"  SuppressLegacyRamps   = {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}");
-        sb.AppendLine($"  AccessAStar            = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar}");
+        sb.AppendLine($"  AccessAStar            = {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar} (session)");
+        sb.AppendLine($"  AccessSnapshotMemoryCeilingMiB = {AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB}");
         sb.AppendLine($"  AccessSearchOverlay   = {AutoDepthDesignation.ShowExperimentalAccessSearchOverlay}");
         sb.AppendLine($"  AccessPotentialOverlay = {AutoDepthDesignation.ShowExperimentalAccessPotentialOverlay}");
         sb.AppendLine($"  AccessHeightHull       = {AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope}");
@@ -414,6 +415,29 @@ public sealed class AtdConsoleCommands
 
         AutoTerrainDesignationsMod.SetSuppressLegacyAccessRamps(parsed);
         return $"[ATD] SuppressLegacyAccessRamps set to {AutoTerrainDesignationsMod.SuppressLegacyAccessRamps}.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the session-only A* access search mode (true/false, on/off, 1/0). A* is enabled by default and is not saved to ATDsettings.json.", "atd_set_access_astar")]
+    private string atdSetAccessAStar(string? value = null)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return ReportCurrentValue($"AccessAStar currently set to {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar} for this session.");
+
+        if (!TryParseConsoleBool(value, out bool parsed))
+            return $"[ATD] Invalid value '{value}'. Use true/false, on/off, yes/no, or 1/0.";
+
+        AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar(parsed);
+        return $"[ATD] AccessAStar set to {AutoTerrainDesignationsMod.ExperimentalAccessUseAStar} for this session.";
+    }
+
+    [ConsoleCommand(false, false, "Sets the estimated retained-memory ceiling for one access snapshot in MiB (128-8192). Use atd_save_settings to persist it to ATDsettings.json.", null)]
+    private string atdSetAccessSnapshotMemoryCeiling(int? value = null)
+    {
+        if (!value.HasValue)
+            return ReportCurrentValue($"AccessSnapshotMemoryCeilingMiB currently set to {AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB}.");
+
+        AutoTerrainDesignationsMod.SetAccessSnapshotMemoryCeilingMiB(value.Value);
+        return $"[ATD] AccessSnapshotMemoryCeilingMiB set to {AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB}. Use atd_save_settings to persist it.";
     }
 
     [ConsoleCommand(false, false, "Sets minBottomOreDensity for a purity level (0-4), clamped 0-1. Minimum ore/(ore+waste) ratio a zone must have to be included. E.g. atd_set_min_bottom_ore_density 2 0.25", null)]

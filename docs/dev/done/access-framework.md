@@ -461,7 +461,7 @@ This does not need to become a large public abstraction. The value is in making 
 
 ## Phased Implementation Plan
 
-This plan continues the phase numbering already used by the implementation commits. Each phase must leave the current straight-corridor generator usable as the control path. The experimental pathfinder remains off by default behind the public `Turning ramps (experimental)` setting; disabling that setting must reproduce current access generation without constructing search state or changing candidate selection.
+This plan continues the phase numbering already used by the implementation commits. Each phase must leave the current straight-corridor generator usable as the control path. During the original rollout, the experimental pathfinder was gated by the public `Turning ramps (experimental)` setting; the current release enables routed accessways for supported modes and keeps the straight generator only as the explicit legacy fallback.
 
 ### Phase 1 - Framework foundation and grounded reachability (complete)
 

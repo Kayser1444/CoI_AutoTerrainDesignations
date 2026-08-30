@@ -145,7 +145,6 @@ public static string Tt(string text) => text;
         SetAutoReleaseExcavatorsWhenIdle(false);
         SetTruckIdlePolicy(TruckIdleBehavior.StayPut);
         SetDumpingPriority(DumpingPriorityDefault);
-        SetTurningRampsEnabled(true);
         SetSuppressLegacyAccessRamps(false);
         SetExperimentalAccessUseAStar(true);
         SetExperimentalAccessUsefulHeightEnvelope(true);
@@ -173,7 +172,7 @@ public static string Tt(string text) => text;
         SetAccessMaxVisitedNodes(250000);
         SetAccessSearchTimeoutSeconds(60);
         SetAccessSearchFrameBudgetMs(30);
-        SetAccessSnapshotMemoryCeilingMiB(512);
+        SetAccessSnapshotMemoryCeilingMiB(AccessSnapshotMemoryCeilingDefaultMiB);
         SetAccessManagerAutomatedFrameBudgetMs(10);
         SetAccessManagerInteractiveFrameBudgetMs(15);
         SetAccessManagerPausedMaxFrameBudgetMs(30);
@@ -352,14 +351,6 @@ public static string Tt(string text) => text;
         SetAutoReleaseTrucksWhenIdle(value);
     }
 
-    /// <summary>Enables the V1 turning-ramp search. On by default.</summary>
-    public static bool TurningRampsEnabled { get; private set; } = true;
-
-    public static void SetTurningRampsEnabled(bool value)
-    {
-        TurningRampsEnabled = value;
-    }
-
     /// <summary>Debug switch that disables the legacy straight-ramp fallback.</summary>
     public static bool SuppressLegacyAccessRamps { get; private set; }
 
@@ -368,10 +359,13 @@ public static string Tt(string text) => text;
         SuppressLegacyAccessRamps = value;
     }
 
-    /// <summary>Uses A* instead of reference Dijkstra for the access search.</summary>
-    public static bool ExperimentalAccessUseAStar { get; private set; }
+    /// <summary>
+    /// Uses A* for the access search. This is on by default and can only be
+    /// changed for the current session through the developer console.
+    /// </summary>
+    internal static bool ExperimentalAccessUseAStar { get; private set; } = true;
 
-    public static void SetExperimentalAccessUseAStar(bool value)
+    internal static void SetExperimentalAccessUseAStar(bool value)
     {
         ExperimentalAccessUseAStar = value;
     }
@@ -626,7 +620,8 @@ public static string Tt(string text) => text;
     public static void SetAccessSearchFrameBudgetMs(int value)
         => AccessSearchFrameBudgetMs = Math.Max(
             1, Math.Min(AccessSearchFrameBudgetMaximumMs, value));
-    public static int AccessSnapshotMemoryCeilingMiB { get; private set; } = 512;
+    internal const int AccessSnapshotMemoryCeilingDefaultMiB = 1024;
+    public static int AccessSnapshotMemoryCeilingMiB { get; private set; } = AccessSnapshotMemoryCeilingDefaultMiB;
     public static void SetAccessSnapshotMemoryCeilingMiB(int value)
         => AccessSnapshotMemoryCeilingMiB = Math.Max(128, Math.Min(8192, value));
     public static int AccessManagerAutomatedFrameBudgetMs { get; private set; } = 10;

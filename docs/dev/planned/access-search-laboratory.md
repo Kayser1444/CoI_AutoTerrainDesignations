@@ -256,6 +256,20 @@ growth. This single-repetition comparison is directional rather than a new
 quiet-machine baseline. All three promoted private cases plus synthetic
 fixtures subsequently passed report `20260829-171407-regression`.
 
+A planned-tower capture on 2026-08-30 added a targeted case audit for two
+materialization anomalies. The canonical plan contained one isolated
+exact-terrain source-launch origin at `(976,1036)` and eleven dense-debris
+props. Current materialization reuses that exact source terrain instead of
+placing a no-op leveling designation or charging generated-V fixed overhead.
+At the exact prop probes, six of the eleven props are covered by leveling cuts
+whose targets lie below the props' placement heights. Restrictive and Never
+cleanup therefore leave those six to the planned excavation; Always may still
+prefer Quick remove. The other five props have no covering route designation
+and retain separate cleanup. The `audit-case` runner command checks these facts
+without rerunning the expensive search, while the full candidate replay proves
+that the route remains structurally identical apart from the intended cost and
+materialized-plan change.
+
 Replay the case with the existing development runner and an explicit Release
 DLL plus the matching installed game `Managed` directory:
 
@@ -344,6 +358,17 @@ reported separately so work cannot be hidden by moving it between phases.
 CPU time, peak working set, managed allocation, and GC observations are
 supporting evidence. Production-equivalent lightweight diagnostics remain
 enabled during authoritative timing; detailed profiling runs separately.
+
+Captured requests retain their estimated snapshot memory and ceiling inside
+the schema-1 request graph. The benchmark reports those values alongside the
+replay process measurements, so existing cases can be compared without being
+rewritten. An explicitly armed new capture also records optional
+`captureMemoryMeasurement` evidence in its manifest: managed-heap, working-set,
+and private-memory counters before and after snapshot construction, collection
+counts, elapsed probe time, and the estimator version. This probe is
+observational, does not control the live guard, and is absent from old cases.
+Replay managed-heap growth remains a search-allocation proxy rather than a
+retroactive measurement of the original in-game snapshot capture.
 
 Authoritative performance runs:
 
@@ -486,6 +511,37 @@ expansions remained 44,578. A three-run benchmark improved from the preceding
 37.905-second median to 34.833 seconds with a 34.818--34.900-second range.
 All three promoted private cases plus the synthetic suite passed report
 `20260829-191517-regression` against the retained DLL.
+
+A bounded follow-up on 2026-08-30 extended the same exact replacement proof
+from one terrain level to two. All three private cases and synthetic fixtures
+remained exact, and managed-heap delta fell by about 44 MB, but the controlled
+three-run Cluster 2 median regressed from 33.780 seconds to 34.187 seconds while
+CPU time increased; peak working set improved by only about 4.8 MB. The
+candidate was rejected and the one-level gate retained. Any broader reuse of
+the proof should first remove repeated launch-position and seam evaluation
+work rather than merely increasing the height window.
+
+The next experiment investigated the player-visible order of ordinary-G to
+generated-V work. In the captured ghost-tower case, the ground phase spent
+10.62 seconds in 10,464 eager G-to-V calls, evaluating 156,215 profiles and
+about 1.31 million bridge steps before the useful mountain attack became
+visible; the visualization callback itself peaked at only 0.16 ms. A candidate
+deferred individual launch directions and tried them by relaxed continuation
+potential while retaining every direction behind an admissible lower-bound
+gate. A focused fixture changed its seam-evaluation order, and corpus replay
+retained the exact trivial and Cluster 2 outcomes.
+
+In-game review and an ordered trace showed that this did not change the real
+ghost-tower frontier. The first diagnostic had recorded a geometrically valid
+seam at visited label 2,202 even though normal label dominance rejected its
+resulting V label. The first surviving V label was actually enqueued at visit
+6,181 and expanded immediately at visit 6,182 after 5.33 seconds; all preceding
+6,181 expansions were G. The difficulty is therefore predicting which ground
+approach will yield the eventual winning concrete V launch, rather than merely
+reordering seam evaluation at already explored ground. That is heuristic work.
+The deferred scheduler and its focused fixture were reverted. The corrected
+`firstEnqueueVisited` diagnostic and the trace findings were retained; no
+performance or responsiveness improvement is claimed for the experiment.
 
 ## Route-change review
 

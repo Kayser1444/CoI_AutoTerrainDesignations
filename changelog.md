@@ -1,5 +1,13 @@
 v0.7.1 [unreleased]
 
+* Changed: Routed experimental accessways are now always enabled for eligible accessway modes. The old `turningRampsExperimental` settings toggle has been removed; legacy straight-only modes and the explicit legacy fallback remain unchanged.
+
+* Changed: Access searches now use A* by default. The persistent `experimentalAccessUseAStar` setting has been removed; `atd_set_access_astar on|off` can still switch the algorithm for the current session when route comparisons are needed.
+
+* Changed: Raised the default conservative estimated-retained-memory ceiling for one access snapshot from 512 MiB to 1,024 MiB. `accessSnapshotMemoryCeilingMiB` remains configurable in `ATDsettings.json` and through `atd_set_access_snapshot_memory_ceiling`.
+* Fixed: Access snapshot capture now uses the union of the 48-tile outside-area G margin and the V side-ray reach instead of adding both margins. The nearby-building capture follows the same boundary while retaining its dedicated safety buffer.
+* Improved: Access Search Laboratory reports the captured snapshot estimate beside replay memory observations. Newly armed captures add optional capture-boundary evidence to manifest metadata; existing replay payloads remain unchanged.
+
 * Fixed: Prop-removal's temporary designation suspend/restore cycle no longer
   revokes the owning tower's generated-designation bookkeeping, so the clear
   button can remove an overlapping access terminal instead of leaving an

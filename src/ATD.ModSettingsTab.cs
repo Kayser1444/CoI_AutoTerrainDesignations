@@ -376,22 +376,10 @@ namespace AutoTerrainDesignations
         {
             content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingExperimentalAccess.AsFormatted));
             content.Add(BuildToggleRow(
-                AtdLocalization.SettingsTurningRampsLabel.AsFormatted,
-                AtdLocalization.SettingsTurningRampsTooltip.AsFormatted,
-                () => AutoTerrainDesignationsMod.TurningRampsEnabled,
-                AutoTerrainDesignationsMod.SetTurningRampsEnabled,
-                refreshers));
-            content.Add(BuildToggleRow(
                 AtdLocalization.SettingsSuppressLegacyRampsLabel.AsFormatted,
                 AtdLocalization.SettingsSuppressLegacyRampsTooltip.AsFormatted,
                 () => AutoTerrainDesignationsMod.SuppressLegacyAccessRamps,
                 AutoTerrainDesignationsMod.SetSuppressLegacyAccessRamps,
-                refreshers));
-            content.Add(BuildToggleRow(
-                AtdLocalization.SettingsAccessAStarLabel.AsFormatted,
-                AtdLocalization.SettingsAccessAStarTooltip.AsFormatted,
-                () => AutoTerrainDesignationsMod.ExperimentalAccessUseAStar,
-                AutoTerrainDesignationsMod.SetExperimentalAccessUseAStar,
                 refreshers));
             content.Add(BuildQuickRemoveDebrisPolicyRow(refreshers));
             content.Add(BuildFloatStepRow(

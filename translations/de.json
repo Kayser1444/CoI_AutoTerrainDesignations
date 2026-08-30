@@ -416,28 +416,12 @@
     "Strafe, wenn ein Strahl innerhalb seiner Spurweite kein Gelände trifft."
   ],
   [
-    "settings.experimental_access.turning_ramps.label",
-    "Wenderampen"
-  ],
-  [
-    "settings.experimental_access.turning_ramps.tooltip",
-    "Wenn diese Option aktiviert ist, kann ATD geroutete Abbiege- oder Serpentinenzufahrten mithilfe von Vanilla-Flach- und Gefällebezeichnungen auswählen und platzieren. AUTO und T1-T3 nutzen geroutete Zufahrten; Legacy 3–5 verwenden nur den Straight-Ramp-Generator. Eck- und Sattelbezeichnungen sind nicht enthalten."
-  ],
-  [
     "settings.experimental_access.suppress_legacy_ramps.label",
     "Unterdrücken Sie alte Rampen"
   ],
   [
     "settings.experimental_access.suppress_legacy_ramps.tooltip",
     "Deaktiviert den alten Generator für gerade Rampen, damit Ergebnisse und Fehler der gerouteten Zugangswege direkt getestet werden können. Für normales Fallback-Verhalten ausgeschaltet lassen."
-  ],
-  [
-    "settings.experimental_access.astar.label",
-    "Verwenden Sie die A*-Suche"
-  ],
-  [
-    "settings.experimental_access.astar.tooltip",
-    "A* statt Referenz-Dijkstra für Zugangsweg-Trockenläufe verwenden. Dijkstra ist die sicherere Validierungsbasis. A* ist schneller."
   ],
   [
     "settings.experimental_access.landscaping_cost_scale.label",
@@ -640,6 +624,10 @@
     "Abbaupriorität des Turms auf {0} setzen."
   ],
   [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "Nur die zugewiesenen Lkw (und Lkw, die teilnehmenden Minentürmen zugewiesen sind) dürfen hier Fracht aufnehmen oder abliefern."
+  ],
+  [
     "panel.farming.title",
     "Feldvorbereitung"
   ],
@@ -780,15 +768,15 @@
     "Auf {0} zoomen"
   ],
   [
+    "access_search.zoom.tooltip",
+    "Zur Zugangsaktion zoomen"
+  ],
+  [
     "vehicle_order.preassigned.tooltip",
     "Vorab zugewiesen an {0}"
   ],
   [
     "vehicle_order.shortcut.tooltip",
     "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
-  ],
-  [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
-    "Nur die zugewiesenen Lkw (und Lkw, die teilnehmenden Minentürmen zugewiesen sind) dürfen hier Fracht aufnehmen oder abliefern."
   ]
 ]

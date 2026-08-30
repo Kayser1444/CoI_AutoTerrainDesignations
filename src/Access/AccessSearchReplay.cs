@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using AutoTerrainDesignations.Access.V2;
 using AutoTerrainDesignations.Access.Worker;
 using Mafi;
+using Mafi.Core.Terrain.Designation;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -38,6 +39,182 @@ namespace AutoTerrainDesignations.Access
             PreparationMilliseconds = Math.Max(0d, preparationMilliseconds);
             SearchMilliseconds = Math.Max(0d, searchMilliseconds);
             MaterializationMilliseconds = Math.Max(0d, materializationMilliseconds);
+        }
+    }
+
+    /// <summary>
+    /// Optional memory evidence collected only for an explicitly armed
+    /// laboratory capture. It is manifest metadata, never part of the replay
+    /// request graph or canonical outcome.
+    /// </summary>
+    internal sealed class AccessReplayMemoryEvidence
+    {
+        internal const string MeasurementKind = "capture-boundary-v1";
+
+        public string EstimatorVersion { get; }
+        public long EstimatedRetainedBytes { get; }
+        public long MemoryCeilingBytes { get; }
+        public long ManagedHeapBeforeBytes { get; }
+        public long ManagedHeapAfterBytes { get; }
+        public long ManagedHeapDeltaBytes { get; }
+        public long WorkingSetBeforeBytes { get; }
+        public long WorkingSetAfterBytes { get; }
+        public long WorkingSetDeltaBytes { get; }
+        public long PrivateMemoryBeforeBytes { get; }
+        public long PrivateMemoryAfterBytes { get; }
+        public long PrivateMemoryDeltaBytes { get; }
+        public int Gen0Collections { get; }
+        public int Gen1Collections { get; }
+        public int Gen2Collections { get; }
+        public double ElapsedMilliseconds { get; }
+
+        internal AccessReplayMemoryEvidence(
+            string estimatorVersion,
+            long estimatedRetainedBytes,
+            long memoryCeilingBytes,
+            long managedHeapBeforeBytes,
+            long managedHeapAfterBytes,
+            long workingSetBeforeBytes,
+            long workingSetAfterBytes,
+            long privateMemoryBeforeBytes,
+            long privateMemoryAfterBytes,
+            int gen0Collections,
+            int gen1Collections,
+            int gen2Collections,
+            double elapsedMilliseconds)
+        {
+            EstimatorVersion = estimatorVersion ?? string.Empty;
+            EstimatedRetainedBytes = Math.Max(0L, estimatedRetainedBytes);
+            MemoryCeilingBytes = Math.Max(0L, memoryCeilingBytes);
+            ManagedHeapBeforeBytes = managedHeapBeforeBytes;
+            ManagedHeapAfterBytes = managedHeapAfterBytes;
+            ManagedHeapDeltaBytes = Delta(
+                managedHeapBeforeBytes, managedHeapAfterBytes);
+            WorkingSetBeforeBytes = workingSetBeforeBytes;
+            WorkingSetAfterBytes = workingSetAfterBytes;
+            WorkingSetDeltaBytes = Delta(
+                workingSetBeforeBytes, workingSetAfterBytes);
+            PrivateMemoryBeforeBytes = privateMemoryBeforeBytes;
+            PrivateMemoryAfterBytes = privateMemoryAfterBytes;
+            PrivateMemoryDeltaBytes = Delta(
+                privateMemoryBeforeBytes, privateMemoryAfterBytes);
+            Gen0Collections = Math.Max(0, gen0Collections);
+            Gen1Collections = Math.Max(0, gen1Collections);
+            Gen2Collections = Math.Max(0, gen2Collections);
+            ElapsedMilliseconds = Math.Max(0d, elapsedMilliseconds);
+        }
+
+        private static long Delta(long before, long after)
+            => before < 0L || after < 0L ? -1L : after - before;
+    }
+
+    /// <summary>
+    /// Process-local capture probe. It is created only while a replay capture
+    /// is armed, so ordinary searches do not pay for process counters.
+    /// Measurements are deliberately observational and must not control the
+    /// live snapshot guard.
+    /// </summary>
+    internal sealed class AccessReplayMemoryProbe
+    {
+        private readonly Stopwatch m_timer;
+        private readonly long m_managedHeapBeforeBytes;
+        private readonly long m_workingSetBeforeBytes;
+        private readonly long m_privateMemoryBeforeBytes;
+        private readonly int m_gen0Before;
+        private readonly int m_gen1Before;
+        private readonly int m_gen2Before;
+
+        private AccessReplayMemoryProbe()
+        {
+            m_timer = Stopwatch.StartNew();
+            m_managedHeapBeforeBytes = ReadManagedHeap();
+            ProcessMemorySample before = ReadProcessMemory();
+            m_workingSetBeforeBytes = before.WorkingSetBytes;
+            m_privateMemoryBeforeBytes = before.PrivateBytes;
+            m_gen0Before = ReadCollectionCount(0);
+            m_gen1Before = ReadCollectionCount(1);
+            m_gen2Before = ReadCollectionCount(2);
+        }
+
+        internal static AccessReplayMemoryProbe Start()
+            => new AccessReplayMemoryProbe();
+
+        internal AccessReplayMemoryEvidence Complete(
+            long estimatedRetainedBytes,
+            long memoryCeilingBytes)
+        {
+            m_timer.Stop();
+            long managedHeapAfterBytes = ReadManagedHeap();
+            ProcessMemorySample after = ReadProcessMemory();
+            return new AccessReplayMemoryEvidence(
+                AccessSnapshotMemoryEstimator.Version,
+                estimatedRetainedBytes,
+                memoryCeilingBytes,
+                m_managedHeapBeforeBytes,
+                managedHeapAfterBytes,
+                m_workingSetBeforeBytes,
+                after.WorkingSetBytes,
+                m_privateMemoryBeforeBytes,
+                after.PrivateBytes,
+                ReadCollectionCount(0) - m_gen0Before,
+                ReadCollectionCount(1) - m_gen1Before,
+                ReadCollectionCount(2) - m_gen2Before,
+                m_timer.Elapsed.TotalMilliseconds);
+        }
+
+        private static long ReadManagedHeap()
+        {
+            try
+            {
+                return GC.GetTotalMemory(forceFullCollection: false);
+            }
+            catch
+            {
+                return -1L;
+            }
+        }
+
+        private static ProcessMemorySample ReadProcessMemory()
+        {
+            try
+            {
+                using (Process process = Process.GetCurrentProcess())
+                {
+                    process.Refresh();
+                    return new ProcessMemorySample(
+                        process.WorkingSet64,
+                        process.PrivateMemorySize64);
+                }
+            }
+            catch
+            {
+                return new ProcessMemorySample(-1L, -1L);
+            }
+        }
+
+        private static int ReadCollectionCount(int generation)
+        {
+            try
+            {
+                return GC.CollectionCount(generation);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private readonly struct ProcessMemorySample
+        {
+            internal long WorkingSetBytes { get; }
+            internal long PrivateBytes { get; }
+
+            internal ProcessMemorySample(
+                long workingSetBytes, long privateBytes)
+            {
+                WorkingSetBytes = workingSetBytes;
+                PrivateBytes = privateBytes;
+            }
         }
     }
 
@@ -100,6 +277,16 @@ namespace AutoTerrainDesignations.Access
                 string name = s_arm.Name;
                 s_arm = null;
                 return $"Cancelled replay capture '{name}'.";
+            }
+        }
+
+        internal static AccessReplayMemoryProbe? BeginMemoryProbe()
+        {
+            lock (s_gate)
+            {
+                return s_arm == null
+                    ? null
+                    : AccessReplayMemoryProbe.Start();
             }
         }
 
@@ -242,6 +429,9 @@ namespace AutoTerrainDesignations.Access
         {
             Assembly assembly = typeof(AccessSearchReplayRecorder).Assembly;
             cancellationToken.ThrowIfCancellationRequested();
+            AccessSearchSnapshot snapshot = candidate.Request!.Snapshot;
+            AccessReplayMemoryEvidence? memoryEvidence =
+                candidate.MemoryEvidence;
             string assemblyPath = arm.AssemblyPath;
             string assemblyHash = arm.AssemblyHash;
             if (!File.Exists(assemblyPath)
@@ -284,6 +474,57 @@ namespace AutoTerrainDesignations.Access
                 + Json("buildConfiguration", configuration) + ",\n"
                 + Json("buildTimestamp", buildTimestamp) + ",\n"
                 + Json("gameAssemblyFingerprint", gameAssemblyFingerprint) + ",\n"
+                + Json("memoryEstimatorVersion",
+                    AccessSnapshotMemoryEstimator.Version) + ",\n"
+                + Json("estimatedRetainedMemoryBytes",
+                    snapshot.EstimatedRetainedMemoryBytes.ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureMemoryCeilingBytes",
+                    snapshot.CaptureMemoryCeilingBytes.ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureMemoryMeasurement",
+                    memoryEvidence == null
+                        ? "unavailable"
+                        : AccessReplayMemoryEvidence.MeasurementKind) + ",\n"
+                + Json("captureManagedHeapBeforeBytes",
+                    (memoryEvidence?.ManagedHeapBeforeBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureManagedHeapAfterBytes",
+                    (memoryEvidence?.ManagedHeapAfterBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureManagedHeapDeltaBytes",
+                    (memoryEvidence?.ManagedHeapDeltaBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureWorkingSetBeforeBytes",
+                    (memoryEvidence?.WorkingSetBeforeBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureWorkingSetAfterBytes",
+                    (memoryEvidence?.WorkingSetAfterBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureWorkingSetDeltaBytes",
+                    (memoryEvidence?.WorkingSetDeltaBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("capturePrivateMemoryBeforeBytes",
+                    (memoryEvidence?.PrivateMemoryBeforeBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("capturePrivateMemoryAfterBytes",
+                    (memoryEvidence?.PrivateMemoryAfterBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("capturePrivateMemoryDeltaBytes",
+                    (memoryEvidence?.PrivateMemoryDeltaBytes ?? -1L).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureGen0Collections",
+                    (memoryEvidence?.Gen0Collections ?? -1).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureGen1Collections",
+                    (memoryEvidence?.Gen1Collections ?? -1).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureGen2Collections",
+                    (memoryEvidence?.Gen2Collections ?? -1).ToString(
+                        CultureInfo.InvariantCulture), false) + ",\n"
+                + Json("captureMeasurementMilliseconds",
+                    (memoryEvidence?.ElapsedMilliseconds ?? -1d).ToString(
+                        "R", CultureInfo.InvariantCulture), false) + ",\n"
                 + Json("preparationMilliseconds", timing.PreparationMilliseconds.ToString("R", CultureInfo.InvariantCulture), false) + ",\n"
                 + Json("searchMilliseconds", timing.SearchMilliseconds.ToString("R", CultureInfo.InvariantCulture), false) + ",\n"
                 + Json("materializationMilliseconds", timing.MaterializationMilliseconds.ToString("R", CultureInfo.InvariantCulture), false) + "\n"
@@ -630,6 +871,159 @@ namespace AutoTerrainDesignations.Access
                 tracePath,
                 out report);
 
+        internal static bool TryAuditCase(
+            string caseDirectory,
+            out string report)
+        {
+            try
+            {
+                LoadBenchmarkInput(
+                    caseDirectory,
+                    out AccessPathRequest request,
+                    out byte[] expected);
+                var canonical = (AccessSearchReplayCanonical.CanonicalRecord)
+                    AccessReplayGraphCodec.Deserialize(
+                        expected,
+                        typeof(AccessSearchReplayCanonical.CanonicalRecord));
+                AccessDesignationPlan plan = canonical.Plan;
+                AccessSearchSnapshot snapshot = request.Snapshot;
+                var capturedResult = new AccessSearchResult(
+                    canonical.Success,
+                    canonical.FailureReason,
+                    canonical.StartOrigin,
+                    canonical.Path,
+                    BitConverter.ToSingle(
+                        BitConverter.GetBytes(canonical.CostBits), 0),
+                    0,
+                    new Dictionary<string, int>(),
+                    0f, 0f, 0f, 0f, 0f,
+                    reachedGoalKind: canonical.ReachedGoalKind,
+                    v2Route: canonical.V2Route);
+                AccessDesignationPlan currentPlan =
+                    AccessPathMaterializer.Materialize(
+                        new AccessSearchWorkspace(snapshot),
+                        capturedResult);
+                var exactTerrain = new List<Tile2i>();
+                var isolatedExactTerrain = new List<Tile2i>();
+                var exactSourceTerrain = new HashSet<Tile2i>(
+                    canonical.V2Route?.RouteSteps
+                        .Where(step => step.Transition != null
+                            && step.Transition.ScoreOnlyGeneratedExteriorRays)
+                        .SelectMany(step => step.Transition!.Delta)
+                        .Where(item => !AccessPathMaterializer
+                            .ProfileHasTerrainDelta(
+                                snapshot, item.Origin, item.Profile))
+                        .Select(item => item.Origin)
+                    ?? Enumerable.Empty<Tile2i>());
+                foreach (AccessPlannedDesignation designation
+                    in plan.Designations)
+                {
+                    if (AccessPathMaterializer.ProfileHasTerrainDelta(
+                            snapshot, designation.Origin,
+                            designation.Profile))
+                        continue;
+                    exactTerrain.Add(designation.Origin);
+                    bool touchesAnother = plan.Designations.Any(other =>
+                        other.Origin != designation.Origin
+                        && Math.Abs(other.Origin.X - designation.Origin.X) <= 4
+                        && Math.Abs(other.Origin.Y - designation.Origin.Y) <= 4);
+                    if (!touchesAnother)
+                        isolatedExactTerrain.Add(designation.Origin);
+                }
+
+                int denseProps = 0;
+                int handledByPlannedTerrain = 0;
+                int plannedExcavationCandidates = 0;
+                var handledKeys = new HashSet<string>(StringComparer.Ordinal);
+                var propDetails = new List<string>();
+                foreach (AccessPropCleanupInfo cleanup in plan.CleanupOrigins)
+                {
+                    foreach (AccessPropSample sample in cleanup.Samples)
+                    {
+                        if (!sample.IsDenseDebris
+                            || !handledKeys.Add(sample.CleanupObjectKey))
+                            continue;
+                        denseProps++;
+                        bool handled = false;
+                        bool excavationCandidate = false;
+                        var covering = new List<string>();
+                        foreach (AccessPlannedDesignation designation
+                            in plan.Designations)
+                        {
+                            AccessHandoffOperation operation =
+                                plan.HandoffOperationsByOrigin.TryGetValue(
+                                    designation.Origin,
+                                    out AccessHandoffOperation mappedOperation)
+                                    ? mappedOperation
+                                    : AccessHandoffOperation.Leveling;
+                            var data = new DesignationData(
+                                        designation.Origin,
+                                        new HeightTilesI(
+                                            designation.Profile.Nw2 / 2),
+                                        new HeightTilesI(
+                                            designation.Profile.Ne2 / 2),
+                                        new HeightTilesI(
+                                            designation.Profile.Se2 / 2),
+                                        new HeightTilesI(
+                                            designation.Profile.Sw2 / 2));
+                            if (!AccessPropCleanupPolicy
+                                    .TryGetDesignationTargetHeight(
+                                        data, sample, out float targetHeight))
+                                continue;
+                            covering.Add($"{designation.Origin}:{operation}:"
+                                + $"{targetHeight.ToString("0.###", CultureInfo.InvariantCulture)}");
+                            excavationCandidate |=
+                                (operation == AccessHandoffOperation.Mining
+                                    || operation == AccessHandoffOperation.Leveling)
+                                && targetHeight
+                                    < sample.PlacedHeight - 0.0001f;
+                            handled |= AccessPropCleanupPolicy
+                                .PlannedOperationRemovesNonTreeProp(
+                                    operation, data, sample);
+                        }
+                        if (handled)
+                            handledByPlannedTerrain++;
+                        if (excavationCandidate)
+                            plannedExcavationCandidates++;
+                        propDetails.Add($"{sample.CleanupObjectKey}@{sample.Tile}"
+                            + $":placed={sample.PlacedHeight.ToString("0.###", CultureInfo.InvariantCulture)}"
+                            + $":threshold={sample.DumpBurialThreshold.ToString("0.###", CultureInfo.InvariantCulture)}"
+                            + $":covering={string.Join("|", covering)}"
+                            + $":handled={handled}");
+                    }
+                }
+
+                string auditManifest = File.ReadAllText(
+                    Path.Combine(
+                        Path.GetFullPath(caseDirectory), "manifest.json"),
+                    Encoding.UTF8);
+                report = $"case={ManifestString(auditManifest, "caseName")} "
+                    + $"start={canonical.StartOrigin} "
+                    + $"firstV2Lanes={(canonical.V2Route == null || canonical.V2Route.States.Count == 0 ? "none" : canonical.V2Route.States[0].GetLaneOrigin(0) + "|" + canonical.V2Route.States[0].GetLaneOrigin(1))} "
+                    + $"designations={plan.Designations.Count} "
+                    + $"currentPlanValid={currentPlan.IsValid} "
+                    + $"currentDesignations={currentPlan.Designations.Count} "
+                    + $"exactTerrain={exactTerrain.Count} "
+                    + $"isolatedExactTerrain={isolatedExactTerrain.Count} "
+                    + $"isolatedExactOrigins={string.Join(";", isolatedExactTerrain)} "
+                    + $"exactSourceTerrain={exactSourceTerrain.Count} "
+                    + $"denseProps={denseProps} "
+                    + $"plannedExcavationCandidates={plannedExcavationCandidates} "
+                    + $"handledByPlannedTerrain={handledByPlannedTerrain} "
+                    + $"propDetails={string.Join(";", propDetails)}";
+                return currentPlan.IsValid
+                    && currentPlan.Designations.Count
+                        == plan.Designations.Count - exactSourceTerrain.Count
+                    && handledByPlannedTerrain
+                        == plannedExcavationCandidates;
+            }
+            catch (Exception ex)
+            {
+                report = "Case audit failed closed: " + ex;
+                return false;
+            }
+        }
+
         private static bool TryReplayCaseCore(
             string caseDirectory,
             bool allowAssemblyMismatch,
@@ -681,7 +1075,9 @@ namespace AutoTerrainDesignations.Access
                         StringComparison.Ordinal))
                     throw new InvalidDataException(
                         "Replay manifest mismatch: atdAssemblySha256");
-                RequireManifest(manifest, "buildConfiguration", "Release");
+                if (!allowAssemblyMismatch)
+                    RequireManifest(
+                        manifest, "buildConfiguration", "Release");
                 string currentGameFingerprint =
                     AccessSearchReplayRecorder.GetGameAssemblyFingerprint();
                 string recordedGameFingerprint = ManifestString(
@@ -776,6 +1172,7 @@ namespace AutoTerrainDesignations.Access
                     + $"materializeMs={materializeMs.ToString("0.###", CultureInfo.InvariantCulture)} "
                     + $"v2BandExpansions={replayDiagnostics.V2BandExpansions} "
                     + $"v2GroundExpansions={replayDiagnostics.V2GroundExpansions} "
+                    + $"g2vFirstEnqueueVisited={replayDiagnostics.V2GroundToVFirstEnqueueVisited} "
                     + $"groundReplacementChecks={replayDiagnostics.V2OrdinaryGroundReplacementChecks} "
                     + $"groundReplacementCandidates={replayDiagnostics.V2OrdinaryGroundReplacementCandidates} "
                     + $"groundReplacementPrunes={replayDiagnostics.V2OrdinaryGroundReplacementPrunes} "
@@ -1054,6 +1451,40 @@ namespace AutoTerrainDesignations.Access
                     caseDirectory,
                     out AccessPathRequest request,
                     out byte[] expected);
+                string manifest = File.ReadAllText(
+                    Path.Combine(
+                        Path.GetFullPath(caseDirectory), "manifest.json"),
+                    Encoding.UTF8);
+                long estimatedRetainedMemoryBytes =
+                    request.Snapshot.EstimatedRetainedMemoryBytes;
+                long captureMemoryCeilingBytes =
+                    request.Snapshot.CaptureMemoryCeilingBytes;
+                string captureMemoryMeasurement =
+                    TryManifestString(
+                        manifest, "captureMemoryMeasurement")
+                    ?? "unavailable";
+                string memoryEstimatorVersion =
+                    TryManifestString(
+                        manifest, "memoryEstimatorVersion")
+                    ?? "embedded-unknown";
+                long captureManagedHeapDeltaBytes =
+                    TryManifestScalar(
+                        manifest, "captureManagedHeapDeltaBytes",
+                        out long capturedHeapDelta)
+                        ? capturedHeapDelta
+                        : -1L;
+                long captureWorkingSetDeltaBytes =
+                    TryManifestScalar(
+                        manifest, "captureWorkingSetDeltaBytes",
+                        out long capturedWorkingSetDelta)
+                        ? capturedWorkingSetDelta
+                        : -1L;
+                long capturePrivateMemoryDeltaBytes =
+                    TryManifestScalar(
+                        manifest, "capturePrivateMemoryDeltaBytes",
+                        out long capturedPrivateDelta)
+                        ? capturedPrivateDelta
+                        : -1L;
                 var preparation = new List<double>(repetitions);
                 var search = new List<double>(repetitions);
                 var materialization = new List<double>(repetitions);
@@ -1122,8 +1553,25 @@ namespace AutoTerrainDesignations.Access
                     + $"totalMaxMs={total.Max().ToString("0.###", CultureInfo.InvariantCulture)} "
                     + $"measuredWallMs={wall.Elapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture)} "
                     + $"cpuMs={cpuMs.ToString("0.###", CultureInfo.InvariantCulture)} "
+                    + $"memoryEstimatorVersion={memoryEstimatorVersion} "
+                    + $"estimatedRetainedMemoryBytes={estimatedRetainedMemoryBytes} "
+                    + $"estimatedRetainedMemoryMiB="
+                    + $"{(estimatedRetainedMemoryBytes / (1024d * 1024d)).ToString("0.###", CultureInfo.InvariantCulture)} "
+                    + $"captureMemoryCeilingBytes={captureMemoryCeilingBytes} "
+                    + $"captureMemoryMeasurement={captureMemoryMeasurement} "
+                    + $"captureManagedHeapDeltaBytes={captureManagedHeapDeltaBytes} "
+                    + $"captureWorkingSetDeltaBytes={captureWorkingSetDeltaBytes} "
+                    + $"capturePrivateMemoryDeltaBytes={capturePrivateMemoryDeltaBytes} "
+                    + $"captureManagedHeapDeltaToEstimateRatio="
+                    + FormatRatio(captureManagedHeapDeltaBytes,
+                        estimatedRetainedMemoryBytes) + " "
                     + $"peakWorkingSetBytes={peakWorkingSet} "
                     + $"managedHeapDeltaBytes={heapAfter - heapBefore} "
+                    + $"replayManagedHeapDeltaToEstimateRatio="
+                    + (repetitions == 1
+                        ? FormatRatio(heapAfter - heapBefore,
+                            estimatedRetainedMemoryBytes)
+                        : "unavailable-repetitions") + " "
                     + $"gen0Collections={GC.CollectionCount(0) - gen0Before} "
                     + $"gen1Collections={GC.CollectionCount(1) - gen1Before} "
                     + $"gen2Collections={GC.CollectionCount(2) - gen2Before} "
@@ -1325,6 +1773,38 @@ namespace AutoTerrainDesignations.Access
                     "Replay manifest scalar is missing: " + key);
             return match.Groups["value"].Value;
         }
+
+        private static string? TryManifestString(
+            string manifest, string key)
+        {
+            Match match = Regex.Match(manifest,
+                "\\\"" + Regex.Escape(key)
+                + "\\\"\\s*:\\s*\\\"(?<value>(?:\\\\.|[^\\\"])*)\\\"");
+            return match.Success
+                ? Regex.Unescape(match.Groups["value"].Value)
+                : null;
+        }
+
+        private static bool TryManifestScalar(
+            string manifest, string key, out long value)
+        {
+            value = 0L;
+            Match match = Regex.Match(manifest,
+                "\\\"" + Regex.Escape(key)
+                + "\\\"\\s*:\\s*(?<value>[-+0-9.eE]+)");
+            return match.Success
+                && long.TryParse(
+                    match.Groups["value"].Value,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out value);
+        }
+
+        private static string FormatRatio(long numerator, long denominator)
+            => numerator < 0L || denominator <= 0L
+                ? "unavailable"
+                : (numerator / (double)denominator).ToString(
+                    "0.###", CultureInfo.InvariantCulture);
     }
 
     internal static class AccessSearchReplayCanonical

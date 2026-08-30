@@ -396,9 +396,11 @@ incremental builder with synchronous/incremental parity coverage. Repair,
 The remaining 255 ms two-cluster advance crossed the synchronous legacy-ramp
 comparison after worker acceptance and was misleadingly attributed to the next
 capture phase. That comparison now yields at candidate and ramp-step
-boundaries under the same active budget and reports its own phase. Repair,
-existing-terrain access, ghost-tower access, and broader mixed-caller lifecycle
-qualification remain open.
+boundaries under the same active budget and reports its own phase. Planned-tower
+ghost access now captures without constructing a game-thread workspace and
+submits its ghost-goal request to the worker. Existing-terrain repair selects
+the same worker adapter through the common ramp path. Runtime qualification of
+both modes and broader mixed-caller lifecycle qualification remain open.
 
 ### Outcome
 
