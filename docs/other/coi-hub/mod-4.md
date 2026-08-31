@@ -4,6 +4,8 @@
 
 *One Mine, One Click — Once You Plop, You Can’t Stop.*
 
+[🛡️ **Code analysis explained**](#code-analysis-explained)
+
 ## 📋 Overview
 
 ***Kayser’s Automatic Terrain Designations (ATD)*** is a quality-of-life mod for Captain of Industry that generates tailored mining designations for Mine Towers. Instead of manually maintaining designations across complex deposits, ATD analyzes the terrain and creates a mining plan that follows the ore body.
@@ -143,11 +145,23 @@ Open ATD in the Mod Settings window for controls that are not available directly
 - **Tower panel defaults** — Choose whether the Mining Designations, Ore Composition, and Farmland Preparation panels start collapsed.
 - **Mine Tower defaults** — Set the initial accessway mode, dumping priority, excavation depth, elevation limit, ore quality, and idle-vehicle behavior, then optionally save them as the configuration for new games.
 
-Accessway search uses A* by default. Advanced users can temporarily switch to Dijkstra with the `atd_set_access_astar` console command when comparing routes; the choice applies only to the current session.
+Accessway search uses A\* by default. Advanced users can temporarily switch to Dijkstra with the `atd_set_access_astar` console command when comparing routes; the choice applies only to the current session.
 
 For mining connoisseurs who enjoy tuning the last grain of ore, ATD also exposes expert ore-quality thresholds and accessway pathfinder controls. Most players can safely leave these at their defaults.
 
 ---
+
+## 🛡️ Code analysis explained
+
+CoI Hub's code analysis flags capabilities that can be legitimate parts of a mod but deserve context. ATD is open source, and these warnings mostly reflect its game integration and access-search development tools:
+
+- **Loads other code at runtime** — ATD's access-search replay tools can load the exact built ATD assembly so recorded searches can be replayed against the same code. The in-game mod does not download or execute arbitrary third-party code.
+- **Spawns processes** — ATD does not launch child processes. The warning is triggered by diagnostic code that reads the current game's process information to measure replay CPU and memory use; it is not used to start external programs.
+- **Accesses filesystem** — ATD reads bundled translation files and its settings, and its replay tools read and write diagnostic cases under Captain of Industry's user-data folder. It does not need broad arbitrary file access for normal mining or accessway gameplay.
+- **Uses Harmony** — Harmony is the patching library ATD uses to integrate with Captain of Industry. It patches specific game and UI methods to add controls, behaviors, and compatibility hooks.
+- **Uses reflection by name** — Some game APIs and UI fields are private or vary between versions. ATD uses named reflection to find optional vanilla types, methods, and fields, then skips that integration or uses a fallback when the expected member is unavailable.
+
+The worker thread itself receives a sealed snapshot of primitive world data and returns a route result. Snapshot capture, live validation, and designation changes remain on the game thread; the worker does not access live Unity or Mafi world objects.
 
 Mine away!
 
