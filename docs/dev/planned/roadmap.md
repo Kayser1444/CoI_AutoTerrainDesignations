@@ -26,7 +26,11 @@ The access framework, V2-style accessway search, and bounded out-of-area ramp fa
   must preserve terrain-extrema heuristic admissibility or weaken that
   heuristic component to zero wherever the rebate can apply.
 - Underground pipe construction support for both vanilla and modded scenarios, if the complexity becomes practical.
-- If the snapshot is too large, shrink it to managable size
+- Implement the accepted
+  [geometry-only masked-corridor fallback](../../adr/0008-shrink-oversized-access-snapshots-with-geometry-only-masked-corridors.md)
+  using the staged
+  [reduced-snapshot implementation plan](reduced-access-snapshot-implementation-plan.md)
+  when a full access snapshot exceeds its retained-memory ceiling.
 - Replace static T1, T2, and T3 accessway clearance levels with dynamic levels based on the available excavator base class prototypes.
 
 ## Reliability and quality work

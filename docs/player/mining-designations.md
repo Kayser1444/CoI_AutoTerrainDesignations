@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.7.1*
+*Current as of: v0.7.2 development build*
 
 ## What it does
 
@@ -24,6 +24,15 @@ The core workflow has five parts:
 6. If needed, click **Clear** to remove the ATD mining designations and try again with different settings.
 
 The panel also includes a **Remove Debris** action. This designates debris in the tower area for cleanup without running a full ore scan. This is useful to clean large areas of debris without spending Unity.
+
+## Development build: queued creation
+
+In the current unreleased build, requests for different towers wait in order.
+Clicking Create Designations again for the same tower replaces its pending
+request. Capture and calculation can be stopped before submission. Once the
+mining batch is submitted to the game, it finishes without rollback; Clear can
+remove the resulting ATD designations afterwards. Mining and access generation
+remain separate phases.
 
 ## Inspector settings
 
@@ -136,6 +145,18 @@ See [Corner Designations](corner-designations.md) for the standalone guide.
 ## Global settings and console commands
 
 The per-tower settings in the inspector are separate from the global defaults stored in `ATDsettings.json`.
+
+### Vanilla fixes
+
+The per-world **Filter ore spikes** option is enabled by default. It detects
+isolated, ultra-thin ore columns that extend far below the surrounding vanilla
+deposit and prevents those anomalous tails from pulling the mine floor down.
+The correction changes only how ATD interprets selected ore while planning;
+it does not alter terrain or existing designations.
+
+Spike filtering runs before **Ore quality**, connectivity, bottom flattening,
+and corner smoothing. Turning it off restores the unfiltered ore interpretation
+for newly created Mining Designations.
 
 ### Terrain safety
 

@@ -1,5 +1,19 @@
 v0.7.2 [unreleased]
 
+* Improved: Added a per-world **Filter ore spikes** option under **Vanilla fixes**, enabled by default. Mining planning now trims isolated ultra-deep vanilla ore tails before Ore quality and bottom flattening while preserving raw captured terrain for safety and replay. The initial strict eight-neighbor, four-layer policy remains tunable through the mining laboratory.
+* Developer: Mining replay decoding accepts the one-field-short legacy `MiningPolicy` layout and initializes its new spike-filter flag to false, preserving exact archived baselines. New captures persist the flag normally.
+
+* Fixed: Background mining replay recording could finish without ever showing a progress toast because visibility waited for game-thread processing time. Toasts now use active wall time; recording shows capture progress and Abort without path-search statistics. The same fix covers worker jobs with inexpensive polling.
+
+* Experimental: Mining capture now yields by elapsed time and shares the terrain-column collector and single worker with access planning. With spike correction disabled, the extracted planner preserves existing ore/depth/geometry rules. Full columns retain material, product, thickness and bedrock facts for later experiments.
+* Changed: Create Designations queues different towers and replaces only the same tower's pending request. Mining submits one native designation batch and verifies actual placements for ownership; a submitted batch finishes without cancellation rollback.
+* Developer: The existing laboratory accepts mining cases (`atd_access_replay_arm <name> <family> mining`), with independent input/expected geometry, exact-DLL replay and benchmarks. Synthetic parity, codec, safety and worker checks pass; large-mine in-game timing and complete corpus qualification remain pending. See the mining worker design note.
+* Developer: Newly recorded mining and access laboratory manifests include the active map name. Existing cases remain replayable but cannot recover this missing provenance retroactively.
+* Fixed: Map-name capture no longer requests the unregistered raw island-map object and aborts ATD initialization. It reads the optional registered legacy map manager with island- and world-map config fallbacks, and settings-path setup now happens before dependency resolution so a later initialization failure cannot produce a misleading missing-settings warning.
+* Experimental: The first ore-spike filter sweep compares strict-neighbor, median-neighbor, and morphology-gated clamps with Ore quality and bottom flattening disabled. Positive captures show strong rock savings with little target-product loss, but the quartz case is materially less favorable. A mostly excavated mop-up capture is retained separately as a provisional negative control; r8/r10 candidates leave its final plan unchanged.
+* Experimental: A known-spike post-Medium mop-up capture shows that intact ore-neighbor detectors fail after surrounding ore is removed. The in-game viewer confirms all six plan-affecting bedrock-r4 sources as spikes; r6 catches two, while r8/r10 change no final geometry. The rock-to-target tradeoff is much tighter than on untouched deposits, and sample 4 remains the false-positive check.
+* Developer: Added a transient laboratory overlay for ore-spike candidate review. It loads the generated marker CSV, colors points by review status, and shows captured depth facts on hover; markers are cleared on world changes and never enter saves.
+
 v0.7.1 [released]
 
 * Changed: Routed experimental accessways are now always enabled for eligible accessway modes. The old `turningRampsExperimental` settings toggle has been removed; legacy straight-only modes and the explicit legacy fallback remain unchanged.

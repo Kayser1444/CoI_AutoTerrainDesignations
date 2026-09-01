@@ -3,6 +3,48 @@
 AutoTerrainDesignations plans and evaluates terrain work needed to keep
 Captain of Industry structures accessible.
 
+## Mining planning
+
+**Captured planning world**:
+A recorded set of world facts in a common format usable by mining and access
+planning, distinct from either planner's request, policy, or proposed work.
+_Avoid_: Combined mine-and-ramp plan, access search workspace
+
+**Captured mining column**:
+A recorded terrain column retaining its coordinates, surface elevation,
+bedrock boundary, and every material layer, including ore, rock, and dirt.
+_Avoid_: Selected-ore interval list, designation-cell aggregate
+
+**Mining replay case**:
+A recorded mining scenario containing individual terrain-column facts before
+aggregation and separately stored expected mine-designation geometry, used to
+compare planning results for the same inputs.
+_Avoid_: Access replay case, saved game, aggregated ore-depth map
+
+**Mine excavation plan**:
+The proposed mining-designation geometry after depth selection, filtering,
+connectivity, bottom flattening, corner smoothing, and mining safety checks,
+before access-ramp planning or live placement.
+_Avoid_: Combined mine-and-access plan, placed mining designations
+
+**Avoided waste-rock excavation**:
+Mineable rock included in the final unfiltered mine excavation plan but absent
+from the otherwise equivalent final spike-filtered plan, measured against raw
+captured material layers.
+_Avoid_: Detected spike depth, removed bedrock, saved designation count
+
+**Foregone target product**:
+Raw selected target-product material included in the final unfiltered mine
+excavation plan but omitted by the otherwise equivalent final spike-filtered
+plan. The material remains in the world and may be designated later.
+_Avoid_: Destroyed ore, filtered-layer count, permanent ore loss
+
+**Spike-filter tradeoff frontier**:
+The nondominated candidate configurations when final mine plans are compared
+by avoided waste-rock excavation and foregone target product. It preserves the
+two outcomes separately instead of assuming one fixed rock-to-product value.
+_Avoid_: Spike detection accuracy, blended spike-filter score
+
 ## Farmland preparation
 
 **Farmland intent**:
@@ -276,6 +318,14 @@ It contains no live world references, callbacks, or pure search structures that
 can instead be derived by the execution backend, and does not change after
 publication.
 _Avoid_: Live terrain view, mutable search cache, serialized world state
+
+**Reduced access snapshot**:
+A captured access snapshot whose request-local search domain is a
+geometry-selected subset used only when full-area capture exceeds its resource
+ceiling.
+It may prove a candidate plan after ordinary validation, but its failure is
+inconclusive because omitted space may contain a route.
+_Avoid_: Equivalent snapshot, authoritative no-path snapshot, terrain-guided crop
 
 **Access search workspace**:
 The request-local mutable state used to evaluate one captured access snapshot,
