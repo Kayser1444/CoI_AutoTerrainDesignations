@@ -1,3 +1,5 @@
+v0.8.1 [unreleased]
+
 v0.8.0 [released]
 
 * Fixed: **Ore composition** now includes the Rock produced when designations excavate below the stored terrain layers into bedrock. Vanilla mines bedrock indefinitely toward the target height and gives it a 200% quantity multiplier versus ordinary rock's 80%; the panel now converts each material with its own live yield before combining products.
