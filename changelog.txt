@@ -1,3 +1,9 @@
+v0.8.0 | 2026-09-01
+* Added: An enabled-by-default **Filter ore spikes** world option under **Vanilla fixes** corrects isolated ultra-thin vanilla ore tails before Ore quality and bottom flattening; captured tests measured up to 99% less bedrock excavation locally and 36% across entire designation plans
+* Improved: **Create Designations** now captures and plans through a dedicated worker thread, keeping the game responsive during large mines
+* Improved: Complete mining plans are placed through one native batch, making designation placement substantially faster
+* Fixed: **Ore composition** now includes Rock produced by excavating bedrock and applies bedrock's higher vanilla mining yield
+
 v0.7.1 | 2026-08-30
 * Changed: Routed turning accessways are now enabled automatically for eligible AUTO and T1–T3 modes; legacy straight-only modes and the explicit legacy fallback remain available
 * Changed: Accessway searches now use A* by default; advanced users can switch to Dijkstra for the current session with `atd_set_access_astar`

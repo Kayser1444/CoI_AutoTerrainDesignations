@@ -13,6 +13,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
+using Mafi.Collections.ImmutableCollections;
+using AutoTerrainDesignations.Mining;
 using Mafi.Core.Buildings.Mine;
 using Mafi.Core.Buildings.Towers;
 using Mafi.Core.Entities;
@@ -34,6 +36,19 @@ namespace AutoTerrainDesignations
     {
         private static int s_latestCreateDesignationsRequestId;
         private static bool s_createDesignationsOperationActive;
+        private static bool s_miningBatchSubmitted;
+        private static bool s_createQueuePumpActive;
+        private static IAreaManagingTower? s_activeCreateTower;
+        private static readonly List<PendingCreateDesignations> s_pendingCreateDesignations =
+            new List<PendingCreateDesignations>();
+
+        private sealed class PendingCreateDesignations
+        {
+            public readonly IAreaManagingTower Tower;
+            public readonly object? Panel;
+            public PendingCreateDesignations(IAreaManagingTower tower, object? panel)
+            { Tower = tower; Panel = panel; }
+        }
         private static ATDAccesswayRequestHandle?
             s_createDesignationsAccessRequest;
 
@@ -88,9 +103,11 @@ namespace AutoTerrainDesignations
             IEnumerator routine,
             int requestId)
         {
+            int world = CurrentWorldGeneration;
             try
             {
-                while (requestId == s_latestCreateDesignationsRequestId)
+                while (IsWorldGenerationActive(world)
+                    && (requestId == s_latestCreateDesignationsRequestId || s_miningBatchSubmitted))
                 {
                     bool movedNext;
                     object? current = null;
@@ -316,23 +333,65 @@ namespace AutoTerrainDesignations
             object? panelKey,
             string source)
         {
-            int requestId = ++s_latestCreateDesignationsRequestId;
-            string towerText = TryGetTowerEntityId(tower, out EntityId towerId) && towerId.IsValid
-                ? towerId.ToString()
-                : "?";
-            LogDebug(
-                $"Create Designations request {requestId} queued "
-                + $"source={source} tower={towerText} panelKey={(panelKey != null ? "present" : "none")}.");
-            if (s_createDesignationsOperationActive)
+            if (s_coroutineHost == null) return;
+            int queuedIndex = s_pendingCreateDesignations.FindIndex(pending => pending.Tower.Id == tower.Id);
+            var queued = new PendingCreateDesignations(tower, panelKey);
+            if (queuedIndex >= 0) s_pendingCreateDesignations[queuedIndex] = queued;
+            else s_pendingCreateDesignations.Add(queued);
+            if (s_createDesignationsOperationActive && s_activeCreateTower?.Id == tower.Id)
             {
-                s_cancelExperimentalAccessSearch = true;
-                CancelAccesswayRequest(
-                    s_createDesignationsAccessRequest,
-                    "Superseded");
-                LogDebug($"Create Designations request {requestId} supersedes the active operation.");
+                ++s_latestCreateDesignationsRequestId;
+                if (!s_miningBatchSubmitted)
+                {
+                    s_cancelExperimentalAccessSearch = true;
+                    CancelAccesswayRequest(s_createDesignationsAccessRequest, "Superseded");
+                }
             }
-            s_coroutineHost?.StartCoroutine(
-                RunCreateDesignationsSingleFlight(tower, panelKey, requestId));
+            LogDebug($"Create Designations queued source={source} tower={tower.Id} pending={s_pendingCreateDesignations.Count}.");
+            if (s_createQueuePumpActive) return;
+            s_createQueuePumpActive = true;
+            s_coroutineHost.StartCoroutine(RunCreateDesignationsQueue());
+        }
+
+        private static IEnumerator RunCreateDesignationsQueue()
+        {
+            int world = CurrentWorldGeneration;
+            try
+            {
+                while (IsWorldGenerationActive(world) && s_pendingCreateDesignations.Count > 0)
+                {
+                    PendingCreateDesignations pending = s_pendingCreateDesignations[0];
+                    s_pendingCreateDesignations.RemoveAt(0);
+                    if (pending.Tower is IEntity entity && entity.IsDestroyed) continue;
+                    s_activeCreateTower = pending.Tower;
+                    IEnumerator operation = RunCreateDesignationsSingleFlight(
+                        pending.Tower, pending.Panel, ++s_latestCreateDesignationsRequestId);
+                    try
+                    {
+                        while (IsWorldGenerationActive(world))
+                        {
+                            bool advanced;
+                            try { advanced = operation.MoveNext(); }
+                            catch (Exception ex)
+                            {
+                                s_log.Error("[ATD Mining] Create Designations failed: " + ex);
+                                break;
+                            }
+                            if (!advanced) break;
+                            yield return operation.Current;
+                        }
+                    }
+                    finally { (operation as IDisposable)?.Dispose(); }
+                }
+            }
+            finally
+            {
+                if (IsWorldGenerationActive(world))
+                {
+                    s_activeCreateTower = null;
+                    s_createQueuePumpActive = false;
+                }
+            }
         }
 
         private static IEnumerator RunCreateDesignationsSingleFlight(
@@ -340,6 +399,7 @@ namespace AutoTerrainDesignations
             object? panelKey,
             int requestId)
         {
+            int world = CurrentWorldGeneration;
             while (s_createDesignationsOperationActive)
             {
                 if (requestId != s_latestCreateDesignationsRequestId)
@@ -365,18 +425,21 @@ namespace AutoTerrainDesignations
             }
             finally
             {
-                CancelAccesswayRequest(
-                    s_createDesignationsAccessRequest,
-                    requestId == s_latestCreateDesignationsRequestId
-                        ? "CreateDesignationsFinished"
-                        : "Superseded");
-                s_createDesignationsAccessRequest = null;
                 (guarded as IDisposable)?.Dispose();
-                HideTerrainAnalysisProgressToast();
-                s_createDesignationsOperationActive = false;
-                if (requestId == s_latestCreateDesignationsRequestId)
-                    s_cancelExperimentalAccessSearch = false;
-                LogDebug($"Create Designations request {requestId} finished or was superseded.");
+                if (IsWorldGenerationActive(world))
+                {
+                    CancelAccesswayRequest(
+                        s_createDesignationsAccessRequest,
+                        requestId == s_latestCreateDesignationsRequestId
+                            ? "CreateDesignationsFinished"
+                            : "Superseded");
+                    s_createDesignationsAccessRequest = null;
+                    HideTerrainAnalysisProgressToast();
+                    s_createDesignationsOperationActive = false;
+                    if (requestId == s_latestCreateDesignationsRequestId)
+                        s_cancelExperimentalAccessSearch = false;
+                    LogDebug($"Create Designations request {requestId} finished or was superseded.");
+                }
             }
         }
 
@@ -491,260 +554,35 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
-            var productSet = HybridSet<LooseProductProto>.From(scanProducts);
-            var tempResults = new Lyst<ProductResource>();
-
-            int scanCount = 0;
-
-            var productCounts = new Dictionary<LooseProductProto, int>();
-            var resourceDetailsByTile = new Dictionary<Tile2i, List<ProductResource>>();
-            int maxHeightDiff = towerSettings.MaxHeightDiff;
-            int maxLayersToExcavate = towerSettings.MaxLayersToExcavate;
-            int? maxDepthToDigTo = towerSettings.MaxDepthToDigTo;
-            int purityLevel = towerSettings.OrePurityLevel;
-            int corridorClearance = towerSettings.CorridorClearance;
-
-            LogDebug(string.Format("Scanning mine area from {0} to {1} for ore depth...", bbMin, bbMax));
-
-            for (int y = bbMin.Y; y < bbMax.Y; y += 4)
-            {
-                for (int x = bbMin.X; x < bbMax.X; x += 4)
-                {
-                    var coord = new Tile2i(x, y);
-                    
-                    // Sample every terrain tile inside the 4x4 designation tile so ore decisions
-                    // do not miss interior pockets or contamination.
-                    if (!TryGetResourcesFromAllTiles(coord, area, terrMgr, productSet, tempResults, out List<ProductResource> resourcesForTile))
-                    {
-                        LogDebug(string.Format("Skipping tile with cells outside area: {0}", coord));
-                        continue;
-                    }
-
-                    if (resourcesForTile.Count == 0)
-                    {
-                        LogDebug(string.Format("Tile {0}: No resources found in sampled cells", coord));
-                        continue;
-                    }
-
-                    try
-                    {
-                        HashSet<LooseProductProto> tileProducts = new HashSet<LooseProductProto>();
-
-                        for (int i = 0; i < resourcesForTile.Count; i++)
-                        {
-                            ProductResource resource = resourcesForTile[i];
-                            tileProducts.Add(resource.Product);
-                        }
-
-                        if (resourcesForTile.Count > 0)
-                        {
-                            resourceDetailsByTile[coord] = resourcesForTile;
-                        }
-
-                        foreach (LooseProductProto product in tileProducts)
-                        {
-                            if (productCounts.TryGetValue(product, out int existingCount))
-                            {
-                                productCounts[product] = existingCount + 1;
-                            }
-                            else
-                            {
-                                productCounts[product] = 1;
-                            }
-                        }
-                    }
-                    catch
-                    {
-                    }
-
-                    scanCount++;
-                    int effectiveBatchSize = GetEffectiveBatchSize();
-                    if (scanCount % effectiveBatchSize == 0)
-                        yield return null;
-                }
-            }
-
-            List<LooseProductProto> targetProducts = scanProducts
-                .Where(product => productCounts.ContainsKey(product))
-                .ToList();
-
-            if (targetProducts.Count == 0)
-            {
-                var repairResult = new ExistingTerrainWorkAccessResult();
-                IEnumerator repairRoutine =
-                    RepairExistingTerrainWorkAccessCoroutine(
-                        tower, terrMgr, towerSettings, generateRamps,
-                        repairResult);
-                while (repairRoutine.MoveNext())
-                    yield return repairRoutine.Current;
-                if (repairResult.RequestCancelled)
-                    yield break;
-                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
-                yield break;
-            }
-
-            ProductProto? selectedProduct = GetSelectedOre(tower);
-            var targetProductIds = BuildTargetProductIdSet(targetProducts);
-            var maxOreDepths = new Dict<Tile2i, int>();
-
-            float minBottomOreDensity = s_minBottomOreDensityByLevel[purityLevel];
-            float minOrePurity    = s_minOrePurityByLevel[purityLevel];
-            float minOreHeight    = s_minOreHeightByLevel[purityLevel];
-
-            foreach (KeyValuePair<Tile2i, List<ProductResource>> kvp in resourceDetailsByTile)
-            {
-                float terrainH = GetMinSurfaceHeightInDesignatableTile(kvp.Key, terrMgr);
-
-                // Criterion 3: contamination ratio — skip tiles where ore fraction is too low
-                if (minOrePurity > 0f)
-                {
-                    float purityRatio = ComputeTilePurityRatio(kvp.Key, terrMgr, targetProductIds);
-                    if (purityRatio < minOrePurity)
-                    {
-                        LogDebug(string.Format("Tile {0} rejected: purity {1:P0} < threshold {2:P0}", kvp.Key, purityRatio, minOrePurity));
-                        continue;
-                    }
-                }
-
-                // Criterion 2: ore height — skip tiles with too little ore (not just isolated)
-                if (minOreHeight > 0f)
-                {
-                    float tileOreHeight = GetTargetProductAmount(kvp.Value, targetProductIds);
-                    if (tileOreHeight < minOreHeight)
-                    {
-                        LogDebug(string.Format("Tile {0} rejected: ore height {1:F2} < threshold {2:F2}", kvp.Key, tileOreHeight, minOreHeight));
-                        continue;
-                    }
-                }
-
-                // Criterion 1: bottom density trim — stop at the deepest ore zone still meeting the min density threshold
-                bool depthFound = minBottomOreDensity > 0f
-                    ? TryGetPurityAdjustedDepth(kvp.Value, targetProductIds, terrainH, minBottomOreDensity, out int depthInt)
-                    : TryGetDeepestResourceDepth(kvp.Value, targetProductIds, terrainH, out depthInt);
-
-                if (depthFound)
-                {
-                    // Apply max-layers constraint (0 = unlimited)
-                    if (maxLayersToExcavate > 0)
-                        depthInt = Math.Max(depthInt, (int)terrainH - maxLayersToExcavate);
-
-                    // Apply absolute min-elevation constraint
-                    if (maxDepthToDigTo.HasValue)
-                        depthInt = Math.Max(depthInt, maxDepthToDigTo.Value);
-
-                    maxOreDepths[kvp.Key] = depthInt;
-                }
-            }
-
+            var mining = new MiningExecutionResult();
+            IEnumerator miningRoutine = RunManagedMining(tower, mining);
+            try { while (miningRoutine.MoveNext()) yield return miningRoutine.Current; }
+            finally { (miningRoutine as IDisposable)?.Dispose(); }
+            if (mining.Plan == null) yield break;
+            var maxOreDepths = mining.Plan.Depths;
+            var cornerHeights = mining.Plan.Corners;
             if (maxOreDepths.Count == 0)
             {
-                var repairResult = new ExistingTerrainWorkAccessResult();
-                IEnumerator repairRoutine =
-                    RepairExistingTerrainWorkAccessCoroutine(
-                        tower, terrMgr, towerSettings, generateRamps,
-                        repairResult);
-                while (repairRoutine.MoveNext())
-                    yield return repairRoutine.Current;
-                if (repairResult.RequestCancelled)
-                    yield break;
-                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
-                yield break;
-            }
-
-            LogDebug(string.Format("Before filtering: {0} tiles in designations", maxOreDepths.Count));
-            FilterIsolatedDesignations(maxOreDepths, targetProductIds, resourceDetailsByTile, purityLevel);
-
-            if (maxOreDepths.Count == 0)
-            {
-                var repairResult = new ExistingTerrainWorkAccessResult();
-                IEnumerator repairRoutine =
-                    RepairExistingTerrainWorkAccessCoroutine(
-                        tower, terrMgr, towerSettings, generateRamps,
-                        repairResult);
-                while (repairRoutine.MoveNext())
-                    yield return repairRoutine.Current;
-                if (repairResult.RequestCancelled)
-                    yield break;
-                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
-                yield break;
-            }
-
-            FillRectilinearHull(maxOreDepths, targetProductIds, resourceDetailsByTile, corridorClearance);
-            if (AutoTerrainDesignationsMod.BottomFlatteningEnabled)
-            {
-                int flattenedBottomTiles = FlattenDesignationBottom(maxOreDepths, purityLevel, AutoTerrainDesignationsMod.BottomFlatteningStrength);
-                if (flattenedBottomTiles > 0)
-                {
-                    LogDebug(string.Format(
-                        "Flattened designation bottom with {0} tile adjustment(s) using {1} mode",
-                        flattenedBottomTiles,
-                        purityLevel <= 0 ? "lower-only" : "leveling"));
-                }
-            }
-
-            int directProtectedRemoved = RemoveDirectlyProtectedMiningTiles(maxOreDepths, terrMgr);
-            if (directProtectedRemoved > 0)
-            {
-                FilterIsolatedDesignations(maxOreDepths, targetProductIds, resourceDetailsByTile, purityLevel);
-                LogDebug($"Mining safety removed {directProtectedRemoved} directly protected designation(s).");
-            }
-
-            if (maxOreDepths.Count == 0)
-            {
-                RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
-                ClearGeneratedHarvestTreesForTower(tower);
-                var repairResult = new ExistingTerrainWorkAccessResult();
-                IEnumerator repairRoutine =
-                    RepairExistingTerrainWorkAccessCoroutine(
-                        tower, terrMgr, towerSettings, generateRamps,
-                        repairResult);
-                while (repairRoutine.MoveNext())
-                    yield return repairRoutine.Current;
-                if (repairResult.RequestCancelled)
-                    yield break;
-                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
-                yield break;
-            }
-
-            LogDebug(string.Format("After filtering+connecting: {0} tiles in designations", maxOreDepths.Count));
-            LogDebug("Selected product: " + selectedProduct?.Id);
-
-            var maxOreDepthOverall = maxOreDepths.Values.Min();
-
-            LogDebug(string.Format("Creating designations for {0} tiles with overall max depth {1}", maxOreDepths.Count, maxOreDepthOverall));
-
-            var cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
-            int rayProtectedRemoved = RemoveRayHazardMiningTiles(maxOreDepths, cornerHeights, terrMgr, tower);
-            if (rayProtectedRemoved > 0)
-            {
-                FilterIsolatedDesignations(maxOreDepths, targetProductIds, resourceDetailsByTile, purityLevel);
-                if (maxOreDepths.Count == 0)
+                IEnumerator emptyReplay = RecordMiningReplay(mining);
+                try { while (emptyReplay.MoveNext()) yield return emptyReplay.Current; }
+                finally { (emptyReplay as IDisposable)?.Dispose(); }
+                if (mining.Plan.ReconcileEmpty)
                 {
                     RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
                     ClearGeneratedHarvestTreesForTower(tower);
-                    var repairResult = new ExistingTerrainWorkAccessResult();
-                    IEnumerator repairRoutine =
-                        RepairExistingTerrainWorkAccessCoroutine(
-                            tower, terrMgr, towerSettings, generateRamps,
-                            repairResult);
-                    while (repairRoutine.MoveNext())
-                        yield return repairRoutine.Current;
-                    if (repairResult.RequestCancelled)
-                        yield break;
-                    MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
-                    yield break;
                 }
-                cornerHeights = BuildAndSmoothCornerHeights(maxOreDepths, maxHeightDiff, purityLevel <= 0);
-                LogDebug($"Mining safety removed {rayProtectedRemoved} designation(s) with protected exterior disturbance.");
+                var repairResult = new ExistingTerrainWorkAccessResult();
+                IEnumerator repairRoutine = RepairExistingTerrainWorkAccessCoroutine(
+                    tower, terrMgr, towerSettings, generateRamps, repairResult);
+                while (repairRoutine.MoveNext()) yield return repairRoutine.Current;
+                if (repairResult.RequestCancelled) yield break;
+                MarkTowerMiningPlanCleanFromWorld(tower, towerSettings);
+                yield break;
             }
 
             // Safety settings can make the new plan smaller.  Existing ATD-owned
             // cells are not removed by AddOrReplaceDesignation, so discard only
             // origins that no longer belong to the recalculated plan.
-            RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
-            ClearGeneratedHarvestTreesForTower(tower);
-            HashSet<Tile2i> preexistingTerrainWorkOrigins =
-                CollectExistingTerrainWorkEndpointOrigins(tower);
             List<Tile2i> recreatedAccesswayOrigins = maxOreDepths.Keys
                 .Where(origin => s_lastClearedAccesswayOrigins.Contains(origin))
                 .OrderBy(origin => origin.X)
@@ -752,13 +590,14 @@ namespace AutoTerrainDesignations
                 .ToList();
             LogExperimentalAccessDebug(
                 $"[ATD Mining Plan Placement Audit] planned={maxOreDepths.Count} " +
-                $"preexistingTerrainWork={preexistingTerrainWorkOrigins.Count} " +
                 $"vehicleClearance={towerSettings.VehicleClearance} " +
                 $"recreatedClearedAccessways={recreatedAccesswayOrigins.Count} " +
                 $"origins=[{string.Join(",", recreatedAccesswayOrigins.Take(24).Select(
                     origin => $"({origin.X},{origin.Y})"))}]");
 
             int designCount = 0;
+            var batch = new List<DesignationData>(maxOreDepths.Count);
+            var placementSlice = System.Diagnostics.Stopwatch.StartNew();
             foreach (var kvp in maxOreDepths)
             {
                 var tile = kvp.Key;
@@ -773,27 +612,67 @@ namespace AutoTerrainDesignations
                     !cornerHeights.TryGetValue(swCorner, out int hSW))
                 {
                     s_log.Warning(string.Format("Missing corner heights for tile {0}", tile));
-                    continue;
+                    yield break;
                 }
 
                 var data = new DesignationData(tile,
                     new HeightTilesI(hNW), new HeightTilesI(hNE),
                     new HeightTilesI(hSE), new HeightTilesI(hSW));
 
-                if (s_desigManager.AddOrReplaceDesignation(s_miningProto, data))
-                {
-                    RegisterGeneratedDesignationOrigin(tower, tile);
-                }
-                else
-                {
-                    s_log.Warning(string.Format("Failed to create designation for tile {0}", tile));
-                }
-
-                designCount++;
-                int effectiveBatchSize = GetEffectiveBatchSize();
-                if (designCount % effectiveBatchSize == 0)
-                    yield return null;
+                batch.Add(data);
+                if (placementSlice.ElapsedMilliseconds >= GetManagedAccesswaySliceBudgetMilliseconds())
+                { yield return null; placementSlice.Restart(); }
             }
+            if (s_inputScheduler == null)
+            { s_log.Error("[ATD Mining] Input scheduler unavailable; no batch submitted."); yield break; }
+            if ((tower is IEntity miningOwner && miningOwner.IsDestroyed)
+                || mining.PolicyKey != MiningPolicyKey(tower))
+            { LogDebug("Mining request invalidated before submission."); yield break; }
+            int placementWorld = CurrentWorldGeneration;
+            int placementRequest = s_latestCreateDesignationsRequestId;
+            RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
+            ClearGeneratedHarvestTreesForTower(tower);
+            HashSet<Tile2i> preexistingTerrainWorkOrigins =
+                CollectExistingTerrainWorkEndpointOrigins(tower);
+            s_miningBatchSubmitted = true;
+            var commitTimer = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                AddTerrainDesignationsCmd command = s_inputScheduler.ScheduleInputCmd(
+                    new AddTerrainDesignationsCmd(s_miningProto.Id, batch.ToImmutableArray()));
+                while (!command.IsProcessed)
+                {
+                    if (!IsWorldGenerationActive(placementWorld)) yield break;
+                    yield return null;
+                }
+                if (!IsWorldGenerationActive(placementWorld)) yield break;
+                LogDebug($"[ATD Mining Batch] count={batch.Count} submissionToObservedCompletionMs={commitTimer.Elapsed.TotalMilliseconds:0.###}");
+                if (command.HasError)
+                { s_log.Warning("[ATD Mining] Native batch failed: " + command.ErrorMessage); yield break; }
+                foreach (DesignationData data in batch)
+                {
+                    var actual = s_desigManager.GetDesignationAt(data.OriginTile);
+                    if (actual.HasValue && actual.Value.Prototype == s_miningProto
+                        && actual.Value.Data.Equals(data))
+                    {
+                        RegisterGeneratedDesignationOrigin(tower, data.OriginTile);
+                        designCount++;
+                    }
+                }
+            }
+            finally
+            {
+                if (IsWorldGenerationActive(placementWorld)) s_miningBatchSubmitted = false;
+            }
+            if (designCount != batch.Count)
+            {
+                s_log.Warning($"[ATD Mining] Native batch placed {designCount}/{batch.Count} designations.");
+                yield break;
+            }
+            if (placementRequest != s_latestCreateDesignationsRequestId) yield break;
+            IEnumerator replay = RecordMiningReplay(mining);
+            try { while (replay.MoveNext()) yield return replay.Current; }
+            finally { (replay as IDisposable)?.Dispose(); }
 
             LogDebug(string.Format("Created {0} designations", designCount));
             if (AccessHarvestDisruptedTrees)

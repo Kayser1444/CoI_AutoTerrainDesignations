@@ -1,6 +1,6 @@
 # Mining Designations
 
-*Current as of: v0.7.2 development build*
+*Current as of: v0.8.0*
 
 ## What it does
 
@@ -153,6 +153,11 @@ isolated, ultra-thin ore columns that extend far below the surrounding vanilla
 deposit and prevents those anomalous tails from pulling the mine floor down.
 The correction changes only how ATD interprets selected ore while planning;
 it does not alter terrain or existing designations.
+
+Bedrock is mineable and produces 2.5 times as much Rock as ordinary rock for
+the same excavated volume. In captured spike-affected mines, this correction
+reduced planned bedrock excavation by up to 99% locally and 36% across entire
+designation plans.
 
 Spike filtering runs before **Ore quality**, connectivity, bottom flattening,
 and corner smoothing. Turning it off restores the unfiltered ore interpretation

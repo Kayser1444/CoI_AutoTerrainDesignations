@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using AutoTerrainDesignations.Access.V2;
+using AutoTerrainDesignations.Mining;
 using Mafi;
 
 namespace AutoTerrainDesignations.Access.Worker
@@ -14,6 +15,19 @@ namespace AutoTerrainDesignations.Access.Worker
         public string RequestId { get; }
         public AccessPathRequest Request { get; }
         public bool CaptureOverlay { get; }
+        public MiningRequest? MiningRequest { get; }
+        public MiningStage MiningStage { get; }
+
+        public AccessSearchWorkerJob(long jobId, int worldGeneration,
+            MiningRequest request, MiningStage stage)
+        {
+            JobId = jobId;
+            WorldGeneration = worldGeneration;
+            RequestId = "mining:" + jobId;
+            Request = null!;
+            MiningRequest = request ?? throw new ArgumentNullException(nameof(request));
+            MiningStage = stage;
+        }
 
         public AccessSearchWorkerJob(
             long jobId,
@@ -82,7 +96,9 @@ namespace AutoTerrainDesignations.Access.Worker
         public string Fault { get; }
         public string Stack { get; }
         public long DroppedOverlaySamples { get; }
-        public bool IsFaulted => Outcome == null;
+        public MiningPlan? MiningPlan { get; }
+        public double MiningMilliseconds { get; }
+        public bool IsFaulted => Outcome == null && MiningPlan == null;
 
         private AccessSearchWorkerTerminal(
             AccessSearchWorkerJob job,
@@ -105,6 +121,19 @@ namespace AutoTerrainDesignations.Access.Worker
             => new AccessSearchWorkerTerminal(
                 job, outcome, string.Empty, string.Empty,
                 droppedOverlaySamples);
+
+        private AccessSearchWorkerTerminal(AccessSearchWorkerJob job, MiningPlan plan, double milliseconds)
+        {
+            Job = job;
+            MiningPlan = plan;
+            MiningMilliseconds = milliseconds;
+            Fault = string.Empty;
+            Stack = string.Empty;
+        }
+
+        internal static AccessSearchWorkerTerminal CompletedMining(
+            AccessSearchWorkerJob job, MiningPlan plan, double milliseconds)
+            => new AccessSearchWorkerTerminal(job, plan, milliseconds);
 
         internal static AccessSearchWorkerTerminal Faulted(
             AccessSearchWorkerJob job,
@@ -376,7 +405,14 @@ namespace AutoTerrainDesignations.Access.Worker
                     AccessSearchWorkerTerminal terminal;
                     try
                     {
-                        terminal = AccessSearchWorkerTerminal.Completed(
+                        if (job.MiningRequest != null)
+                        {
+                            Stopwatch miningTimer = Stopwatch.StartNew();
+                            MiningPlan mining = MiningPlanner.Execute(job.MiningRequest, job.MiningStage, control);
+                            terminal = AccessSearchWorkerTerminal.CompletedMining(job, mining,
+                                miningTimer.Elapsed.TotalMilliseconds);
+                        }
+                        else terminal = AccessSearchWorkerTerminal.Completed(
                             job,
                             AccessSearchExecutionCore.Execute(
                                 job.Request, control),

@@ -279,6 +279,7 @@ namespace AutoTerrainDesignations
         private static int s_startupTowerPrioritySyncAttempts;
         private static bool s_accessAvoidOcean = true;
         private static bool s_accessAvoidBuildings = true;
+        private static bool s_filterOreSpikes = true;
         private static bool s_allowRampsOutsideTowerAreas = true;
         private static bool s_accessHarvestDisruptedTrees = true;
         private static bool s_accessAllowDigToRemoveDebris = true;
@@ -295,6 +296,7 @@ namespace AutoTerrainDesignations
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
+        internal static bool FilterOreSpikes => s_filterOreSpikes;
         internal static bool AllowRampsOutsideTowerAreas =>
             s_allowRampsOutsideTowerAreas;
         internal static bool AccessHarvestDisruptedTrees => s_accessHarvestDisruptedTrees;
@@ -326,6 +328,12 @@ namespace AutoTerrainDesignations
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
+        internal static void SetFilterOreSpikes(bool value)
+        {
+            if (s_filterOreSpikes != value)
+                MarkAllMiningPlansDirty();
+            s_filterOreSpikes = value;
+        }
         internal static void SetAllowRampsOutsideTowerAreas(bool value) =>
             s_allowRampsOutsideTowerAreas = value;
         internal static void SetAccessHarvestDisruptedTrees(bool value) => s_accessHarvestDisruptedTrees = value;
@@ -339,6 +347,7 @@ namespace AutoTerrainDesignations
         {
             s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
             s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
+            s_filterOreSpikes = AutoTerrainDesignationsMod.FilterOreSpikes;
             s_allowRampsOutsideTowerAreas =
                 AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas;
             s_accessHarvestDisruptedTrees = AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees;
@@ -388,6 +397,7 @@ namespace AutoTerrainDesignations
         {
             AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
             AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
+            AutoTerrainDesignationsMod.SetFilterOreSpikes(s_filterOreSpikes);
             AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(
                 s_allowRampsOutsideTowerAreas);
             AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
@@ -1105,6 +1115,7 @@ namespace AutoTerrainDesignations
 
         internal static void ResetWorldRuntimeState()
         {
+            ClearOreSpikeReviewMarkers();
             ResetAccesswayManagerRuntime("WorldReset");
             s_propRemovalManager?.Dispose(restoreOriginals: true);
             s_propRemovalManager = null;
@@ -1119,6 +1130,10 @@ namespace AutoTerrainDesignations
             s_cancelExperimentalAccessSearch = true;
             s_createDesignationsOperationActive = false;
             s_createDesignationsAccessRequest = null;
+            s_pendingCreateDesignations.Clear();
+            s_createQueuePumpActive = false;
+            s_activeCreateTower = null;
+            s_miningBatchSubmitted = false;
 
             s_desigManager = null;
             s_miningProto = null;

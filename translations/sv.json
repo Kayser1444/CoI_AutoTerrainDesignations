@@ -228,6 +228,18 @@
     "Terrängsäkerhet"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "Vanillakorrigeringar"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "Filtrera malmspikar"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "Ignorera isolerade, ultratunna malmspikar som sträcker sig långt under den omgivande fyndigheten när gruvbeteckningar skapas. Korrigeringen körs före Malmkvalitet och bottenutjämning. Ursprungliga terrängdata och befintliga beteckningar ändras inte."
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "Undvik havet"
   ],

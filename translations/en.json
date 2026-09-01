@@ -228,6 +228,18 @@
     "Terrain safety"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "Vanilla fixes"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "Filter ore spikes"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "Ignore isolated ultra-thin ore spikes that extend far below the surrounding deposit when creating Mining Designations. This correction runs before Ore quality and bottom flattening. Raw terrain and existing designations are unchanged."
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "Avoid ocean"
   ],

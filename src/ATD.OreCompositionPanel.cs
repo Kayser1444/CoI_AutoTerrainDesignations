@@ -41,12 +41,6 @@ namespace AutoTerrainDesignations
         private static ProtosDb? s_protosDb;
         private static TerrainMaterialProto? s_bedrockMaterial;
 
-        // LooseProductProto -> first TerrainMaterialProto that produces it; used to convert
-        // raw terrain thickness to actual mined quantity (accounts for MinedQuantityMult and
-        // the global Ore Mining Yield difficulty setting via MinedQuantityPerTileCubed).
-        private static readonly Dictionary<LooseProductProto, TerrainMaterialProto> s_productToTerrainMaterial =
-            new Dictionary<LooseProductProto, TerrainMaterialProto>();
-
         // Called when the inspector switches to a new tower; resets content to the prompt.
         private static readonly Dictionary<object, Action> s_resetContentCallbacks =
             new Dictionary<object, Action>();
@@ -64,22 +58,6 @@ namespace AutoTerrainDesignations
             s_protosDb = protosDb;
             s_bedrockMaterial = bedrockMaterial;
 
-            // Build lookup: LooseProductProto -> TerrainMaterialProto
-            // MinedQuantityPerTileCubed on TerrainMaterialProto is kept live by the game
-            // (via OnPropertyUpdated) so it always reflects the current difficulty setting.
-            s_productToTerrainMaterial.Clear();
-            if (protosDb != null)
-            {
-                foreach (var mat in protosDb.All<TerrainMaterialProto>())
-                {
-                    var prod = mat.MinedProduct;
-                    if (prod != null && prod != LooseProductProto.Phantom
-                        && !s_productToTerrainMaterial.ContainsKey(prod))
-                    {
-                        s_productToTerrainMaterial[prod] = mat;
-                    }
-                }
-            }
         }
 
         internal static void ResetContent(object inspectorInstance)
@@ -233,7 +211,7 @@ namespace AutoTerrainDesignations
                 .Distinct()
                 .ToList();
             var productSet = HybridSet<LooseProductProto>.From(allOres);
-            var thicknessByProduct = new Dictionary<LooseProductProto, float>();
+            var quantityByProduct = new Dictionary<LooseProductProto, float>();
 
             foreach (TerrainDesignation designation in tower.ManagedDesignations)
             {
@@ -250,37 +228,41 @@ namespace AutoTerrainDesignations
                     while (enumerator.MoveNext())
                     {
                         TerrainMaterialThicknessSlim layer = enumerator.Current;
-                        if (s_bedrockMaterial != null && layer.SlimId == s_bedrockMaterial.SlimId)
-                            break;
                         float layerThick = layer.Thickness.Value.ToFloat();
                         float layerTop   = surfaceHeight - cumulativeDepthF;
                         float layerBot   = layerTop - layerThick;
                         if (layerTop <= centerCutoff) break;
-                        float countedThick = layerBot >= centerCutoff ? layerThick : (layerTop - centerCutoff);
                         TerrainMaterialProto mat = layer.SlimId.ToFull(tile.TerrainManager);
+                        bool isBedrock = s_bedrockMaterial != null
+                            && layer.SlimId == s_bedrockMaterial.SlimId;
+                        // Vanilla synthesizes bedrock indefinitely once the stored layers are
+                        // exhausted. MineMaterial returns as much bedrock as the excavator asks
+                        // for, so a designation below the captured bedrock top must count all
+                        // remaining depth down to its target height.
+                        float countedThick = isBedrock
+                            ? layerTop - centerCutoff
+                            : (layerBot >= centerCutoff ? layerThick : layerTop - centerCutoff);
                         var product = mat.MinedProduct;
                         if (productSet.Contains(product))
                         {
-                            float h = countedThick * 16f;
-                            if (thicknessByProduct.TryGetValue(product, out float existing))
-                                thicknessByProduct[product] = existing + h;
+                            // Convert each material separately. Bedrock and ordinary rock share
+                            // a product but have different yields (200% versus 80% in vanilla).
+                            float quantity = countedThick * 16f
+                                * mat.MinedQuantityPerTileCubed.Value.ToFloat();
+                            if (quantityByProduct.TryGetValue(product, out float existing))
+                                quantityByProduct[product] = existing + quantity;
                             else
-                                thicknessByProduct[product] = h;
+                                quantityByProduct[product] = quantity;
                         }
+                        if (isBedrock) break;
                         cumulativeDepthF += layerThick;
                     }
                 }
                 catch { }
             }
 
-            var results = thicknessByProduct
-                .Select(kvp =>
-                {
-                    float qty = kvp.Value;
-                    if (s_productToTerrainMaterial.TryGetValue(kvp.Key, out var mat))
-                        qty = kvp.Value * mat.MinedQuantityPerTileCubed.Value.ToFloat();
-                    return (kvp.Key, qty);
-                })
+            var results = quantityByProduct
+                .Select(kvp => (product: kvp.Key, qty: kvp.Value))
                 .OrderByDescending(t => t.qty)
                 .ToList();
 

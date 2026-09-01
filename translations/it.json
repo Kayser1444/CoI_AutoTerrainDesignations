@@ -228,6 +228,18 @@
     "Sicurezza del terreno"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "Correzioni del gioco base"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "Filtra picchi di minerale"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "Ignora i picchi di minerale isolati e ultrasottili che si estendono molto al di sotto del giacimento circostante durante la creazione delle designazioni minerarie. Questa correzione viene applicata prima di Qualità del minerale e Livellamento del fondo. Il terreno originale e le designazioni esistenti rimangono invariati."
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "Evitare l'oceano"
   ],

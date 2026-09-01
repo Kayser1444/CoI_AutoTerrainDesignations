@@ -5,10 +5,11 @@ One Mine — One Click.
 Kayser’s Automatic Terrain Designations is a quality-of-life mod for Captain of Industry that **generates tailored mining designations for your mine towers**. Instead of manually creating designations across complex ore deposits, the mod analyzes terrain depth and places connected mining orders that follow the contours of the deposit. **Once you play with it, you do not want to go back**.
 
 ## :gear: Features
-- **Create Designations** — Instantly designate all mineable ore within a mine tower's area
+- **Create Designations** — Scan and plan on a dedicated worker thread, then place the complete mine in one fast batch
+- **Filter ore spikes** — Correct isolated ultra-thin vanilla ore tails before they drag a mine deep into high-yield bedrock
 - **Generate Ramps** — Generate access ramps to connect new dig areas to the surface
 - **Clear Designations** — Easily clear ATD mining designations within a tower's area
-- See **Ore composition** of the designation
+- See **Ore composition** of the designation, including Rock produced by bedrock excavation
 - Set **Mining Priority** on tower level
 - **Ore Sorting Plant exports** — Route output to compatible storages and Mine Towers, set export priority, and assign trucks
 - **Settings** to fine tune the designations

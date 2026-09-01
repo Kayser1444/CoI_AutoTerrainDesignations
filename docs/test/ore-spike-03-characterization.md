@@ -136,7 +136,7 @@ thresholds or a default. Do not mutate raw snapshots or infer that all
 Disrupted material is faulty.
 
 The agreed presentation and pipeline are in the
-[ore spike filter design](../dev/planned/ore-spike-filter.md): a world-setting
+[ore spike filter design](../dev/done/ore-spike-filter.md): a world-setting
 **Filter ore spikes** under **Vanilla issue correction**, applied to a derived
 ore interpretation before the existing mining algorithm.
 

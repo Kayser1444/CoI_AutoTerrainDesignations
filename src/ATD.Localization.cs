@@ -160,6 +160,12 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.heading.experimental_access", "Accessways", "Settings section heading for accessway settings.");
         public static LocStr SettingsHeadingWorldSafety =
             Loc.Str("settings.world.safety", "Terrain safety", "Settings section heading for world terrain-safety settings.");
+        public static LocStr SettingsHeadingVanillaIssueCorrection =
+            Loc.Str("settings.world.vanilla_issue_correction", "Vanilla fixes", "Settings section heading for fixes to known vanilla terrain-generation issues.");
+        public static LocStr SettingsFilterOreSpikesLabel =
+            Loc.Str("settings.world.filter_ore_spikes.label", "Filter ore spikes", "World setting label for filtering anomalously deep vanilla ore spikes.");
+        public static LocStr SettingsFilterOreSpikesTooltip =
+            Loc.Str("settings.world.filter_ore_spikes.tooltip", "Ignore isolated ultra-thin ore spikes that extend far below the surrounding deposit when creating Mining Designations. This correction runs before Ore quality and bottom flattening. Raw terrain and existing designations are unchanged.", "World setting tooltip for filtering anomalously deep vanilla ore spikes.");
         public static LocStr SettingsAvoidOceanLabel =
             Loc.Str("settings.world.avoid_ocean.label", "Avoid ocean", "World safety setting label for ocean avoidance.");
         public static LocStr SettingsAvoidOceanTooltip =

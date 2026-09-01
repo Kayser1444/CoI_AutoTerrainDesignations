@@ -213,7 +213,8 @@ namespace AutoTerrainDesignations
                     out ATDAccesswayRequestHandle? handle,
                     out ATDAccesswayHandleSnapshot snapshot)
                 || handle == null
-                || snapshot.ProcessingMilliseconds < 250d
+                || !AccesswayProgressPresentation.ShouldShowToast(snapshot,
+                    manager.ReadHealth().ActiveWallSeconds)
                 || s_uiRoot == null)
             {
                 if (handle == null)
@@ -237,10 +238,7 @@ namespace AutoTerrainDesignations
                         => "construction leveling access",
                     _ => "terrain access"
                 };
-                bool captureMode = snapshot.Phase.StartsWith(
-                    "Recording access replay", StringComparison.Ordinal)
-                    || snapshot.Phase.StartsWith(
-                        "Cancelling access replay", StringComparison.Ordinal);
+                bool captureMode = AccesswayProgressPresentation.IsReplayCapture(snapshot);
                 string stopWork = captureMode
                     ? "Abort replay capture"
                     : handle.Kind switch
@@ -252,7 +250,8 @@ namespace AutoTerrainDesignations
                     _ => "Stop automatic farming access"
                 };
                 var progressText = new LocStrFormatted(
-                    $"[ATD] {snapshot.Phase}; finding {workType}");
+                    captureMode ? $"[ATD] {snapshot.Phase}"
+                        : $"[ATD] {snapshot.Phase}; finding {workType}");
                 var statsText = new LocStrFormatted(
                     AccesswayProgressPresentation.FormatStats(
                         snapshot,

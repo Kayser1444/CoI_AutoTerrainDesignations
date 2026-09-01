@@ -1,8 +1,8 @@
 # Mining scanning, worker execution, and laboratory
 
-Status: implementation approved on 2026-08-31. Initial implementation and local
-fixtures are complete; in-game qualification and representative corpus replay
-remain open. No spike filter is implemented.
+Status: the production mining worker, shared capture path, native batch commit,
+replay laboratory, and initial ore-spike filter ship in v0.8.0. Further corpus
+capture and laboratory tooling remain open.
 
 Architecture decision: [Shared capture and worker for mining and access](../../adr/0007-share-planning-capture-and-worker-for-mining-and-access.md).
 
@@ -27,9 +27,10 @@ needed to investigate spikes and a baseline for comparing later filters.
 Filter implementation and intentional changes to mining results follow this
 baseline milestone; they are not part of the initial extraction.
 
-The subsequent [ore spike filter](../planned/ore-spike-filter.md) has an agreed
-world-settings toggle under **Vanilla issue correction**, separate from ore
-quality. Its algorithm is still under investigation; raw captures remain intact.
+The subsequent [ore spike filter](../done/ore-spike-filter.md) has a
+world-settings toggle under **Vanilla fixes**, separate from ore quality. The
+initial bedrock-neighborhood r4 policy is qualified for release; raw captures
+remain intact so later parameter tuning can replay the same terrain.
 
 ## Agreed terrain capture detail
 
@@ -277,8 +278,9 @@ placement bookkeeping must still be observed for that submitted command.
 This does not authorize placing into a different world after a world reset;
 world lifetime remains a separate concern.
 
-Measure large-mine commit duration; native batching alone does not establish a
-responsiveness bound.
+Continue collecting representative large-mine commit timings after release.
+In-game qualification already established a large player-visible placement
+improvement from native batch submission.
 The earlier proposal of cancellable sliced placement with retained partial
 work has not been accepted as the primary approach.
 

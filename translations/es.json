@@ -228,6 +228,18 @@
     "Seguridad del terreno"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "Correcciones del juego base"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "Filtrar picos de mineral"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "Ignora los picos de mineral aislados y ultrafinos que se extienden muy por debajo del yacimiento circundante al crear designaciones de minería. Esta corrección se aplica antes de Calidad del mineral y Aplanado del fondo. El terreno original y las designaciones existentes no se modifican."
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "Evite el océano"
   ],

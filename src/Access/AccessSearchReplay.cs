@@ -222,12 +222,13 @@ namespace AutoTerrainDesignations.Access
     /// Dormant developer capture switch. The hot path performs only the null
     /// check unless a developer explicitly arms the next accepted search.
     /// </summary>
-    internal static class AccessSearchReplayRecorder
+    internal static partial class AccessSearchReplayRecorder
     {
         private const int SchemaVersion = 1;
         private const string CaseExtension = ".atd-access-case";
         private static readonly object s_gate = new object();
         private static ArmState? s_arm;
+        private static string s_currentMapName = string.Empty;
 
         private sealed class ArmState
         {
@@ -236,10 +237,20 @@ namespace AutoTerrainDesignations.Access
             public DateTime ArmedUtc;
             public string AssemblyPath = string.Empty;
             public string AssemblyHash = string.Empty;
+            public string Kind = "access";
+            public string MapName = string.Empty;
         }
 
-        internal static string Arm(string? name, string? scenarioFamily)
+        internal static void SetCurrentMapName(string? mapName)
         {
+            lock (s_gate)
+                s_currentMapName = mapName ?? string.Empty;
+        }
+
+        internal static string Arm(string? name, string? scenarioFamily, string caseKind = "access")
+        {
+            if (caseKind != "access" && caseKind != "mining")
+                return "Replay case kind must be access or mining.";
             string safeName = SanitizeName(name, "manual");
             string safeFamily = SanitizeName(scenarioFamily, "manual");
             string assemblyPath;
@@ -264,9 +275,10 @@ namespace AutoTerrainDesignations.Access
                     ArmedUtc = DateTime.UtcNow,
                     AssemblyPath = assemblyPath,
                     AssemblyHash = assemblyHash,
+                    Kind = caseKind,
                 };
             }
-            return $"Armed the next accepted access search as '{safeName}' ({safeFamily}).";
+            return $"Armed the next accepted {caseKind} plan as '{safeName}' ({safeFamily}).";
         }
 
         internal static string Cancel()
@@ -284,7 +296,7 @@ namespace AutoTerrainDesignations.Access
         {
             lock (s_gate)
             {
-                return s_arm == null
+                return s_arm == null || s_arm.Kind != "access"
                     ? null
                     : AccessReplayMemoryProbe.Start();
             }
@@ -298,7 +310,8 @@ namespace AutoTerrainDesignations.Access
             lock (s_gate)
             {
                 arm = s_arm;
-                if (arm == null) return null;
+                if (arm == null || arm.Kind != "access") return null;
+                arm.MapName = s_currentMapName;
                 s_arm = null;
             }
 
@@ -456,6 +469,7 @@ namespace AutoTerrainDesignations.Access
                 + Json("schema", SchemaVersion.ToString(CultureInfo.InvariantCulture), false) + ",\n"
                 + Json("caseName", arm.Name) + ",\n"
                 + Json("scenarioFamily", arm.ScenarioFamily) + ",\n"
+                + Json("mapName", arm.MapName) + ",\n"
                 + Json("provenance", provenance) + ",\n"
                 + Json("armedUtc", arm.ArmedUtc.ToString("O", CultureInfo.InvariantCulture)) + ",\n"
                 + Json("capturedUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)) + ",\n"
@@ -704,6 +718,12 @@ namespace AutoTerrainDesignations.Access
             m_cancellation.Cancel();
         }
 
+        internal void CancelAndDiscardWhenComplete()
+        {
+            Cancel();
+            m_task.ContinueWith(completed => TryFinalizePendingPublication(false, out string ignored));
+        }
+
         internal void SetPendingPublication(
             string temporaryDirectory,
             string completedDirectory,
@@ -875,6 +895,8 @@ namespace AutoTerrainDesignations.Access
             string caseDirectory,
             out string report)
         {
+            if (Mining.MiningReplayFacade.IsMiningCase(caseDirectory))
+                return Mining.MiningReplayFacade.Replay(caseDirectory, true, false, 1, out report);
             try
             {
                 LoadBenchmarkInput(
@@ -1031,6 +1053,16 @@ namespace AutoTerrainDesignations.Access
             string? tracePath,
             out string report)
         {
+            if (Mining.MiningReplayFacade.IsMiningCase(caseDirectory))
+            {
+                if (tracePath != null)
+                {
+                    report = "Expansion tracing applies to access searches, not mining plans.";
+                    return false;
+                }
+                return Mining.MiningReplayFacade.Replay(caseDirectory, allowAssemblyMismatch,
+                    allowGameAssemblyMismatch, 1, out report);
+            }
             try
             {
                 string directory = Path.GetFullPath(caseDirectory);
@@ -1428,6 +1460,8 @@ namespace AutoTerrainDesignations.Access
             bool allowGameAssemblyMismatch,
             out string report)
         {
+            if (Mining.MiningReplayFacade.IsMiningCase(caseDirectory))
+                return Mining.MiningReplayFacade.Replay(caseDirectory, true, allowGameAssemblyMismatch, repetitions, out report);
             if (repetitions < 1 || repetitions > 50)
             {
                 report = "Benchmark repetitions must be between 1 and 50.";
@@ -1641,6 +1675,8 @@ namespace AutoTerrainDesignations.Access
         internal static bool TryBenchmarkCaseCodec(
             string caseDirectory, out string report)
         {
+            if (Mining.MiningReplayFacade.IsMiningCase(caseDirectory))
+                return Mining.MiningReplayFacade.BenchmarkCodec(caseDirectory, out report);
             try
             {
                 string dataPath = Path.Combine(
@@ -1737,7 +1773,7 @@ namespace AutoTerrainDesignations.Access
             return length;
         }
 
-        private static void RequireManifest(
+        internal static void RequireManifest(
             string manifest, string key, string expected)
         {
             Match match = Regex.Match(manifest,
@@ -2687,14 +2723,30 @@ namespace AutoTerrainDesignations.Access
                     : FormatterServices.GetUninitializedObject(type);
                 if (!type.IsValueType) Add(id, value);
                 FieldInfo[] fields = GetFields(type); int count = ReadCount(10000);
-                if (count != fields.Length) throw new InvalidDataException("Field layout mismatch for " + type.FullName);
-                foreach (FieldInfo field in fields)
+                bool legacyMiningPolicy = type.FullName ==
+                        "AutoTerrainDesignations.Mining.MiningPolicy"
+                    && count == fields.Length - 1;
+                if (count != fields.Length && !legacyMiningPolicy)
+                    throw new InvalidDataException("Field layout mismatch for " + type.FullName);
+                int fieldIndex = 0;
+                for (int i = 0; i < count; i++)
                 {
+                    if (legacyMiningPolicy && fieldIndex < fields.Length
+                        && fields[fieldIndex].Name == "FilterOreSpikes")
+                        fieldIndex++;
+                    if (fieldIndex >= fields.Length)
+                        throw new InvalidDataException("Field layout mismatch for " + type.FullName);
+                    FieldInfo field = fields[fieldIndex++];
                     string key = ReadString();
                     string expected = field.DeclaringType!.FullName + "|" + field.Name;
                     if (key != expected) throw new InvalidDataException("Field layout mismatch for " + type.FullName);
                     field.SetValue(value, Read());
                 }
+                if (legacyMiningPolicy && fieldIndex < fields.Length
+                    && fields[fieldIndex].Name == "FilterOreSpikes")
+                    fieldIndex++;
+                if (fieldIndex != fields.Length)
+                    throw new InvalidDataException("Field layout mismatch for " + type.FullName);
                 return value;
             }
             private void Add(int id, object value)

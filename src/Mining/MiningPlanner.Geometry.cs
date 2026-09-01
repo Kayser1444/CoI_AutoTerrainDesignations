@@ -12,25 +12,23 @@ using System.Collections.Generic;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
-using Mafi.Core.Terrain.Resources;
 
-namespace AutoTerrainDesignations
+
+namespace AutoTerrainDesignations.Mining
 {
-    public static partial class AutoDepthDesignation
+    internal sealed partial class MiningPlanner
     {
-        // Transitional legacy geometry oracle for ATD.MiningFixtures. Live mining
-        // uses MiningPlanner; FloodFillOrigins also remains shared with cleanup.
-        private static void FilterIsolatedDesignations(
+        private void FilterIsolatedDesignations(
             Dict<Tile2i, int> maxOreDepths,
             HashSet<string> targetProductIds,
-            Dictionary<Tile2i, List<ProductResource>> resourceDetailsByTile,
+            Dictionary<Tile2i, List<MiningOreInterval>> resourceDetailsByTile,
             int purityLevel)
         {
             if (maxOreDepths.Count == 0)
                 return;
 
             int clampedPurityLevel = Math.Max(0, Math.Min(4, purityLevel));
-            int minComponentSize = s_minComponentSizeByLevel[clampedPurityLevel];
+            int minComponentSize = m_policy.MinComponentSize;
 
             // Find all connected components
             var visited = new HashSet<Tile2i>();
@@ -38,6 +36,7 @@ namespace AutoTerrainDesignations
 
             foreach (var tile in maxOreDepths.Keys)
             {
+                Checkpoint();
                 if (!visited.Contains(tile))
                 {
                     var component = new List<Tile2i>();
@@ -55,6 +54,7 @@ namespace AutoTerrainDesignations
             var tilesToRemove = new List<Tile2i>();
             foreach (var component in components)
             {
+                Checkpoint();
                 if (component == mainComponent)
                     continue;
 
@@ -81,10 +81,10 @@ namespace AutoTerrainDesignations
         /// Connects surviving secondary components to the main (largest) component
         /// by adding fixed-width rectilinear corridors and then filling enclosed holes.
         /// </summary>
-        private static void FillRectilinearHull(
+        private void FillRectilinearHull(
             Dict<Tile2i, int> maxOreDepths,
             HashSet<string> targetProductIds,
-            Dictionary<Tile2i, List<ProductResource>> resourceDetailsByTile,
+            Dictionary<Tile2i, List<MiningOreInterval>> resourceDetailsByTile,
             int corridorClearance)
         {
             if (maxOreDepths.Count == 0)
@@ -95,6 +95,7 @@ namespace AutoTerrainDesignations
             var components = new List<List<Tile2i>>();
             foreach (var tile in maxOreDepths.Keys)
             {
+                Checkpoint();
                 if (!visited.Contains(tile))
                 {
                     var comp = new List<Tile2i>();
@@ -114,6 +115,7 @@ namespace AutoTerrainDesignations
                 // Connect each secondary to the growing connected set
                 for (int i = 1; i < components.Count; i++)
                 {
+                Checkpoint();
                     var secondary = components[i];
 
                     // Find closest tile pair between connected and secondary (by squared distance)
@@ -122,8 +124,10 @@ namespace AutoTerrainDesignations
 
                     foreach (var a in connectedSet)
                     {
+                Checkpoint();
                         foreach (var b in secondary)
                         {
+                Checkpoint();
                             long dx = (long)(a.X - b.X);
                             long dy = (long)(a.Y - b.Y);
                             long dist = dx * dx + dy * dy;
@@ -152,6 +156,7 @@ namespace AutoTerrainDesignations
                     {
                         foreach (var pathTile in pathTiles)
                         {
+                Checkpoint();
                             Tile2i[] jAnchors = {
                                 new Tile2i(pathTile.X,     pathTile.Y    ),
                                 new Tile2i(pathTile.X - 4, pathTile.Y    ),
@@ -160,6 +165,7 @@ namespace AutoTerrainDesignations
                             };
                             foreach (var ja in jAnchors)
                             {
+                Checkpoint();
                                 if (IsFullTwoByTwoAtAnchor(ja, maxOreDepths)) continue;
                                 if (CountMissingInAnchor(ja, maxOreDepths) != 1) continue;
                                 GetTwoByTwoBlock(ja, out Tile2i j00, out Tile2i j10, out Tile2i j01, out Tile2i j11);
@@ -227,7 +233,7 @@ namespace AutoTerrainDesignations
         ///     missing tiles per anchor).  When another component is reached, activate
         ///     anchors along the cheapest path.  Repeats until one component remains.
         /// </summary>
-        private static int EnforceMinimumClearanceTwo(Dict<Tile2i, int> maxOreDepths)
+        private int EnforceMinimumClearanceTwo(Dict<Tile2i, int> maxOreDepths)
         {
             if (maxOreDepths.Count == 0)
                 return 0;
@@ -241,6 +247,7 @@ namespace AutoTerrainDesignations
             var originalTiles = new HashSet<Tile2i>(maxOreDepths.Keys);
             foreach (var tile in originalTiles)
             {
+                Checkpoint();
                 if (IsTileCovered(tile, maxOreDepths))
                     continue;
 
@@ -256,6 +263,7 @@ namespace AutoTerrainDesignations
                 };
                 foreach (var anchor in candidateAnchors)
                 {
+                Checkpoint();
                     int missing = CountMissingInAnchor(anchor, maxOreDepths);
                     if (missing < fewestMissing)
                     {
@@ -276,12 +284,15 @@ namespace AutoTerrainDesignations
             bool adjacencyChanged = true;
             while (adjacencyChanged)
             {
+                Checkpoint();
                 adjacencyChanged = false;
                 var tilesNow = maxOreDepths.Keys.ToList();
                 foreach (var tile in tilesNow)
                 {
+                Checkpoint();
                     foreach (var dir in s_cardinalDirections)
                     {
+                Checkpoint();
                         var nb = Offset(tile, dir);
                         if (!maxOreDepths.ContainsKey(nb)) continue;
 
@@ -329,6 +340,7 @@ namespace AutoTerrainDesignations
             int minY = int.MaxValue, maxY = int.MinValue;
             foreach (var tile in maxOreDepths.Keys)
             {
+                Checkpoint();
                 if (tile.X < minX) minX = tile.X;
                 if (tile.X > maxX) maxX = tile.X;
                 if (tile.Y < minY) minY = tile.Y;
@@ -338,10 +350,12 @@ namespace AutoTerrainDesignations
 
             while (true)
             {
+                Checkpoint();
                 // Collect all fully-passable anchors.
                 var passable = new HashSet<Tile2i>();
                 foreach (var tile in maxOreDepths.Keys)
                 {
+                Checkpoint();
                     var cas = new Tile2i[]
                     {
                         new Tile2i(tile.X,     tile.Y    ),
@@ -362,15 +376,18 @@ namespace AutoTerrainDesignations
                 int numComponents = 0;
                 foreach (var start in passable)
                 {
+                Checkpoint();
                     if (componentOf.ContainsKey(start)) continue;
                     var bfsQ = new Queue<Tile2i>();
                     bfsQ.Enqueue(start);
                     componentOf[start] = numComponents;
                     while (bfsQ.Count > 0)
                     {
+                Checkpoint();
                         var cur = bfsQ.Dequeue();
                         foreach (var dir in s_cardinalDirections)
                         {
+                Checkpoint();
                             var nb = Offset(cur, dir);
                             if (passable.Contains(nb) && !componentOf.ContainsKey(nb))
                             {
@@ -401,6 +418,7 @@ namespace AutoTerrainDesignations
                 var pq = new SortedSet<(int cost, int x, int y)>();
                 foreach (var anchor in passable)
                 {
+                Checkpoint();
                     if (componentOf[anchor] != srcComp) continue;
                     dist[anchor] = 0;
                     pq.Add((0, anchor.X, anchor.Y));
@@ -410,6 +428,7 @@ namespace AutoTerrainDesignations
                 Tile2i target = default;
                 while (pq.Count > 0)
                 {
+                Checkpoint();
                     var entry = pq.Min;
                     pq.Remove(entry);
                     var (curCost, cx, cy) = entry;
@@ -427,6 +446,7 @@ namespace AutoTerrainDesignations
 
                     foreach (var dir in s_cardinalDirections)
                     {
+                Checkpoint();
                         var nb = Offset(cur, dir);
                         if (nb.X < minX || nb.X > maxX || nb.Y < minY || nb.Y > maxY)
                             continue;
@@ -448,6 +468,7 @@ namespace AutoTerrainDesignations
                 var pathPos = target;
                 while (true)
                 {
+                Checkpoint();
                     if (!IsFullTwoByTwoAtAnchor(pathPos, maxOreDepths))
                     {
                         var toAdd = new Dict<Tile2i, int>();
@@ -465,7 +486,7 @@ namespace AutoTerrainDesignations
             return totalAdded;
         }
 
-        private static bool IsTileCovered(Tile2i tile, Dict<Tile2i, int> maxOreDepths)
+        private bool IsTileCovered(Tile2i tile, Dict<Tile2i, int> maxOreDepths)
         {
             if (IsFullTwoByTwoAtAnchor(new Tile2i(tile.X,     tile.Y    ), maxOreDepths)) return true;
             if (IsFullTwoByTwoAtAnchor(new Tile2i(tile.X - 4, tile.Y    ), maxOreDepths)) return true;
@@ -475,7 +496,7 @@ namespace AutoTerrainDesignations
         }
 
 
-        private static int CountMissingInAnchor(Tile2i anchor, Dict<Tile2i, int> maxOreDepths)
+        private int CountMissingInAnchor(Tile2i anchor, Dict<Tile2i, int> maxOreDepths)
         {
             GetTwoByTwoBlock(anchor, out Tile2i t00, out Tile2i t10, out Tile2i t01, out Tile2i t11);
             int missing = 0;
@@ -486,14 +507,14 @@ namespace AutoTerrainDesignations
             return missing;
         }
 
-        private static bool IsFullTwoByTwoAtAnchor(Tile2i anchor, Dict<Tile2i, int> maxOreDepths)
+        private bool IsFullTwoByTwoAtAnchor(Tile2i anchor, Dict<Tile2i, int> maxOreDepths)
         {
             GetTwoByTwoBlock(anchor, out Tile2i t00, out Tile2i t10, out Tile2i t01, out Tile2i t11);
             return maxOreDepths.ContainsKey(t00) && maxOreDepths.ContainsKey(t10)
                 && maxOreDepths.ContainsKey(t01) && maxOreDepths.ContainsKey(t11);
         }
 
-        private static void AddMissingTilesForAnchor(
+        private void AddMissingTilesForAnchor(
             Tile2i anchor,
             Dict<Tile2i, int> maxOreDepths,
             Dict<Tile2i, int> toAdd)
@@ -519,6 +540,7 @@ namespace AutoTerrainDesignations
                 int shallowest = int.MinValue;
                 foreach (var dir in s_cardinalDirections)
                 {
+                Checkpoint();
                     var nb = Offset(tile, dir);
                     int d;
                     if (maxOreDepths.TryGetValue(nb, out d) || toAdd.TryGetValue(nb, out d))
@@ -537,7 +559,7 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private static void GetTwoByTwoBlock(
+        private void GetTwoByTwoBlock(
             Tile2i anchor,
             out Tile2i t00,
             out Tile2i t10,
@@ -550,11 +572,11 @@ namespace AutoTerrainDesignations
             t11 = new Tile2i(anchor.X + 4, anchor.Y + 4);
         }
 
-        private static Tile2i SelectBestCandidateByTargetProduct(
+        private Tile2i SelectBestCandidateByTargetProduct(
             Tile2i first,
             Tile2i second,
             HashSet<string> targetProductIds,
-            Dictionary<Tile2i, List<ProductResource>> resourceDetailsByTile,
+            Dictionary<Tile2i, List<MiningOreInterval>> resourceDetailsByTile,
             Dict<Tile2i, int> maxOreDepths)
         {
             float firstAmount = GetTargetProductAmount(first, targetProductIds, resourceDetailsByTile);
@@ -571,10 +593,10 @@ namespace AutoTerrainDesignations
                 : second;
         }
 
-        private static float GetTargetProductAmount(
+        private float GetTargetProductAmount(
             Tile2i tile,
             HashSet<string> targetProductIds,
-            Dictionary<Tile2i, List<ProductResource>> resourceDetailsByTile)
+            Dictionary<Tile2i, List<MiningOreInterval>> resourceDetailsByTile)
         {
             if (!resourceDetailsByTile.TryGetValue(tile, out var resources))
                 return 0f;
@@ -582,8 +604,8 @@ namespace AutoTerrainDesignations
             return GetTargetProductAmount(resources, targetProductIds);
         }
 
-        private static float GetTargetProductAmount(
-            List<ProductResource> resources,
+        private float GetTargetProductAmount(
+            List<MiningOreInterval> resources,
             HashSet<string> targetProductIds)
         {
             if (resources == null || resources.Count == 0)
@@ -592,15 +614,16 @@ namespace AutoTerrainDesignations
             float total = 0f;
             for (int i = 0; i < resources.Count; i++)
             {
-                ProductResource resource = resources[i];
-                if (targetProductIds.Contains(resource.Product.Id.ToString()))
-                    total += resource.Height.Value.ToFloat();
+                Checkpoint();
+                MiningOreInterval resource = resources[i];
+                if (targetProductIds.Contains(resource.ProductId))
+                    total += resource.Height;
             }
 
             return total;
         }
 
-        private static int CountExistingNeighbors(Tile2i tile, Dict<Tile2i, int> tiles)
+        private int CountExistingNeighbors(Tile2i tile, Dict<Tile2i, int> tiles)
         {
             int count = 0;
             if (tiles.ContainsKey(new Tile2i(tile.X, tile.Y + 4))) count++;
@@ -613,7 +636,7 @@ namespace AutoTerrainDesignations
         // Lays a single-tile-wide spine along pathTiles.  For clearance=2 the corridor
         // is widened later by EnforceMinimumClearanceTwo; stamping 2×2 blocks here would
         // cause double-widening because those tiles seed the clearance algorithm.
-        private static int AddFixedWidthHullPath(List<Tile2i> pathTiles, Dict<Tile2i, int> maxOreDepths, HashSet<Tile2i> connectedSet)
+        private int AddFixedWidthHullPath(List<Tile2i> pathTiles, Dict<Tile2i, int> maxOreDepths, HashSet<Tile2i> connectedSet)
         {
             int added = 0;
             for (int i = 0; i < pathTiles.Count; i++)
@@ -621,7 +644,7 @@ namespace AutoTerrainDesignations
             return added;
         }
 
-        private static void AddHullTile(
+        private void AddHullTile(
             Tile2i tile,
             Dict<Tile2i, int> maxOreDepths,
             HashSet<Tile2i> connectedSet,
@@ -636,13 +659,14 @@ namespace AutoTerrainDesignations
             connectedSet.Add(tile);
         }
 
-        private static int FillInteriorHoles(Dict<Tile2i, int> maxOreDepths)
+        private int FillInteriorHoles(Dict<Tile2i, int> maxOreDepths)
         {
             var visited = new HashSet<Tile2i>();
             var holesToAdd = new HashSet<Tile2i>();
 
             foreach (var tile in maxOreDepths.Keys)
             {
+                Checkpoint();
                 if (visited.Contains(tile))
                     continue;
 
@@ -657,6 +681,7 @@ namespace AutoTerrainDesignations
                 var componentSet = new HashSet<Tile2i>();
                 foreach (var compTile in component)
                 {
+                Checkpoint();
                     componentSet.Add(compTile);
                     if (compTile.X < minX) minX = compTile.X;
                     if (compTile.X > maxX) maxX = compTile.X;
@@ -669,8 +694,10 @@ namespace AutoTerrainDesignations
 
                 for (int y = minY; y <= maxY; y += 4)
                 {
+                Checkpoint();
                     for (int x = minX; x <= maxX; x += 4)
                     {
+                Checkpoint();
                         var coord = new Tile2i(x, y);
                         if (componentSet.Contains(coord))
                             continue;
@@ -683,9 +710,11 @@ namespace AutoTerrainDesignations
 
                 while (queue.Count > 0)
                 {
+                Checkpoint();
                     Tile2i empty = queue.Dequeue();
                     foreach (var direction in s_cardinalDirections)
                     {
+                Checkpoint();
                         Tile2i neighbor = Offset(empty, direction);
                         if (neighbor.X < minX || neighbor.X > maxX || neighbor.Y < minY || neighbor.Y > maxY)
                             continue;
@@ -698,8 +727,10 @@ namespace AutoTerrainDesignations
 
                 for (int y = minY; y <= maxY; y += 4)
                 {
+                Checkpoint();
                     for (int x = minX; x <= maxX; x += 4)
                     {
+                Checkpoint();
                         var coord = new Tile2i(x, y);
                         if (componentSet.Contains(coord))
                             continue;
@@ -713,6 +744,7 @@ namespace AutoTerrainDesignations
             int added = 0;
             foreach (var holeTile in holesToAdd)
             {
+                Checkpoint();
                 if (maxOreDepths.ContainsKey(holeTile))
                     continue;
 
@@ -728,7 +760,7 @@ namespace AutoTerrainDesignations
         /// first moves horizontally (X-axis) to align, then vertically (Y-axis) to reach B.
         /// Returns all designation-grid tiles along the path (world coordinates, 4-unit steps).
         /// </summary>
-        private static List<Tile2i> ComputeRectilinearPath(Tile2i from, Tile2i to)
+        private List<Tile2i> ComputeRectilinearPath(Tile2i from, Tile2i to)
         {
             var path = new List<Tile2i>();
 
@@ -739,6 +771,7 @@ namespace AutoTerrainDesignations
             int xStep = x < tx ? 4 : (x > tx ? -4 : 0);
             while (x != tx)
             {
+                Checkpoint();
                 var tile = new Tile2i(x, y);
                 if (!path.Contains(tile))
                     path.Add(tile);
@@ -749,6 +782,7 @@ namespace AutoTerrainDesignations
             int yStep = y < ty ? 4 : (y > ty ? -4 : 0);
             while (y != ty)
             {
+                Checkpoint();
                 var tile = new Tile2i(x, y);
                 if (!path.Contains(tile))
                     path.Add(tile);
@@ -763,12 +797,13 @@ namespace AutoTerrainDesignations
             return path;
         }
 
-        private static int NearestDepth(Tile2i query, Dict<Tile2i, int> existing)
+        private int NearestDepth(Tile2i query, Dict<Tile2i, int> existing)
         {
             int best = 0;
             long bestDist = long.MaxValue;
             foreach (var kvp in existing)
             {
+                Checkpoint();
                 long dx = (long)(kvp.Key.X - query.X);
                 long dy = (long)(kvp.Key.Y - query.Y);
                 long d = dx * dx + dy * dy;
@@ -777,7 +812,7 @@ namespace AutoTerrainDesignations
             return best;
         }
 
-        private static void FloodFill(Tile2i start, Dict<Tile2i, int> tiles, HashSet<Tile2i> visited, List<Tile2i> component)
+        private void FloodFill(Tile2i start, Dict<Tile2i, int> tiles, HashSet<Tile2i> visited, List<Tile2i> component)
         {
             var queue = new Queue<Tile2i>();
             queue.Enqueue(start);
@@ -785,12 +820,14 @@ namespace AutoTerrainDesignations
 
             while (queue.Count > 0)
             {
+                Checkpoint();
                 var current = queue.Dequeue();
                 component.Add(current);
 
                 // Check all 4 cardinal directions (4-tile grid offsets)
                 foreach (var direction in s_cardinalDirections)
                 {
+                Checkpoint();
                     var neighbor = Offset(current, direction);
                     if (tiles.ContainsKey(neighbor) && !visited.Contains(neighbor))
                     {
@@ -801,7 +838,7 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private static void FloodFillOrigins(Tile2i start, HashSet<Tile2i> origins, HashSet<Tile2i> visited, List<Tile2i> component)
+        private void FloodFillOrigins(Tile2i start, HashSet<Tile2i> origins, HashSet<Tile2i> visited, List<Tile2i> component)
         {
             var queue = new Queue<Tile2i>();
             queue.Enqueue(start);
@@ -809,11 +846,13 @@ namespace AutoTerrainDesignations
 
             while (queue.Count > 0)
             {
+                Checkpoint();
                 var current = queue.Dequeue();
                 component.Add(current);
 
                 foreach (var direction in s_cardinalDirections)
                 {
+                Checkpoint();
                     var neighbor = Offset(current, direction);
                     if (origins.Contains(neighbor) && !visited.Contains(neighbor))
                     {
@@ -824,21 +863,22 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private static bool IsIsolatedComponentBelowThreshold(
+        private bool IsIsolatedComponentBelowThreshold(
             List<Tile2i> component,
             HashSet<string> targetProductIds,
-            Dictionary<Tile2i, List<ProductResource>> resourceDetailsByTile,
+            Dictionary<Tile2i, List<MiningOreInterval>> resourceDetailsByTile,
             int purityLevel)
         {
             // Check if ALL tiles in this component have ore height < 1.0
             foreach (var tile in component)
             {
+                Checkpoint();
                 if (!resourceDetailsByTile.TryGetValue(tile, out var resources))
                     continue;
 
                 float tileOreHeight = GetTargetProductAmount(resources, targetProductIds);
 
-                float minOreHeight = s_minOreHeightByLevel[purityLevel];
+                float minOreHeight = m_policy.MinOreHeight;
                 if (minOreHeight <= 0f || tileOreHeight >= minOreHeight)
                 {
                     // At least one tile has sufficient ore height, keep this component
@@ -850,7 +890,7 @@ namespace AutoTerrainDesignations
             return true;
         }
 
-        private static int FlattenDesignationBottom(Dict<Tile2i, int> tileDepths, int purityLevel, int strength)
+        private int FlattenDesignationBottom(Dict<Tile2i, int> tileDepths, int purityLevel, int strength)
         {
             if (tileDepths.Count == 0)
                 return 0;
@@ -862,6 +902,7 @@ namespace AutoTerrainDesignations
 
             foreach (Tile2i tile in tileDepths.Keys)
             {
+                Checkpoint();
                 if (visited.Contains(tile))
                 {
                     continue;
@@ -875,6 +916,7 @@ namespace AutoTerrainDesignations
             var updates = new Dictionary<Tile2i, int>();
             foreach (List<Tile2i> component in components)
             {
+                Checkpoint();
                 if (component.Count < 4)
                 {
                     continue;
@@ -883,6 +925,7 @@ namespace AutoTerrainDesignations
                 var depths = new List<int>(component.Count);
                 foreach (Tile2i tile in component)
                 {
+                Checkpoint();
                     depths.Add(tileDepths[tile]);
                 }
                 depths.Sort();
@@ -899,6 +942,7 @@ namespace AutoTerrainDesignations
 
                 foreach (Tile2i tile in component)
                 {
+                Checkpoint();
                     int currentDepth = tileDepths[tile];
                     int nextDepth = currentDepth;
 
@@ -923,6 +967,7 @@ namespace AutoTerrainDesignations
 
             foreach (var kvp in updates)
             {
+                Checkpoint();
                 tileDepths[kvp.Key] = kvp.Value;
             }
             totalAdjusted = updates.Count;
@@ -930,13 +975,14 @@ namespace AutoTerrainDesignations
             return totalAdjusted;
         }
 
-        private static Dict<Tile2i, int> BuildAndSmoothCornerHeights(Dict<Tile2i, int> tileDepths, int maxAllowedDiff = 1, bool preserveDeepestTileBottom = false)
+        private Dict<Tile2i, int> BuildAndSmoothCornerHeights(Dict<Tile2i, int> tileDepths, int maxAllowedDiff = 1, bool preserveDeepestTileBottom = false)
         {
             var corners = new Dict<Tile2i, int>();
 
             // Build initial corner heights by averaging tile depths at shared corners
             foreach (var kvp in tileDepths)
             {
+                Checkpoint();
                 var tile = kvp.Key;
                 var depth = kvp.Value;
 
@@ -963,14 +1009,17 @@ namespace AutoTerrainDesignations
 
             while (changed && iteration < maxIterations)
             {
+                Checkpoint();
                 changed = false;
                 iteration++;
 
                 foreach (var corner in corners.Keys.ToList())
                 {
+                Checkpoint();
                     int h = corners[corner];
                     foreach (var offset in adjacentOffsets)
                     {
+                Checkpoint();
                         var neighbor = Offset(corner, offset);
                         if (!corners.TryGetValue(neighbor, out int nh)) continue;
 
@@ -992,14 +1041,14 @@ namespace AutoTerrainDesignations
             }
 
             if (iteration >= maxIterations)
-                Log.Warning(string.Format("Corner smoothing did not converge after {0} iterations", maxIterations));
+                LogDebug(string.Format("Corner smoothing did not converge after {0} iterations", maxIterations));
             else
                 LogDebug(string.Format("Corner smoothing converged after {0} iterations", iteration));
 
             return corners;
         }
 
-        private static void UpdateCornerHeight(Dict<Tile2i, int> corners, Tile2i corner, int newHeight, bool preserveDeepestTileBottom)
+        private void UpdateCornerHeight(Dict<Tile2i, int> corners, Tile2i corner, int newHeight, bool preserveDeepestTileBottom)
         {
             if (corners.TryGetValue(corner, out int existingHeight))
             {
@@ -1013,7 +1062,7 @@ namespace AutoTerrainDesignations
             }
         }
 
-        private static Tile2i Offset(Tile2i origin, Tile2i delta)
+        private Tile2i Offset(Tile2i origin, Tile2i delta)
         {
             return new Tile2i(origin.X + delta.X, origin.Y + delta.Y);
         }

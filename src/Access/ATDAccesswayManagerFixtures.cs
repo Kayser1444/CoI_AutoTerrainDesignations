@@ -221,6 +221,7 @@ namespace AutoTerrainDesignations.Access
 
         private static bool ValidateProgressPresentation(out string failure)
         {
+            if (!ValidateBackgroundCaptureToast(out failure)) return false;
             var workerSnapshot = new ATDAccesswayHandleSnapshot(
                 ATDAccesswayRequestState.Active,
                 null,
@@ -256,6 +257,46 @@ namespace AutoTerrainDesignations.Access
             {
                 failure = "Cooperative progress text lost slice diagnostics: "
                     + cooperative;
+                return false;
+            }
+            failure = string.Empty;
+            return true;
+        }
+
+        internal static bool ValidateBackgroundCaptureToast(out string failure)
+        {
+            var recording = new ATDAccesswayHandleSnapshot(
+                ATDAccesswayRequestState.Active, null, 0, 0,
+                processingMilliseconds: 2d,
+                phase: "Recording access replay: mining 40% (Encoding mining request)");
+            if (!AccesswayProgressPresentation.ShouldShowToast(recording, 84d))
+            {
+                failure = "Mining capture running for 84 seconds has no toast because polling used only 2 ms.";
+                return false;
+            }
+            if (AccesswayProgressPresentation.ShouldShowToast(recording, 0.1d))
+            {
+                failure = "Brief background work should not flash a toast.";
+                return false;
+            }
+            if (!AccesswayProgressPresentation.IsReplayCapture(recording)
+                || AccesswayProgressPresentation.FormatStats(recording, 100000, 15, 120).Contains("visited"))
+            {
+                failure = "Background replay capture is presented as a path search.";
+                return false;
+            }
+            var worker = new ATDAccesswayHandleSnapshot(ATDAccesswayRequestState.Active,
+                null, 0, 0, 2d, "Planning mine", 1000d, ATDAccesswayExecutionBackend.Worker);
+            if (!AccesswayProgressPresentation.ShouldShowToast(worker, 1d))
+            {
+                failure = "Worker progress toast also depends on game-thread polling time.";
+                return false;
+            }
+            var complete = new ATDAccesswayHandleSnapshot(ATDAccesswayRequestState.Succeeded,
+                null, 0, 0, 2d);
+            if (AccesswayProgressPresentation.ShouldShowToast(complete, 84d))
+            {
+                failure = "Completed capture still asks for a progress toast.";
                 return false;
             }
             failure = string.Empty;

@@ -7,7 +7,10 @@
 // intended to contain only original mod code/modification; if MaFi Games material
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 // Auto Terrain Designations - Debug/diagnostic helpers (not part of the published feature set)
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using Mafi;
 using Mafi.Core.Terrain;
@@ -49,6 +52,29 @@ partial class AutoDepthDesignation
     private static IReadOnlyList<AccessClusterOverlayRecord>
         s_accessClusterOverlayRecords =
             new List<AccessClusterOverlayRecord>();
+    private static readonly List<OreSpikeReviewMarker>
+        s_oreSpikeReviewMarkers = new List<OreSpikeReviewMarker>();
+
+    private readonly struct OreSpikeReviewMarker
+    {
+        public Tile2i Position { get; }
+        public string Kind { get; }
+        public string Label { get; }
+        public float OreBottom { get; }
+        public float Bedrock { get; }
+        public float Cutoff { get; }
+
+        public OreSpikeReviewMarker(Tile2i position, string kind, string label,
+            float oreBottom, float bedrock, float cutoff)
+        {
+            Position = position;
+            Kind = kind;
+            Label = label;
+            OreBottom = oreBottom;
+            Bedrock = bedrock;
+            Cutoff = cutoff;
+        }
+    }
 
     private readonly struct V2PathabilityOverlayPoint
     {
@@ -109,6 +135,7 @@ partial class AutoDepthDesignation
     private static GUIStyle? s_tileOverlayStyle;
     private static GUIStyle? s_clusterOverlayStyle;
     private static GUIStyle? s_potentialOverlayStyle;
+    private static GUIStyle? s_oreSpikeReviewOverlayStyle;
 
     internal static void DrawCursorOverlay(bool tickerActive, int worldGeneration)
     {
@@ -118,6 +145,7 @@ partial class AutoDepthDesignation
         DrawExperimentalAccessPotentialOverlay();
         DrawV2PathabilityOverlay();
         DrawAccessClusterOverlay();
+        DrawOreSpikeReviewOverlay();
         if (!ShowCursorOverlay || !TryGetCursorTile(out Tile3f pos)) return;
 
         s_tileOverlayStyle ??= new GUIStyle(GUI.skin.box)
@@ -240,7 +268,128 @@ partial class AutoDepthDesignation
         ClearExperimentalAccessPotentialOverlay();
         ClearV2PathabilityOverlay();
         ClearAccessClusterOverlay();
+        ClearOreSpikeReviewMarkers();
     }
+
+    internal static string LoadOreSpikeReviewMarkers()
+    {
+        if (string.IsNullOrWhiteSpace(s_modRootDirectoryPath))
+            return "[ATD] Mod root is unavailable; marker file cannot be loaded.";
+        string path = Path.Combine(s_modRootDirectoryPath!, ".scratch",
+            "ore-spike-review-markers.csv");
+        if (!File.Exists(path))
+            return "[ATD] Ore-spike marker file not found: " + path;
+
+        var parsed = new List<OreSpikeReviewMarker>();
+        try
+        {
+            string[] lines = File.ReadAllLines(path);
+            for (int index = 0; index < lines.Length; index++)
+            {
+                string line = lines[index].Trim();
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal)
+                    || line.StartsWith("x,", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string[] values = line.Split(',');
+                if (values.Length < 7
+                    || !int.TryParse(values[0], NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out int x)
+                    || !int.TryParse(values[1], NumberStyles.Integer,
+                        CultureInfo.InvariantCulture, out int y)
+                    || !float.TryParse(values[4], NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out float oreBottom)
+                    || !float.TryParse(values[5], NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out float bedrock)
+                    || !float.TryParse(values[6], NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out float cutoff))
+                    return $"[ATD] Invalid ore-spike marker row {index + 1}.";
+                string kind = values[2].Trim().ToLowerInvariant();
+                if (kind != "review" && kind != "confirmed"
+                    && kind != "mopup")
+                    return $"[ATD] Invalid ore-spike marker kind on row {index + 1}.";
+                parsed.Add(new OreSpikeReviewMarker(new Tile2i(x, y), kind,
+                    values[3].Trim(), oreBottom, bedrock, cutoff));
+                if (parsed.Count > 500)
+                    return "[ATD] Ore-spike marker file exceeds 500 markers.";
+            }
+        }
+        catch (Exception ex)
+        {
+            return "[ATD] Failed to load ore-spike markers: " + ex.Message;
+        }
+
+        s_oreSpikeReviewMarkers.Clear();
+        s_oreSpikeReviewMarkers.AddRange(parsed);
+        return $"[ATD] Loaded {parsed.Count} ore-spike review marker(s). "
+            + "Yellow = review, green = confirmed intact spike, "
+            + "cyan = confirmed mop-up-only effect.";
+    }
+
+    internal static void ClearOreSpikeReviewMarkers()
+        => s_oreSpikeReviewMarkers.Clear();
+
+    private static void DrawOreSpikeReviewOverlay()
+    {
+        if (s_oreSpikeReviewMarkers.Count == 0)
+            return;
+        Camera? camera = Camera.main;
+        TerrainManager? terrain = s_desigManager?.TerrainManager;
+        if (camera == null || terrain == null)
+            return;
+
+        s_oreSpikeReviewOverlayStyle ??= new GUIStyle(GUI.skin.box)
+        {
+            alignment = TextAnchor.MiddleLeft,
+            fontSize = 12,
+            normal = { textColor = Color.white },
+        };
+        int reviewCount = s_oreSpikeReviewMarkers.Count(item => item.Kind == "review");
+        int confirmedCount = s_oreSpikeReviewMarkers.Count - reviewCount;
+        GUI.Box(new Rect(10f, 44f, 310f, 42f),
+            $"Ore-spike review: {reviewCount} to inspect, {confirmedCount} confirmed\n"
+                + "yellow = inspect   green = intact   cyan = mop-up only",
+            s_oreSpikeReviewOverlayStyle);
+
+        OreSpikeReviewMarker? hovered = null;
+        Vector2 mouse = UnityEngine.Event.current.mousePosition;
+        foreach (OreSpikeReviewMarker marker in s_oreSpikeReviewMarkers)
+        {
+            if (!terrain.IsValidCoord(marker.Position))
+                continue;
+            float height = terrain.GetHeight(marker.Position).Value.ToFloat();
+            Vector3 screen = camera.WorldToScreenPoint(new Vector3(
+                (marker.Position.X + 0.5f) * 2f, height + 1.2f,
+                (marker.Position.Y + 0.5f) * 2f));
+            if (screen.z <= 0f)
+                continue;
+            Vector2 gui = new Vector2(screen.x, Screen.height - screen.y);
+            Color previous = GUI.color;
+            GUI.color = Color.black;
+            GUI.DrawTexture(new Rect(gui.x - 9f, gui.y - 9f, 18f, 18f),
+                GetAccessSearchOverlayCircleTexture());
+            GUI.color = GetOreSpikeReviewColor(marker.Kind);
+            GUI.DrawTexture(new Rect(gui.x - 6f, gui.y - 6f, 12f, 12f),
+                GetAccessSearchOverlayCircleTexture());
+            GUI.color = previous;
+            if ((mouse - gui).sqrMagnitude <= 196f)
+                hovered = marker;
+        }
+
+        if (hovered.HasValue)
+        {
+            OreSpikeReviewMarker marker = hovered.Value;
+            GUI.Box(new Rect(10f, 90f, 355f, 48f),
+                $"{marker.Label} ({marker.Position.X},{marker.Position.Y}) "
+                    + $"[{marker.Kind}]\nore bottom={marker.OreBottom:0.##}  "
+                    + $"bedrock={marker.Bedrock:0.##}  cutoff={marker.Cutoff:0.##}",
+                s_oreSpikeReviewOverlayStyle);
+        }
+    }
+
+    private static Color GetOreSpikeReviewColor(string kind)
+        => kind == "confirmed" ? Color.green
+            : kind == "mopup" ? Color.cyan
+            : new Color(1f, 0.72f, 0.05f, 1f);
 
     private static void DrawExperimentalAccessSearchOverlay()
     {

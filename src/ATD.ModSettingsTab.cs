@@ -95,6 +95,7 @@ namespace AutoTerrainDesignations
             var refreshers = new List<Action>();
             var content = BuildSettingsColumn();
 
+            AddVanillaIssueCorrectionSection(content, refreshers);
             AddScanBehaviorSection(content, refreshers);
             AddWorldSafetySection(content, refreshers);
             AddNotificationsSection(content, refreshers);
@@ -428,6 +429,19 @@ namespace AutoTerrainDesignations
             AddPathfinderInt(content, refreshers, AtdLocalization.SettingsFrameBudgetLabel, AtdLocalization.SettingsFrameBudgetTooltip, () => AutoTerrainDesignationsMod.AccessSearchFrameBudgetMs, AutoTerrainDesignationsMod.SetAccessSearchFrameBudgetMs, 1, 5, 10);
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsRayMaximumCostLabel, AtdLocalization.SettingsRayMaximumCostTooltip, () => AutoTerrainDesignationsMod.AccessRayMaxCost, AutoTerrainDesignationsMod.SetAccessRayMaxCost, 10f, 50f, 100f);
             AddPathfinderFloat(content, refreshers, AtdLocalization.SettingsUnresolvedRayPenaltyLabel, AtdLocalization.SettingsUnresolvedRayPenaltyTooltip, () => AutoTerrainDesignationsMod.AccessRayUnresolvedPenalty, AutoTerrainDesignationsMod.SetAccessRayUnresolvedPenalty, 10f, 50f, 100f);
+        }
+
+        private static void AddVanillaIssueCorrectionSection(Column content,
+            List<Action> refreshers)
+        {
+            content.Add(BuildSectionHeading(
+                AtdLocalization.SettingsHeadingVanillaIssueCorrection.AsFormatted));
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsFilterOreSpikesLabel.AsFormatted,
+                AtdLocalization.SettingsFilterOreSpikesTooltip.AsFormatted,
+                () => AutoDepthDesignation.FilterOreSpikes,
+                AutoDepthDesignation.SetFilterOreSpikes,
+                refreshers));
         }
 
         private static void AddWorldSafetySection(Column content, List<Action> refreshers)

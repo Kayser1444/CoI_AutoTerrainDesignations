@@ -228,6 +228,18 @@
     "地形安全"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "原版问题修复"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "过滤矿脉尖刺"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "创建采矿规划时忽略远低于周围矿床的孤立超细矿脉尖刺。此修复会在矿石质量和底部平整处理之前运行。原始地形和现有规划不会被更改。"
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "避开海洋"
   ],

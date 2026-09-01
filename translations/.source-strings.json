@@ -13,6 +13,7 @@
   "notification.ramp_access_not_accessible": "[ATD] {entity} could not path to the ramp",
   "notification.ramp_access_snapshot_too_large": "[ATD] {entity} access area is too large for the turning-ramp search",
   "notification.ramp_access_truncated": "[ATD] {entity} could not fit a full access ramp",
+  "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip": "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here.",
   "panel.designations.accessway_mode.auto.tooltip": "Use the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF.",
   "panel.designations.accessway_mode.label": "Accessway mode",
   "panel.designations.accessway_mode.legacy_3": "Legacy 3",
@@ -85,9 +86,9 @@
   "settings.corner_mode.label": "Corner designations mode",
   "settings.corner_mode.tooltip": "Key used to enter and toggle corner designation mode while a terrain designation tool is active.",
   "settings.dumping_priority.label": "Dumping priority",
-  "settings.dumping_priority.tooltip": "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively.",
   "settings.dumping_priority.passive": "Passive",
   "settings.dumping_priority.passive.tooltip": "Only import from active exporters.",
+  "settings.dumping_priority.tooltip": "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively.",
   "settings.experimental_access.landscaping_cost_scale.label": "Landscaping cost vs. distance",
   "settings.experimental_access.landscaping_cost_scale.tooltip": "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming.",
   "settings.experimental_access.landslide_run.label": "Landslide protection slope factor",
@@ -194,6 +195,5 @@
   "vehicle_order.confirm.singular": "Order a new {0} for {2} at {1}?",
   "vehicle_order.preassigned.tooltip": "Pre-assigned to {0}",
   "vehicle_order.shortcut.tooltip": "Shift-Alt-click to order a new {0} for {2} at {1}",
-  "vehicle_order.zoom.tooltip": "Zoom to {0}",
-  "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip": "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here."
+  "vehicle_order.zoom.tooltip": "Zoom to {0}"
 }

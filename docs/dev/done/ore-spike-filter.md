@@ -1,7 +1,7 @@
 # Ore spike filter
 
-Status: initial public implementation complete; the detector remains subject to
-in-game validation and parameter tuning.
+Status: initial public implementation qualified for v0.8.0. The detector remains
+replayable and parameterized for later corpus tuning.
 
 ## World setting
 
@@ -60,10 +60,10 @@ See [sample 1](../../test/ore-spike-01-characterization.md),
 [mop-up sample 4](../../test/ore-spike-04-characterization.md) and
 [post-Medium sample 6](../../test/ore-spike-06-characterization.md). Detection
 thresholds in these surveys are descriptive, not chosen filter defaults.
-There are enough positive examples for an initial offline experiment.
-Compare spatial support and small-group approaches against legitimate steep
-deposits, thin and separated seams, and final ore/waste/geometry outcomes
-before rollout.
+Bedrock-aware replay across nine captured mining cases retained the r4
+bedrock-neighborhood detector as the best initial release boundary. It directly
+matches the vanilla defect, retains the deliberately captured smaller spikes
+that r5 misses, and avoids the broader assumptions of ore-profile detectors.
 
 ## Success criterion
 
@@ -93,11 +93,17 @@ The two primary measures are:
   Report each selected product separately as well as their total.
 
 Express material volume as captured layer thickness multiplied by one terrain
-tile's area. Keep this as terrain tile-volume unless an authoritative product
-yield conversion is added. Captain of Industry's actual `Bedrock_Terrain` is
-not mineable: exclude it from avoided waste rock and report any target-profile
-penetration into bedrock separately. Report avoided dirt, other waste, and
+tile's area. Captain of Industry mines `Bedrock_Terrain` indefinitely below the
+stored layers toward the designation target. It produces the normal Rock
+product with a 200% material multiplier versus ordinary rock's 80%, so count
+bedrock below its captured top and convert each material with its own live
+yield before combining products. Report avoided dirt, other waste, and
 foregone non-target useful products as secondary material totals.
+
+The v0.8.0 qualification measured up to 99% less bedrock excavation locally
+and 36% across entire designation plans. The strongest whole-plan capture
+prevented an estimated 4.79 million Rock while changing estimated target ore
+by about 0.002%.
 
 Do not choose a candidate from one blended score. Plot and compare the Pareto
 frontier of avoided waste rock against foregone target product. Also report:

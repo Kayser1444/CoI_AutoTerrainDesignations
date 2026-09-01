@@ -80,6 +80,16 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     return BenchmarkCase(
                         assembly, Path.GetFullPath(args[3]), repetitions);
                 }
+                Type miningFixtures = assembly.GetType("AutoTerrainDesignations.AutoDepthDesignation", true);
+                MethodInfo miningValidate = miningFixtures.GetMethod("ValidateMiningExtractionFixtures",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                if (miningValidate != null)
+                {
+                    object[] miningArgs = { string.Empty };
+                    bool miningOk = (bool)(miningValidate.Invoke(null, miningArgs) ?? false);
+                    Console.WriteLine($"Mining extraction fixtures: success={miningOk} failure={miningArgs[0]}");
+                    if (!miningOk) return 1;
+                }
                 Type replayFixtures = assembly.GetType(
                     "AutoTerrainDesignations.Access.AccessSearchReplayFixtures", true);
                 MethodInfo validateReplay = replayFixtures.GetMethod(

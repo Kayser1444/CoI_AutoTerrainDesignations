@@ -12,6 +12,8 @@
 
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
+Version 0.8.0 moves mining planning to a dedicated worker thread, places completed plans through one fast native batch, and adds an enabled-by-default correction for ultra-thin vanilla ore spikes that can otherwise drag large mine plans deep into high-yield bedrock.
+
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
 All tower settings are persisted in the vanilla save file. The mod can be added to or removed from games at any time. 100% open source.
@@ -19,6 +21,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 ## ⚙️ Feature List
 
 [⛏️ **Create designations**](#create-designations)
+
+[🛠️ **Vanilla fixes**](#vanilla-fixes)
 
 [🛣️ **Routed accessways**](#routed-accessways)
 
@@ -56,7 +60,7 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 
 *ATD's integrated Mine Tower controls, with detailed explanations available in tooltips.*
 
-Choose a product or use **AUTO**, then scan the tower area and create a tailored mining plan with one click. Per-tower controls cover ore quality, excavation depth, elevation limits, corridor clearance, dumping priority, and accessway mode.
+Choose a product or use **AUTO**, then scan the tower area and create a tailored mining plan with one click. Per-tower controls cover ore quality, excavation depth, elevation limits, corridor clearance, dumping priority, and accessway mode. Snapshot capture is sliced to keep frames responsive, pure planning runs on a dedicated worker thread, and the final plan is placed through one native batch.
 
 ![image.png](/content-images/3f41494ce10ad35a656b8e2e7dd123a3103a6776d2b321a750669581b003b044/image.png)
 
@@ -65,6 +69,12 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 ![image.png](/content-images/a0997d7fab775c43c4a570b8315c89e9bd9e0513fcea4fc63c08b3e50ec6a79a/image.png)
 
 *The completed excavation follows the deposit with minimal unnecessary digging.*
+
+### 🛠️ Vanilla fixes
+
+The enabled-by-default **Filter ore spikes** world option corrects isolated ultra-thin ore tails produced by vanilla terrain generation before **Ore quality** and bottom flattening are applied. These tails can drag broad mining designations many levels into bedrock, which produces 2.5 times as much Rock as ordinary rock for the same excavated volume.
+
+Across captured spike-affected mines, the filter reduced planned bedrock excavation by up to **99% locally and 36% across entire designation plans**. In the strongest whole-plan test it prevented an estimated 4.8 million units of Rock while changing estimated target ore by about 0.002%. Raw terrain and existing designations remain unchanged.
 
 ### 🛣️ Routed accessways
 
@@ -84,7 +94,7 @@ Use **Clear designations** to remove the selected tower's ATD-generated terrain 
 
 ![image.png](/content-images/006b3e17740b08334a9fcdbcbc0dd0424499217939153f9322497b80bb48c0bd/image.png)*Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
 
-The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It reflects the current Ore Mining Yield difficulty setting and works with both ATD-generated and manually placed designations.
+The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It includes Rock produced by digging into bedrock, applies bedrock's higher vanilla yield, reflects the current Ore Mining Yield difficulty setting, and works with both ATD-generated and manually placed designations.
 
 ### 🎯 Mining and dumping priorities
 
@@ -139,6 +149,7 @@ Turn flat leveling work into farmable ground with per-tower automation. ATD mana
 Open ATD in the Mod Settings window for controls that are not available directly from an individual Mine Tower:
 
 - **Terrain safety** — Choose how cautiously ATD predicts landslides and keeps generated work away from oceans and buildings.
+- **Vanilla fixes** — Keep the ore-spike correction enabled, or disable it for exact unfiltered vanilla deposit geometry.
 - **Ramps outside tower areas** — Allow a bounded retry just beyond the tower boundary when no valid in-area accessway can be found.
 - **Debris and tree handling** — Control disrupted-tree harvesting, terrain changes used to remove debris, and when accessway cleanup may spend Unity on Quick remove.
 - **Notifications** — Enable or disable excavator-completion and accessway warning notifications.
@@ -161,7 +172,7 @@ CoI Hub's code analysis flags capabilities that can be legitimate parts of a mod
 - **Uses Harmony** — Harmony is the patching library ATD uses to integrate with Captain of Industry. It patches specific game and UI methods to add controls, behaviors, and compatibility hooks.
 - **Uses reflection by name** — Some game APIs and UI fields are private or vary between versions. ATD uses named reflection to find optional vanilla types, methods, and fields, then skips that integration or uses a fallback when the expected member is unavailable.
 
-The worker thread itself receives a sealed snapshot of primitive world data and returns a route result. Snapshot capture, live validation, and designation changes remain on the game thread; the worker does not access live Unity or Mafi world objects.
+The worker thread itself receives a sealed snapshot of primitive world data and returns a mining or accessway plan. Snapshot capture, live validation, and designation changes remain on the game thread; the worker does not access live Unity or Mafi world objects.
 
 Mine away!
 

@@ -10,6 +10,7 @@ using System;
 using System.IO;
 using HarmonyLib;
 using Mafi;
+using Mafi.Core;
 using Mafi.Collections;
 using Mafi.Core.Entities;
 using Mafi.Core.Buildings.VehicleDepots;
@@ -18,6 +19,7 @@ using Mafi.Core.GameLoop;
 using Mafi.Core.Mods;
 using Mafi.Core.Notifications;
 using Mafi.Core.Input;
+using Mafi.Core.Map;
 using Mafi.Core.PathFinding;
 using Mafi.Core.Prototypes;
 using Mafi.Core.SaveGame;
@@ -154,6 +156,7 @@ public static string Tt(string text) => text;
         TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1.5f);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
+        SetFilterOreSpikes(true);
         SetAllowRampsOutsideTowerAreas(true);
         SetAccessHarvestDisruptedTrees(true);
         SetAccessAllowDigToRemoveDebris(true);
@@ -468,6 +471,16 @@ public static string Tt(string text) => text;
         AccessAvoidBuildings = value;
     }
 
+    /// <summary>New-world default for correcting isolated vanilla ore spikes.</summary>
+    public static bool FilterOreSpikes { get; private set; } = true;
+
+    public static void SetFilterOreSpikes(bool value)
+    {
+        if (FilterOreSpikes != value)
+            AutoDepthDesignation.MarkAllMiningPlansDirty();
+        FilterOreSpikes = value;
+    }
+
     /// <summary>
     /// Allows a bounded accessway retry beyond the tower area
     /// after the normal in-area search exhausts its available routes.
@@ -686,9 +699,12 @@ public static string Tt(string text) => text;
 
     public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
     {
+        Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         try
         {
             AutoDepthDesignation.s_log.EnableConsoleLogging();
+            AutoDepthDesignation.SetModRootDirectoryPath(
+                Manifest.RootDirectoryPath);
             AutoDepthDesignation.s_log.RegisterAutoConsoleMirroring(this, resolver.Resolve<IGameLoopEvents>(), resolver.Resolve<GameConsoleCommandsExecutor>());
             AutoTerrainDesignationsTicker.DestroyActive();
 
@@ -717,6 +733,15 @@ public static string Tt(string text) => text;
             INotificationsManager notificationsManager = resolver.Resolve<INotificationsManager>();
             IInputScheduler inputScheduler = resolver.Resolve<IInputScheduler>();
             ConfigSerializationContext configSerializationContext = resolver.Resolve<ConfigSerializationContext>();
+            MapManager? mapManager = resolver.TryResolve<MapManager>().ValueOrNull;
+            CoreModConfig? coreModConfig =
+                resolver.TryResolve<CoreModConfig>().ValueOrNull;
+            string? mapName = mapManager?.Map.MapName;
+            if (string.IsNullOrEmpty(mapName))
+                mapName = coreModConfig?.LoadedIslandMapName.ValueOrNull;
+            if (string.IsNullOrEmpty(mapName))
+                mapName = coreModConfig?.LoadedWorldMapName.ValueOrNull;
+            Access.AccessSearchReplayRecorder.SetCurrentMapName(mapName);
             IVehicleBuffersRegistry? vehicleBuffersRegistry = null;
             ITruckJobsFilterManager? truckJobsFilter = null;
             UnreachableTerrainDesignationsManager? unreachableTerrainDesignations = null;
@@ -742,7 +767,6 @@ public static string Tt(string text) => text;
                 AutoTerrainDesignationsTicker.CreateForWorld(
                     AutoDepthDesignation.CurrentWorldGeneration + 1,
                     () => m_simLoopEvents?.IsSimPaused ?? false);
-            AutoDepthDesignation.SetModRootDirectoryPath(Manifest.RootDirectoryPath);
             m_entitiesManager = entitiesManager;
             m_entitiesManager.EntityRemoved.AddNonSaveable(this, onEntityRemoved);
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
@@ -852,6 +876,7 @@ public static string Tt(string text) => text;
 
     private void onGameTerminated()
     {
+        Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();
         AutoDepthDesignation.ResetWorldRuntimeState();
@@ -987,6 +1012,7 @@ public static string Tt(string text) => text;
 
     public void Dispose()
     {
+        Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();
         AutoDepthDesignation.ResetWorldRuntimeState();

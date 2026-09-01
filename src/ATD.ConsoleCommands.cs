@@ -24,18 +24,19 @@ namespace AutoTerrainDesignations;
 [GlobalDependency(RegistrationMode.AsSelf, false, false)]
 public sealed class AtdConsoleCommands
 {
-    [ConsoleCommand(false, false, "Arms a one-shot developer capture of the next accepted access search for standalone replay.", "atd_access_replay_arm")]
+    [ConsoleCommand(false, false, "Arms one replay capture: case name, scenario family, and optional case kind (access or mining).", "atd_access_replay_arm")]
     private string atdAccessReplayArm(
         string? caseName = null,
-        string? scenarioFamily = null)
+        string? scenarioFamily = null,
+        string caseKind = "access")
     {
         string message = AccessSearchReplayRecorder.Arm(
-            caseName, scenarioFamily);
+            caseName, scenarioFamily, caseKind);
         AutoDepthDesignation.s_log.Info("[ATD Access Replay] " + message);
         return "[ATD] " + message;
     }
 
-    [ConsoleCommand(false, false, "Cancels an armed access-search replay capture.", "atd_access_replay_cancel")]
+    [ConsoleCommand(false, false, "Cancels an armed access or mining replay capture.", "atd_access_replay_cancel")]
     private string atdAccessReplayCancel()
     {
         string message = AccessSearchReplayRecorder.Cancel();
@@ -56,6 +57,8 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  OrePurityLevel        = {AutoTerrainDesignationsMod.OrePurityLevel}");
         sb.AppendLine($"  BottomFlattening      = {AutoTerrainDesignationsMod.BottomFlatteningEnabled}");
         sb.AppendLine($"  BottomFlatteningStrength = {AutoTerrainDesignationsMod.BottomFlatteningStrength}");
+        sb.AppendLine($"  FilterOreSpikesDefault = {AutoTerrainDesignationsMod.FilterOreSpikes}");
+        sb.AppendLine($"  FilterOreSpikesWorld   = {AutoDepthDesignation.FilterOreSpikes}");
         sb.AppendLine($"  MinCorridorClearance  = {AutoTerrainDesignationsMod.MinCorridorClearance}");
         sb.AppendLine($"  TerrainPanelCollapsed = {AutoTerrainDesignationsMod.TerrainDesignationsPanelCollapsed}");
         sb.AppendLine($"  OrePanelCollapsed     = {AutoTerrainDesignationsMod.OreCompositionPanelCollapsed}");
@@ -580,6 +583,18 @@ public sealed class AtdConsoleCommands
     {
         AutoDepthDesignation.ClearDiagnosticOverlays();
         return "[ATD] Diagnostic overlays cleared.";
+    }
+
+    [ConsoleCommand(false, false, "Loads the current laboratory ore-spike marker CSV, or clears its persistent overlay.", "atd_ore_spike_review_markers")]
+    private string atdOreSpikeReviewMarkers(string action = "load")
+    {
+        if (string.Equals(action, "clear", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "off", StringComparison.OrdinalIgnoreCase))
+        {
+            AutoDepthDesignation.ClearOreSpikeReviewMarkers();
+            return "[ATD] Ore-spike review markers cleared.";
+        }
+        return AutoDepthDesignation.LoadOreSpikeReviewMarkers();
     }
 
     [ConsoleCommand(false, false, "Toggles a persistent V2 Mega-handoff overlay for the latest access search: red = locally pathable but disconnected from the tower, green = tower-reachable, cyan = selected route. Session-only.", null)]

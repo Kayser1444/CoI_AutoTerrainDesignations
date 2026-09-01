@@ -595,6 +595,10 @@ namespace AutoTerrainDesignations
                 if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidOcean(accessAvoidOcean.Value);
 
+                bool? filterOreSpikes = ParseBool(json, "filterOreSpikes");
+                if (filterOreSpikes.HasValue && ShouldPreserveBool(filterOreSpikes.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetFilterOreSpikes(filterOreSpikes.Value);
+
                 bool? accessAvoidBuildings = ParseBool(json, "accessAvoidBuildings");
                 if (accessAvoidBuildings.HasValue && ShouldPreserveBool(accessAvoidBuildings.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidBuildings(accessAvoidBuildings.Value);
@@ -1124,6 +1128,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that avoids ocean in accessways and Mining Designations. Mining cells directly overlapping ocean are excluded and projected underwater cutting is avoided. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_filterOreSpikes\": \"New-game default for the per-world Filter ore spikes option. It corrects isolated ultra-thin vanilla ore spikes before Ore quality and bottom flattening. Default: true.\",");
+            sb.AppendLine($"  \"filterOreSpikes\": {BoolToJsonStr(AutoTerrainDesignationsMod.FilterOreSpikes)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");

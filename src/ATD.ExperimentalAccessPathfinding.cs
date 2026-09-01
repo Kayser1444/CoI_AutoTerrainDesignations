@@ -1983,24 +1983,7 @@ namespace AutoTerrainDesignations
             TerrainManager terrainManager,
             Tile2i tile)
         {
-            var layers = new List<AccessTerrainLayer>();
-            float topHeight = terrainManager.GetHeight(tile).Value.ToFloat();
-            TerrainLayerEnumerator enumerator =
-                terrainManager.EnumerateLayers(terrainManager.GetTileIndex(tile));
-            while (enumerator.MoveNext())
-            {
-                TerrainMaterialThicknessSlim layer = enumerator.Current;
-                float thickness = layer.Thickness.Value.ToFloat();
-                TerrainMaterialProto material = layer.SlimId.ToFull(terrainManager);
-                float bottomHeight = topHeight - thickness;
-                layers.Add(new AccessTerrainLayer(
-                    topHeight,
-                    bottomHeight,
-                    GetCutMaterialSlope(material),
-                    material.Id.ToString()));
-                topHeight = bottomHeight;
-            }
-            return new AccessTerrainColumn(layers);
+            return CapturePlanningTerrainColumn(terrainManager, tile).ToAccessColumn();
         }
 
         private static void ResolveAccessMaterialSlopes(

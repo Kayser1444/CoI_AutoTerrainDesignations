@@ -81,6 +81,8 @@ namespace AutoTerrainDesignations
             sb.Append(TowerSettingsConfigSchemaVersion.ToString(CultureInfo.InvariantCulture));
             sb.Append(",\"worldSettings\":{\"avoidOcean\":");
             AppendJsonBool(sb, AccessAvoidOcean);
+            sb.Append(",\"filterOreSpikes\":");
+            AppendJsonBool(sb, FilterOreSpikes);
             sb.Append(",\"avoidBuildings\":");
             AppendJsonBool(sb, AccessAvoidBuildings);
             sb.Append(",\"allowRampsOutsideTowerAreas\":");
@@ -254,6 +256,8 @@ namespace AutoTerrainDesignations
             {
                 if (TryGetBool(worldSettings, "avoidOcean", out bool avoidOcean))
                     SetAccessAvoidOcean(avoidOcean);
+                if (TryGetBool(worldSettings, "filterOreSpikes", out bool filterOreSpikes))
+                    SetFilterOreSpikes(filterOreSpikes);
                 if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))
                     SetAccessAvoidBuildings(avoidBuildings);
                 if (TryGetBool(worldSettings, "allowRampsOutsideTowerAreas", out bool allowOutside))

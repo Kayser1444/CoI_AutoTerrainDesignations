@@ -228,6 +228,18 @@
     "Geländesicherheit"
   ],
   [
+    "settings.world.vanilla_issue_correction",
+    "Korrekturen am Basisspiel"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "Erzspitzen filtern"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "Ignoriert beim Erstellen von Abbaubezeichnungen isolierte, extrem dünne Erzspitzen, die weit unter die umliegende Lagerstätte reichen. Diese Korrektur wird vor Erzqualität und Bodenglättung angewendet. Die ursprünglichen Geländedaten und vorhandenen Bezeichnungen bleiben unverändert."
+  ],
+  [
     "settings.world.avoid_ocean.label",
     "Vermeiden Sie das Meer"
   ],

@@ -1,7 +1,7 @@
 # Ore spike filter evaluation
 
-Status: proposed laboratory protocol. No candidate filter, threshold, or
-acceptance threshold has been selected.
+Status: corrected bedrock-aware protocol used to qualify the v0.8.0
+bedrock-neighborhood r4 filter. Further captures can reuse the same protocol.
 
 ## Question
 
@@ -100,9 +100,11 @@ The report must also expose:
   furthest changed column; and
 - exact geometry outside the candidate's correction neighborhood.
 
-`Bedrock_Terrain` is an impassable boundary rather than mineable waste. Do not
-credit it as saved rock. A target that penetrates it is a separate correctness
-failure.
+`Bedrock_Terrain` is mineable and continues indefinitely below the stored
+terrain layers. Vanilla converts it to Rock with a 200% material multiplier,
+versus ordinary rock's 80%. Count the complete interval from the captured
+bedrock top down to the final target and apply each terrain material's own live
+yield before combining products.
 
 ## Corpus and comparison
 
@@ -116,6 +118,7 @@ detector statistics.
 For each candidate family, sweep its parameters offline and retain all
 nondominated configurations. A useful candidate should avoid substantial rock
 on the positive cases, preserve nearly all raw target product, add negligible
-excavation, and leave negative-control geometry unchanged. Numeric acceptance
-thresholds and the setting's default state remain decisions to make from the
-measured frontier and in-game inspection.
+excavation, and leave negative-control geometry unchanged. The initial corpus
+and in-game inspection selected the bedrock-neighborhood r4 detector as the
+enabled-by-default v0.8.0 policy. Continue reporting the full frontier when new
+captures challenge that boundary.

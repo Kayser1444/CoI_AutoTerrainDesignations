@@ -2,8 +2,10 @@
 
 Date: 2026-08-31
 
-Status: positive-case parameter sweep. This experiment narrows the candidates;
-it does not select a production algorithm, threshold, or setting default.
+Status: superseded historical parameter sweep. Its material scoring incorrectly
+clamped excavation at bedrock, so its rock totals and candidate ranking must not
+be used for release claims. The captures and detector variants remain useful;
+v0.8.0 qualification reran them with mineable, high-yield bedrock included.
 
 ## Question and arena
 
@@ -17,8 +19,10 @@ exterior safety ray for changed candidate geometry, so the experiment compares
 plans at `DirectSafety`: direct protected-origin checks and final corners are
 included; candidate-dependent exterior building/ocean rays are excluded.
 
-The material comparison uses the raw captured layers and clamps excavation to
-the raw bedrock boundary. Volumes are terrain tile-volume, not truck cargo.
+The material comparison in this historical run used the raw captured layers
+and incorrectly clamped excavation to the raw bedrock boundary. Vanilla instead
+mines bedrock indefinitely toward the designation target and produces Rock at
+2.5 times ordinary rock's yield per equal volume.
 
 ## Prototype filters
 

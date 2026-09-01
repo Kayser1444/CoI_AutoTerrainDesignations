@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 196,
+  "total_keys": 198,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
