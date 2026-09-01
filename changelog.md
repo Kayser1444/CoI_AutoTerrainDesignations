@@ -1,4 +1,4 @@
-v0.8.0 [packaged]
+v0.8.0 [released]
 
 * Fixed: **Ore composition** now includes the Rock produced when designations excavate below the stored terrain layers into bedrock. Vanilla mines bedrock indefinitely toward the target height and gives it a 200% quantity multiplier versus ordinary rock's 80%; the panel now converts each material with its own live yield before combining products.
 * Improved: Mining snapshot capture now yields by elapsed time, pure planning runs on the shared dedicated worker thread, and final mining designations are submitted through one native batch. Large plans remain responsive during capture and placement is dramatically faster.
