@@ -264,6 +264,18 @@
     "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
   ],
   [
+    "settings.world.performance",
+    "PERFORMANCE"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Use worker thread"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Use a background thread for access and mining planning. Enabled by default. Turn off for compatibility troubleshooting; planning then runs on the game thread and may cause pauses, especially in large mines. Applies to new planning requests."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Landscape to remove debris"
   ],

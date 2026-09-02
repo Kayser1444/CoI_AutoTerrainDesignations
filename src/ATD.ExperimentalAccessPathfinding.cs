@@ -2576,6 +2576,66 @@ namespace AutoTerrainDesignations
             return result;
         }
 
+        private static IEnumerator RunExperimentalAccessDryRunConfigured(
+            AccessPathRequest request,
+            AccessSearchWorkspace? workspace,
+            AccessOriginCluster cluster,
+            int clusterIndex,
+            int clusterCount,
+            ExperimentalAccessDryRunResult output,
+            ExperimentalAccessSliceControl? sliceControl,
+            bool useWorkerThread)
+        {
+            if (!useWorkerThread)
+            {
+                int world = CurrentWorldGeneration;
+                IEnumerator wait = WaitForAccessSearchWorkerToStop(sliceControl, world);
+                while (wait.MoveNext())
+                    yield return wait.Current;
+                if ((sliceControl?.CancellationRequested ?? s_cancelExperimentalAccessSearch)
+                    || !IsWorldGenerationActive(world))
+                {
+                    CompleteWorkerFailure(request, output, "SearchCancelled");
+                    yield break;
+                }
+            }
+
+            IEnumerator search = useWorkerThread
+                ? RunExperimentalAccessDryRunWorker(
+                    request, cluster, output, sliceControl)
+                : RunExperimentalAccessDryRunSliced(
+                    request,
+                    workspace ?? new AccessSearchWorkspace(request.Snapshot),
+                    cluster,
+                    clusterIndex,
+                    clusterCount,
+                    output,
+                    sliceControl);
+            try
+            {
+                while (search.MoveNext())
+                    yield return search.Current;
+            }
+            finally
+            {
+                (search as IDisposable)?.Dispose();
+            }
+        }
+
+        private static IEnumerator WaitForAccessSearchWorkerToStop(
+            ExperimentalAccessSliceControl? control, int world)
+        {
+            // Only the game-thread manager submits jobs. Once the pending and
+            // active slots are empty, it can safely start cooperative work.
+            while (AccessSearchWorker.Shared.HasRunningJob
+                && !(control?.CancellationRequested ?? s_cancelExperimentalAccessSearch)
+                && IsWorldGenerationActive(world))
+            {
+                control?.ReportPhase("Waiting for previous worker job to stop");
+                yield return null;
+            }
+        }
+
         private static IEnumerator RunExperimentalAccessDryRunWorker(
             AccessPathRequest request,
             AccessOriginCluster cluster,

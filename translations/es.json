@@ -264,6 +264,18 @@
     "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
   ],
   [
+    "settings.world.performance",
+    "RENDIMIENTO"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Usar subproceso de trabajo"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Usar un subproceso en segundo plano para planificar accesos y minería. Está activado de forma predeterminada. Desactívalo para solucionar problemas de compatibilidad; la planificación se ejecutará en el subproceso del juego y puede causar pausas, especialmente en minas grandes. Se aplica a las nuevas solicitudes de planificación."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Paisaje para eliminar escombros."
   ],

@@ -10,10 +10,15 @@ using Mafi;
 
 namespace AutoTerrainDesignations.Mining
 {
-    internal static class MiningFixtures
+    internal static partial class MiningFixtures
     {
         internal static bool ValidateSafetyAndWorker(out string failure)
         {
+            if (!ValidateDiagonalSafety(out failure)) return false;
+            bool oceanSafe = ValidateExteriorConvergence(false, out string oceanFailure);
+            bool buildingsSafe = ValidateExteriorConvergence(true, out string buildingFailure);
+            if (!oceanSafe || !buildingsSafe)
+            { failure = oceanFailure + " " + buildingFailure; return false; }
             if (!ValidateSpikeFilter(out failure)) return false;
             var inspected = new HashSet<Type>();
             if (!Pure(typeof(MiningRequest)) || !Pure(typeof(MiningPlan)))

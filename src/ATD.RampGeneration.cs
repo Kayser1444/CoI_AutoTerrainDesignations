@@ -911,15 +911,16 @@ namespace AutoTerrainDesignations
                             $"resolvedVehicleWidth={refreshedSnapshot.VehicleWidth} " +
                             $"requiredWidth={request.RequiredWidth}");
                         var experimentalDryRun = new ExperimentalAccessDryRunResult();
-                        IEnumerator mergedSearch = useWorkerSearch
-                            ? RunExperimentalAccessDryRunWorker(
-                                request, cluster, experimentalDryRun,
-                                sliceControl)
-                            : RunExperimentalAccessDryRunSliced(
-                                request, snapshotBuild.Workspace!, cluster,
+                        IEnumerator mergedSearch =
+                            RunExperimentalAccessDryRunConfigured(
+                                request,
+                                snapshotBuild.Workspace,
+                                cluster,
                                 currentClusterOrdinal,
                                 unreachableClusterCount,
-                                experimentalDryRun, sliceControl);
+                                experimentalDryRun,
+                                sliceControl,
+                                useWorkerSearch);
                         while (mergedSearch.MoveNext())
                             yield return mergedSearch.Current;
                         experimentalResult = experimentalDryRun.SearchResult!;
@@ -977,16 +978,16 @@ namespace AutoTerrainDesignations
                                         "0.##", System.Globalization.CultureInfo.InvariantCulture)}");
                                 var outsideDryRun =
                                     new ExperimentalAccessDryRunResult();
-                                IEnumerator outsideSearch = useWorkerSearch
-                                    ? RunExperimentalAccessDryRunWorker(
-                                        request, cluster, outsideDryRun,
-                                        sliceControl)
-                                    : RunExperimentalAccessDryRunSliced(
+                                IEnumerator outsideSearch =
+                                    RunExperimentalAccessDryRunConfigured(
                                         request,
-                                        outsideSnapshotBuild.Workspace!,
-                                        cluster, currentClusterOrdinal,
+                                        outsideSnapshotBuild.Workspace,
+                                        cluster,
+                                        currentClusterOrdinal,
                                         unreachableClusterCount,
-                                        outsideDryRun, sliceControl);
+                                        outsideDryRun,
+                                        sliceControl,
+                                        useWorkerSearch);
                                 while (outsideSearch.MoveNext())
                                     yield return outsideSearch.Current;
                                 experimentalResult = outsideDryRun.SearchResult!;

@@ -264,6 +264,18 @@
     "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
   ],
   [
+    "settings.world.performance",
+    "PRESTANDA"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Använd arbetstråd"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Använd en bakgrundstråd för planering av tillfarter och gruvdrift. Aktiverad som standard. Stäng av för felsökning av kompatibilitet; planeringen körs då i speltråden och kan orsaka pauser, särskilt i stora gruvor. Gäller nya planeringsförfrågningar."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Landskap för att ta bort skräp"
   ],

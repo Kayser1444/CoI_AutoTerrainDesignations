@@ -156,6 +156,7 @@ public static string Tt(string text) => text;
         TrySetExperimentalAccessV2HeightEnvelopeUpperAllowance(1.5f);
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
+        SetUseWorkerThread(true);
         SetFilterOreSpikes(true);
         SetAllowRampsOutsideTowerAreas(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -471,6 +472,18 @@ public static string Tt(string text) => text;
         AccessAvoidBuildings = value;
     }
 
+    /// <summary>
+    /// Default execution backend for pure access and mining planning.
+    /// Worker execution is enabled by default; disabling it opts out to
+    /// game-thread execution.
+    /// </summary>
+    public static bool UseWorkerThread { get; private set; } = true;
+
+    public static void SetUseWorkerThread(bool value)
+    {
+        UseWorkerThread = value;
+    }
+
     /// <summary>New-world default for correcting isolated vanilla ore spikes.</summary>
     public static bool FilterOreSpikes { get; private set; } = true;
 
@@ -713,6 +726,8 @@ public static string Tt(string text) => text;
             m_gameLoopEvents = resolver.Resolve<IGameLoopEvents>();
             m_simLoopEvents = resolver.Resolve<ISimLoopEvents>();
             m_saveManager = resolver.Resolve<ISaveManager>();
+            Access.AccessSearchReplayRecorder.SetSnapshotSaveRequester(
+                m_saveManager.RequestGameSave);
             m_gameLoopEvents.Terminate.AddNonSaveable(this, onGameTerminated);
             m_simLoopEvents.BeforeSave.AddNonSaveable(this, beforeSave);
             m_simLoopEvents.UpdateAfterCmdProc.AddNonSaveable(this,
@@ -876,6 +891,7 @@ public static string Tt(string text) => text;
 
     private void onGameTerminated()
     {
+        Access.AccessSearchReplayRecorder.SetSnapshotSaveRequester(null);
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();

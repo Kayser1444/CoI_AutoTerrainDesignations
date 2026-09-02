@@ -1,5 +1,12 @@
 v0.8.1 [unreleased]
 
+* Added: World settings now includes **PERFORMANCE → Use worker thread**, enabled by default. The per-world opt-out runs new planning requests on the game thread; Save as config stores the default for future worlds. Mining passes can pause the game in this mode. Backend changes wait for any cancelled worker computation to stop before starting game-thread planning.
+
+* Fixed: Mining ocean and building protection now rechecks the final excavation boundary after removing unsafe designations and rebuilding corner heights. Previously, a single pass could leave newly exposed faces unchecked. Protection repeats until the remaining plan passes, capturing additional terrain facts as needed.
+* Improved: Added outward diagonal protection rays at exposed convex mining corners, covering ocean and building hazards missed by cardinal-only rays. Diagonal rays use the same material-dependent height increment per grid-neighbor step and the configured end buffer.
+* Verified: Ocean/building regression cases cover repeated boundary removal, diagonal directions, end buffers, staged capture, missing facts, and map bounds. All 13 fixture groups and the Debug build passed. On the recorded gold-island case, the corrected plan decreased from 2,239 designations to 1,052 with repeated cardinal checks, then to 670 with diagonal checks.
+* Accepted limitation: In-game testing on the gold island held back the ocean with a margin at maximum safety. Medium safety left a tiny breach between cardinal and diagonal directions. This is accepted as a player-controlled trade-off between excavation reach and protection; sampled rays are not a universal guarantee against flooding or landslides.
+
 v0.8.0 [released]
 
 * Fixed: **Ore composition** now includes the Rock produced when designations excavate below the stored terrain layers into bedrock. Vanilla mines bedrock indefinitely toward the target height and gives it a 200% quantity multiplier versus ordinary rock's 80%; the panel now converts each material with its own live yield before combining products.

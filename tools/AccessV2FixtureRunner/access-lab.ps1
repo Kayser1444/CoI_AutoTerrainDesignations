@@ -12,7 +12,8 @@ param(
     [string] $BaselineAssemblyPath,
     [string] $ManagedDirectory = 'C:\Program Files (x86)\Steam\steamapps\common\Captain of Industry\Captain of Industry_Data\Managed',
     [string] $TargetFamily,
-    [int] $Parallelism = 2,
+    [ValidateRange(1, 6)]
+    [int] $Parallelism = 6,
     [int] $TimeoutSeconds = 180,
     [int] $MemoryCeilingMiB = 4096,
     [int] $Repetitions = 5,

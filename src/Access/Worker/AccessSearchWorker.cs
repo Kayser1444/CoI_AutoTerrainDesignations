@@ -174,6 +174,17 @@ namespace AutoTerrainDesignations.Access.Worker
 
         private AccessSearchWorker() { }
 
+        // Logical cancellation can release the manager before computation has
+        // stopped. Game-thread planning must wait for this physical boundary.
+        internal bool HasRunningJob
+        {
+            get
+            {
+                lock (m_gate)
+                    return m_pending != null || m_active != null;
+            }
+        }
+
         internal void SetCurrentWorld(int worldGeneration)
         {
             lock (m_gate)

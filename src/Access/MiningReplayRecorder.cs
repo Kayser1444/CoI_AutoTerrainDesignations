@@ -27,8 +27,10 @@ namespace AutoTerrainDesignations.Access
                 var token = operation.CancellationToken;
                 operation.SetProgress(0, "Encoding mining request");
                 byte[] input = AccessReplayGraphCodec.Serialize(request, token,
-                    (done, total) => operation.SetProgress((int)(done * 70 / Math.Max(1, total)),
-                        "Encoding mining request"));
+                    (done, total) => operation.SetProgress(
+                        5 + (int)(done * 70 / Math.Max(1, total)),
+                        "Encoding mining request"),
+                    done => operation.SetSizingProgress(done));
                 byte[] expected = MiningReplayFacade.Canonical(plan);
                 byte[] payload = BuildPayload(input, expected, token);
                 string hash = Sha256(payload, token);

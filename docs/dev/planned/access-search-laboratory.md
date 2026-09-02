@@ -180,6 +180,11 @@ Arming archives the exact currently installed DLL under the private Laboratory
 that immutable cached binary, so later development builds cannot make a valid
 case unreplayable.
 
+When the matching access or mining snapshot capture begins, the current game
+is also queued for a save using the sanitized case name. The save is requested
+only once per arm, and access arms do not trigger on mining captures (or vice
+versa), so the saved world remains aligned with the recorded snapshot.
+
 The arm remains dormant until a routed candidate is accepted by authoritative
 post-placement validation. A dirty, rejected, cancelled, or timed-out search
 does not produce a validated case. The completed directory is written
@@ -193,7 +198,10 @@ Encoding and compression run on a background capture operation after ownership
 of the immutable request has transferred from the accepted search. A lightweight
 sizing pass gives the encoder an exact work-unit denominator; the calling
 coroutine remains alive and yields while the progress surface reports the
-current capture stage and percentage. During this post-commit interval, the
+current capture stage and percentage. The sizing pass reports coarse 1–4%
+milestones before the exact 5–75% graph-write range begins, so large captures
+no longer remain visually at 0% while the denominator is being computed.
+During this post-commit interval, the
 button is relabeled **Abort replay capture** and cancels only the recorder. It
 does not invalidate or roll back the already accepted access route. Cancellation
 is checked during sizing, encoding, payload hashing, and chunked compression;
@@ -321,8 +329,8 @@ The local operator entry point is
 
 Promotion copies a content-addressed case into the private corpus, attaches
 required family and suite-role metadata, and makes its files read-only.
-Regression runs synthetic fixtures first, then semantic cases in bounded fresh
-child processes. Benchmarking selects performance cases, remains sequential,
+Regression runs synthetic fixtures first, then semantic cases in up to six
+bounded fresh child processes. Benchmarking selects performance cases, remains sequential,
 and defers while Captain of Industry is running unless an explicitly
 directional busy-machine smoke run is requested. Both commands write readable
 Markdown and machine-queryable JSON reports beneath the laboratory `reports`

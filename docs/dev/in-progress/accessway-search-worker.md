@@ -1,15 +1,17 @@
 # Accessway Search Worker
 
 Status: approved design with Tickets 1, 2, 2A, and foundational 2B complete.
-Ticket 3's dormant worker and Ticket 4's first interactive slice are implemented
-for internal playtesting:
+Ticket 3's worker and Ticket 4's first interactive slice are implemented for
+the current default-worker rollout:
 live snapshot capture, validation, and commit stay on the game thread, while
 workspace preparation, V1/V2 search, and plan materialization execute through
 one canonical pure executor on a lazy below-normal background thread. The
 worker has one job/result slot, latest-value progress, logical cancellation,
 timeout and world-generation handling, non-blocking manager polling, and one
 permitted infrastructure restart. Farming and interactive Create Designations
-select it internally; it is deliberately not a player setting. Synthetic canonical parity and
+use the worker by default. The World settings tab exposes a public per-world
+**Use worker thread** opt-out under **PERFORMANCE**; disabling it selects
+game-thread execution. Synthetic canonical parity and
 cancellation fixtures pass, and all three promoted private replay cases remain
 exact through the shared executor as of 2026-08-29. The first large two-cluster
 farming playtest passed both sequential clusters and led to completion of the
@@ -259,6 +261,11 @@ partial diagnostics as user cancellation, with terminal classification
 
 ## Approved phased rollout
 
+The stages and promotion gates below record the original rollout plan.
+The current public opt-out and its transition behavior are described in
+**Approved execution-mode setting** and **Approved execution-mode transitions**;
+those sections supersede the original global tri-state setting proposal.
+
 Worker execution rolls out in three explicit stages:
 
 1. **Worker opt-in.** Cooperative manager execution remains the production
@@ -291,17 +298,14 @@ mode and is unconditionally fail closed.
 
 ## Approved execution-mode setting
 
-Stages one and two expose one global, non-save execution policy with three
-values: `Default`, `Cooperative`, and `Worker`. It belongs in
-`ATDSettings.json` and the Accessways settings UI because backend selection is
-an installation/runtime preference rather than world state.
-
-In stage one, `Default` resolves to `Cooperative`. In stage two, `Default`
-resolves to `Worker`. An explicit stage-one worker opt-in or stage-two
-cooperative opt-out remains selected. In stage three all stored values resolve
-to `Worker`; an obsolete explicit `Cooperative` value is diagnosed and ignored
-or migrated. This avoids encoding a release's temporary default as a permanent
-boolean choice.
+The current rollout exposes one public per-world boolean **Use worker thread**
+setting under **PERFORMANCE** in the World settings tab. It defaults to
+`true`, so worker execution is enabled by default. Disabling it is an
+explicit compatibility opt-out and selects game-thread execution. Access
+search yields cooperatively; each pure mining-planner pass is synchronous
+and can cause a visible pause on large mines.
+The value is stored in the existing removable world-settings state; **Save as
+config** also writes it as the default for new worlds.
 
 ## Approved save and reset behavior
 
@@ -435,17 +439,16 @@ automatic time threshold.
 
 ## Approved execution-mode transitions
 
-Changing the resolved execution mode hard-invalidates the active attempt. The
-manager logically cancels it with reason `ExecutionModeChanged`; its access
-obligation remains live and becomes immediately eligible under the newly
-resolved backend without failure backoff.
+Changing the toggle applies to new planning requests. Each access request and
+each mining capture/planning operation retains its selected backend until it
+finishes, including mining safety recaptures. Changing the toggle does not
+cancel active work or interrupt designation commit.
 
-A worker-to-cooperative change waits for worker cancellation acknowledgment
-before cooperative work starts. A cooperative-to-worker change stops at the
-next cooperative cancellation boundary. The two backends never overlap.
-Queued requests require no snapshot rebuild because they resolve execution mode
-only when activated. If the request has already entered atomic designation
-commit, that commit finishes and the new mode applies to the next request.
+If cancellation or preemption releases an old worker request before its pure
+computation has stopped, game-thread planning yields until the worker's pending
+and active slots are empty. Waiting checks cancellation and world lifetime;
+it never blocks the game thread. The manager is the sole job submitter, so
+no new worker job can race that transition into game-thread planning.
 
 ## Approved terminal-result ordering
 
@@ -731,8 +734,8 @@ Implementation proceeds in this order:
    callers are only partially migrated.
 4. Migrate interactive, repair, existing-terrain, and ghost-tower access work
    through the same request and execution boundary.
-5. Expose stage one's public worker opt-in only after every production access
-   caller honors the selected global execution mode.
+5. Expose the public per-world worker opt-out after every production access
+   caller honors the selected execution mode. Worker execution defaults to on.
 
 During partial migration, production must not run cooperative interactive work
 concurrently with worker farming work. Hiding the incomplete mode avoids a
@@ -763,9 +766,9 @@ CPU policy.
    migrate interactive, repair, existing-terrain, and ghost-tower paths. Verify
    saving, world reset, preemption, mode transitions, terminal races, and fail-
    closed behavior.
-7. **Stage-one opt-in release.** Expose the global execution-mode setting and
-   translations, tune measured bounds, satisfy the stage-one promotion gates,
-   playtest, and prepare the public worker-opt-in release.
+7. **Public opt-out.** Expose the per-world execution toggle under PERFORMANCE,
+   enabled by default, with game-thread execution available for troubleshooting.
+   Verify persistence, backend selection, and cancellation handoff.
 
 Every slice keeps the normal production backend usable. Partial worker support
 remains inaccessible to players until all production callers honor the same

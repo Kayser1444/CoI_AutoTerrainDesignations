@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AutoTerrainDesignations.Planning;
 using Mafi;
@@ -59,19 +60,29 @@ namespace AutoTerrainDesignations.Mining
             MiningPolicy policy = request.Policy;
             if (!policy.AvoidOcean && !policy.AvoidBuildings) yield break;
             var directions = new[] { new Tile2i(-1, 0), new Tile2i(1, 0),
-                new Tile2i(0, -1), new Tile2i(0, 1) };
+                new Tile2i(0, -1), new Tile2i(0, 1),
+                new Tile2i(-1, -1), new Tile2i(1, -1),
+                new Tile2i(-1, 1), new Tile2i(1, 1) };
             foreach (Tile2i origin in plan.Depths.Keys)
             {
                 bool hazardous = false;
-                for (int side = 0; side < 4 && !hazardous; side++)
+                for (int side = 0; side < directions.Length && !hazardous; side++)
                 {
                     Tile2i direction = directions[side];
                     if (plan.Depths.ContainsKey(origin
                         + new RelTile2i(direction.X * 4, direction.Y * 4))) continue;
-                    for (int step = 0; step <= 4 && !hazardous; step++)
+                    bool diagonal = side >= 4;
+                    // An outward diagonal belongs to a convex corner: both of its
+                    // faces are exposed and the diagonal quadrant is not planned.
+                    // Repeated safety passes discover corners exposed by removals.
+                    if (diagonal && (plan.Depths.ContainsKey(origin.AddX(direction.X * 4))
+                        || plan.Depths.ContainsKey(origin.AddY(direction.Y * 4)))) continue;
+                    for (int step = 0; step <= (diagonal ? 0 : 4) && !hazardous; step++)
                     {
-                        int x = side == 0 ? 0 : side == 1 ? 4 : step;
-                        int y = side == 2 ? 0 : side == 3 ? 4 : step;
+                        int x = diagonal ? (direction.X < 0 ? 0 : 4)
+                            : side == 0 ? 0 : side == 1 ? 4 : step;
+                        int y = diagonal ? (direction.Y < 0 ? 0 : 4)
+                            : side == 2 ? 0 : side == 3 ? 4 : step;
                         Tile2i start = origin + new RelTile2i(x, y);
                         yield return start;
                         float height = (plan.Corners[origin] * (4 - x) * (4 - y)
@@ -83,7 +94,10 @@ namespace AutoTerrainDesignations.Mining
                         if (!cut && height <= surface + 0.0001f) continue;
                         int maxDistance = direction.X != 0
                             ? (direction.X < 0 ? start.X : request.TerrainSize.X - 1 - start.X)
-                            : (direction.Y < 0 ? start.Y : request.TerrainSize.Y - 1 - start.Y);
+                            : int.MaxValue;
+                        if (direction.Y != 0)
+                            maxDistance = Math.Min(maxDistance, direction.Y < 0
+                                ? start.Y : request.TerrainSize.Y - 1 - start.Y);
                         for (int distance = 1; distance <= maxDistance; distance++)
                         {
                             Tile2i tile = start + new RelTile2i(direction.X * distance, direction.Y * distance);
@@ -92,6 +106,9 @@ namespace AutoTerrainDesignations.Mining
                             float slope = policy.DumpingSlope;
                             if (cut && !column.TryGetSlope(height, out slope))
                                 slope = policy.FallbackMiningSlope;
+                            // Use grid-neighbor steps, including diagonals. Vanilla
+                            // collapse compares the same height-difference bounds
+                            // for both; multiplying rise by sqrt(2) is less safe.
                             height += cut ? slope : -slope;
                             if ((policy.AvoidBuildings && BuildingAt(request, tile))
                                 || (policy.AvoidOcean && cut && column.IsOcean && height < 1f))

@@ -1,3 +1,8 @@
+v0.8.1 | 2026-09-02
+* Added: A per-world **Use worker thread** setting under **Performance**, enabled by default. Disable it to run new planning requests on the game thread when needed; **Save as config** controls future worlds
+* Fixed: Mining ocean and building protection now repeats boundary checks after removing unsafe designations and rebuilding corner heights, preventing newly exposed faces from escaping protection
+* Improved: Mining protection now checks exposed diagonal corners in addition to cardinal directions, covering ocean and building hazards around convex boundaries
+
 v0.8.0 | 2026-09-01
 * Added: An enabled-by-default **Filter ore spikes** world option under **Vanilla fixes** corrects isolated ultra-thin vanilla ore tails before Ore quality and bottom flattening; captured tests measured up to 99% less bedrock excavation locally and 36% across entire designation plans
 * Improved: **Create Designations** now captures and plans through a dedicated worker thread, keeping the game responsive during large mines

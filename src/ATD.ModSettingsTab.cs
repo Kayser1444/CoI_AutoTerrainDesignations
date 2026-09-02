@@ -97,6 +97,7 @@ namespace AutoTerrainDesignations
 
             AddVanillaIssueCorrectionSection(content, refreshers);
             AddScanBehaviorSection(content, refreshers);
+            AddPerformanceSection(content, refreshers);
             AddWorldSafetySection(content, refreshers);
             AddNotificationsSection(content, refreshers);
 
@@ -477,6 +478,17 @@ namespace AutoTerrainDesignations
                 AtdLocalization.SettingsAllowDigToRemoveDebrisTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessAllowDigToRemoveDebris,
                 AutoDepthDesignation.SetAccessAllowDigToRemoveDebris,
+                refreshers));
+        }
+
+        private static void AddPerformanceSection(Column content, List<Action> refreshers)
+        {
+            content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingPerformance.AsFormatted));
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsUseWorkerThreadLabel.AsFormatted,
+                AtdLocalization.SettingsUseWorkerThreadTooltip.AsFormatted,
+                () => AutoDepthDesignation.UseWorkerThread,
+                AutoDepthDesignation.SetUseWorkerThread,
                 refreshers));
         }
 

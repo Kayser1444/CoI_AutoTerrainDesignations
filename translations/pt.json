@@ -264,6 +264,18 @@
     "Marcar as árvores nas zonas de acesso finalizadas e nas zonas de perturbação designadas à mineração para colheita. Quando desativado, o ATD não cria ordens de colheita de árvores. Os pedidos de colheita feitos pelo ATD são removidos pela ação Clear; as ordens de colheita de jogadores não relacionados são preservadas."
   ],
   [
+    "settings.world.performance",
+    "DESEMPENHO"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Usar thread de trabalho"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Usar uma thread em segundo plano para o planejamento de acessos e mineração. Ativado por padrão. Desative para solucionar problemas de compatibilidade; o planejamento será executado na thread do jogo e poderá causar pausas, especialmente em minas grandes. Aplica-se a novas solicitações de planejamento."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Paisagem para remover detritos"
   ],

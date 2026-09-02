@@ -167,6 +167,16 @@ for newly created Mining Designations.
 
 The per-world **Avoid ocean** and **Avoid buildings** options also apply to regular mining plans. ATD removes mine cells that directly overlap ocean or a building safety perimeter before evaluating the remaining mine edge. It then avoids exterior terrain work that would reach protected ocean or buildings. **Safety policy** controls the combined landslide prediction and protected-area buffer from `MIN` through `MAX`; `MED` is the default. **Harvest disrupted trees** marks trees in the final mine body and its disturbance zone only when enabled; disabling it creates no ATD tree harvest orders.
 
+### PERFORMANCE
+
+The per-world **Use worker thread** option is enabled by default. It runs
+pure access and mining planning on ATD's dedicated worker thread to reduce
+game-thread stalls. Disable it for compatibility troubleshooting. Planning
+then runs on the game thread and may cause pauses, especially in large mines.
+The change applies to new planning requests; an active request finishes using
+its selected backend. **Save as config** makes the current world value the
+default for new worlds.
+
 Useful console commands:
 
 | Command | What it does |

@@ -603,6 +603,11 @@ namespace AutoTerrainDesignations
                 if (accessAvoidBuildings.HasValue && ShouldPreserveBool(accessAvoidBuildings.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidBuildings(accessAvoidBuildings.Value);
 
+                bool? useWorkerThread = ParseBool(json, "useWorkerThread");
+                if (useWorkerThread.HasValue
+                    && ShouldPreserveBool(useWorkerThread.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetUseWorkerThread(useWorkerThread.Value);
+
                 bool? allowRampsOutsideTowerAreas = ParseBool(json, "allowRampsOutsideTowerAreas");
                 if (allowRampsOutsideTowerAreas.HasValue && ShouldPreserveBool(allowRampsOutsideTowerAreas.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(allowRampsOutsideTowerAreas.Value);
@@ -1134,6 +1139,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidBuildings\": \"New-game default for the per-world option that avoids building footprints and safety perimeters in accessways and Mining Designations. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidBuildings\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidBuildings)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_useWorkerThread\": \"New-world default for Use worker thread. Disable to run access and mining planning on the game thread for compatibility troubleshooting; large mines may cause pauses. Changes apply to new planning requests. Default: true.\",");
+            sb.AppendLine($"  \"useWorkerThread\": {BoolToJsonStr(AutoTerrainDesignationsMod.UseWorkerThread)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search exhausts its available routes. Timeouts and other interrupted searches do not retry. The game may show its normal outside-area alarm. Default: true.\",");
             sb.AppendLine($"  \"allowRampsOutsideTowerAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas)},");

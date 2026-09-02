@@ -230,6 +230,7 @@ namespace AutoTerrainDesignations
                 yield break;
             }
 
+            bool useWorkerThread = UseWorkerThread;
             var snapshotBuild = new ExperimentalAccessSnapshotBuildResult();
             IEnumerator snapshotPreparation = BuildExperimentalAccessSnapshot(
                 tower, workDepths, cornerHeights, terrMgr,
@@ -239,7 +240,7 @@ namespace AutoTerrainDesignations
                 generatedAreaMarginTiles: 0,
                 snapshotBuild,
                 sliceControl,
-                createWorkspace: false);
+                createWorkspace: !useWorkerThread);
             while (snapshotPreparation.MoveNext())
                 yield return snapshotPreparation.Current;
 
@@ -268,8 +269,15 @@ namespace AutoTerrainDesignations
                 fixedGoalOrigins: Array.Empty<Tile2i>(),
                 groundGoalOverride: ghostGroundGoals);
             var dryRun = new ExperimentalAccessDryRunResult();
-            IEnumerator search = RunExperimentalAccessDryRunWorker(
-                request, cluster, dryRun, sliceControl);
+            IEnumerator search = RunExperimentalAccessDryRunConfigured(
+                request,
+                snapshotBuild.Workspace,
+                cluster,
+                0,
+                1,
+                dryRun,
+                sliceControl,
+                useWorkerThread);
             while (search.MoveNext())
                 yield return search.Current;
             if (sliceControl?.CancellationRequested

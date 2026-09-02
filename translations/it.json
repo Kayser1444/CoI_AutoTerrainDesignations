@@ -264,6 +264,18 @@
     "Contrassegnare gli alberi negli accessi finalizzati e nelle zone di disturbo per la designazione mineraria per il raccolto. Quando disabilitato, ATD non crea ordini di raccolta alberi. Gli ordini di raccolto piazzati da ATD vengono rimossi da una delle azioni Cancella; gli ordini di raccolta dei giocatori non correlati vengono conservati."
   ],
   [
+    "settings.world.performance",
+    "PRESTAZIONI"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Usa il thread di lavoro"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Usa un thread in background per la pianificazione degli accessi e delle attività minerarie. Attivo per impostazione predefinita. Disattivalo per la risoluzione dei problemi di compatibilità; la pianificazione verrà eseguita nel thread di gioco e potrebbe causare pause, soprattutto nelle miniere grandi. Si applica alle nuove richieste di pianificazione."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Paesaggio per rimuovere i detriti"
   ],

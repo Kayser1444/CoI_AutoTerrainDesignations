@@ -228,6 +228,7 @@ namespace AutoTerrainDesignations.Access
         private const string CaseExtension = ".atd-access-case";
         private static readonly object s_gate = new object();
         private static ArmState? s_arm;
+        private static Action<string>? s_snapshotSaveRequester;
         private static string s_currentMapName = string.Empty;
 
         private sealed class ArmState
@@ -239,6 +240,54 @@ namespace AutoTerrainDesignations.Access
             public string AssemblyHash = string.Empty;
             public string Kind = "access";
             public string MapName = string.Empty;
+            public bool SnapshotSaveRequested;
+        }
+
+        internal static void SetSnapshotSaveRequester(
+            Action<string>? requester)
+        {
+            lock (s_gate)
+                s_snapshotSaveRequester = requester;
+        }
+
+        internal static void RequestSnapshotSaveIfArmed(string caseKind)
+        {
+            if (caseKind != "access" && caseKind != "mining")
+                return;
+
+            ArmState? arm;
+            Action<string>? requester;
+            lock (s_gate)
+            {
+                arm = s_arm;
+                requester = s_snapshotSaveRequester;
+                if (arm == null
+                    || !string.Equals(
+                        arm.Kind, caseKind, StringComparison.Ordinal)
+                    || arm.SnapshotSaveRequested
+                    || requester == null)
+                    return;
+                arm.SnapshotSaveRequested = true;
+            }
+
+            try
+            {
+                requester(arm.Name);
+                AutoDepthDesignation.s_log.Info(
+                    "[ATD Access Replay] snapshot save requested: "
+                    + arm.Name);
+            }
+            catch (Exception ex)
+            {
+                lock (s_gate)
+                {
+                    if (ReferenceEquals(s_arm, arm))
+                        arm.SnapshotSaveRequested = false;
+                }
+                AutoDepthDesignation.s_log.Warning(
+                    "[ATD Access Replay] snapshot save request failed: "
+                    + ex.Message);
+            }
         }
 
         internal static void SetCurrentMapName(string? mapName)
@@ -278,7 +327,8 @@ namespace AutoTerrainDesignations.Access
                     Kind = caseKind,
                 };
             }
-            return $"Armed the next accepted {caseKind} plan as '{safeName}' ({safeFamily}).";
+            return $"Armed the next accepted {caseKind} plan as '{safeName}' ({safeFamily}); "
+                + $"its snapshot will be saved as '{safeName}'.";
         }
 
         internal static string Cancel()
@@ -296,10 +346,11 @@ namespace AutoTerrainDesignations.Access
         {
             lock (s_gate)
             {
-                return s_arm == null || s_arm.Kind != "access"
-                    ? null
-                    : AccessReplayMemoryProbe.Start();
+                if (s_arm == null || s_arm.Kind != "access")
+                    return null;
             }
+            RequestSnapshotSaveIfArmed("access");
+            return AccessReplayMemoryProbe.Start();
         }
 
         internal static AccessReplayCaptureOperation? BeginRecordAccepted(
@@ -333,7 +384,8 @@ namespace AutoTerrainDesignations.Access
                     request, token, (completed, total) =>
                         operation.SetProgress(
                             5 + (int)(completed * 70L / Math.Max(1L, total)),
-                            "Encoding replay request"));
+                            "Encoding replay request"),
+                    completed => operation.SetSizingProgress(completed));
                 operation.SetProgress(75, "Encoding canonical outcome");
                 byte[] expectedBytes = AccessSearchReplayCanonical.Serialize(
                     candidate.SearchResult, candidate.Plan);
@@ -677,6 +729,8 @@ namespace AutoTerrainDesignations.Access
     {
         private volatile string m_stage = "Starting replay capture";
         private volatile int m_percent;
+        private int m_sizingPercent = 1;
+        private long m_nextSizingProgressWork = 4096L;
         private volatile bool m_abortRequested;
         private Task<string> m_task = null!;
         private string? m_temporaryDirectory;
@@ -700,6 +754,7 @@ namespace AutoTerrainDesignations.Access
             Func<AccessReplayCaptureOperation, string> work)
         {
             var operation = new AccessReplayCaptureOperation();
+            operation.SetProgress(1, "Preparing replay capture");
             operation.m_task = Task.Run(
                 () => work(operation), operation.m_cancellation.Token);
             return operation;
@@ -709,6 +764,25 @@ namespace AutoTerrainDesignations.Access
         {
             m_percent = Math.Max(0, Math.Min(100, percent));
             m_stage = "Recording access replay: " + stage;
+        }
+
+        internal void SetSizingProgress(long completedWork)
+        {
+            completedWork = Math.Max(0L, completedWork);
+            while (m_sizingPercent < 4
+                && completedWork >= m_nextSizingProgressWork)
+            {
+                m_sizingPercent++;
+                m_nextSizingProgressWork = m_nextSizingProgressWork
+                    > long.MaxValue / 4L
+                    ? long.MaxValue
+                    : m_nextSizingProgressWork * 4L;
+            }
+            SetProgress(
+                m_sizingPercent,
+                "Sizing replay request ("
+                    + completedWork.ToString("N0", CultureInfo.InvariantCulture)
+                    + " graph items)");
         }
 
         internal void Cancel()
@@ -2084,6 +2158,30 @@ namespace AutoTerrainDesignations.Access
                     new AccessPathEndpoint(
                         AccessPathEndpointKind.GroundTiles, new[] { goal }),
                     1, AccessPathIntent.InspectExistingRoute);
+                bool writerProgressStarted = false;
+                bool sizingProgressObservedBeforeWriter = false;
+                var sizingProgress = new List<long>();
+                long lastSizingProgress = -1L;
+                AccessReplayGraphCodec.Serialize(
+                    new int[8192], CancellationToken.None,
+                    (completed, total) => writerProgressStarted = true,
+                    completed =>
+                    {
+                        if (!writerProgressStarted)
+                            sizingProgressObservedBeforeWriter = true;
+                        if (completed < lastSizingProgress)
+                            throw new InvalidOperationException(
+                                "Replay sizing progress was not monotonic.");
+                        lastSizingProgress = completed;
+                        sizingProgress.Add(completed);
+                    });
+                if (!sizingProgressObservedBeforeWriter
+                    || sizingProgress.Count < 2
+                    || lastSizingProgress <= 0L)
+                {
+                    failure = "Replay graph sizing did not report progress before graph writing.";
+                    return false;
+                }
                 byte[] encoded = AccessReplayGraphCodec.Serialize(request);
                 long lastCompleted = 0L;
                 long reportedTotal = 0L;
@@ -2417,11 +2515,18 @@ namespace AutoTerrainDesignations.Access
             object? value,
             CancellationToken cancellationToken,
             Action<long, long>? progress)
+            => Serialize(value, cancellationToken, progress, sizingProgress: null);
+
+        internal static byte[] Serialize(
+            object? value,
+            CancellationToken cancellationToken,
+            Action<long, long>? progress,
+            Action<long>? sizingProgress)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            long totalWork = progress == null
+            long totalWork = progress == null && sizingProgress == null
                 ? 0L
-                : new GraphCounter(cancellationToken).Count(value);
+                : new GraphCounter(cancellationToken, sizingProgress).Count(value);
             cancellationToken.ThrowIfCancellationRequested();
             using (var stream = new MemoryStream())
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
@@ -2597,16 +2702,24 @@ namespace AutoTerrainDesignations.Access
         private sealed class GraphCounter
         {
             private readonly CancellationToken m_cancellationToken;
+            private readonly Action<long>? m_progress;
             private readonly HashSet<object> m_seen =
                 new HashSet<object>(ReferenceComparer.Instance);
             private long m_work;
 
-            internal GraphCounter(CancellationToken cancellationToken)
-                => m_cancellationToken = cancellationToken;
+            internal GraphCounter(
+                CancellationToken cancellationToken,
+                Action<long>? progress)
+            {
+                m_cancellationToken = cancellationToken;
+                m_progress = progress;
+            }
 
             internal long Count(object? value)
             {
+                m_progress?.Invoke(0L);
                 Visit(value);
+                m_progress?.Invoke(m_work);
                 return Math.Max(1L, m_work);
             }
 
@@ -2614,7 +2727,10 @@ namespace AutoTerrainDesignations.Access
             {
                 m_work++;
                 if ((m_work & 4095L) == 0L)
+                {
                     m_cancellationToken.ThrowIfCancellationRequested();
+                    m_progress?.Invoke(m_work);
+                }
                 if (value == null) return;
                 Type type = value.GetType();
                 ValidateType(type);

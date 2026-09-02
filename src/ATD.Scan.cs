@@ -719,7 +719,7 @@ namespace AutoTerrainDesignations
                                     allowExistingPlannedRampShortcut: true,
                                     result: rampResult,
                                     sliceControl: sliceControl,
-                                    useWorkerSearch: true)),
+                                    useWorkerSearch: UseWorkerThread)),
                         () =>
                         {
                             var payload =
@@ -1324,7 +1324,7 @@ namespace AutoTerrainDesignations
                 allowExistingPlannedRampShortcut: true,
                 result: rampResult,
                 sliceControl: sliceControl,
-                useWorkerSearch: true);
+                useWorkerSearch: UseWorkerThread);
             while (rampRoutine.MoveNext())
                 yield return rampRoutine.Current;
             if (repairResult != null)

@@ -279,6 +279,7 @@ namespace AutoTerrainDesignations
         private static int s_startupTowerPrioritySyncAttempts;
         private static bool s_accessAvoidOcean = true;
         private static bool s_accessAvoidBuildings = true;
+        private static bool s_useWorkerThread = true;
         private static bool s_filterOreSpikes = true;
         private static bool s_allowRampsOutsideTowerAreas = true;
         private static bool s_accessHarvestDisruptedTrees = true;
@@ -296,6 +297,7 @@ namespace AutoTerrainDesignations
 
         internal static bool AccessAvoidOcean => s_accessAvoidOcean;
         internal static bool AccessAvoidBuildings => s_accessAvoidBuildings;
+        internal static bool UseWorkerThread => s_useWorkerThread;
         internal static bool FilterOreSpikes => s_filterOreSpikes;
         internal static bool AllowRampsOutsideTowerAreas =>
             s_allowRampsOutsideTowerAreas;
@@ -328,6 +330,7 @@ namespace AutoTerrainDesignations
 
         internal static void SetAccessAvoidOcean(bool value) => s_accessAvoidOcean = value;
         internal static void SetAccessAvoidBuildings(bool value) => s_accessAvoidBuildings = value;
+        internal static void SetUseWorkerThread(bool value) => s_useWorkerThread = value;
         internal static void SetFilterOreSpikes(bool value)
         {
             if (s_filterOreSpikes != value)
@@ -347,6 +350,7 @@ namespace AutoTerrainDesignations
         {
             s_accessAvoidOcean = AutoTerrainDesignationsMod.AccessAvoidOcean;
             s_accessAvoidBuildings = AutoTerrainDesignationsMod.AccessAvoidBuildings;
+            s_useWorkerThread = AutoTerrainDesignationsMod.UseWorkerThread;
             s_filterOreSpikes = AutoTerrainDesignationsMod.FilterOreSpikes;
             s_allowRampsOutsideTowerAreas =
                 AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas;
@@ -397,6 +401,7 @@ namespace AutoTerrainDesignations
         {
             AutoTerrainDesignationsMod.SetAccessAvoidOcean(s_accessAvoidOcean);
             AutoTerrainDesignationsMod.SetAccessAvoidBuildings(s_accessAvoidBuildings);
+            AutoTerrainDesignationsMod.SetUseWorkerThread(s_useWorkerThread);
             AutoTerrainDesignationsMod.SetFilterOreSpikes(s_filterOreSpikes);
             AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(
                 s_allowRampsOutsideTowerAreas);

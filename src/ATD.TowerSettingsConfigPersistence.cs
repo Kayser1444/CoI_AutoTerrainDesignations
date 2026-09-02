@@ -81,6 +81,8 @@ namespace AutoTerrainDesignations
             sb.Append(TowerSettingsConfigSchemaVersion.ToString(CultureInfo.InvariantCulture));
             sb.Append(",\"worldSettings\":{\"avoidOcean\":");
             AppendJsonBool(sb, AccessAvoidOcean);
+            sb.Append(",\"useWorkerThread\":");
+            AppendJsonBool(sb, UseWorkerThread);
             sb.Append(",\"filterOreSpikes\":");
             AppendJsonBool(sb, FilterOreSpikes);
             sb.Append(",\"avoidBuildings\":");
@@ -256,6 +258,8 @@ namespace AutoTerrainDesignations
             {
                 if (TryGetBool(worldSettings, "avoidOcean", out bool avoidOcean))
                     SetAccessAvoidOcean(avoidOcean);
+                if (TryGetBool(worldSettings, "useWorkerThread", out bool useWorkerThread))
+                    SetUseWorkerThread(useWorkerThread);
                 if (TryGetBool(worldSettings, "filterOreSpikes", out bool filterOreSpikes))
                     SetFilterOreSpikes(filterOreSpikes);
                 if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))

@@ -264,6 +264,18 @@
     "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
   ],
   [
+    "settings.world.performance",
+    "LEISTUNG"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "Worker-Thread verwenden"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "Einen Hintergrundthread für die Zugangs- und Bergbauplanung verwenden. Standardmäßig aktiviert. Zur Kompatibilitätsdiagnose deaktivieren; die Planung läuft dann im Spielthread und kann besonders bei großen Minen Pausen verursachen. Gilt für neue Planungsanfragen."
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "Landschaft zum Entfernen von Trümmern"
   ],

@@ -117,8 +117,10 @@ namespace AutoTerrainDesignations
         private static IEnumerator CaptureAndPlanMining(IAreaManagingTower tower,
             ExperimentalAccessSliceControl control, MiningExecutionResult output)
         {
+            AccessSearchReplayRecorder.RequestSnapshotSaveIfArmed("mining");
             TerrainManager terrain = s_desigManager!.TerrainManager;
             int world = CurrentWorldGeneration;
+            bool useWorkerThread = UseWorkerThread;
             var area = tower.Area;
             ATDTowerSettings settings = GetOrCreateTowerSettings(tower);
             int level = settings.OrePurityLevel;
@@ -169,18 +171,21 @@ namespace AutoTerrainDesignations
                 policy, new Tile2i(terrain.TerrainSize.X, terrain.TerrainSize.Y), columns, buildings);
             // Geometry determines the needed safety footprint. Each publication owns
             // sealed collections; later capture cannot mutate a worker's input.
-            foreach (MiningStage stage in new[] { MiningStage.Body, MiningStage.DirectSafety, MiningStage.Complete })
+            MiningStage stage = MiningStage.Body;
+            while (true)
             {
                 CheckCapture();
                 output.Request = request.Seal();
-                IEnumerator work = ExecuteMiningOnWorker(output.Request, stage, control, output, world);
+                IEnumerator work = useWorkerThread
+                    ? ExecuteMiningOnWorker(output.Request, stage, control, output, world)
+                    : ExecuteMiningOnGameThread(output.Request, stage, control, output, world);
                 try { while (work.MoveNext()) yield return work.Current; }
                 finally { (work as IDisposable)?.Dispose(); }
                 if (output.Plan == null) yield break;
                 if (output.Plan.Depths.Count == 0) break;
                 IEnumerable<Tile2i>? facts = stage == MiningStage.Body
                     ? MiningSafety.DirectFacts(request, output.Plan)
-                    : stage == MiningStage.DirectSafety
+                    : output.Plan.NeedsSafetyCoverage
                         ? MiningSafety.TraceExterior(request, output.Plan, new List<Tile2i>()) : null;
                 if (facts == null) break;
                 control.ReportPhase("Capturing mine safety footprint");
@@ -192,6 +197,7 @@ namespace AutoTerrainDesignations
                     if (timer.ElapsedMilliseconds >= control.SliceBudgetMilliseconds)
                     { yield return null; timer.Restart(); }
                 }
+                stage = MiningStage.SafetyCoverage;
             }
             LogDebug($"[ATD Mining Capture] columns={columns.Count} estimatedRetainedBytes={estimatedBytes} "
                 + $"terrainReadMs={captureMilliseconds:0.###} maxColumnMs={maxColumnMilliseconds:0.###}");
@@ -268,6 +274,27 @@ namespace AutoTerrainDesignations
                 if (!consumed) worker.Abandon(id, "MiningDisposed");
                 control.ClearDisposalCancellation();
             }
+        }
+
+        private static IEnumerator ExecuteMiningOnGameThread(
+            MiningRequest request,
+            MiningStage stage,
+            ExperimentalAccessSliceControl control,
+            MiningExecutionResult output,
+            int world)
+        {
+            output.Plan = null;
+            IEnumerator wait = WaitForAccessSearchWorkerToStop(control, world);
+            while (wait.MoveNext())
+                yield return wait.Current;
+            if (control.CancellationRequested || !IsWorldGenerationActive(world))
+                yield break;
+
+            control.ReportPhase("Planning mine");
+            // The pure mining planner is synchronous; unlike access search it
+            // has no resumable session. Opting out can therefore cause a hitch.
+            output.Plan = MiningPlanner.Execute(request, stage);
+            yield break;
         }
 
         private static IEnumerator RecordMiningReplay(MiningExecutionResult mining)

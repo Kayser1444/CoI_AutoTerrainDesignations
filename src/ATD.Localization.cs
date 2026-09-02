@@ -152,6 +152,8 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.heading.designations", "Designations", "Settings section heading for designation behavior.");
         public static LocStr SettingsHeadingScanPerformance =
             Loc.Str("settings.heading.scan_performance", "Scan performance", "Settings section heading for scan performance.");
+        public static LocStr SettingsHeadingPerformance =
+            Loc.Str("settings.world.performance", "PERFORMANCE", "Settings section heading for world performance settings.");
         public static LocStr SettingsHeadingKeyboardShortcuts =
             Loc.Str("settings.heading.keyboard_shortcuts", "Keyboard shortcuts", "Settings section heading for keyboard shortcuts.");
         public static LocStr SettingsHeadingNotifications =
@@ -174,6 +176,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.avoid_buildings.label", "Avoid buildings", "World safety setting label for building avoidance.");
         public static LocStr SettingsAvoidBuildingsTooltip =
             Loc.Str("settings.world.avoid_buildings.tooltip", "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided.", "World safety setting tooltip for building avoidance.");
+        public static LocStr SettingsUseWorkerThreadLabel =
+            Loc.Str("settings.world.use_worker_thread.label", "Use worker thread", "World performance setting label for dedicated worker-thread execution.");
+        public static LocStr SettingsUseWorkerThreadTooltip =
+            Loc.Str("settings.world.use_worker_thread.tooltip", "Use a background thread for access and mining planning. Enabled by default. Turn off for compatibility troubleshooting; planning then runs on the game thread and may cause pauses, especially in large mines. Applies to new planning requests.", "World performance setting tooltip for dedicated worker-thread execution.");
         public static LocStr SettingsHarvestDisruptedTreesLabel =
             Loc.Str("settings.world.harvest_disrupted_trees.label", "Harvest disrupted trees", "World safety setting label for disrupted-tree harvesting.");
         public static LocStr SettingsHarvestDisruptedTreesTooltip =

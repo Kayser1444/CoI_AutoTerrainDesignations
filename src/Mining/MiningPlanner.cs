@@ -108,23 +108,35 @@ namespace AutoTerrainDesignations.Mining
                 m_policy.PurityLevel <= 0);
             var plan = new MiningPlan(depths, corners, "Planned");
             if (stage == MiningStage.DirectSafety) return plan;
-            var rejected = new List<Tile2i>();
-            foreach (Tile2i fact in MiningSafety.TraceExterior(m_request, plan, rejected))
+            // Removing a boundary exposes previously shared faces. Only publish a
+            // complete plan after its rebuilt geometry passes an entire safety pass.
+            // Every unsuccessful pass removes at least one origin, so this converges
+            // without an arbitrary iteration limit that could publish unsafe work.
+            while (true)
             {
-                Checkpoint();
-                // Fail closed on absent facts; a missing sample is never empty terrain.
-                m_request.Column(fact);
-            }
-            foreach (Tile2i origin in rejected) depths.Remove(origin);
-            if (rejected.Count > 0)
-            {
+                var rejected = new List<Tile2i>();
+                foreach (Tile2i fact in MiningSafety.TraceExterior(m_request, plan, rejected))
+                {
+                    Checkpoint();
+                    // Coverage discovery returns the untouched start-of-pass plan.
+                    // The main thread captures its rays, seals the enlarged facts,
+                    // and retries on the worker. Complete/replay still fail closed.
+                    if (stage == MiningStage.SafetyCoverage && !m_request.TryGetColumn(fact, out _))
+                        return new MiningPlan(depths, corners, MiningPlan.SafetyCoverageRequired);
+                    m_request.Column(fact);
+                }
+                if (rejected.Count == 0)
+                {
+                    Checkpoint();
+                    return plan;
+                }
+                foreach (Tile2i origin in rejected) depths.Remove(origin);
                 FilterIsolatedDesignations(depths, targets, resources, m_policy.PurityLevel);
                 if (depths.Count == 0) return Empty("SafetyRemovedAll", true);
                 corners = BuildAndSmoothCornerHeights(depths, m_policy.MaxHeightDiff,
                     m_policy.PurityLevel <= 0);
+                plan = new MiningPlan(depths, corners, "Planned");
             }
-            Checkpoint();
-            return new MiningPlan(depths, corners, "Planned");
         }
 
         private static MiningPlan Empty(string reason, bool reconcile = false)

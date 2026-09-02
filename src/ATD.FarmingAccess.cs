@@ -709,7 +709,7 @@ namespace AutoTerrainDesignations
                         emitNoCandidateWarnings: false,
                         newPlannerOnly: true,
                         sliceControl: sliceControl,
-                        useWorkerSearch: true),
+                        useWorkerSearch: UseWorkerThread),
                     () =>
                     {
                         var payload = new FarmingManagedAccessResult(

@@ -73,14 +73,16 @@ namespace AutoTerrainDesignations.Mining
             new HashSet<Tile2i>(m_buildings));
     }
 
-    internal enum MiningStage { Body, DirectSafety, Complete }
+    internal enum MiningStage { Body, DirectSafety, Complete, SafetyCoverage }
 
     internal sealed class MiningPlan
     {
+        internal const string SafetyCoverageRequired = "SafetyCoverageRequired";
         public readonly Dict<Tile2i, int> Depths;
         public readonly Dict<Tile2i, int> Corners;
         public readonly bool ReconcileEmpty;
         public readonly string Outcome;
+        public bool NeedsSafetyCoverage => Outcome == SafetyCoverageRequired;
         public MiningPlan(Dict<Tile2i, int> depths, Dict<Tile2i, int> corners,
             string outcome, bool reconcileEmpty = false)
         { Depths = depths; Corners = corners; Outcome = outcome; ReconcileEmpty = reconcileEmpty; }

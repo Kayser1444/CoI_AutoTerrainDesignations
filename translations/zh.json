@@ -264,6 +264,18 @@
     "在最终确定的通道和采矿指定干扰区域中标记树木以供采伐。禁用后，ATD 不会创建树木采伐订单。 ATD 下的收获订单可通过清除操作删除；不相关的玩家收获订单被保留。"
   ],
   [
+    "settings.world.performance",
+    "性能"
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "使用工作线程"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "使用后台线程进行通道和采矿规划。默认启用。关闭此选项可排查兼容性问题；规划随后会在游戏线程中运行，并可能导致暂停，尤其是在大型矿区中。仅适用于新的规划请求。"
+  ],
+  [
     "settings.world.allow_dig_to_remove_debris.label",
     "景观清除杂物"
   ],
