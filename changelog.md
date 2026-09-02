@@ -1,4 +1,4 @@
-v0.8.1 [unreleased]
+v0.8.1 [packaged]
 
 * Added: World settings now includes **PERFORMANCE → Use worker thread**, enabled by default. The per-world opt-out runs new planning requests on the game thread; Save as config stores the default for future worlds. Mining passes can pause the game in this mode. Backend changes wait for any cancelled worker computation to stop before starting game-thread planning.
 
