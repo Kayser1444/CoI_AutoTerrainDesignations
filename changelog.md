@@ -1,5 +1,7 @@
 v0.8.2 [unreleased]
 
+* Fixed: Access Search Laboratory replay now accepts request graphs up to the 1 GiB payload bound, allowing max-area captures whose serialized request exceeds the former 768 MiB section limit.
+
 * Fixed: Ore Sorting Plant export routes, priorities, and assigned-truck state now save successfully by registering the `atdOreSorterExports` state parameter in `config.json`.
 
 * Added: **PERFORMANCE → Reduce oversized areas** is a default-on per-world option. When the normal access snapshot exceeds its memory ceiling, ATD now builds one deterministic, geometry-only low-turn corridor from the active source cluster toward known goals or the tower access, captures terrain and blockers only inside its sparse context mask, and runs the normal route search there. The reduced attempt may select a different route; `ReducedAreaNoPath` remains inconclusive. Requests whose full snapshot fits keep the existing path.

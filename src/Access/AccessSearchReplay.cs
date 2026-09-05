@@ -933,6 +933,11 @@ namespace AutoTerrainDesignations.Access
     {
         private const int MaxCompressedBytes = 256 * 1024 * 1024;
         private const int MaxPayloadBytes = 1024 * 1024 * 1024;
+        // A max-area capture can legitimately place almost the entire replay
+        // payload in the request graph. Keep this bound aligned with the
+        // enclosing payload limit; framing and expected data remain covered
+        // by the payload-size check.
+        private const int MaxRequestBytes = 1024 * 1024 * 1024;
 
         internal static bool TryReplayCase(string caseDirectory, out string report)
             => TryReplayCaseCore(
@@ -1206,7 +1211,7 @@ namespace AutoTerrainDesignations.Access
                     int schema = reader.ReadInt32();
                     if (schema != 1)
                         throw new InvalidDataException($"Unsupported replay schema {schema}.");
-                    int requestLength = ReadLength(reader, 768 * 1024 * 1024);
+                    int requestLength = ReadLength(reader, MaxRequestBytes);
                     requestBytes = reader.ReadBytes(requestLength);
                     if (requestBytes.Length != requestLength)
                         throw new EndOfStreamException("Truncated replay request.");
@@ -1721,7 +1726,7 @@ namespace AutoTerrainDesignations.Access
                 if (reader.ReadString() != "ATD_ACCESS_REPLAY"
                     || reader.ReadInt32() != 1)
                     throw new InvalidDataException("Replay header mismatch.");
-                int requestLength = ReadLength(reader, 768 * 1024 * 1024);
+                int requestLength = ReadLength(reader, MaxRequestBytes);
                 byte[] requestBytes = reader.ReadBytes(requestLength);
                 if (requestBytes.Length != requestLength)
                     throw new EndOfStreamException("Truncated replay request.");
@@ -1772,7 +1777,7 @@ namespace AutoTerrainDesignations.Access
                     if (reader.ReadString() != "ATD_ACCESS_REPLAY"
                         || reader.ReadInt32() != 1)
                         throw new InvalidDataException("Replay header mismatch.");
-                    int length = ReadLength(reader, 768 * 1024 * 1024);
+                    int length = ReadLength(reader, MaxRequestBytes);
                     requestBytes = reader.ReadBytes(length);
                     if (requestBytes.Length != length)
                         throw new EndOfStreamException("Truncated replay request.");
