@@ -173,9 +173,17 @@ The per-world **Use worker thread** option is enabled by default. It runs
 pure access and mining planning on ATD's dedicated worker thread to reduce
 game-thread stalls. Disable it for compatibility troubleshooting. Planning
 then runs on the game thread and may cause pauses, especially in large mines.
-The change applies to new planning requests; an active request finishes using
-its selected backend. **Save as config** makes the current world value the
-default for new worlds.
+The execution-mode change applies to new planning requests; an active request
+finishes using its selected backend.
+
+The per-world **Reduce oversized areas** option is also enabled by default.
+If the normal access snapshot would exceed its configured memory ceiling, ATD
+tries one smaller, geometry-only corridor around the current access sources
+and goals. Its purpose is to find some usable route in very large modded tower
+areas; it may choose a different route than a full-area search. A failed
+reduced search is inconclusive and does not prove that the full area has no
+route.
+**Save as config** makes both current world values the defaults for new worlds.
 
 Useful console commands:
 

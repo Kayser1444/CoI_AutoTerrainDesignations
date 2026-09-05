@@ -24,7 +24,8 @@ namespace AutoTerrainDesignations.Access
         EdgeMismatch,
         Obstructed,
         UnsupportedGeometry,
-        SnapshotTooLarge
+        SnapshotTooLarge,
+        ReducedAreaNoPath
     }
 
     public enum AccessNeedType

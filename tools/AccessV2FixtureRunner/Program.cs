@@ -27,8 +27,11 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 && string.Equals(args[0], "benchmark", StringComparison.OrdinalIgnoreCase);
             bool auditCase = args.Length == 4
                 && string.Equals(args[0], "audit-case", StringComparison.OrdinalIgnoreCase);
+            bool reductionFixture = args.Length == 3
+                && string.Equals(args[0], "reduction-fixture", StringComparison.OrdinalIgnoreCase);
             bool caseMode = replay || benchmarkCodec || candidateReplay
-                || compatibleReplay || traceCandidate || benchmark || auditCase;
+                || compatibleReplay || traceCandidate || benchmark || auditCase
+                || reductionFixture;
             if (!caseMode && args.Length != 2)
             {
                 Console.Error.WriteLine(
@@ -38,6 +41,7 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     + "  AccessV2FixtureRunner candidate-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
                     + "  AccessV2FixtureRunner compatible-replay <ATD assembly> <CoI Managed directory> <case directory>\n"
                     + "  AccessV2FixtureRunner audit-case <ATD assembly> <CoI Managed directory> <case directory>\n"
+                    + "  AccessV2FixtureRunner reduction-fixture <ATD assembly> <CoI Managed directory>\n"
                     + "  AccessV2FixtureRunner trace-candidate <ATD assembly> <CoI Managed directory> <case directory> <trace.csv>\n"
                     + "  AccessV2FixtureRunner benchmark <ATD assembly> <CoI Managed directory> <case directory> <repetitions>\n"
                     + "  AccessV2FixtureRunner codec-benchmark <ATD assembly> <CoI Managed directory> <case directory>");
@@ -51,6 +55,8 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
             try
             {
                 Assembly assembly = Assembly.LoadFrom(assemblyPath);
+                if (reductionFixture)
+                    return RunReductionFixture(assembly);
                 if (replay)
                     return ReplayCase(assembly, Path.GetFullPath(args[3]));
                 if (candidateReplay || compatibleReplay)
@@ -324,6 +330,31 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
             {
                 AppDomain.CurrentDomain.AssemblyResolve -= ResolveAssembly;
             }
+        }
+
+        private static int RunReductionFixture(Assembly assembly)
+        {
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            Type fixtures = assembly.GetType(
+                "AutoTerrainDesignations.Access.Reduction.ReducedAccessDomainFixtures",
+                true);
+            MethodInfo validate = fixtures.GetMethod(
+                "ValidateAll",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                ?? throw new MissingMethodException(fixtures.FullName, "ValidateAll");
+            object[] args = { string.Empty };
+            bool success = (bool)(validate.Invoke(null, args) ?? false);
+            timer.Stop();
+            Console.WriteLine(
+                $"Reduced access fixtures: success={success} failure={args[0]} "
+                + $"elapsedMs={timer.Elapsed.TotalMilliseconds:0.##}");
+            if (success && timer.Elapsed > TimeSpan.FromSeconds(5))
+            {
+                Console.Error.WriteLine(
+                    "Reduced access fixtures exceeded the 5 second ceiling.");
+                return 1;
+            }
+            return success ? 0 : 1;
         }
 
         private static int ReplayCase(Assembly assembly, string caseDirectory)

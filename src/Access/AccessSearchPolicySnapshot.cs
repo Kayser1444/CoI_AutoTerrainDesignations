@@ -19,6 +19,7 @@ namespace AutoTerrainDesignations.Access
         public bool AvoidOcean { get; }
         public bool AvoidBuildings { get; }
         public bool AllowRampsOutsideTowerAreas { get; }
+        public bool ReduceOversizedAreas { get; }
         public bool HarvestDisruptedTrees { get; }
         public bool AllowDigToRemoveDebris { get; }
         public QuickRemoveDebrisPolicy QuickRemoveDebrisPolicy { get; }
@@ -59,6 +60,7 @@ namespace AutoTerrainDesignations.Access
             bool avoidOcean,
             bool avoidBuildings,
             bool allowRampsOutsideTowerAreas,
+            bool reduceOversizedAreas,
             bool harvestDisruptedTrees,
             bool allowDigToRemoveDebris,
             QuickRemoveDebrisPolicy quickRemoveDebrisPolicy,
@@ -92,6 +94,7 @@ namespace AutoTerrainDesignations.Access
             AvoidOcean = avoidOcean;
             AvoidBuildings = avoidBuildings;
             AllowRampsOutsideTowerAreas = allowRampsOutsideTowerAreas;
+            ReduceOversizedAreas = reduceOversizedAreas;
             HarvestDisruptedTrees = harvestDisruptedTrees;
             AllowDigToRemoveDebris = allowDigToRemoveDebris;
             QuickRemoveDebrisPolicy = quickRemoveDebrisPolicy;
@@ -129,6 +132,7 @@ namespace AutoTerrainDesignations.Access
                 AutoTerrainDesignationsMod.AccessAvoidOcean,
                 AutoTerrainDesignationsMod.AccessAvoidBuildings,
                 AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas,
+                AutoDepthDesignation.ReduceOversizedAreas,
                 AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees,
                 AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris,
                 AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy,
@@ -169,6 +173,7 @@ namespace AutoTerrainDesignations.Access
                 avoidOcean,
                 avoidBuildings,
                 AllowRampsOutsideTowerAreas,
+                ReduceOversizedAreas,
                 HarvestDisruptedTrees,
                 AllowDigToRemoveDebris,
                 QuickRemoveDebrisPolicy,
@@ -208,6 +213,7 @@ namespace AutoTerrainDesignations.Access
                 Add(policy.AvoidOcean ? 1 : 0);
                 Add(policy.AvoidBuildings ? 1 : 0);
                 Add(policy.AllowRampsOutsideTowerAreas ? 1 : 0);
+                Add(policy.ReduceOversizedAreas ? 1 : 0);
                 Add(policy.HarvestDisruptedTrees ? 1 : 0);
                 Add(policy.AllowDigToRemoveDebris ? 1 : 0);
                 Add((int)policy.QuickRemoveDebrisPolicy);

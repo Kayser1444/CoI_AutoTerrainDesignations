@@ -180,6 +180,10 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.world.use_worker_thread.label", "Use worker thread", "World performance setting label for dedicated worker-thread execution.");
         public static LocStr SettingsUseWorkerThreadTooltip =
             Loc.Str("settings.world.use_worker_thread.tooltip", "Use a background thread for access and mining planning. Enabled by default. Turn off for compatibility troubleshooting; planning then runs on the game thread and may cause pauses, especially in large mines. Applies to new planning requests.", "World performance setting tooltip for dedicated worker-thread execution.");
+        public static LocStr SettingsReduceOversizedAreasLabel =
+            Loc.Str("settings.world.reduce_oversized_areas.label", "Reduce oversized areas", "World performance setting label for reduced access snapshots.");
+        public static LocStr SettingsReduceOversizedAreasTooltip =
+            Loc.Str("settings.world.reduce_oversized_areas.tooltip", "When the full access snapshot is too large for the memory ceiling, try one smaller geometry-only corridor around the current starts and goals. This aims to find some route; it may differ from a full-area route, and failure does not prove that no route exists.", "World performance setting tooltip for reduced access snapshots.");
         public static LocStr SettingsHarvestDisruptedTreesLabel =
             Loc.Str("settings.world.harvest_disrupted_trees.label", "Harvest disrupted trees", "World safety setting label for disrupted-tree harvesting.");
         public static LocStr SettingsHarvestDisruptedTreesTooltip =

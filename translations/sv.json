@@ -212,6 +212,10 @@
     "Skanningsprestanda"
   ],
   [
+    "settings.world.performance",
+    "PRESTANDA"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "Kortkommandon"
   ],
@@ -256,24 +260,28 @@
     "Undvik byggnader i genererade tillfarter och gruvplaner i den här världen. Gruvceller som överlappar en byggnad eller dess säkerhetsmarginal utesluts. Även beräknad terrängstörning nära byggnader undviks."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "Skörda störda träd"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
-  ],
-  [
-    "settings.world.performance",
-    "PRESTANDA"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "Använd arbetstråd"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "Använd en bakgrundstråd för planering av tillfarter och gruvdrift. Aktiverad som standard. Stäng av för felsökning av kompatibilitet; planeringen körs då i speltråden och kan orsaka pauser, särskilt i stora gruvor. Gäller nya planeringsförfrågningar."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "Minska överdimensionerade områden"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "När den fullständiga åtkomstögonblicksbilden är för stor för minnesgränsen, försök med en mindre korridor baserad enbart på geometri runt de aktuella starterna och målen. Målet är att hitta någon väg; den kan skilja sig från en väg över hela området, och ett misslyckande bevisar inte att ingen väg finns."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Skörda störda träd"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",

@@ -212,6 +212,10 @@
     "Rendimiento del escaneo"
   ],
   [
+    "settings.world.performance",
+    "RENDIMIENTO"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "Atajos de teclado"
   ],
@@ -256,24 +260,28 @@
     "Evite los edificios en los accesos generados y los planes mineros en este mundo. Se excluyen las celdas mineras que se superpongan a un edificio o a su perímetro de seguridad. También se evitan las perturbaciones previstas del terreno cerca de los edificios."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "Cosecha de árboles interrumpidos"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
-  ],
-  [
-    "settings.world.performance",
-    "RENDIMIENTO"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "Usar subproceso de trabajo"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "Usar un subproceso en segundo plano para planificar accesos y minería. Está activado de forma predeterminada. Desactívalo para solucionar problemas de compatibilidad; la planificación se ejecutará en el subproceso del juego y puede causar pausas, especialmente en minas grandes. Se aplica a las nuevas solicitudes de planificación."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "Reducir áreas sobredimensionadas"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "Cuando la instantánea completa de acceso es demasiado grande para el límite de memoria, se intenta un corredor más pequeño y basado solo en geometría alrededor de los inicios y objetivos actuales. El objetivo es encontrar alguna ruta; puede diferir de la ruta del área completa, y un fallo no demuestra que no exista ninguna ruta."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Cosecha de árboles interrumpidos"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",

@@ -6,5 +6,9 @@
   "atdPendingVehicleAllocations": {
     "default": "{\"schemaVersion\":1,\"queues\":[],\"tickets\":[]}",
     "description": "Internal saved state for pending ATD vehicle pre-allocation queues."
+  },
+  "atdOreSorterExports": {
+    "default": "{\"schemaVersion\":1,\"sorters\":[]}",
+    "description": "Internal saved state for ATD ore sorter export routes and assignments."
   }
 }

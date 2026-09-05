@@ -53,6 +53,8 @@ namespace AutoTerrainDesignations.Access
 
         public static bool ValidateCoreTransitions(out string failure)
         {
+            if (!AccessPropTerrainRemovalFixtures.Validate(out failure))
+                return false;
             var noPathResult = new AccessSearchResult(
                 false, "NoPath", Tile2i.Zero,
                 Array.Empty<AccessSearchNode>(), 0f, 0,
@@ -676,40 +678,6 @@ namespace AutoTerrainDesignations.Access
                     AccessHandoffOperation.Dumping, buriedProp,
                     exactPropSample))
             { failure = "exact-position accessway prop classifier failed"; return false; }
-            if (AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Always,
-                    buriedByPlannedDumping: true,
-                    removedByPlannedExcavation: false,
-                    out _)
-                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Always,
-                    buriedByPlannedDumping: false,
-                    removedByPlannedExcavation: true,
-                    out bool alwaysQuick)
-                || !alwaysQuick
-                || AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Restrictive,
-                    buriedByPlannedDumping: true,
-                    removedByPlannedExcavation: false,
-                    out _)
-                || AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Restrictive,
-                    buriedByPlannedDumping: false,
-                    removedByPlannedExcavation: true,
-                    out _)
-                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Restrictive,
-                    buriedByPlannedDumping: false,
-                    removedByPlannedExcavation: false,
-                    out bool restrictiveQuick)
-                || !restrictiveQuick
-                || !AccessPropCleanupPolicy.TryGetNonBuriedPropRemovalStrategy(
-                    QuickRemoveDebrisPolicy.Never,
-                    buriedByPlannedDumping: false,
-                    removedByPlannedExcavation: false,
-                    out bool neverQuick)
-                || neverQuick)
-            { failure = "non-buried prop-removal strategy policy failed"; return false; }
             for (int fixedCoordinate = -5; fixedCoordinate <= 5; fixedCoordinate++)
             {
                 for (int start = -5; start <= 5; start++)
@@ -6661,7 +6629,8 @@ namespace AutoTerrainDesignations.Access
         internal static IReadOnlyCollection<Tile2i> BuildFinalGeneratedDisturbedTiles(
             AccessSearchSnapshot snapshot,
             AccessSearchResult result,
-            AccessSearchWorkspace? workspace = null)
+            AccessSearchWorkspace? workspace = null,
+            IDictionary<Tile2i, AccessProjectedTerrainEffect>? projectedWork = null)
         {
             if (result.V2Route != null)
             {
@@ -6680,6 +6649,9 @@ namespace AutoTerrainDesignations.Access
                             v2Disturbed.Add(generated[index].Origin
                                 + new RelTile2i(x, y));
                 v2Disturbed.UnionWith(replayedHistory.CollectRayTiles());
+                if (projectedWork != null)
+                    foreach (Tile2i tile in replayedHistory.CollectRayTiles())
+                        projectedWork[tile] = replayedHistory.GetProjectedTerrainEffect(tile);
                 return v2Disturbed;
             }
             var disturbed = new HashSet<Tile2i>();
@@ -6715,6 +6687,12 @@ namespace AutoTerrainDesignations.Access
                         snapshot, node.Position, profile, node.EntryDirection, operation,
                         out AccessLandscapingCost landscaping, out _, out _,
                         history: replayHistory);
+                    if (projectedWork != null && landscaping.IsFatal)
+                    {
+                        projectedWork.Clear();
+                        return disturbed;
+                    }
+                    CollectProjectedWork(landscaping.RayHeightConstraints);
                     foreach (Tile2i tile in landscaping.DisturbedRayTiles)
                         disturbed.Add(tile);
                     for (int x = 0; x <= 4; x++)
@@ -6760,6 +6738,12 @@ namespace AutoTerrainDesignations.Access
                             GetGeneratedWorkOperation(predecessorOperation),
                             snapshot.VehicleClearanceRadius);
                     }
+                    if (projectedWork != null && turnRay.IsFatal)
+                    {
+                        projectedWork.Clear();
+                        return disturbed;
+                    }
+                    CollectProjectedWork(turnRayConstraints);
                     replayHistory = replayHistory.WithGenerated(
                         node.Position, profile,
                         MergeDisturbedRayTiles(
@@ -6774,6 +6758,26 @@ namespace AutoTerrainDesignations.Access
                 predecessor = node;
             }
             return disturbed;
+
+            void CollectProjectedWork(IReadOnlyList<AccessRayHeightConstraint> constraints)
+            {
+                if (projectedWork == null)
+                    return;
+                foreach (AccessRayHeightConstraint constraint in constraints)
+                {
+                    projectedWork.TryGetValue(constraint.Tile, out AccessProjectedTerrainEffect effect);
+                    effect.Merge(new AccessProjectedTerrainEffect
+                    {
+                        HasCutWork = !constraint.IsSafetyOnly && constraint.Operation == AccessSideRayOperation.Cut,
+                        CutCeiling = constraint.Height,
+                        HasFillWork = !constraint.IsSafetyOnly && constraint.Operation == AccessSideRayOperation.Fill,
+                        FillFloor = constraint.Height,
+                        HasCutSafety = constraint.IsSafetyOnly && constraint.Operation == AccessSideRayOperation.Cut,
+                        HasFillSafety = constraint.IsSafetyOnly && constraint.Operation == AccessSideRayOperation.Fill,
+                    });
+                    projectedWork[constraint.Tile] = effect;
+                }
+            }
         }
 
         private static bool ValidateGeneratedPath(IReadOnlyList<AccessSearchNode> path,

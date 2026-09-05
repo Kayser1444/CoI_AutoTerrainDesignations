@@ -2,6 +2,35 @@
 
 Status: implemented and integrated with the accessway pathfinder.
 
+## Commit-time terrain destruction exemption
+
+After route selection, `AccessPropTerrainRemoval` decides whether each live
+non-tree prop still needs a separate cleanup request. This does not refund
+search costs, alter route selection, or change the canonical cleanup metadata.
+The existing tree-harvest behavior is unchanged.
+
+The internal, non-configurable safety margin is `0.5` terrain levels. Skip a
+request, including under **Always**, only when projected terrain is strictly
+below `PlacedAtHeight + PlacementHeightOffset - 0.5`, or strictly above
+`PlacedAtHeight + scaled DespawnBuriedThreshold + 0.5`. The runtime reads all
+prop-specific thresholds and the exact position from the live prop; older
+captures lack placement-height offsets and must not invent them.
+
+Explicit final designation targets are evaluated at the exact prop position.
+Outside their footprints, the final generated route's replayed side-ray work
+must predict the same removal direction at all four surrounding terrain samples.
+An explicit designation covering a sample takes precedence over crossing rays.
+Safety-only spans provide no usable height. Missing samples, opposing work,
+unknown operations, non-finite values and exact margin equality retain cleanup.
+For props still needing removal, **Always** and **Restrictive** use quick removal;
+**Never** keeps the existing landscaping/manual-fallback behavior.
+
+Both V1 and V2 use their existing final-route replay to collect the projected
+work. No search policy, capture schema, serialization, or persistent state is
+added. Failed replay retains cleanup. The projections remain approximate terrain
+models, not a guarantee about vanilla landslide execution; in-game verification
+of the exemption remains necessary.
+
 ## Problem
 
 Terrain props are not all equivalent blockers. Trees are props, but CoI spaces trees far enough apart that even mega vehicles can normally weave through or around a forest without terrain work. Boulders, bushes, and similar debris props are different: they can sit densely enough on otherwise usable ground that vanilla vehicle pathability marks the occupied tiles blocked. The current accessway snapshot excludes those blocked tiles from the `G` graph. When a blocked ground strip lies between two clear ground regions, the pathfinder can route around it by switching from `G` to generated `V`, digging under or through the prop footprint, then switching back from `V` to `G`.

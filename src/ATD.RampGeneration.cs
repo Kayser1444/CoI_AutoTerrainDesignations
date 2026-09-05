@@ -21,6 +21,7 @@ using Mafi.Core.Terrain;
 using Mafi.Core.Terrain.Designation;
 using UnityEngine;
 using AutoTerrainDesignations.Access;
+using AutoTerrainDesignations.Access.Reduction;
 using Mafi.Core.Products;
 using Mafi.Core.Prototypes;
 using EntityId = Mafi.Core.EntityId;
@@ -671,9 +672,18 @@ namespace AutoTerrainDesignations
                 LogExperimentalAccessDebug(preflight.Format());
                 if (snapshotTooLarge)
                 {
-                    experimentalSearchEnabled = false;
                     experimentalSnapshotTooLarge = true;
-                    result.FailureReason = "SnapshotTooLarge";
+                    if (!ReduceOversizedAreas)
+                    {
+                        experimentalSearchEnabled = false;
+                        result.FailureReason = "SnapshotTooLarge";
+                    }
+                    else
+                    {
+                        LogExperimentalAccessDebug(
+                            "[ATD Access Reduction] full snapshot exceeds "
+                            + "the ceiling; planning one reduced domain per cluster.");
+                    }
                 }
             }
 
@@ -832,7 +842,7 @@ namespace AutoTerrainDesignations
                 bool experimentalCandidateUsesOutsideArea = false;
                 AccessReplayMemoryEvidence? experimentalMemoryEvidence = null;
                 string experimentalFailureSummary =
-                    experimentalSnapshotTooLarge
+                    experimentalSnapshotTooLarge && !ReduceOversizedAreas
                         ? "SnapshotTooLarge"
                         : string.Empty;
                 if (experimentalSearchEnabled)
@@ -852,8 +862,66 @@ namespace AutoTerrainDesignations
                         accessibleFixedGoals.Clear();
                     var snapshotBuild =
                         new ExperimentalAccessSnapshotBuildResult();
-                    IEnumerator snapshotPreparation =
-                        BuildExperimentalAccessSnapshot(
+                    ReducedAccessDomainPlan? reducedDomain = null;
+                    if (experimentalSnapshotTooLarge)
+                    {
+                        var geometryGoals = new List<Tile2i>(
+                            accessibleFixedGoals);
+                        if (groundGoalOverride != null)
+                            geometryGoals.AddRange(groundGoalOverride);
+                        Tile2i physicalMax = new Tile2i(
+                            terrMgr.TerrainSize.X - 1,
+                            terrMgr.TerrainSize.Y - 1);
+                        Tile2i proxy = GetTowerAccessPosition(
+                            tower,
+                            tower.Area.BoundingBoxMin,
+                            tower.Area.BoundingBoxMax);
+                        bool planned = ReducedAccessDomainPlanner.TryPlan(
+                            cluster.Origins.Select(origin => origin.Origin)
+                                .ToArray(),
+                            geometryGoals,
+                            proxy,
+                            tower.Area,
+                            Tile2i.Zero,
+                            physicalMax,
+                            generatedAreaMargin: 0,
+                            minimumHalfWidth: Math.Max(4,
+                                configuredRampWidth + 2),
+                            captureHalo:
+                                Math.Max(
+                                    RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                                    AutoTerrainDesignationsMod
+                                        .AccessCandidateRayMaxDistance
+                                    + AutoTerrainDesignationsMod
+                                        .AccessRayEndBuffer) + 4,
+                            memoryCeilingBytes:
+                                AutoTerrainDesignationsMod
+                                    .AccessSnapshotMemoryCeilingMiB
+                                * 1024L * 1024L,
+                            out reducedDomain,
+                            out string reductionFailure);
+                        if (!planned)
+                        {
+                            snapshotBuild.FailureReason =
+                                "ReducedAreaNoPath:" + reductionFailure;
+                        }
+                        else
+                        {
+                            LogExperimentalAccessDebug(
+                                $"[ATD Access Reduction] cluster={cluster.ClusterId} "
+                                + $"version={ReducedAccessDomainPlanner.Version} "
+                                + $"selectedSources={reducedDomain.SelectedSources.Count} "
+                                + $"builtBranches={reducedDomain.BuiltSourceBranchCount} "
+                                + $"searchOrigins={reducedDomain.SearchOrigins.Count} "
+                                + $"captureTiles={reducedDomain.CaptureTiles.Count} "
+                                + $"halfWidth={reducedDomain.CorridorHalfWidth} "
+                                + $"estimatedBytes={reducedDomain.EstimatedBytes} "
+                                + $"fingerprint={reducedDomain.Fingerprint}");
+                        }
+                    }
+                    IEnumerator? snapshotPreparation = reducedDomain != null
+                        || !experimentalSnapshotTooLarge
+                        ? BuildExperimentalAccessSnapshot(
                             tower,
                             accessWorkDepths,
                             cornerHeights,
@@ -865,9 +933,12 @@ namespace AutoTerrainDesignations
                             generatedAreaMarginTiles: 0,
                             snapshotBuild,
                             sliceControl,
-                            createWorkspace: !useWorkerSearch);
-                    while (snapshotPreparation.MoveNext())
-                        yield return snapshotPreparation.Current;
+                            createWorkspace: !useWorkerSearch,
+                            reducedDomain: reducedDomain)
+                        : null;
+                    if (snapshotPreparation != null)
+                        while (snapshotPreparation.MoveNext())
+                            yield return snapshotPreparation.Current;
                     string refreshFailure = snapshotBuild.FailureReason;
                     if (snapshotBuild.Snapshot != null)
                     {
@@ -882,13 +953,15 @@ namespace AutoTerrainDesignations
                         LogExperimentalAccessDebug(
                             $"[ATD Access Search] cluster={cluster.ClusterId} " +
                             $"preparing fixedGoals={accessibleFixedGoals.Count} " +
-                            $"towerGoals={refreshedSnapshot.GoalCount} starts={cluster.Origins.Count}");
+                            $"towerGoals={refreshedSnapshot.GoalCount} " +
+                            $"starts={(reducedDomain?.SelectedSources.Count ?? cluster.Origins.Count)}");
 
                         sliceControl?.ReportPhase("Preparing search request");
                         long requestBuildStart = AtdDiagnostics.Timestamp();
                         AccessPathRequest request = BuildMergedGoalAccessRequest(
                             refreshedSnapshot, cluster, accessibleFixedGoals,
-                            groundGoalOverride: groundGoalOverride);
+                            groundGoalOverride: groundGoalOverride,
+                            sourceOriginsOverride: reducedDomain?.SelectedSources);
                         double requestBuildMilliseconds =
                             AtdDiagnostics.ElapsedSince(requestBuildStart)
                             * 1000d / System.Diagnostics.Stopwatch.Frequency;
@@ -937,8 +1010,50 @@ namespace AutoTerrainDesignations
                                 $"inAreaFailure={inAreaFailure}");
                             var outsideSnapshotBuild =
                                 new ExperimentalAccessSnapshotBuildResult();
-                            IEnumerator outsideSnapshotPreparation =
-                                BuildExperimentalAccessSnapshot(
+                            ReducedAccessDomainPlan? outsideReducedDomain = null;
+                            if (reducedDomain != null)
+                            {
+                                var outsideGeometryGoals = new List<Tile2i>(
+                                    accessibleFixedGoals);
+                                if (groundGoalOverride != null)
+                                    outsideGeometryGoals.AddRange(
+                                        groundGoalOverride);
+                                bool outsidePlanned =
+                                    ReducedAccessDomainPlanner.TryPlan(
+                                        cluster.Origins.Select(origin =>
+                                            origin.Origin).ToArray(),
+                                        outsideGeometryGoals,
+                                        GetTowerAccessPosition(
+                                            tower,
+                                            tower.Area.BoundingBoxMin,
+                                            tower.Area.BoundingBoxMax),
+                                        tower.Area,
+                                        Tile2i.Zero,
+                                        new Tile2i(
+                                            terrMgr.TerrainSize.X - 1,
+                                            terrMgr.TerrainSize.Y - 1),
+                                        OUTSIDE_TOWER_RAMP_FALLBACK_TILES,
+                                        Math.Max(4, configuredRampWidth + 2),
+                                        Math.Max(
+                                            RAMP_ACCESS_SEARCH_MARGIN_TILES,
+                                            AutoTerrainDesignationsMod
+                                                .AccessCandidateRayMaxDistance
+                                            + AutoTerrainDesignationsMod
+                                                .AccessRayEndBuffer) + 4,
+                                        AutoTerrainDesignationsMod
+                                            .AccessSnapshotMemoryCeilingMiB
+                                            * 1024L * 1024L,
+                                        out outsideReducedDomain,
+                                        out string outsideReductionFailure);
+                                if (!outsidePlanned)
+                                    outsideSnapshotBuild.FailureReason =
+                                        "ReducedAreaNoPath:"
+                                        + outsideReductionFailure;
+                            }
+                            IEnumerator? outsideSnapshotPreparation =
+                                reducedDomain == null
+                                    || outsideReducedDomain != null
+                                ? BuildExperimentalAccessSnapshot(
                                     tower,
                                     accessWorkDepths,
                                     cornerHeights,
@@ -950,9 +1065,12 @@ namespace AutoTerrainDesignations
                                     OUTSIDE_TOWER_RAMP_FALLBACK_TILES,
                                     outsideSnapshotBuild,
                                     sliceControl,
-                                    createWorkspace: !useWorkerSearch);
-                            while (outsideSnapshotPreparation.MoveNext())
-                                yield return outsideSnapshotPreparation.Current;
+                                    createWorkspace: !useWorkerSearch,
+                                    reducedDomain: outsideReducedDomain)
+                                : null;
+                            if (outsideSnapshotPreparation != null)
+                                while (outsideSnapshotPreparation.MoveNext())
+                                    yield return outsideSnapshotPreparation.Current;
                             string outsideSnapshotFailure =
                                 outsideSnapshotBuild.FailureReason;
                             if (outsideSnapshotBuild.Snapshot != null)
@@ -967,7 +1085,9 @@ namespace AutoTerrainDesignations
                                     AtdDiagnostics.Timestamp();
                                 request = BuildMergedGoalAccessRequest(
                                     outsideSnapshot, cluster, accessibleFixedGoals,
-                                    groundGoalOverride: groundGoalOverride);
+                                    groundGoalOverride: groundGoalOverride,
+                                    sourceOriginsOverride:
+                                        outsideReducedDomain?.SelectedSources);
                                 double outsideRequestBuildMilliseconds =
                                     AtdDiagnostics.ElapsedSince(outsideRequestBuildStart)
                                     * 1000d / System.Diagnostics.Stopwatch.Frequency;
@@ -1080,8 +1200,11 @@ namespace AutoTerrainDesignations
 
                         if (!experimentalResult.Success)
                         {
-                            experimentalFailureSummary =
+                            string searchFailure =
                                 FormatExperimentalFailureSummary(experimentalResult);
+                            experimentalFailureSummary = reducedDomain == null
+                                ? searchFailure
+                                : "ReducedAreaNoPath:" + searchFailure;
                             // Preserve the concrete search outcome for the
                             // manager's terminal diagnostic. Without this,
                             // managed farming requests collapsed a quick
@@ -1103,8 +1226,14 @@ namespace AutoTerrainDesignations
                     {
                         experimentalSnapshot = null;
                         experimentalSearchEnabled = false;
-                        experimentalFailureSummary = refreshFailure;
-                        result.FailureReason = refreshFailure;
+                        experimentalFailureSummary =
+                            experimentalSnapshotTooLarge
+                                && !refreshFailure.StartsWith(
+                                    "ReducedAreaNoPath",
+                                    StringComparison.Ordinal)
+                                ? "ReducedAreaNoPath:" + refreshFailure
+                                : refreshFailure;
+                        result.FailureReason = experimentalFailureSummary;
                         LogExperimentalAccessDebug($"[ATD Access] snapshot refresh failed: {refreshFailure}");
                     }
                 }
@@ -1542,6 +1671,10 @@ namespace AutoTerrainDesignations
         private static BlockedReason GetBlockedReason(
             string failureSummary)
             => failureSummary.IndexOf(
+                    "ReducedAreaNoPath",
+                    StringComparison.Ordinal) >= 0
+                ? BlockedReason.ReducedAreaNoPath
+                : failureSummary.IndexOf(
                     "SnapshotTooLarge",
                     StringComparison.Ordinal) >= 0
                 ? BlockedReason.SnapshotTooLarge

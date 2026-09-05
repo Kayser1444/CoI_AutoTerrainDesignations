@@ -157,6 +157,7 @@ public static string Tt(string text) => text;
         SetAccessAvoidOcean(true);
         SetAccessAvoidBuildings(true);
         SetUseWorkerThread(true);
+        SetReduceOversizedAreas(true);
         SetFilterOreSpikes(true);
         SetAllowRampsOutsideTowerAreas(true);
         SetAccessHarvestDisruptedTrees(true);
@@ -482,6 +483,17 @@ public static string Tt(string text) => text;
     public static void SetUseWorkerThread(bool value)
     {
         UseWorkerThread = value;
+    }
+
+    /// <summary>
+    /// When a full access snapshot exceeds its memory ceiling, allow one
+    /// geometry-only reduced corridor attempt. Reduced failure is inconclusive.
+    /// </summary>
+    public static bool ReduceOversizedAreas { get; private set; } = true;
+
+    public static void SetReduceOversizedAreas(bool value)
+    {
+        ReduceOversizedAreas = value;
     }
 
     /// <summary>New-world default for correcting isolated vanilla ore spikes.</summary>

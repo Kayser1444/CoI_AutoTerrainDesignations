@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Mafi;
 using AutoTerrainDesignations.Access.V2;
+using AutoTerrainDesignations.Access.Reduction;
 
 namespace AutoTerrainDesignations.Access
 {
@@ -342,9 +343,12 @@ namespace AutoTerrainDesignations.Access
         private readonly Tile2i m_goalDistanceMin;
         private readonly Tile2i m_goalDistanceMax;
         private readonly AccessDurabilityCorner[] m_durabilityCorners;
-        private readonly List<AccessDurabilityCorner>?[,] m_spatialGrid;
+        private readonly List<AccessDurabilityCorner>?[,]? m_spatialGrid;
+        private readonly Dictionary<long, List<AccessDurabilityCorner>>?
+            m_sparseSpatialGrid;
         private readonly int m_gridWidth;
         private readonly int m_gridHeight;
+        private readonly AccessTileCoverage? m_captureCoverage;
         private const int SPATIAL_CELL_SIZE = 16;
 
         public Tile2i BoundsMin { get; }
@@ -470,10 +474,12 @@ namespace AutoTerrainDesignations.Access
             HashSet<Tile2i>? prebuiltProjectedFixedGroundNodes = null,
             V2.AccessV2GroundGraph? prebuiltV2GroundGraph = null,
             V2.AccessV2FixedNavigationGraph?
-                prebuiltV2FixedNavigationGraph = null)
+                prebuiltV2FixedNavigationGraph = null,
+            AccessTileCoverage? captureCoverage = null)
         {
             BoundsMin = boundsMin;
             BoundsMax = boundsMax;
+            m_captureCoverage = captureCoverage;
             TowerCenter = towerCenter;
             MinHeight2 = minHeight2;
             MaxHeight2 = maxHeight2;
@@ -757,11 +763,26 @@ namespace AutoTerrainDesignations.Access
                 ? ownedDurabilityCorners
                 : new List<AccessDurabilityCorner>(durabilityCorners).ToArray();
 
-            int widthTiles = boundsMax.X - boundsMin.X + 1;
-            int heightTiles = boundsMax.Y - boundsMin.Y + 1;
-            m_gridWidth = (widthTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
-            m_gridHeight = (heightTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
-            m_spatialGrid = new List<AccessDurabilityCorner>[m_gridWidth, m_gridHeight];
+            if (captureCoverage == null)
+            {
+                int widthTiles = boundsMax.X - boundsMin.X + 1;
+                int heightTiles = boundsMax.Y - boundsMin.Y + 1;
+                m_gridWidth =
+                    (widthTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
+                m_gridHeight =
+                    (heightTiles + SPATIAL_CELL_SIZE - 1) / SPATIAL_CELL_SIZE;
+                m_spatialGrid = new List<AccessDurabilityCorner>?[
+                    m_gridWidth, m_gridHeight];
+                m_sparseSpatialGrid = null;
+            }
+            else
+            {
+                m_gridWidth = 0;
+                m_gridHeight = 0;
+                m_spatialGrid = null;
+                m_sparseSpatialGrid =
+                    new Dictionary<long, List<AccessDurabilityCorner>>();
+            }
 
             foreach (AccessDurabilityCorner corner in m_durabilityCorners)
             {
@@ -774,20 +795,34 @@ namespace AutoTerrainDesignations.Access
                 int minY = Math.Max(boundsMin.Y, corner.Position.Y - maxDistance);
                 int maxY = Math.Min(boundsMax.Y, corner.Position.Y + maxDistance);
 
-                int minCx = Math.Max(0, (minX - boundsMin.X) / SPATIAL_CELL_SIZE);
-                int maxCx = Math.Min(m_gridWidth - 1, (maxX - boundsMin.X) / SPATIAL_CELL_SIZE);
-                int minCy = Math.Max(0, (minY - boundsMin.Y) / SPATIAL_CELL_SIZE);
-                int maxCy = Math.Min(m_gridHeight - 1, (maxY - boundsMin.Y) / SPATIAL_CELL_SIZE);
+                int minCx = (minX - boundsMin.X) / SPATIAL_CELL_SIZE;
+                int maxCx = (maxX - boundsMin.X) / SPATIAL_CELL_SIZE;
+                int minCy = (minY - boundsMin.Y) / SPATIAL_CELL_SIZE;
+                int maxCy = (maxY - boundsMin.Y) / SPATIAL_CELL_SIZE;
 
                 for (int cx = minCx; cx <= maxCx; cx++)
                 {
                     for (int cy = minCy; cy <= maxCy; cy++)
                     {
-                        if (m_spatialGrid[cx, cy] == null)
+                        if (m_sparseSpatialGrid != null)
                         {
-                            m_spatialGrid[cx, cy] = new List<AccessDurabilityCorner>();
+                            long key = SpatialCellKey(cx, cy);
+                            if (!m_sparseSpatialGrid.TryGetValue(
+                                    key,
+                                    out List<AccessDurabilityCorner> sparseCell))
+                            {
+                                sparseCell = new List<AccessDurabilityCorner>();
+                                m_sparseSpatialGrid.Add(key, sparseCell);
+                            }
+                            sparseCell.Add(corner);
                         }
-                        m_spatialGrid[cx, cy]!.Add(corner);
+                        else if (m_spatialGrid != null)
+                        {
+                            if (m_spatialGrid[cx, cy] == null)
+                                m_spatialGrid[cx, cy] =
+                                    new List<AccessDurabilityCorner>();
+                            m_spatialGrid[cx, cy]!.Add(corner);
+                        }
                     }
                 }
             }
@@ -828,8 +863,9 @@ namespace AutoTerrainDesignations.Access
             => m_generatedVPrimeOrigins;
 
         public bool IsTileInside(Tile2i tile)
-            => tile.X >= BoundsMin.X && tile.Y >= BoundsMin.Y
-                && tile.X <= BoundsMax.X && tile.Y <= BoundsMax.Y;
+            => m_captureCoverage?.Contains(tile)
+                ?? (tile.X >= BoundsMin.X && tile.Y >= BoundsMin.Y
+                    && tile.X <= BoundsMax.X && tile.Y <= BoundsMax.Y);
 
         private HashSet<Tile2i> BuildGeneratedVPrimeOrigins()
         {
@@ -2308,9 +2344,23 @@ namespace AutoTerrainDesignations.Access
 
             int cx = (position.X - BoundsMin.X) / SPATIAL_CELL_SIZE;
             int cy = (position.Y - BoundsMin.Y) / SPATIAL_CELL_SIZE;
-            if (cx < 0 || cx >= m_gridWidth || cy < 0 || cy >= m_gridHeight) return false;
-            List<AccessDurabilityCorner>? cellCorners = m_spatialGrid[cx, cy];
-            if (cellCorners == null) return false;
+            List<AccessDurabilityCorner>? cellCorners;
+            if (m_sparseSpatialGrid != null)
+            {
+                if (!m_sparseSpatialGrid.TryGetValue(
+                        SpatialCellKey(cx, cy), out cellCorners))
+                    return false;
+            }
+            else
+            {
+                if (m_spatialGrid == null
+                    || cx < 0 || cx >= m_gridWidth
+                    || cy < 0 || cy >= m_gridHeight)
+                    return false;
+                cellCorners = m_spatialGrid[cx, cy];
+                if (cellCorners == null)
+                    return false;
+            }
 
             foreach (AccessDurabilityCorner corner in cellCorners)
             {
@@ -2319,6 +2369,9 @@ namespace AutoTerrainDesignations.Access
             }
             return false;
         }
+
+        private static long SpatialCellKey(int x, int y)
+            => ((long)x << 32) ^ (uint)y;
 
         private bool MatchesFixedNeighbors(Tile2i origin, AccessHeightProfile profile)
         {

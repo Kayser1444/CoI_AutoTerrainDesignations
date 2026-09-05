@@ -12,7 +12,7 @@
 
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
-Version 0.8.1 adds a per-world **Use worker thread** setting under **Performance**, enabled by default, so new planning requests can use either responsive background planning or game-thread planning when needed. It also strengthens mining safety with repeated boundary checks and diagonal protection rays around exposed convex corners.
+Version 0.8.2 adds **Reduce oversized areas** under **Performance**, allowing very large or effectively unbounded tower areas to make a best-effort accessway attempt through a geometry-only sparse corridor. It also fixes Ore Sorting Plant route persistence and strengthens debris cleanup safety. The previous release's per-world **Use worker thread** setting remains enabled by default, so new planning requests can use either responsive background planning or game-thread planning when needed.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
@@ -155,7 +155,7 @@ Open ATD in the Mod Settings window for controls that are not available directly
 - **Notifications** — Enable or disable excavator-completion and accessway warning notifications.
 - **Tower panel defaults** — Choose whether the Mining Designations, Ore Composition, and Farmland Preparation panels start collapsed.
 - **Mine Tower defaults** — Set the initial accessway mode, dumping priority, excavation depth, elevation limit, ore quality, and idle-vehicle behavior, then optionally save them as the configuration for new games.
-- **Performance** — Choose whether new planning requests use a dedicated worker thread or the game thread; **Save as config** sets the default for future worlds.
+- **Performance** — Choose whether new planning requests use a dedicated worker thread or the game thread; **Save as config** sets the default for future worlds. **Reduce oversized areas** lets very large access areas make a best-effort attempt through a geometry-only sparse corridor when the full snapshot exceeds the memory ceiling.
 
 Accessway search uses A\* by default. Advanced users can temporarily switch to Dijkstra with the `atd_set_access_astar` console command when comparing routes; the choice applies only to the current session.
 

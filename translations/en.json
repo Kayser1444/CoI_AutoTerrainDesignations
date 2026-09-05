@@ -212,6 +212,10 @@
     "Scan performance"
   ],
   [
+    "settings.world.performance",
+    "PERFORMANCE"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "Keyboard shortcuts"
   ],
@@ -256,24 +260,28 @@
     "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "Harvest disrupted trees"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
-  ],
-  [
-    "settings.world.performance",
-    "PERFORMANCE"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "Use worker thread"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "Use a background thread for access and mining planning. Enabled by default. Turn off for compatibility troubleshooting; planning then runs on the game thread and may cause pauses, especially in large mines. Applies to new planning requests."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "Reduce oversized areas"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "When the full access snapshot is too large for the memory ceiling, try one smaller geometry-only corridor around the current starts and goals. This aims to find some route; it may differ from a full-area route, and failure does not prove that no route exists."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Harvest disrupted trees"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",

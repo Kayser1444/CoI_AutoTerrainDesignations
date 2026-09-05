@@ -44,10 +44,12 @@ namespace AutoTerrainDesignations.Access
             bool v2Valid = false;
             bool architectureValid = false;
             bool captureValid = false;
+            bool reductionValid = false;
             string v1Failure = string.Empty;
             string v2Failure = string.Empty;
             string architectureFailure = string.Empty;
             string captureFailure = string.Empty;
+            string reductionFailure = string.Empty;
 
             try
             {
@@ -71,6 +73,16 @@ namespace AutoTerrainDesignations.Access
 
             try
             {
+                reductionValid = Reduction.ReducedAccessDomainFixtures
+                    .ValidateAll(out reductionFailure);
+            }
+            catch (Exception ex)
+            {
+                reductionFailure = "Exception:" + ex.GetType().Name;
+            }
+
+            try
+            {
                 v1Valid = AccessPathSearch.ValidateCoreTransitions(
                     out v1Failure);
             }
@@ -89,7 +101,8 @@ namespace AutoTerrainDesignations.Access
                 v2Failure = "Exception:" + ex.GetType().Name;
             }
 
-            s_valid = architectureValid && captureValid && v1Valid && v2Valid;
+            s_valid = architectureValid && captureValid && reductionValid
+                && v1Valid && v2Valid;
             if (s_valid)
             {
                 s_failureReason = string.Empty;
@@ -99,6 +112,7 @@ namespace AutoTerrainDesignations.Access
                 s_failureReason =
                     "Architecture=" + (architectureValid ? "ok" : architectureFailure)
                     + ";Capture=" + (captureValid ? "ok" : captureFailure)
+                    + ";Reduction=" + (reductionValid ? "ok" : reductionFailure)
                     + ";V1=" + (v1Valid ? "ok" : v1Failure)
                     + ";V2=" + (v2Valid ? "ok" : v2Failure);
             }

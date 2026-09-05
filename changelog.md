@@ -1,5 +1,17 @@
 v0.8.2 [unreleased]
 
+* Fixed: Ore Sorting Plant export routes, priorities, and assigned-truck state now save successfully by registering the `atdOreSorterExports` state parameter in `config.json`.
+
+* Added: **PERFORMANCE → Reduce oversized areas** is a default-on per-world option. When the normal access snapshot exceeds its memory ceiling, ATD now builds one deterministic, geometry-only low-turn corridor from the active source cluster toward known goals or the tower access, captures terrain and blockers only inside its sparse context mask, and runs the normal route search there. The reduced attempt may select a different route; `ReducedAreaNoPath` remains inconclusive. Requests whose full snapshot fits keep the existing path.
+
+* Fixed: Reduced-domain planning no longer rebuilds the same corridor for every nearby source in a large cluster. Sources already covered by the selected corridor are admitted without another mask construction, avoiding the multi-second game-thread freeze and allocation spike observed with more than 2,000 mining origins.
+
+* Fixed: Reduced-domain planning now spends remaining memory capacity on balanced corridor widening after admitting complete source branches. Higher ceilings therefore produce larger useful masks instead of repeating the same narrow corridor; widening stops at the largest four-tile increment that fits the conservative estimate.
+
+* Fixed: Corridor widening now grows the existing sparse mask one ring at a time instead of repeatedly rebuilding larger trial masks. Its budget uses the same retained-memory accounting as snapshot preflight, including worst-case building occupancy, so a planned reduced mask cannot immediately fail capture as `SnapshotTooLarge`.
+
+* Fixed: Accessway cleanup now leaves props to planned terrain work when explicit targets or projected side-ray work exceed vanilla's destruction threshold by more than an internal 0.5 terrain levels. This also takes precedence over **Always** quick removal. Live placement-height offsets and scaled burial thresholds are respected; safety-only, missing, conflicting, and borderline projections retain cleanup. Route selection/scoring and tree harvesting are unchanged; no public parameter or saved state was added.
+
 v0.8.1 [released]
 
 * Added: World settings now includes **PERFORMANCE → Use worker thread**, enabled by default. The per-world opt-out runs new planning requests on the game thread; Save as config stores the default for future worlds. Mining passes can pause the game in this mode. Backend changes wait for any cancelled worker computation to stop before starting game-thread planning.

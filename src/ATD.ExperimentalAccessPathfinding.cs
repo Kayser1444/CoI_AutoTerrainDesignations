@@ -23,6 +23,7 @@ using Mafi.Unity.UiToolkit.Component;
 using Mafi.Unity.UiToolkit.Library;
 using Mafi.Unity.Ui;
 using AutoTerrainDesignations.Access;
+using AutoTerrainDesignations.Access.Reduction;
 using AutoTerrainDesignations.Access.V2;
 using AutoTerrainDesignations.Access.Worker;
 
@@ -455,7 +456,8 @@ namespace AutoTerrainDesignations
             int generatedAreaMarginTiles,
             ExperimentalAccessSnapshotBuildResult output,
             ExperimentalAccessSliceControl? sliceControl,
-            bool createWorkspace = true)
+            bool createWorkspace = true,
+            ReducedAccessDomainPlan? reducedDomain = null)
         {
             // Initialize deterministic fixtures before taking the capture
             // slot; the capture fixture itself verifies that the slot is
@@ -487,7 +489,8 @@ namespace AutoTerrainDesignations
                     generatedAreaMarginTiles,
                     output,
                     sliceControl,
-                    createWorkspace);
+                    createWorkspace,
+                    reducedDomain);
                 while (capture.MoveNext())
                     yield return capture.Current;
             }
@@ -687,7 +690,8 @@ namespace AutoTerrainDesignations
             int generatedAreaMarginTiles,
             ExperimentalAccessSnapshotBuildResult output,
             ExperimentalAccessSliceControl? sliceControl,
-            bool createWorkspace)
+            bool createWorkspace,
+            ReducedAccessDomainPlan? reducedDomain)
         {
             long capturePreambleStart = AtdDiagnostics.Timestamp();
             Stopwatch snapshotTimer = Stopwatch.StartNew();
@@ -738,10 +742,20 @@ namespace AutoTerrainDesignations
                 AtdDiagnostics.ElapsedSince(capturePreambleStart);
             long captureStepStart = AtdDiagnostics.Timestamp();
             AccessCapturedBuildingFacts buildingFacts =
-                AccessCapturedBuildingFacts.Capture(
-                    s_buildingOccupiedTiles,
-                    s_buildingFixedHeights2ByTile,
-                    s_layoutEntityOccupanciesByTile);
+                reducedDomain == null
+                    ? AccessCapturedBuildingFacts.Capture(
+                        s_buildingOccupiedTiles,
+                        s_buildingFixedHeights2ByTile,
+                        s_layoutEntityOccupanciesByTile)
+                    : AccessCapturedBuildingFacts.Capture(
+                        s_buildingOccupiedTiles.Where(
+                            reducedDomain.CaptureTiles.Contains),
+                        s_buildingFixedHeights2ByTile.Where(pair =>
+                                reducedDomain.CaptureTiles.Contains(pair.Key))
+                            .ToDictionary(pair => pair.Key, pair => pair.Value),
+                        s_layoutEntityOccupanciesByTile.Where(pair =>
+                                reducedDomain.CaptureTiles.Contains(pair.Key))
+                            .ToDictionary(pair => pair.Key, pair => pair.Value));
             long buildingFactsTicks =
                 AtdDiagnostics.ElapsedSince(captureStepStart);
             captureStepStart = AtdDiagnostics.Timestamp();
@@ -762,6 +776,13 @@ namespace AutoTerrainDesignations
                 out Tile2i towerCenter,
                 out Tile2i groundCaptureMin,
                 out Tile2i groundCaptureMax);
+            if (reducedDomain != null)
+            {
+                boundsMin = reducedDomain.SearchOrigins.BoundsMin;
+                boundsMax = reducedDomain.SearchOrigins.BoundsMax;
+                groundCaptureMin = reducedDomain.CaptureTiles.BoundsMin;
+                groundCaptureMax = reducedDomain.CaptureTiles.BoundsMax;
+            }
             long captureDesignationRevision =
                 CurrentTerrainDesignationRevision;
 
@@ -771,27 +792,35 @@ namespace AutoTerrainDesignations
             long captureHeight = Math.Max(
                 0L,
                 (long)groundCaptureMax.Y - groundCaptureMin.Y + 1L);
-            long captureTileCount = captureWidth > 0
-                && captureHeight > 0
-                && captureWidth <= long.MaxValue / captureHeight
-                    ? captureWidth * captureHeight
-                    : long.MaxValue;
+            long captureTileCount = reducedDomain != null
+                ? reducedDomain.CaptureTiles.Count
+                : captureWidth > 0
+                    && captureHeight > 0
+                    && captureWidth <= long.MaxValue / captureHeight
+                        ? captureWidth * captureHeight
+                        : long.MaxValue;
             long originWidth = Math.Max(
                 0L,
                 ((long)boundsMax.X - boundsMin.X) / 4L + 2L);
             long originHeight = Math.Max(
                 0L,
                 ((long)boundsMax.Y - boundsMin.Y) / 4L + 2L);
-            long originCount = originWidth > 0
-                && originHeight > 0
-                && originWidth <= long.MaxValue / originHeight
-                    ? originWidth * originHeight
-                    : long.MaxValue;
+            long originCount = reducedDomain != null
+                ? reducedDomain.SearchOrigins.Count
+                : originWidth > 0
+                    && originHeight > 0
+                    && originWidth <= long.MaxValue / originHeight
+                        ? originWidth * originHeight
+                        : long.MaxValue;
+            int coveredTileDepthCount = reducedDomain == null
+                ? tileDepths.Count
+                : (int)Math.Min(
+                    Math.Min(originCount, int.MaxValue), tileDepths.Count);
             long initialEstimate =
                 EstimateExperimentalSnapshotMemory(
                     captureTileCount,
                     originCount,
-                    tileDepths.Count,
+                    coveredTileDepthCount,
                     buildingFacts.OccupiedTileCount);
             captureDiagnostics.SetEstimatedRetainedBytes(initialEstimate);
             if (!captureBudget.TryAccept(initialEstimate))
@@ -847,9 +876,14 @@ namespace AutoTerrainDesignations
                 ? int.MaxValue
                 : (int)originCount;
             int designationCapacity = s_desigManager.Designations.Count;
+            int coveredDesignationCapacity = reducedDomain == null
+                ? designationCapacity
+                : (int)Math.Min(
+                    designationCapacity,
+                    Math.Min(captureTileCount, int.MaxValue));
             long fixedProfileCapacityLong = Math.Min(
                 originCount,
-                (long)designationCapacity + tileDepths.Count);
+                (long)designationCapacity + coveredTileDepthCount);
             int fixedProfileCapacity = fixedProfileCapacityLong >= int.MaxValue
                 ? int.MaxValue
                 : (int)fixedProfileCapacityLong;
@@ -875,9 +909,11 @@ namespace AutoTerrainDesignations
             var designatedOrigins = new HashSet<Tile2i>();
             var rayDesignationOrigins = new HashSet<Tile2i>();
             var rayDesignations =
-                new Dictionary<Tile2i, TerrainDesignation>(designationCapacity);
+                new Dictionary<Tile2i, TerrainDesignation>(
+                    coveredDesignationCapacity);
             var projectedRayDesignations =
-                new Dictionary<Tile2i, TerrainDesignation>(designationCapacity);
+                new Dictionary<Tile2i, TerrainDesignation>(
+                    coveredDesignationCapacity);
             var groundExclusionReasons = new Dictionary<Tile2i, string>();
             long collectionAllocationTicks =
                 AtdDiagnostics.ElapsedSince(captureStepStart);
@@ -905,7 +941,9 @@ namespace AutoTerrainDesignations
                 if (origin.X >= fixedDesignationMin.X
                     && origin.X <= fixedDesignationMax.X
                     && origin.Y >= fixedDesignationMin.Y
-                    && origin.Y <= fixedDesignationMax.Y)
+                    && origin.Y <= fixedDesignationMax.Y
+                    && (reducedDomain == null
+                        || reducedDomain.SearchOrigins.Contains(origin)))
                 {
                     designatedOrigins.Add(origin);
                     fixedProfiles[origin] = ProfileFromDesignation(designation);
@@ -913,7 +951,10 @@ namespace AutoTerrainDesignations
                 if (origin.X >= rayDesignationMin.X
                     && origin.X <= rayDesignationMax.X
                     && origin.Y >= rayDesignationMin.Y
-                    && origin.Y <= rayDesignationMax.Y)
+                    && origin.Y <= rayDesignationMax.Y
+                    && (reducedDomain == null
+                        || CoverageIntersectsDesignation(
+                            reducedDomain.CaptureTiles, origin)))
                 {
                     rayDesignationOrigins.Add(origin);
                     rayDesignations[origin] = designation;
@@ -924,7 +965,10 @@ namespace AutoTerrainDesignations
                 if (origin.X >= projectedDesignationMin.X
                     && origin.X <= projectedDesignationMax.X
                     && origin.Y >= projectedDesignationMin.Y
-                    && origin.Y <= projectedDesignationMax.Y)
+                    && origin.Y <= projectedDesignationMax.Y
+                    && (reducedDomain == null
+                        || CoverageIntersectsDesignation(
+                            reducedDomain.CaptureTiles, origin)))
                 {
                     projectedRayDesignations[origin] = designation;
                 }
@@ -978,6 +1022,9 @@ namespace AutoTerrainDesignations
             foreach (var pair in tileDepths)
             {
                 Tile2i origin = pair.Key;
+                if (reducedDomain != null
+                    && !reducedDomain.SearchOrigins.Contains(origin))
+                    continue;
                 workOrigins.Add(origin);
                 int fallback = pair.Value;
                 int nw = cornerHeights.TryGetValue(origin, out int value) ? value : fallback;
@@ -1011,11 +1058,11 @@ namespace AutoTerrainDesignations
             int maxHeight2 = int.MinValue;
             long terrainTileTicks = 0L;
             captureStepStart = AtdDiagnostics.Timestamp();
-            for (int x = groundCaptureMin.X; x <= groundCaptureMax.X; x++)
+            IEnumerable<Tile2i> captureTiles = reducedDomain != null
+                ? reducedDomain.CaptureTiles.EnumerateTiles()
+                : EnumerateAccessRectangle(groundCaptureMin, groundCaptureMax);
+            foreach (Tile2i tile in captureTiles)
             {
-                for (int y = groundCaptureMin.Y; y <= groundCaptureMax.Y; y++)
-                {
-                    Tile2i tile = new Tile2i(x, y);
                     float preciseHeight = terrMgr.GetHeight(tile).Value.ToFloat();
                     int height2 = ToHeight2(preciseHeight);
                     groundHeight2[tile] = height2;
@@ -1058,18 +1105,18 @@ namespace AutoTerrainDesignations
                         captureStepStart = AtdDiagnostics.Timestamp();
                     }
                 }
-            }
             terrainTileTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
 
             int firstOriginX = boundsMin.X & -4;
             int firstOriginY = boundsMin.Y & -4;
             long terrainCenterTicks = 0L;
             captureStepStart = AtdDiagnostics.Timestamp();
-            for (int x = firstOriginX; x <= boundsMax.X; x += 4)
+            IEnumerable<Tile2i> searchOrigins = reducedDomain != null
+                ? reducedDomain.SearchOrigins.EnumerateTiles()
+                : EnumerateAccessOrigins(
+                    firstOriginX, firstOriginY, boundsMax, 0);
+            foreach (Tile2i origin in searchOrigins)
             {
-                for (int y = firstOriginY; y <= boundsMax.Y; y += 4)
-                {
-                    Tile2i origin = new Tile2i(x, y);
                     if (IsOriginInsideGeneratedArea(
                             tower, origin, generatedAreaMarginTiles))
                     {
@@ -1097,16 +1144,16 @@ namespace AutoTerrainDesignations
                         phaseTimer.Restart();
                         captureStepStart = AtdDiagnostics.Timestamp();
                     }
-                }
             }
             terrainCenterTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
             long terrainColumnTicks = 0L;
             captureStepStart = AtdDiagnostics.Timestamp();
-            for (int x = firstOriginX; x <= boundsMax.X + 4; x += 4)
+            IEnumerable<Tile2i> terrainColumnOrigins = reducedDomain != null
+                ? EnumerateRequiredTerrainColumns(reducedDomain.SearchOrigins)
+                : EnumerateAccessOrigins(
+                    firstOriginX, firstOriginY, boundsMax, 4);
+            foreach (Tile2i corner in terrainColumnOrigins)
             {
-                for (int y = firstOriginY; y <= boundsMax.Y + 4; y += 4)
-                {
-                    Tile2i corner = new Tile2i(x, y);
                     if (terrMgr.IsValidCoord(corner))
                     {
                         terrainColumns[corner] =
@@ -1130,7 +1177,6 @@ namespace AutoTerrainDesignations
                         phaseTimer.Restart();
                         captureStepStart = AtdDiagnostics.Timestamp();
                     }
-                }
             }
             terrainColumnTicks += AtdDiagnostics.ElapsedSince(captureStepStart);
             captureStepStart = AtdDiagnostics.Timestamp();
@@ -1362,7 +1408,8 @@ namespace AutoTerrainDesignations
                 tower,
                 terrMgr,
                 boundsMin,
-                boundsMax);
+                boundsMax,
+                reducedDomain?.CaptureTiles);
             long capturePropsTicks =
                 AtdDiagnostics.ElapsedSince(navigationStepStart);
             navigationStepStart = AtdDiagnostics.Timestamp();
@@ -1432,7 +1479,8 @@ namespace AutoTerrainDesignations
                 long towerFloodStart = AtdDiagnostics.Timestamp();
                 if (!TryBuildTowerReachableGround(tower, towerBoundsMin, towerBoundsMax,
                     groundNodes, provider, pathParams,
-                    out towerReachableGround, out groundStart))
+                    out towerReachableGround, out groundStart,
+                    reducedDomain?.CaptureTiles))
                 {
                     output.FailureReason = "NoTowerGround";
                     yield break;
@@ -1545,7 +1593,8 @@ namespace AutoTerrainDesignations
             }
 
             AccessUsefulHeightEnvelope? usefulHeightEnvelope = null;
-            if (AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope)
+            if (reducedDomain == null
+                && AutoTerrainDesignationsMod.ExperimentalAccessUsefulHeightEnvelope)
             {
                 if (!AccessUsefulHeightEnvelope.ValidateSelfTest(
                         out string envelopeSelfTestFailure))
@@ -1641,7 +1690,10 @@ namespace AutoTerrainDesignations
                 phaseTimer.Restart();
             }
 
-            bool useAStar = policy.UseAStar;
+            // Reduced snapshots intentionally use Dijkstra. The existing A*
+            // potential is a dense enclosing-box array and would defeat sparse
+            // corridor memory accounting.
+            bool useAStar = policy.UseAStar && reducedDomain == null;
             AccessV1GroundGoalDistance? prebuiltV1GroundGoalDistance = null;
             float[]? prebuiltAnyGoalDistance = null;
             if (sliceControl != null && useAStar)
@@ -1732,6 +1784,9 @@ namespace AutoTerrainDesignations
                 Stopwatch occupiedSlice = Stopwatch.StartNew();
                 foreach (Tile2i occupied in buildingFacts.EnumerateOccupiedTiles())
                 {
+                    if (reducedDomain != null
+                        && !reducedDomain.CaptureTiles.Contains(occupied))
+                        continue;
                     ownedOccupiedTiles.Add(occupied);
                     if (occupiedSlice.ElapsedMilliseconds
                         < sliceControl.SliceBudgetMilliseconds)
@@ -1883,7 +1938,10 @@ namespace AutoTerrainDesignations
                 groundNodes,
                 towerReachableGround,
                 ownedOccupiedTiles
-                    ?? buildingFacts.EnumerateOccupiedTiles(),
+                    ?? (reducedDomain == null
+                        ? buildingFacts.EnumerateOccupiedTiles()
+                        : buildingFacts.EnumerateOccupiedTiles().Where(
+                            reducedDomain.CaptureTiles.Contains)),
                 oceanTiles,
                 sliceControl != null
                     ? durabilityCorners.ToArray()
@@ -1937,7 +1995,8 @@ namespace AutoTerrainDesignations
                     prebuiltProjectedFixedGroundNodes,
                 prebuiltV2GroundGraph: prebuiltV2GroundGraph,
                 prebuiltV2FixedNavigationGraph:
-                    prebuiltV2FixedNavigationGraph);
+                    prebuiltV2FixedNavigationGraph,
+                captureCoverage: reducedDomain?.CaptureTiles);
             snapshotTimer.Stop();
             output.Snapshot = snapshot;
             output.MemoryEvidence = memoryProbe?.Complete(
@@ -2079,7 +2138,8 @@ namespace AutoTerrainDesignations
             IAreaManagingTower tower,
             TerrainManager terrMgr,
             Tile2i boundsMin,
-            Tile2i boundsMax)
+            Tile2i boundsMax,
+            AccessTileCoverage? captureCoverage = null)
         {
             var captured = new List<AccessCapturedProp>();
             if (s_terrainPropsManager != null)
@@ -2090,13 +2150,31 @@ namespace AutoTerrainDesignations
                         boundsMax.X - boundsMin.X + 1,
                         boundsMax.Y - boundsMin.Y + 1));
                 var occupiedTiles = new Lyst<Tile2i>();
-                foreach (TerrainPropData prop
-                    in s_terrainPropsManager.EnumeratePropsInArea(area))
+                IEnumerable<TerrainPropData> props = captureCoverage == null
+                    ? s_terrainPropsManager.EnumeratePropsInArea(area)
+                    : s_terrainPropsManager.TerrainProps.Values;
+                foreach (TerrainPropData prop in props)
                 {
                     if (prop.Proto.DoesNotBlocksVehicles)
                         continue;
                     occupiedTiles.Clear();
                     prop.CalculateOccupiedTiles(terrMgr, occupiedTiles);
+                    if (captureCoverage != null)
+                    {
+                        bool intersectsCoverage = false;
+                        for (int tileIndex = 0;
+                            tileIndex < occupiedTiles.Count;
+                            tileIndex++)
+                        {
+                            if (!captureCoverage.Contains(
+                                    occupiedTiles[tileIndex]))
+                                continue;
+                            intersectsCoverage = true;
+                            break;
+                        }
+                        if (!intersectsCoverage)
+                            continue;
+                    }
                     captured.Add(new AccessCapturedProp(
                         isTree: false,
                         isDenseDebris: true,
@@ -2117,10 +2195,15 @@ namespace AutoTerrainDesignations
 
             if (s_treesManager != null)
             {
-                foreach (TreeId treeId
-                    in s_treesManager.EnumerateTreesInArea(tower.Area))
+                IEnumerable<TreeId> treeIds = captureCoverage == null
+                    ? s_treesManager.EnumerateTreesInArea(tower.Area)
+                    : s_treesManager.Trees.Keys;
+                foreach (TreeId treeId in treeIds)
                 {
                     if (!s_treesManager.TryGetTree(treeId, out TreeData tree))
+                        continue;
+                    if (captureCoverage != null
+                        && !captureCoverage.Contains(tree.Id.Position.AsFull))
                         continue;
                     captured.Add(new AccessCapturedProp(
                         isTree: true,
@@ -2492,9 +2575,14 @@ namespace AutoTerrainDesignations
             AccessOriginCluster cluster,
             IEnumerable<Tile2i> fixedGoalOrigins,
             float maxCostLimit = float.MaxValue,
-            IEnumerable<Tile2i>? groundGoalOverride = null)
+            IEnumerable<Tile2i>? groundGoalOverride = null,
+            IEnumerable<Tile2i>? sourceOriginsOverride = null)
         {
             int requiredWidth = snapshot.VehicleWidth > 4 ? 2 : 1;
+            List<Tile2i> sourceOrigins = (sourceOriginsOverride
+                    ?? cluster.Origins.Select(origin => origin.Origin))
+                .Distinct()
+                .ToList();
             List<Tile2i> fixedGoals = fixedGoalOrigins.Distinct().ToList();
             List<Tile2i> groundGoals = (groundGoalOverride
                     ?? snapshot.GoalGroundNodes)
@@ -2503,7 +2591,7 @@ namespace AutoTerrainDesignations
             AccessV2EndpointSet? v2Endpoints = requiredWidth == 2
                 ? AccessV2FrontageDiscovery.Build(
                     snapshot,
-                    cluster.Origins.Select(origin => origin.Origin))
+                    sourceOrigins)
                 : null;
             if (v2Endpoints != null)
             {
@@ -2537,7 +2625,7 @@ namespace AutoTerrainDesignations
                 snapshot,
                 new AccessPathEndpoint(
                     AccessPathEndpointKind.FixedProfiles,
-                    cluster.Origins.Select(origin => origin.Origin)),
+                    sourceOrigins),
                 new AccessPathEndpoint(
                     fixedGoals,
                     groundGoals),
@@ -4849,6 +4937,8 @@ namespace AutoTerrainDesignations
             if (!TryPlaceDenseDebrisCleanupDesignations(
                     placementPlan.CleanupOrigins,
                     plannedPlacements,
+                    snapshot,
+                    candidate.SearchResult,
                     tower,
                     reservedRampTiles,
                     placedCleanupRequests,
@@ -5313,6 +5403,8 @@ namespace AutoTerrainDesignations
         private static bool TryPlaceDenseDebrisCleanupDesignations(
             IReadOnlyList<AccessPropCleanupInfo> cleanupOrigins,
             IReadOnlyDictionary<Tile2i, PlannedExperimentalDesignation> plannedPlacements,
+            AccessSearchSnapshot snapshot,
+            AccessSearchResult searchResult,
             IAreaManagingTower tower,
             HashSet<Tile2i>? reservedRampTiles,
             List<ATDPropRemovalRequestHandle> placedCleanupRequests,
@@ -5370,6 +5462,15 @@ namespace AutoTerrainDesignations
             var placedCleanupOrigins = new HashSet<Tile2i>();
             var plannedTerrainWorkOrigins = new HashSet<Tile2i>(
                 plannedPlacements.Keys);
+            var terrainWork = plannedPlacements.Values.Select(planned =>
+                new AccessPropPlannedTerrainWork(planned.Data,
+                    planned.Proto == s_miningProto ? AccessHandoffOperation.Mining
+                        : planned.Proto == s_dumpingProto ? AccessHandoffOperation.Dumping
+                        : planned.Proto == s_levelingProto ? AccessHandoffOperation.Leveling
+                        : AccessHandoffOperation.None)).ToArray();
+            var projectedWork = new Dictionary<Tile2i, AccessProjectedTerrainEffect>();
+            AccessPathSearch.BuildFinalGeneratedDisturbedTiles(
+                snapshot, searchResult, projectedWork: projectedWork);
             int preplacedTerrainWork = 0;
             int buriedProps = 0;
             int handledByDefaultOperation = 0;
@@ -5394,29 +5495,21 @@ namespace AutoTerrainDesignations
                 }
                 Tile2i propOrigin = TerrainDesignation.GetOrigin(
                     liveProp.Position.Tile2i);
-                bool buriedByPlannedDumping = plannedPlacements.Values.Any(
-                    planned => AccessPropCleanupPolicy
-                        .PlannedOperationRemovesNonTreeProp(
-                            planned.Proto == s_dumpingProto
-                                ? AccessHandoffOperation.Dumping
-                                : AccessHandoffOperation.None,
-                            planned.Data, sample));
-                bool removedByPlannedExcavation = plannedPlacements.Values.Any(
-                    planned => AccessPropCleanupPolicy
-                        .PlannedOperationRemovesNonTreeProp(
-                            planned.Proto == s_miningProto
-                                ? AccessHandoffOperation.Mining
-                                : planned.Proto == s_levelingProto
-                                    ? AccessHandoffOperation.Leveling
-                                    : AccessHandoffOperation.None,
-                            planned.Data, sample));
+                var liveSample = new AccessPropSample(sample.Tile, false, true, true,
+                    dumpBurialProbeTile: liveProp.Position.Tile2i,
+                    dumpBurialProbeOffsetX: liveProp.PositionWithinTile.X.ToFloat(),
+                    dumpBurialProbeOffsetY: liveProp.PositionWithinTile.Y.ToFloat(),
+                    placedHeight: liveProp.PlacedAtHeight.Value.ToFloat(),
+                    dumpBurialThreshold: burialThreshold);
 
                 QuickRemoveDebrisPolicy policy =
                     AccessQuickRemoveDebrisPolicy;
-                if (!AccessPropCleanupPolicy
-                    .TryGetNonBuriedPropRemovalStrategy(
-                        policy, buriedByPlannedDumping,
-                        removedByPlannedExcavation,
+                if (!AccessPropTerrainRemoval.TryGetRemovalStrategy(
+                        policy, liveSample,
+                        liveProp.PlacementHeightOffset.Value.ToFloat(),
+                        terrainWork,
+                        tile => projectedWork.TryGetValue(tile, out AccessProjectedTerrainEffect effect)
+                            ? effect : default,
                         out bool quickRemove))
                 {
                     handledByDefaultOperation++;
@@ -6636,11 +6729,14 @@ namespace AutoTerrainDesignations
             IPathabilityProvider provider,
             VehiclePathFindingParams pathParams,
             out HashSet<Tile2i> reachedGround,
-            out Tile2i start)
+            out Tile2i start,
+            AccessTileCoverage? captureCoverage = null)
         {
             reachedGround = new HashSet<Tile2i>();
             Tile2i towerAccessPosition = GetTowerAccessPosition(tower, boundsMin, boundsMax);
-            if (!TryFindNearestTowerGroundSeed(tower, groundNodes, provider, pathParams, towerAccessPosition, out start))
+            if (!TryFindNearestTowerGroundSeed(
+                    tower, groundNodes, provider, pathParams,
+                    towerAccessPosition, out start, captureCoverage))
                 return false;
 
             int minX = Math.Min(boundsMin.X, towerAccessPosition.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
@@ -6659,7 +6755,9 @@ namespace AutoTerrainDesignations
                 {
                     Tile2i next = current + direction;
                     if (next.X < minX || next.X > maxX || next.Y < minY || next.Y > maxY
-                        || visited.Contains(next))
+                        || visited.Contains(next)
+                        || (captureCoverage != null
+                            && !captureCoverage.Contains(next)))
                         continue;
 
                     bool insideManagedArea = tower.Area.ContainsTile(next);
@@ -6788,9 +6886,12 @@ namespace AutoTerrainDesignations
             IPathabilityProvider provider,
             VehiclePathFindingParams pathParams,
             Tile2i origin,
-            out Tile2i seed)
+            out Tile2i seed,
+            AccessTileCoverage? captureCoverage = null)
         {
-            if (IsTowerGroundSeed(tower, groundNodes, provider, pathParams, origin))
+            if ((captureCoverage == null || captureCoverage.Contains(origin))
+                && IsTowerGroundSeed(
+                    tower, groundNodes, provider, pathParams, origin))
             {
                 seed = origin;
                 return true;
@@ -6800,15 +6901,15 @@ namespace AutoTerrainDesignations
             {
                 for (int y = -radius; y <= radius; y++)
                 {
-                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(-radius, y), out seed)
-                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(radius, y), out seed))
+                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(-radius, y), out seed, captureCoverage)
+                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(radius, y), out seed, captureCoverage))
                         return true;
                 }
 
                 for (int x = -radius + 1; x < radius; x++)
                 {
-                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, -radius), out seed)
-                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, radius), out seed))
+                    if (TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, -radius), out seed, captureCoverage)
+                        || TryUseTowerGroundSeed(tower, groundNodes, provider, pathParams, origin + new RelTile2i(x, radius), out seed, captureCoverage))
                         return true;
                 }
             }
@@ -6823,9 +6924,12 @@ namespace AutoTerrainDesignations
             IPathabilityProvider provider,
             VehiclePathFindingParams pathParams,
             Tile2i candidate,
-            out Tile2i seed)
+            out Tile2i seed,
+            AccessTileCoverage? captureCoverage = null)
         {
-            if (IsTowerGroundSeed(tower, groundNodes, provider, pathParams, candidate))
+            if ((captureCoverage == null || captureCoverage.Contains(candidate))
+                && IsTowerGroundSeed(
+                    tower, groundNodes, provider, pathParams, candidate))
             {
                 seed = candidate;
                 return true;
@@ -6865,6 +6969,48 @@ namespace AutoTerrainDesignations
                 }
             }
             return false;
+        }
+
+        private static IEnumerable<Tile2i> EnumerateAccessRectangle(
+            Tile2i min, Tile2i max)
+        {
+            for (int x = min.X; x <= max.X; x++)
+                for (int y = min.Y; y <= max.Y; y++)
+                    yield return new Tile2i(x, y);
+        }
+
+        private static bool CoverageIntersectsDesignation(
+            AccessTileCoverage coverage, Tile2i origin)
+        {
+            for (int y = 0; y <= 4; y++)
+                for (int x = 0; x <= 4; x++)
+                    if (coverage.Contains(origin + new RelTile2i(x, y)))
+                        return true;
+            return false;
+        }
+
+        private static IEnumerable<Tile2i> EnumerateAccessOrigins(
+            int firstX, int firstY, Tile2i max, int extra)
+        {
+            for (int x = firstX; x <= max.X + extra; x += 4)
+                for (int y = firstY; y <= max.Y + extra; y += 4)
+                    yield return new Tile2i(x, y);
+        }
+
+        private static IEnumerable<Tile2i> EnumerateRequiredTerrainColumns(
+            AccessTileCoverage searchOrigins)
+        {
+            var columns = new HashSet<Tile2i>();
+            foreach (Tile2i origin in searchOrigins.EnumerateTiles())
+            {
+                columns.Add(origin);
+                columns.Add(origin + new RelTile2i(4, 0));
+                columns.Add(origin + new RelTile2i(0, 4));
+                columns.Add(origin + new RelTile2i(4, 4));
+            }
+            foreach (Tile2i column in columns
+                .OrderBy(tile => tile.Y).ThenBy(tile => tile.X))
+                yield return column;
         }
 
         private static int ToHeight2(float height)

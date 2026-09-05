@@ -1,3 +1,8 @@
+v0.8.2 | 2026-09-05
+* Improved: **Reduce oversized areas** under **Performance** so very large or effectively unbounded tower areas can still make a best-effort accessway attempt through a geometry-only sparse corridor
+* Fixed: Reduced access snapshots now use the available memory ceiling to build one larger useful corridor while keeping capture within the same conservative memory accounting as snapshot preflight
+* Fixed: Accessway debris cleanup now leaves terrain work for planned excavation when projected cleanup would exceed the safe quick-removal threshold
+
 v0.8.1 | 2026-09-02
 * Added: A per-world **Use worker thread** setting under **Performance**, enabled by default. Disable it to run new planning requests on the game thread when needed; **Save as config** controls future worlds
 * Fixed: Mining ocean and building protection now repeats boundary checks after removing unsafe designations and rebuilding corner heights, preventing newly exposed faces from escaping protection

@@ -212,6 +212,10 @@
     "Scan-Leistung"
   ],
   [
+    "settings.world.performance",
+    "LEISTUNG"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "Tastenkürzel"
   ],
@@ -256,24 +260,28 @@
     "Vermeiden Sie Gebäude in generierten Zugangswegen und Bergbauplänen auf dieser Welt. Ausgenommen sind Bergbauzellen, die ein Gebäude oder dessen Sicherheitsperimeter überlappen. Auch geplante Geländestörungen in der Nähe von Gebäuden werden vermieden."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "Ernten Sie zerstörte Bäume"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
-  ],
-  [
-    "settings.world.performance",
-    "LEISTUNG"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "Worker-Thread verwenden"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "Einen Hintergrundthread für die Zugangs- und Bergbauplanung verwenden. Standardmäßig aktiviert. Zur Kompatibilitätsdiagnose deaktivieren; die Planung läuft dann im Spielthread und kann besonders bei großen Minen Pausen verursachen. Gilt für neue Planungsanfragen."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "Übergroße Bereiche reduzieren"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "Wenn der vollständige Zugangs-Schnappschuss zu groß für die Speichergrenze ist, wird ein kleinerer, rein geometrischer Korridor um die aktuellen Starts und Ziele versucht. Dies soll irgendeinen Weg finden; er kann sich vom Weg im Gesamtbereich unterscheiden, und ein Fehlschlag beweist nicht, dass kein Weg existiert."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Ernten Sie zerstörte Bäume"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",

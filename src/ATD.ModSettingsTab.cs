@@ -490,6 +490,12 @@ namespace AutoTerrainDesignations
                 () => AutoDepthDesignation.UseWorkerThread,
                 AutoDepthDesignation.SetUseWorkerThread,
                 refreshers));
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsReduceOversizedAreasLabel.AsFormatted,
+                AtdLocalization.SettingsReduceOversizedAreasTooltip.AsFormatted,
+                () => AutoDepthDesignation.ReduceOversizedAreas,
+                AutoDepthDesignation.SetReduceOversizedAreas,
+                refreshers));
         }
 
         private static Row BuildQuickRemoveDebrisPolicyRow(List<Action> refreshers)

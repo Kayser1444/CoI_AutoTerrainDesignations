@@ -313,27 +313,6 @@ namespace AutoTerrainDesignations.Access
                     sample.DumpBurialThreshold);
         }
 
-        public static bool TryGetNonBuriedPropRemovalStrategy(
-            QuickRemoveDebrisPolicy policy,
-            bool buriedByPlannedDumping,
-            bool removedByPlannedExcavation,
-            out bool quickRemove)
-        {
-            if (buriedByPlannedDumping)
-            {
-                quickRemove = false;
-                return false;
-            }
-            if (policy != QuickRemoveDebrisPolicy.Always
-                && removedByPlannedExcavation)
-            {
-                quickRemove = false;
-                return false;
-            }
-            quickRemove = policy != QuickRemoveDebrisPolicy.Never;
-            return true;
-        }
-
         public static bool TryGetDesignationTargetHeight(
             DesignationData data, AccessPropSample sample,
             out float targetHeight)

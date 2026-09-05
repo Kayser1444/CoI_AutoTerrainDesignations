@@ -212,6 +212,10 @@
     "扫描性能"
   ],
   [
+    "settings.world.performance",
+    "性能"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "键盘快捷键"
   ],
@@ -256,24 +260,28 @@
     "避免在这个世界中生成的通道和采矿计划中出现建筑物。与建筑物或其安全边界重叠的采矿单元被排除在外。还避免了建筑物附近的预计地形干扰。"
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "收获被破坏的树木"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "在最终确定的通道和采矿指定干扰区域中标记树木以供采伐。禁用后，ATD 不会创建树木采伐订单。 ATD 下的收获订单可通过清除操作删除；不相关的玩家收获订单被保留。"
-  ],
-  [
-    "settings.world.performance",
-    "性能"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "使用工作线程"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "使用后台线程进行通道和采矿规划。默认启用。关闭此选项可排查兼容性问题；规划随后会在游戏线程中运行，并可能导致暂停，尤其是在大型矿区中。仅适用于新的规划请求。"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "缩小过大的区域"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "当完整访问快照超过内存上限时，尝试在当前起点和目标周围使用一个更小的纯几何走廊。此功能旨在找到一条可行路线；它可能不同于完整区域的路线，失败也不能证明不存在路线。"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "收获被破坏的树木"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "在最终确定的通道和采矿指定干扰区域中标记树木以供采伐。禁用后，ATD 不会创建树木采伐订单。 ATD 下的收获订单可通过清除操作删除；不相关的玩家收获订单被保留。"
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",

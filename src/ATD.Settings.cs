@@ -608,6 +608,12 @@ namespace AutoTerrainDesignations
                     && ShouldPreserveBool(useWorkerThread.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetUseWorkerThread(useWorkerThread.Value);
 
+                bool? reduceOversizedAreas = ParseBool(json, "reduceOversizedAreas");
+                if (reduceOversizedAreas.HasValue
+                    && ShouldPreserveBool(reduceOversizedAreas.Value, migrateGeneratedDefaults, true))
+                    AutoTerrainDesignationsMod.SetReduceOversizedAreas(
+                        reduceOversizedAreas.Value);
+
                 bool? allowRampsOutsideTowerAreas = ParseBool(json, "allowRampsOutsideTowerAreas");
                 if (allowRampsOutsideTowerAreas.HasValue && ShouldPreserveBool(allowRampsOutsideTowerAreas.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAllowRampsOutsideTowerAreas(allowRampsOutsideTowerAreas.Value);
@@ -771,6 +777,14 @@ namespace AutoTerrainDesignations
                     StringComparison.Ordinal) < 0)
             {
                 failure = "The generated snapshot memory ceiling was not 1024 MiB.";
+                return false;
+            }
+
+            if (json.IndexOf(
+                    "\"reduceOversizedAreas\":",
+                    StringComparison.Ordinal) < 0)
+            {
+                failure = "The generated reduced-area default was missing.";
                 return false;
             }
 
@@ -1142,6 +1156,9 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_useWorkerThread\": \"New-world default for Use worker thread. Disable to run access and mining planning on the game thread for compatibility troubleshooting; large mines may cause pauses. Changes apply to new planning requests. Default: true.\",");
             sb.AppendLine($"  \"useWorkerThread\": {BoolToJsonStr(AutoTerrainDesignationsMod.UseWorkerThread)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_reduceOversizedAreas\": \"New-world default for Reduce oversized areas. When a full access snapshot exceeds its memory ceiling, try one deterministic geometry-only corridor around the current starts and goals. This may find a different route, and failure is inconclusive. Default: true.\",");
+            sb.AppendLine($"  \"reduceOversizedAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.ReduceOversizedAreas)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_allowRampsOutsideTowerAreas\": \"New-game default for Allow ramps outside tower areas. When enabled, narrow and T3/Mega accessways retry within 16 tiles beyond the tower boundary only after the in-area search exhausts its available routes. Timeouts and other interrupted searches do not retry. The game may show its normal outside-area alarm. Default: true.\",");
             sb.AppendLine($"  \"allowRampsOutsideTowerAreas\": {BoolToJsonStr(AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas)},");

@@ -83,6 +83,8 @@ namespace AutoTerrainDesignations
             AppendJsonBool(sb, AccessAvoidOcean);
             sb.Append(",\"useWorkerThread\":");
             AppendJsonBool(sb, UseWorkerThread);
+            sb.Append(",\"reduceOversizedAreas\":");
+            AppendJsonBool(sb, ReduceOversizedAreas);
             sb.Append(",\"filterOreSpikes\":");
             AppendJsonBool(sb, FilterOreSpikes);
             sb.Append(",\"avoidBuildings\":");
@@ -260,6 +262,8 @@ namespace AutoTerrainDesignations
                     SetAccessAvoidOcean(avoidOcean);
                 if (TryGetBool(worldSettings, "useWorkerThread", out bool useWorkerThread))
                     SetUseWorkerThread(useWorkerThread);
+                if (TryGetBool(worldSettings, "reduceOversizedAreas", out bool reduceOversizedAreas))
+                    SetReduceOversizedAreas(reduceOversizedAreas);
                 if (TryGetBool(worldSettings, "filterOreSpikes", out bool filterOreSpikes))
                     SetFilterOreSpikes(filterOreSpikes);
                 if (TryGetBool(worldSettings, "avoidBuildings", out bool avoidBuildings))

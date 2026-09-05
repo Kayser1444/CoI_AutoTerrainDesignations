@@ -1,6 +1,7 @@
 # Reduced access snapshot implementation plan
 
-Status: accepted architecture; implementation not started.
+Status: core production implementation landed; replay-schema expansion,
+real-world qualification, and extended geometry cases remain follow-up work.
 
 This plan implements
 [ADR 0008](../../adr/0008-shrink-oversized-access-snapshots-with-geometry-only-masked-corridors.md).

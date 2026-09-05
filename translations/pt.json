@@ -212,6 +212,10 @@
     "Desempenho da varredura"
   ],
   [
+    "settings.world.performance",
+    "DESEMPENHO"
+  ],
+  [
     "settings.heading.keyboard_shortcuts",
     "Atalhos de teclado"
   ],
@@ -256,24 +260,28 @@
     "Evite edifícios em acessos gerados e planos de mineração neste mundo. Excluem-se as células de mineração que se sobrepõem a um edifício ou ao seu perímetro de segurança. A perturbação projetada do terreno perto de edifícios também é evitada."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
-    "Colha árvores interrompidas"
-  ],
-  [
-    "settings.world.harvest_disrupted_trees.tooltip",
-    "Marcar as árvores nas zonas de acesso finalizadas e nas zonas de perturbação designadas à mineração para colheita. Quando desativado, o ATD não cria ordens de colheita de árvores. Os pedidos de colheita feitos pelo ATD são removidos pela ação Clear; as ordens de colheita de jogadores não relacionados são preservadas."
-  ],
-  [
-    "settings.world.performance",
-    "DESEMPENHO"
-  ],
-  [
     "settings.world.use_worker_thread.label",
     "Usar thread de trabalho"
   ],
   [
     "settings.world.use_worker_thread.tooltip",
     "Usar uma thread em segundo plano para o planejamento de acessos e mineração. Ativado por padrão. Desative para solucionar problemas de compatibilidade; o planejamento será executado na thread do jogo e poderá causar pausas, especialmente em minas grandes. Aplica-se a novas solicitações de planejamento."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "Reduzir áreas grandes demais"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "Quando o instantâneo completo de acesso é grande demais para o limite de memória, tente um corredor menor baseado apenas em geometria ao redor dos pontos iniciais e objetivos atuais. O objetivo é encontrar alguma rota; ela pode ser diferente da rota da área completa, e uma falha não prova que nenhuma rota existe."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "Colha árvores interrompidas"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "Marcar as árvores nas zonas de acesso finalizadas e nas zonas de perturbação designadas à mineração para colheita. Quando desativado, o ATD não cria ordens de colheita de árvores. Os pedidos de colheita feitos pelo ATD são removidos pela ação Clear; as ordens de colheita de jogadores não relacionados são preservadas."
   ],
   [
     "settings.world.allow_dig_to_remove_debris.label",
