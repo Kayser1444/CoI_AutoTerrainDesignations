@@ -1,4 +1,4 @@
-v0.8.2 [packaged]
+v0.8.2 [released]
 
 * Fixed: Access Search Laboratory replay now accepts request graphs up to the 1 GiB payload bound, allowing max-area captures whose serialized request exceeds the former 768 MiB section limit.
 
