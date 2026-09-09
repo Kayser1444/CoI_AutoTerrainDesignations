@@ -26,6 +26,8 @@ namespace AutoTerrainDesignations
         internal const string TowerSettingsConfigKey = "atdTowerSettingsStateJson";
 
         private const int TowerSettingsConfigSchemaVersion = 1;
+        private const string LegacyEmptyStatePlaceholder =
+            "Keep me! I am required to persist the mod tower settings within the vanilla save file.";
 
         private static string? s_lastLoadedTowerSettingsJson;
 
@@ -35,6 +37,15 @@ namespace AutoTerrainDesignations
         {
             string json = store.LoadJson();
             if (string.IsNullOrWhiteSpace(json))
+            {
+                LogInfo($"Persistence: no tower settings found in {store.StorageKind}; using defaults.");
+                return;
+            }
+
+            // Older configs used a human-readable sentinel as the initial value.
+            // Treat it like an empty state so existing saves do not report a
+            // parse warning on their first load after this format correction.
+            if (string.Equals(json.Trim(), LegacyEmptyStatePlaceholder, StringComparison.Ordinal))
             {
                 LogInfo($"Persistence: no tower settings found in {store.StorageKind}; using defaults.");
                 return;
