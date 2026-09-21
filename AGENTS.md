@@ -1,5 +1,25 @@
 # Codex Instructions for ATD
 
+ATD is the workspace entry point, but it is not automatically the target
+project. If a request names another maintained mod or shared project, route the
+work to that repository before inspecting or editing files. The explicit user
+request takes precedence over this repository's current directory.
+
+In particular, route Lighthouse, Beacon, early buildings, research
+progression, Hauler, Miner, Lumberjack, Cart Hauler, and other KPIE worker
+requests to:
+
+`C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\KaysersPreIndustrialEra`
+
+Route shared logging, translation tooling, common helpers, and other shared
+features to:
+
+`C:\Users\jonas.adolphson\AppData\Roaming\Captain of Industry\Mods\CoI_AutoHelpers`
+
+“Lumberjack” refers to the KPIE worker unless the request explicitly concerns
+forestry designations. After routing, read the target repository's `AGENTS.md`
+and only the relevant shared instructions.
+
 The shared workspace instructions live at:
 
 - `../AGENTS.md`

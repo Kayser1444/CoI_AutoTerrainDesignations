@@ -45,3 +45,10 @@ Each is decompiled into its own subdirectory under the output root (e.g. `…\Ma
 ## Change detection
 
 By default the script compares the DLL's last-modified time against the newest file in the matching output directory. If the output is already up to date the DLL is skipped. Pass `-Force` to bypass this check.
+
+## Manifest and changelog synchronization
+
+After decompilation and catalog generation, the script automatically:
+- Updates `max_verified_game_version` in `manifest.json` for all maintained packaged mods (`AutoTerrainDesignations`, `AutoForestryDesignations`, `DesignerToolkit`, and `KaysersPreIndustrialEra`).
+- Records a compatibility verification entry under the active `[unreleased]` section in each mod's private `changelog.md` / `CHANGELOG.md` (including `CoI_AutoHelpers`).
+

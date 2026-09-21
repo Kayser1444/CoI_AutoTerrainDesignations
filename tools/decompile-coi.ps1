@@ -334,6 +334,7 @@ if ($null -ne $gameVersion) {
         'AutoTerrainDesignations'
         'AutoForestryDesignations'
         'DesignerToolkit'
+        'KaysersPreIndustrialEra'
     )
 
     foreach ($modName in $maintainedModNames) {
@@ -358,3 +359,64 @@ if ($null -ne $gameVersion) {
         }
     }
 }
+
+# ---------------------------------------------------------------------------
+# 7. Record game version compatibility verification in maintained changelogs
+# ---------------------------------------------------------------------------
+if ($null -ne $gameVersion) {
+    $modsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $allMaintainedMods = @(
+        'AutoTerrainDesignations'
+        'AutoForestryDesignations'
+        'DesignerToolkit'
+        'KaysersPreIndustrialEra'
+        'CoI_AutoHelpers'
+    )
+
+    $versionLabel = if ($buildNumber) { "$gameVersion (build $buildNumber)" } else { $gameVersion }
+
+    foreach ($modName in $allMaintainedMods) {
+        $modRoot = Join-Path $modsRoot $modName
+        $changelogPath = $null
+        foreach ($name in @('changelog.md', 'CHANGELOG.md')) {
+            $candidate = Join-Path $modRoot $name
+            if (Test-Path -LiteralPath $candidate) {
+                $changelogPath = $candidate
+                break
+            }
+        }
+
+        if (-not $changelogPath) { continue }
+
+        $content = Get-Content -LiteralPath $changelogPath -Raw
+        if (-not $content) { continue }
+
+        if ($content -match [regex]::Escape("Captain of Industry $gameVersion")) {
+            Write-Host ''
+            Write-Host "${modName}\$((Split-Path $changelogPath -Leaf)): compatibility already recorded for $gameVersion"
+            continue
+        }
+
+        $starCount = ([regex]::Matches($content, '(?m)^\*\s')).Count
+        $dashCount = ([regex]::Matches($content, '(?m)^-\s')).Count
+        $bullet = if ($starCount -gt $dashCount) { '* ' } else { '- ' }
+        $entryText = "${bullet}Verified compatibility with Captain of Industry $versionLabel."
+
+        $updated = $null
+        if ($content -match '(?si)(##\s*\[Unreleased\].*?###\s*Changed\r?\n)') {
+            $rx = [regex]::new('(?si)(##\s*\[Unreleased\].*?###\s*Changed\r?\n\r?\n?)')
+            $updated = $rx.Replace($content, "`${1}$entryText`n", 1)
+        }
+        elseif ($content -match '(?mi)^(?<header>#{0,3}\s*.*\[unreleased\].*)$') {
+            $rx = [regex]::new('(?mi)^(?<header>#{0,3}\s*.*\[unreleased\].*)\r?\n')
+            $updated = $rx.Replace($content, "`${header}`n`n$entryText`n", 1)
+        }
+
+        if ($updated -and $updated -ne $content) {
+            Set-Content -LiteralPath $changelogPath -Value $updated -NoNewline -Encoding UTF8
+            Write-Host ''
+            Write-Host "${modName}\$((Split-Path $changelogPath -Leaf)): added verification entry for $versionLabel"
+        }
+    }
+}
+
