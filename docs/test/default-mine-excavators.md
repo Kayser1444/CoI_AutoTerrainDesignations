@@ -23,6 +23,18 @@ fixture executable passed all zone, IL guard, and hook installation checks.
 The fixture build emitted NU1900 because NuGet vulnerability metadata could
 not be retrieved; this did not prevent its build or execution.
 
+2026-10-02 release preparation: the Release solution build passed with zero
+warnings/errors. The 0.9.0 ZIP contains the expected 17 files, portable entry
+names, the correct manifest and public changelog, and nine locale bundles with
+208 keys each and preserved substitution tokens. The exact packaged DLL passed
+the Release fixture executable after being copied into its output directory
+and run without rebuilding. The project stamps every build with its build time,
+so rebuilding the fixture project alone produces a different DLL hash.
+
+Package SHA-256:
+`EBF6F351149382FCA4D723EA4D91D10FAC0C70CB354046F85E31EF5F8F3C248B`.
+In-game checks remain pending.
+
 ## Initial runtime trial
 
 1. Restart the game and confirm the loaded ATD DLL timestamp using
