@@ -1,4 +1,4 @@
-v0.9.0 [packaged]
+v0.9.0 [released]
 
 * Added the default-off **Unassigned excavators excavate** World Settings option. Unassigned excavators work Mining designations outside every Mine Tower area and request available global trucks for delivery, while remaining visibly unassigned. Native patch installation and zone fixtures pass; in-game logistics, save/load continuity, and playable removal still need validation. Transient cargo loss on removal is acceptable; the save must remain playable.
 
