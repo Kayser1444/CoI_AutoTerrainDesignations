@@ -4,11 +4,15 @@
 
 *One Mine, One Click — Once You Plop, You Can’t Stop.*
 
+[🛡️ **Code analysis explained**](#code-analysis-explained)
+
 ## 📋 Overview
 
 ***Kayser’s Automatic Terrain Designations (ATD)*** is a quality-of-life mod for Captain of Industry that generates tailored mining designations for Mine Towers. Instead of manually maintaining designations across complex deposits, ATD analyzes the terrain and creates a mining plan that follows the ore body.
 
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
+
+Version 0.8.1 adds a per-world **Use worker thread** setting under **Performance**, enabled by default, so new planning requests can use either responsive background planning or game-thread planning when needed. It also strengthens mining safety with repeated boundary checks and diagonal protection rays around exposed convex corners.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
@@ -17,6 +21,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 ## ⚙️ Feature List
 
 [⛏️ **Create designations**](#create-designations)
+
+[🛠️ **Vanilla fixes**](#vanilla-fixes)
 
 [🛣️ **Routed accessways**](#routed-accessways)
 
@@ -54,7 +60,7 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 
 *ATD's integrated Mine Tower controls, with detailed explanations available in tooltips.*
 
-Choose a product or use **AUTO**, then scan the tower area and create a tailored mining plan with one click. Per-tower controls cover ore quality, excavation depth, elevation limits, corridor clearance, dumping priority, and accessway mode.
+Choose a product or use **AUTO**, then scan the tower area and create a tailored mining plan with one click. Per-tower controls cover ore quality, excavation depth, elevation limits, corridor clearance, dumping priority, and accessway mode. Snapshot capture is sliced to keep frames responsive, pure planning runs on a dedicated worker thread, and the final plan is placed through one native batch.
 
 ![image.png](/content-images/3f41494ce10ad35a656b8e2e7dd123a3103a6776d2b321a750669581b003b044/image.png)
 
@@ -64,11 +70,19 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 
 *The completed excavation follows the deposit with minimal unnecessary digging.*
 
+### 🛠️ Vanilla fixes
+
+The enabled-by-default **Filter ore spikes** world option corrects isolated ultra-thin ore tails produced by vanilla terrain generation before **Ore quality** and bottom flattening are applied. These tails can drag broad mining designations many levels into bedrock, which produces 2.5 times as much Rock as ordinary rock for the same excavated volume.
+
+Across captured spike-affected mines, the filter reduced planned bedrock excavation by up to **99% locally and 36% across entire designation plans**. In the strongest whole-plan test it prevented an estimated 4.8 million units of Rock while changing estimated target ore by about 0.002%. Raw terrain and existing designations remain unchanged.
+
 ### 🛣️ Routed accessways
 
 ![image.png](/content-images/2abe8a41147dc6cde9ff42a475bc0b237150b61b8d8d7b86e9a587ee3ef474e6/image.png)*A routed accessway connecting isolated terrain work to ground the assigned excavators can reach.*
 
-ATD can generate turning accessways sized for T1, T2, or T3/Mega Excavators. **AUTO** selects a suitable clearance from assigned or available excavators, while explicit modes give you direct control. Legacy straight ramps remain available when preferred.
+ATD automatically enables routed turning accessways for eligible modes, sized for T1, T2, or T3/Mega Excavators. **AUTO** selects a suitable clearance from assigned or available excavators, while explicit T1-T3 modes give you direct control. Legacy straight ramps remain available in the Legacy modes and as an explicit fallback when preferred.
+
+Large accessway searches now perform more work asynchronously and in short slices, keeping the game responsive during complex plans.
 
 ### 🧹 Clear designations
 
@@ -80,7 +94,7 @@ Use **Clear designations** to remove the selected tower's ATD-generated terrain 
 
 ![image.png](/content-images/006b3e17740b08334a9fcdbcbc0dd0424499217939153f9322497b80bb48c0bd/image.png)*Live ore composition estimates for the terrain designations currently managed by the Mine Tower.*
 
-The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It reflects the current Ore Mining Yield difficulty setting and works with both ATD-generated and manually placed designations.
+The **Ore composition** panel estimates the products contained in the tower's current mining and leveling designations. It includes Rock produced by digging into bedrock, applies bedrock's higher vanilla yield, reflects the current Ore Mining Yield difficulty setting, and works with both ATD-generated and manually placed designations.
 
 ### 🎯 Mining and dumping priorities
 
@@ -135,15 +149,31 @@ Turn flat leveling work into farmable ground with per-tower automation. ATD mana
 Open ATD in the Mod Settings window for controls that are not available directly from an individual Mine Tower:
 
 - **Terrain safety** — Choose how cautiously ATD predicts landslides and keeps generated work away from oceans and buildings.
+- **Vanilla fixes** — Keep the ore-spike correction enabled, or disable it for exact unfiltered vanilla deposit geometry.
 - **Ramps outside tower areas** — Allow a bounded retry just beyond the tower boundary when no valid in-area accessway can be found.
 - **Debris and tree handling** — Control disrupted-tree harvesting, terrain changes used to remove debris, and when accessway cleanup may spend Unity on Quick remove.
 - **Notifications** — Enable or disable excavator-completion and accessway warning notifications.
 - **Tower panel defaults** — Choose whether the Mining Designations, Ore Composition, and Farmland Preparation panels start collapsed.
 - **Mine Tower defaults** — Set the initial accessway mode, dumping priority, excavation depth, elevation limit, ore quality, and idle-vehicle behavior, then optionally save them as the configuration for new games.
+- **Performance** — Choose whether new planning requests use a dedicated worker thread or the game thread; **Save as config** sets the default for future worlds.
+
+Accessway search uses A\* by default. Advanced users can temporarily switch to Dijkstra with the `atd_set_access_astar` console command when comparing routes; the choice applies only to the current session.
 
 For mining connoisseurs who enjoy tuning the last grain of ore, ATD also exposes expert ore-quality thresholds and accessway pathfinder controls. Most players can safely leave these at their defaults.
 
 ---
+
+## 🛡️ Code analysis explained
+
+CoI Hub's code analysis flags capabilities that can be legitimate parts of a mod but deserve context. ATD is open source, and these warnings mostly reflect its game integration and access-search development tools:
+
+- **Loads other code at runtime** — ATD's access-search replay tools can load the exact built ATD assembly so recorded searches can be replayed against the same code. The in-game mod does not download or execute arbitrary third-party code.
+- **Spawns processes** — ATD does not launch child processes. The warning is triggered by diagnostic code that reads the current game's process information to measure replay CPU and memory use; it is not used to start external programs.
+- **Accesses filesystem** — ATD reads bundled translation files and its settings, and its replay tools read and write diagnostic cases under Captain of Industry's user-data folder. It does not need broad arbitrary file access for normal mining or accessway gameplay.
+- **Uses Harmony** — Harmony is the patching library ATD uses to integrate with Captain of Industry. It patches specific game and UI methods to add controls, behaviors, and compatibility hooks.
+- **Uses reflection by name** — Some game APIs and UI fields are private or vary between versions. ATD uses named reflection to find optional vanilla types, methods, and fields, then skips that integration or uses a fallback when the expected member is unavailable.
+
+The worker thread itself receives a sealed snapshot of primitive world data and returns a mining or accessway plan. Snapshot capture, live validation, and designation changes remain on the game thread; the worker does not access live Unity or Mafi world objects.
 
 Mine away!
 
