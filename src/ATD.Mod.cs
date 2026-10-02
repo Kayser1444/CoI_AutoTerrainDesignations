@@ -103,6 +103,7 @@ public static string Tt(string text) => text;
         }
         AutoDepthDesignation.ApplyInspectorPatches(m_harmony);
         AutoDepthDesignation.ApplyOreSorterExportPatches(m_harmony);
+        AutoDepthDesignation.ApplyDefaultMinePatches(m_harmony);
         AutoDepthDesignation.ApplyCornerPatches(m_harmony);
         TruckIdlePolicyPatches.Apply(m_harmony);
         PreAllocationPatches.Apply(m_harmony);
@@ -163,6 +164,8 @@ public static string Tt(string text) => text;
         SetAccessHarvestDisruptedTrees(true);
         SetAccessAllowDigToRemoveDebris(true);
         SetAccessQuickRemoveDebrisPolicy(QuickRemoveDebrisPolicy.Restrictive);
+        SetMiningHazardOverlayEnabled(false);
+        SetMiningHazardFencePreviewEnabled(false);
         SetAccessLandscapingCostDistanceScale(1f);
         SetAccessPropCleanupLandscapingCost(8f);
         SetAccessLandslideRunPerHeight(1f);
@@ -455,6 +458,22 @@ public static string Tt(string text) => text;
 
     /// <summary>Rejects accessway rays whose projected disturbance reaches ocean.</summary>
     public static bool AccessAvoidOcean { get; private set; } = true;
+
+    /// <summary>New-world default for displaying the predicted mining collapse envelope.</summary>
+    public static bool MiningHazardOverlayEnabled { get; private set; }
+
+    public static void SetMiningHazardOverlayEnabled(bool value)
+    {
+        MiningHazardOverlayEnabled = value;
+    }
+
+    /// <summary>New-world default for the developer-only mining hazard fence-point preview.</summary>
+    public static bool MiningHazardFencePreviewEnabled { get; private set; }
+
+    public static void SetMiningHazardFencePreviewEnabled(bool value)
+    {
+        MiningHazardFencePreviewEnabled = value;
+    }
 
     public static void SetAccessAvoidOcean(bool value)
     {
@@ -799,6 +818,7 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.Initialize(desigManager, protosDb, worldMapManager, ticker, entitiesManager, terrainPropsManager, propsRemovalProcessor, treesManager, vehiclePathFindingManager, parkAndWaitJobFactory, notificationsManager, inputScheduler, configSerializationContext, vehiclesManager);
             AutoDepthDesignation.ConfigureActiveSoilImport(vehicleBuffersRegistry, truckJobsFilter, unreachableTerrainDesignations, dumpingJobFactory, cargoPickUpFactory, chainedNavigationFactory, vehicleLastOutputBufferManager);
             AutoDepthDesignation.ConfigureOreSorterExports(vehicleBuffersRegistry);
+            AutoDepthDesignation.ConfigureDefaultMine(resolver);
             m_towerSettingsStateStore = ModStateJsonStores.CreateDefault(JsonConfig, AutoDepthDesignation.TowerSettingsConfigKey);
             AutoDepthDesignation.LoadTowerSettingsFromJsonStore(m_towerSettingsStateStore);
             AutoDepthDesignation.PropRemovalManager?.ResumeLoadedRequests();
@@ -822,6 +842,9 @@ public static string Tt(string text) => text;
             try { shortcutsManager = resolver.Resolve<ShortcutsManager>(); }
             catch (Exception ex5) { AutoDepthDesignation.s_log.Warning("ShortcutsManager not available: " + ex5.Message); }
             AutoDepthDesignation.InitializeCornerMode(terrainCursor, desigRenderer, cursorManager, shortcutsManager);
+            AutoDepthDesignation.InitializeMiningHazardOverlay(
+                m_gameLoopEvents!,
+                desigRenderer);
         }
         catch (Exception ex)
         {
@@ -842,6 +865,8 @@ public static string Tt(string text) => text;
         if (current - m_lastSimTick < Duration.OneSecond)
             return;
         m_lastSimTick = current;
+        try { AutoDepthDesignation.TickDefaultMine(); }
+        catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickDefaultMine"); }
         try { AutoDepthDesignation.TickFarmingPreparationSessions(); }
         catch (Exception ex) { AutoDepthDesignation.s_log.Exception(ex, "TickFarmingPreparationSessions"); }
         try { AutoDepthDesignation.TickActiveDumpingDemand(); }
@@ -861,6 +886,7 @@ public static string Tt(string text) => text;
     // pending cleanup is visible without allowing Quick remove to execute.
     private void onPausedSimUpdate()
     {
+        AutoDepthDesignation.ApplyPendingDefaultMineSetting();
         if (m_simLoopEvents == null || !m_simLoopEvents.IsSimPaused)
             return;
         try { AutoDepthDesignation.PropRemovalManager?.Tick(allowQuickRemoval: false); }
@@ -869,6 +895,8 @@ public static string Tt(string text) => text;
 
     private void beforeSave()
     {
+        AutoDepthDesignation.ApplyPendingDefaultMineSetting();
+        AutoDepthDesignation.PrepareDefaultMineForSave();
         AutoDepthDesignation.PrepareActiveDumpingForSave();
         AutoDepthDesignation.PrepareAccesswayManagerForSave();
         AutoDepthDesignation.PropRemovalManager?.PrepareForSave();
@@ -899,6 +927,7 @@ public static string Tt(string text) => text;
         AutoDepthDesignation.ResumeFarmingRuntimeAfterSave();
         AutoDepthDesignation.RestoreTransientNotificationsAfterSave();
         AutoDepthDesignation.ReReleaseIdleVehiclesAfterSave();
+        AutoDepthDesignation.ResumeDefaultMineAfterSave();
     }
 
     private void onGameTerminated()

@@ -1,0 +1,829 @@
+[
+  [
+    "common.level.off",
+    "끔"
+  ],
+  [
+    "common.level.low",
+    "낮음"
+  ],
+  [
+    "common.level.med",
+    "중간"
+  ],
+  [
+    "common.level.high",
+    "높음"
+  ],
+  [
+    "common.level.max",
+    "최대"
+  ],
+  [
+    "panel.designations.title",
+    "채굴 지정"
+  ],
+  [
+    "panel.designations.description",
+    "이 관제탑의 지형 지정을 자동으로 생성합니다."
+  ],
+  [
+    "panel.designations.create_button",
+    "지정 생성"
+  ],
+  [
+    "panel.designations.create_tooltip",
+    "이 관제탑의 영역을 스캔하여 채굴 지정을 배치합니다."
+  ],
+  [
+    "panel.designations.debris_tooltip",
+    "ATD의 잔해 제거 관리자를 통해 도달 가능한 잔해를 굴삭기로 제거하도록 요청합니다. 기존 지정은 일시적으로 중단되었다가 제거 후 복원됩니다. 이 버튼은 빠른 제거에 결속력을 절대 소모하지 않으며, '잔해 제거용 지형 정리' 설정을 따릅니다. Ctrl+클릭하면 도달 불가능한 잔해도 포함합니다."
+  ],
+  [
+    "panel.designations.clear_tooltip",
+    "이 관제탑이 ATD로 생성한 지형 지정과 벌목 지정을 삭제합니다. Shift+클릭하면 관제탑 영역 내의 모든 지형 지정과, 이 관제탑이 생성한 벌목 지정만 삭제합니다."
+  ],
+  [
+    "panel.designations.clear_tooltip.shift_click",
+    "이 관제탑이 ATD로 생성한 지형 지정과 벌목 지정을 삭제합니다. Shift+클릭하면 관제탑 영역 내의 모든 지형 지정과, 이 관제탑이 생성한 벌목 지정만 삭제합니다."
+  ],
+  [
+    "panel.designations.ore_filter.auto",
+    "자동"
+  ],
+  [
+    "panel.designations.accessway_mode.label",
+    "진입로 모드"
+  ],
+  [
+    "settings.dumping_priority.label",
+    "매립 우선순위"
+  ],
+  [
+    "settings.dumping_priority.tooltip",
+    "능동 매립에는 기본 게임의 반입 우선순위 1–15를 사용하며, 숫자가 낮을수록 더 긴급합니다. '수동'은 기본 게임의 수동 매립을 사용하며 능동 반출처에서만 반입합니다. 기본값: 수동. 농경지 표토는 항상 능동 매립됩니다."
+  ],
+  [
+    "settings.dumping_priority.passive",
+    "수동"
+  ],
+  [
+    "settings.dumping_priority.passive.tooltip",
+    "능동 반출처에서만 반입합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3",
+    "구형 3"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4",
+    "구형 4"
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5",
+    "구형 5"
+  ],
+  [
+    "panel.designations.accessway_mode.off.tooltip",
+    "진입로와 램프를 생성하지 않습니다."
+  ],
+  [
+    "panel.designations.accessway_mode.auto.tooltip",
+    "이 관제탑에 배정되었거나 사전 배정된 가장 큰 굴삭기를 기준으로 하고, 없으면 맵에 있는 가장 큰 굴삭기를 기준으로 합니다. 굴삭기가 하나도 없으면 '자동'은 '끔'과 동일하게 동작합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.t1.tooltip",
+    "T1 굴삭기의 통행 가능성을 기준으로 경로형 진입로를 생성합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.t2.tooltip",
+    "T2 굴삭기의 통행 가능성을 기준으로 경로형 진입로를 생성합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.t3.tooltip",
+    "T3/초대형 굴삭기의 통행 가능성을 기준으로 2차선 경로형 진입로를 생성합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "T3/초대형 굴삭기 기준으로 검증된, 지정 칸 3개 폭의 구형 직선 램프만 생성합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "T3/초대형 굴삭기 기준으로 검증된, 지정 칸 4개 폭의 구형 직선 램프만 생성합니다."
+  ],
+  [
+    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "T3/초대형 굴삭기 기준으로 검증된, 지정 칸 5개 폭의 구형 직선 램프만 생성합니다."
+  ],
+  [
+    "panel.designations.max_layers.label",
+    "최대 굴착 층수"
+  ],
+  [
+    "panel.designations.max_layers.tooltip",
+    "지표면에서부터 굴착할 최대 층수입니다. (∞ = 제한 없음)"
+  ],
+  [
+    "panel.designations.elevation_limit.label",
+    "고도 한계"
+  ],
+  [
+    "panel.designations.elevation_limit.tooltip",
+    "최대 굴착 깊이(절대 고도)입니다. (-∞ = 제한 없음)"
+  ],
+  [
+    "panel.designations.ore_purity.label",
+    "광석 품질"
+  ],
+  [
+    "panel.designations.ore_purity.tooltip",
+    "스캔 시 광석 품질을 기준으로 지형 기둥을 얼마나 엄격하게 거를지 정합니다. 굴삭기가 실제로 산출할 물질 구성을 예측하는 값은 아닙니다.\n끔: 모든 타일을 포함하고 끝까지 굴착합니다.\n낮음: 광석이 매우 희박한 타일을 제외하고, 바닥의 얇은 광석 꼬리를 잘라냅니다.\n중간: 적당한 품질 — 피복층이 두껍거나 광석이 적은 타일을 건너뜁니다.\n높음: 광석 기둥이 깨끗한 풍부한 타일만 포함합니다.\n최대: 피복층·깊이·광석 밀도 필터를 가장 엄격하게 적용합니다."
+  ],
+  [
+    "settings.ore_quality.value_tooltip",
+    "{0}: 최소 광석 높이 {1:0.##} 지형 타일, 최소 바닥 밀도 {2:P0}, 최소 광석 순도 {3:P0}, 최소 연결 덩어리 크기 {4} 타일."
+  ],
+  [
+    "settings.ore_quality.value.off",
+    "끔"
+  ],
+  [
+    "settings.ore_quality.value.low",
+    "낮음"
+  ],
+  [
+    "settings.ore_quality.value.medium",
+    "중간"
+  ],
+  [
+    "settings.ore_quality.value.high",
+    "높음"
+  ],
+  [
+    "settings.ore_quality.value.maximum",
+    "최대"
+  ],
+  [
+    "panel.designations.corridor_clearance.label",
+    "통로 폭"
+  ],
+  [
+    "panel.designations.corridor_clearance.tooltip",
+    "광석 구역을 연결하고 통행 가능성을 보장하기 위한 최소 통로 폭입니다.\n0 = 사용 안 함 (구역을 분리된 채로 두고, 통로 생성·구멍 메우기를 하지 않음)\n1 = 1타일 통로 (소형·중형 차량)\n2 = 2타일 통로 (초대형 차량)\n"
+  ],
+  [
+    "panel.designations.scanning_filter.label",
+    "스캔 필터:"
+  ],
+  [
+    "panel.designations.scanning_filter.tooltip",
+    "'지정 생성'이 무엇을 스캔할지 선택합니다.\n\n자동:\n• 지형 지정이 이미 있으면 이를 보존하고, 완료되지 않은 지형 작업 덩어리를 경로 탐색 시작점으로 사용합니다. 착공되지 않은 적격 채굴 관제탑 청사진(고스트)이 있으면 그 입구가 현재 관제탑 대신 경로 탐색 목표가 됩니다.\n• 그렇지 않으면 적격 관제탑 청사진을 자연 진입로 표식으로 삼아, 처음 찾은 유효한 경로를 확정합니다. 인식된 청사진이 있으면 경로를 배치할 수 없더라도 생산품 스캔을 하지 않습니다.\n• 지형 작업도 적격 청사진도 없으면 유용한 생산품을 스캔하여 채굴 계획을 생성합니다.\n\n'자동'은 절대 잔해나 흙으로 대체하지 않습니다. 그런 작업이 필요하면 '흙'을 직접 선택하거나 잔해 제거 버튼을 사용하세요."
+  ],
+  [
+    "settings.mod.name",
+    "자동 지형 지정"
+  ],
+  [
+    "settings.tab.defaults",
+    "기본값"
+  ],
+  [
+    "settings.tab.world_settings",
+    "월드 설정"
+  ],
+  [
+    "settings.tab.ore_quality",
+    "광석 품질"
+  ],
+  [
+    "settings.heading.mining_defaults",
+    "채굴 관제탑 기본값"
+  ],
+  [
+    "settings.heading.panel_defaults",
+    "패널 기본값"
+  ],
+  [
+    "settings.heading.designations",
+    "지정"
+  ],
+  [
+    "settings.heading.scan_performance",
+    "스캔 성능"
+  ],
+  [
+    "settings.world.performance",
+    "성능"
+  ],
+  [
+    "settings.heading.keyboard_shortcuts",
+    "단축키"
+  ],
+  [
+    "settings.heading.notifications",
+    "알림"
+  ],
+  [
+    "settings.heading.experimental_access",
+    "진입로"
+  ],
+  [
+    "settings.world.safety",
+    "지형 안전"
+  ],
+  [
+    "settings.world.mining_visualization",
+    "채굴 시각화"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "채굴 붕괴 예상 영역 표시"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "실시간 채굴 지정으로 인해 ATD가 산사태의 영향을 받을 수 있다고 예측한 지형에 줄무늬 오버레이를 표시합니다. 게임의 지형 지정 오버레이가 표시된 동안에만 나타납니다."
+  ],
+  [
+    "settings.world.vanilla_issue_correction",
+    "기본 게임 문제 보정"
+  ],
+  [
+    "settings.world.filter_ore_spikes.label",
+    "광석 스파이크 필터"
+  ],
+  [
+    "settings.world.filter_ore_spikes.tooltip",
+    "채굴 지정을 생성할 때, 주변 광맥보다 훨씬 깊이 뻗어 내려간 고립된 초박형 광석 스파이크를 무시합니다. 이 보정은 광석 품질 필터와 바닥 평탄화보다 먼저 실행됩니다. 원래 지형과 기존 지정은 변경되지 않습니다."
+  ],
+  [
+    "settings.world.avoid_ocean.label",
+    "바다 회피"
+  ],
+  [
+    "settings.world.avoid_ocean.tooltip",
+    "이 월드에서 생성되는 진입로와 채굴 계획이 바다를 피하도록 합니다. 바다와 겹치는 채굴 칸은 제외됩니다. 해수면 아래로 파 내려가는 예상 굴착도 피하지만, 바다로의 매립은 계속 허용됩니다. 위험한 해안선 작업을 허용하려면 끄세요."
+  ],
+  [
+    "settings.world.avoid_buildings.label",
+    "건물 회피"
+  ],
+  [
+    "settings.world.avoid_buildings.tooltip",
+    "이 월드에서 생성되는 진입로와 채굴 계획이 건물을 피하도록 합니다. 건물이나 그 안전 반경과 겹치는 채굴 칸은 제외됩니다. 건물 근처의 예상 지형 교란도 피합니다."
+  ],
+  [
+    "settings.world.use_worker_thread.label",
+    "작업 스레드 사용"
+  ],
+  [
+    "settings.world.use_worker_thread.tooltip",
+    "진입로 및 채굴 계획 연산에 백그라운드 스레드를 사용합니다. 기본적으로 켜져 있습니다. 호환성 문제를 진단할 때만 끄세요. 끄면 계획 연산이 게임 스레드에서 실행되어, 특히 대형 광산에서 일시 정지가 생길 수 있습니다. 새 계획 요청부터 적용됩니다."
+  ],
+  [
+    "settings.world.reduce_oversized_areas.label",
+    "과대 영역 축소"
+  ],
+  [
+    "settings.world.reduce_oversized_areas.tooltip",
+    "전체 진입 스냅샷이 메모리 한도를 넘을 만큼 크면, 현재 시작점과 목표 주변의 더 작은 형상 전용 통로로 한 번 재시도합니다. 어떻게든 경로를 찾는 것이 목적이며, 전체 영역 기준 경로와 다를 수 있습니다. 실패해도 경로가 존재하지 않는다는 뜻은 아닙니다."
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.label",
+    "교란된 나무 벌목"
+  ],
+  [
+    "settings.world.harvest_disrupted_trees.tooltip",
+    "확정된 진입로와 채굴 지정의 교란 구역 안에 있는 나무를 벌목 대상으로 지정합니다. 끄면 ATD는 벌목 지시를 만들지 않습니다. ATD가 만든 벌목 지시는 두 '삭제' 동작 중 어느 것으로든 제거되며, 플레이어가 따로 만든 벌목 지시는 유지됩니다."
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.label",
+    "잔해 제거용 지형 정리"
+  ],
+  [
+    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "지형 정리 없이는 잔해를 굴착할 수 없을 때, 잔해 제거 과정에서 가능한 최소한의 지형 변경을 허용합니다. 끄면 제거 요청이 실패하고 요청한 작업 흐름에 알림이 갑니다."
+  ],
+  [
+    "settings.world.quick_remove_debris.label",
+    "잔해 빠른 제거"
+  ],
+  [
+    "settings.world.quick_remove_debris.tooltip",
+    "경로형 진입로의 잔해에 대해 ATD가 게임의 '빠른 제거'를 언제 사용할지 정합니다. 빠른 제거는 게임이 일시 정지되지 않았을 때만 결속력을 소모합니다. 이 정책은 채굴 관제탑의 '잔해 제거' 버튼에는 적용되지 않습니다."
+  ],
+  [
+    "settings.world.quick_remove_debris.always",
+    "항상"
+  ],
+  [
+    "settings.world.quick_remove_debris.always.tooltip",
+    "계획된 매립 지정으로 충분히 묻힐 잔해를 제외한 모든 진입로 잔해에 빠른 제거를 사용합니다. 지형 정리가 빨라지지만 결속력을 소모합니다."
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive",
+    "제한적"
+  ],
+  [
+    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "일반 굴착을 우선하되, 굴착만으로 작업 후 통행 가능성을 보장할 수 없을 때 빠른 제거를 사용합니다."
+  ],
+  [
+    "settings.world.quick_remove_debris.never",
+    "사용 안 함"
+  ],
+  [
+    "settings.world.quick_remove_debris.never.tooltip",
+    "진입로 잔해에 대해 빠른 제거로 결속력을 절대 소모하지 않습니다. 제거는 굴착과 '잔해 제거용 지형 정리' 설정에 의존하며, 플레이어가 직접 빠른 제거로 도와야 할 수 있습니다."
+  ],
+  [
+    "settings.world.safety_policy.label",
+    "안전 정책"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.label",
+    "관제탑 영역 밖 램프 허용"
+  ],
+  [
+    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "진입로 탐색이 관제탑 영역 안의 가능한 경로를 모두 소진하면, 경계 밖 16타일 이내에서 다시 시도합니다. 이 대체 탐색은 좁은 진입로와 T3/초대형 진입로 모두에 적용되며, 시간 초과나 기타 탐색 중단 후에는 실행되지 않고, 게임의 일반적인 '영역 밖' 경고가 뜰 수 있습니다. 기본값: 켜짐."
+  ],
+  [
+    "settings.world.safety_policy.tooltip",
+    "ATD가 산사태를 얼마나 신중하게 예측하고, 보호 대상인 바다와 건물로부터 얼마나 거리를 둘지 정합니다. 높은 정책일수록 여유 공간을 더 확보하고, 낮은 정책일수록 위험 요소에 더 가깝게 지형 작업을 허용합니다. 기본값: 균형."
+  ],
+  [
+    "settings.world.safety_policy.value_tooltip",
+    "{0}: 산사태 예측 경사 계수 {1}, 보호 구역 완충 거리 {2} 타일."
+  ],
+  [
+    "settings.world.safety_policy.minimum",
+    "최소"
+  ],
+  [
+    "settings.world.safety_policy.low",
+    "낮음"
+  ],
+  [
+    "settings.world.safety_policy.balanced",
+    "균형"
+  ],
+  [
+    "settings.world.safety_policy.high",
+    "높음"
+  ],
+  [
+    "settings.world.safety_policy.maximum",
+    "최대"
+  ],
+  [
+    "settings.tab.pathfinder",
+    "진입로"
+  ],
+  [
+    "settings.pathfinder.costs",
+    "경로 비용"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.label",
+    "지형 지정 비용"
+  ],
+  [
+    "settings.pathfinder.generated_v_fixed.tooltip",
+    "생성되는 지형 지정 하나마다 부과되는 고정 비용입니다. 값이 높을수록 이동 거리와 전체 지형 정리 비용이 늘더라도 지형 지정 수가 적은 경로를 선호합니다."
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.label",
+    "직접 지형 작업 가중치"
+  ],
+  [
+    "settings.pathfinder.direct_work_weight.tooltip",
+    "생성된 지형 지정의 바로 위나 아래를 직접 굴착하거나 매립하는 작업에 적용되는 가중치입니다."
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.label",
+    "측면 레이 작업 가중치"
+  ],
+  [
+    "settings.pathfinder.side_ray_weight.tooltip",
+    "측면 및 회전 모서리의 지형 정리 레이(지형까지 쏘는 탐지선)에 적용되는 가중치입니다."
+  ],
+  [
+    "settings.pathfinder.candidate_distance.label",
+    "후보 레이 최대 거리"
+  ],
+  [
+    "settings.pathfinder.candidate_distance.tooltip",
+    "후보 레이의 최대 추적 거리입니다. 값이 높을수록 매우 큰 측면 쐐기 지형까지 보호하고 비용에 반영하지만 탐색 시간이 늘어납니다. 기본값: 16."
+  ],
+  [
+    "settings.pathfinder.limits",
+    "탐색 한도"
+  ],
+  [
+    "settings.pathfinder.visited.label",
+    "최대 방문 노드 수"
+  ],
+  [
+    "settings.pathfinder.visited.tooltip",
+    "검사할 최대 상태 수입니다. 값이 높을수록 더 어려운 경로를 풀 수 있지만 시간과 메모리를 더 사용합니다."
+  ],
+  [
+    "settings.pathfinder.timeout.label",
+    "탐색 시간 제한 (초)"
+  ],
+  [
+    "settings.pathfinder.timeout.tooltip",
+    "진입로 탐색 1회에 허용되는 최대 실제 시간입니다."
+  ],
+  [
+    "settings.pathfinder.frame_budget.label",
+    "프레임 예산 (ms)"
+  ],
+  [
+    "settings.pathfinder.frame_budget.tooltip",
+    "게임 프레임당 대략적인 탐색 작업 예산입니다. 값이 높을수록 빨리 끝나지만 멈춤이 길어집니다."
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.label",
+    "레이당 최대 비용"
+  ],
+  [
+    "settings.pathfinder.ray_max_cost.tooltip",
+    "미해결 레이(지형과 만나지 못한 레이) 하나가 기여하는 지형 정리 비용의 상한입니다."
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.label",
+    "미해결 레이 페널티"
+  ],
+  [
+    "settings.pathfinder.ray_unresolved.tooltip",
+    "레이가 추적 범위 안에서 지형과 만나지 못했을 때의 페널티입니다."
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.label",
+    "구형 램프 비활성화"
+  ],
+  [
+    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "구형 직선 램프 생성기를 비활성화하여, 경로형 진입로의 결과와 실패를 직접 테스트할 수 있게 합니다. 일반적인 대체 동작을 원하면 꺼 두세요."
+  ],
+  [
+    "settings.experimental_access.landscaping_cost_scale.label",
+    "지형 정리 비용 대 거리"
+  ],
+  [
+    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "지형 정리 비용 1단위에 해당하는 타일 거리 비용입니다. 지형 정리 비용 1단위는 돌 1단위를 매립하거나 굴착하는 것과 같습니다. 범위: 0-100, 기본값: 1. 값이 높을수록 지형 변경이 적은 경로를 선호합니다."
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "잔해 정리 지형 비용"
+  ],
+  [
+    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "진입 탐색에서 사용된 잔해 정리 시작점마다 한 번씩 부과되는 지형 정리 비용입니다. 1단위는 돌 1단위 매립 또는 굴착과 같으며, 기본값 8은 관측된 굴삭기의 정리 작업량을 반영합니다. 값이 높을수록 잔해 정리가 필요한 경로를 덜 선호합니다."
+  ],
+  [
+    "settings.experimental_access.landslide_run.label",
+    "산사태 방지 경사 계수"
+  ],
+  [
+    "settings.experimental_access.landslide_run.tooltip",
+    "지형 높이 1단계당 수평 배제 거리입니다. 1은 45도 경사에 해당하며, 값이 높을수록 배제 구역이 넓어지고(예: 모래 지형), 낮을수록 좁아집니다. 범위: 0.05-2, 기본값: 1."
+  ],
+  [
+    "settings.max_slope.label",
+    "최대 경사"
+  ],
+  [
+    "settings.max_slope.tooltip",
+    "인접한 지정 모서리 간에 허용되는 최대 높이 차이입니다. 범위: 1-3."
+  ],
+  [
+    "settings.bottom_flattening.label",
+    "바닥 평탄화"
+  ],
+  [
+    "settings.bottom_flattening.tooltip",
+    "바닥 평탄화 강도(0~10)입니다. 0이면 바닥 평탄화 단계를 끕니다."
+  ],
+  [
+    "settings.batch_size.label",
+    "일괄 처리 크기"
+  ],
+  [
+    "settings.batch_size.tooltip",
+    "게임이 일시 정지되지 않았을 때 코루틴 프레임당 배치할 지정 수입니다. 범위: 1-200."
+  ],
+  [
+    "settings.panel_defaults.mining_collapsed.label",
+    "채굴 패널 접기"
+  ],
+  [
+    "settings.panel_defaults.mining_collapsed.tooltip",
+    "채굴 지정 패널을 기본적으로 접힌 상태로 시작할지 여부입니다."
+  ],
+  [
+    "settings.panel_defaults.ore_collapsed.label",
+    "광석 패널 접기"
+  ],
+  [
+    "settings.panel_defaults.ore_collapsed.tooltip",
+    "광석 구성 패널을 기본적으로 접힌 상태로 시작할지 여부입니다."
+  ],
+  [
+    "settings.panel_defaults.farming_collapsed.label",
+    "농경 패널 접기"
+  ],
+  [
+    "settings.panel_defaults.farming_collapsed.tooltip",
+    "농경지 준비 패널을 기본적으로 접힌 상태로 시작할지 여부입니다."
+  ],
+  [
+    "settings.notifications.excavator_completion.label",
+    "굴삭기 완성 알림"
+  ],
+  [
+    "settings.notifications.excavator_completion.tooltip",
+    "차량 정비소에서 미배정(자유) 굴삭기가 완성될 때 ATD가 녹색 알림을 표시할지 여부입니다."
+  ],
+  [
+    "settings.notifications.ramp_warning.label",
+    "램프 경고 알림"
+  ],
+  [
+    "settings.notifications.ramp_warning.tooltip",
+    "채굴 관제탑에 램프 진입 경고 알림을 표시할지 여부입니다."
+  ],
+  [
+    "settings.ore_quality.min_ore_height.label",
+    "최소 광석 높이"
+  ],
+  [
+    "settings.ore_quality.min_ore_height.tooltip",
+    "이 품질 단계에서 요구하는 최소 광석 두께(지형 타일 단위)입니다."
+  ],
+  [
+    "settings.ore_quality.min_bottom_density.label",
+    "최소 바닥 밀도"
+  ],
+  [
+    "settings.ore_quality.min_bottom_density.tooltip",
+    "이전 광석 바닥에서 이번 광석 바닥까지의 최소 광석 밀도입니다. 0~1로 제한됩니다."
+  ],
+  [
+    "settings.ore_quality.min_ore_purity.label",
+    "최소 광석 순도"
+  ],
+  [
+    "settings.ore_quality.min_ore_purity.tooltip",
+    "이 품질 단계에서 요구하는 기둥 대비 광석 최소 비율입니다. 0~1로 제한됩니다."
+  ],
+  [
+    "settings.ore_quality.min_component_size.label",
+    "최소 덩어리 크기"
+  ],
+  [
+    "settings.ore_quality.min_component_size.tooltip",
+    "고립 필터를 통과하기 위해 한 덩어리가 가져야 할 최소 연결 지정 타일 수입니다."
+  ],
+  [
+    "settings.corner_mode.label",
+    "모서리 지정 모드"
+  ],
+  [
+    "settings.corner_mode.tooltip",
+    "지형 지정 도구가 활성화된 동안 모서리 지정 모드로 전환하고 토글하는 키입니다."
+  ],
+  [
+    "settings.corner_mode.invalid_tooltip",
+    "K, 1, F1, Space, Escape 같은 단일 키를 사용하세요."
+  ],
+  [
+    "settings.status.applied",
+    "적용됨"
+  ],
+  [
+    "settings.status.invalid_key",
+    "잘못된 키"
+  ],
+  [
+    "settings.action.save_as_global",
+    "설정으로 저장"
+  ],
+  [
+    "settings.action.save_as_global.tooltip",
+    "현재 설정을 ATDsettings.json에 저장합니다. 이후 모든 새 게임의 기본값으로 사용됩니다."
+  ],
+  [
+    "settings.action.restore_defaults",
+    "기본값 복원"
+  ],
+  [
+    "settings.action.restore_defaults.tooltip",
+    "모든 설정을 모드 전역 기본값으로 복원합니다. (설정 파일로 자동 저장되지는 않습니다.)"
+  ],
+  [
+    "settings.status.saved_to_file",
+    "ATDsettings.json에 저장했습니다."
+  ],
+  [
+    "settings.status.save_failed",
+    "저장 실패. 로그를 확인하세요."
+  ],
+  [
+    "settings.status.restored_defaults",
+    "내장 기본값을 메모리에 복원했습니다."
+  ],
+  [
+    "panel.ore.title",
+    "광석 구성"
+  ],
+  [
+    "panel.ore.description",
+    "이 관제탑의 현재 채굴 지정 안에 있는 광석 자원입니다. (산사태 가능성은 반영하지 않습니다.)"
+  ],
+  [
+    "panel.ore.prompt_scan",
+    "↺를 눌러 광석 구성을 스캔하세요."
+  ],
+  [
+    "panel.ore.scan_tooltip",
+    "광석 구성 스캔"
+  ],
+  [
+    "panel.ore.no_tower",
+    "선택된 관제탑이 없습니다."
+  ],
+  [
+    "panel.ore.no_minable_designations",
+    "채굴 가능한 지정이 없습니다."
+  ],
+  [
+    "panel.ore.priority_selected_tooltip",
+    "관제탑 채굴 우선순위가 {0}(으)로 설정되었습니다. 클릭하면 해제합니다."
+  ],
+  [
+    "panel.ore.priority_set_tooltip",
+    "관제탑 채굴 우선순위를 {0}(으)로 설정합니다."
+  ],
+  [
+    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "배정된 트럭(및 참여 중인 채굴 관제탑에 배정된 트럭)만 이곳에서 화물을 수거하거나 배달할 수 있습니다."
+  ],
+  [
+    "panel.farming.title",
+    "농경지 준비"
+  ],
+  [
+    "panel.farming.description",
+    "평탄화 지정의 준비와 최종 채우기를 자동화하여 최상층을 농사 가능한 땅으로 만듭니다."
+  ],
+  [
+    "panel.farming.automation_toggle.label",
+    "농경지 준비 자동화"
+  ],
+  [
+    "panel.farming.automation_toggle.tooltip",
+    "부적합한 최상층 물질을 걷어낸 뒤 최종 채우기 지시를 복원하여, 평탄화 지정을 농경지용으로 준비합니다."
+  ],
+  [
+    "panel.farming.idle_release_excavators.label",
+    "유휴 시 굴삭기 자동 해제"
+  ],
+  [
+    "panel.farming.idle_release_excavators.tooltip",
+    "대기 중인 굴착 작업이 있는 지정이 없거나 관제탑이 일시 정지된 동안, 이 관제탑에서 굴삭기 배정을 자동으로 해제합니다.\n굴삭기는 추적되며 굴착 작업이 다시 생기면 재배정됩니다."
+  ],
+  [
+    "panel.farming.truck_idle_policy.label",
+    "유휴 트럭 동작"
+  ],
+  [
+    "panel.farming.truck_idle_policy.tooltip",
+    "이 관제탑에 대기 중인 굴착 작업이 없거나 관제탑이 일시 정지된 동안, 배정된 트럭이 무엇을 할지 선택합니다."
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower",
+    "관제탑에 주차"
+  ],
+  [
+    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "기본 게임 동작: 트럭 배정을 유지하고 유휴 시 관제탑으로 돌려보냅니다.\n장점: 트럭이 가까이 대기하여 다음 작업에 바로 투입됩니다.\n단점: 유휴 트럭이 관제탑 영역을 차지하고 불필요한 복귀 이동을 할 수 있습니다."
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put",
+    "제자리 대기"
+  ],
+  [
+    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "트럭 배정을 유지하되 유휴 시 관제탑으로 돌려보내지 않습니다.\n장점: 불필요한 복귀 이동을 피하고 트럭이 마지막 작업 구역 근처에 머뭅니다.\n단점: 트럭이 작업 구역 곳곳에 흩어질 수 있습니다."
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release",
+    "임시 해제"
+  ],
+  [
+    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "유휴 트럭의 배정을 임시로 해제하여 일반 운송 및 건설 작업을 돕게 합니다. 굴착 작업이 다시 생기면 트럭은 이 관제탑에 재배정됩니다.\n장점: 해제된 트럭이 유휴 시간 동안 일반 운송과 건설을 도울 수 있습니다.\n단점: 다른 관제탑, 특히 임시 해제를 사용하지 않는 관제탑에 배정되면 이 관제탑의 작업이 재개될 때 쓸 수 없을 수 있습니다."
+  ],
+  [
+    "panel.farming.soft_released_excavators.label",
+    "임시 해제된 굴삭기: "
+  ],
+  [
+    "panel.farming.vehicle_status.assigned",
+    "배정됨: {0}"
+  ],
+  [
+    "panel.farming.vehicle_status.none",
+    "없음"
+  ],
+  [
+    "panel.farming.soft_released_trucks.label",
+    "임시 해제된 트럭: "
+  ],
+  [
+    "panel.farming.vehicle_status.released",
+    "ATD 해제: "
+  ],
+  [
+    "panel.farming.vehicle_status.destroyed",
+    "<파괴됨>"
+  ],
+  [
+    "toolbox.corner_outer.tooltip",
+    "모서리(바깥): 볼록한 모서리 램프를 배치합니다."
+  ],
+  [
+    "toolbox.corner_inner.tooltip",
+    "모서리(안쪽): 오목한 모서리 램프를 배치합니다."
+  ],
+  [
+    "toolbox.corner_planar.tooltip",
+    "평면 모서리: 대각선 평면 램프를 배치합니다."
+  ],
+  [
+    "notification.ramp_access_failed",
+    "[ATD] {entity}에서 진입 램프를 시작할 수 없습니다"
+  ],
+  [
+    "notification.ramp_access_truncated",
+    "[ATD] {entity}에 전체 진입 램프를 배치할 공간이 부족합니다"
+  ],
+  [
+    "notification.ramp_access_not_accessible",
+    "[ATD] {entity}에서 램프까지 경로를 찾을 수 없습니다"
+  ],
+  [
+    "notification.ramp_access_snapshot_too_large",
+    "[ATD] {entity}의 진입 영역이 회전 램프 탐색에 너무 큽니다"
+  ],
+  [
+    "notification.farming_complete",
+    "[ATD] {entity}의 농경지 준비 및 채우기 완료"
+  ],
+  [
+    "notification.excavator_completed",
+    "[ATD] {entity}에서 미배정 {0} 완성"
+  ],
+  [
+    "notification.debris_cleanup_none_found",
+    "[ATD] {entity}에서 정리할 잔해를 찾지 못했습니다"
+  ],
+  [
+    "notification.debris_cleanup_none_reachable",
+    "[ATD] {entity}에서 도달 가능한 잔해를 찾지 못했습니다. Ctrl+클릭하면 도달 불가능한 잔해도 포함합니다"
+  ],
+  [
+    "vehicle_order.confirm.singular",
+    "{1}에서 {2}용 {0}을(를) 새로 주문할까요?"
+  ],
+  [
+    "vehicle_order.confirm.plural",
+    "{2}에서 {3}용 {1} {0}대를 새로 주문할까요?"
+  ],
+  [
+    "vehicle_order.confirm.button",
+    "주문"
+  ],
+  [
+    "vehicle_order.zoom.tooltip",
+    "{0}(으)로 이동"
+  ],
+  [
+    "access_search.zoom.tooltip",
+    "진입 작업 위치로 이동"
+  ],
+  [
+    "vehicle_order.preassigned.tooltip",
+    "{0}에 사전 배정됨"
+  ],
+  [
+    "vehicle_order.shortcut.tooltip",
+    "Shift+Alt+클릭으로 {1}에서 {2}용 {0}을(를) 새로 주문"
+  ]
+,
+  ["settings.world.default_mine.label", "미배정 굴착기가 채굴합니다"],
+  ["settings.world.default_mine.tooltip", "미배정 굴착기가 모든 광산 타워 영역 밖의 채굴 지정을 작업합니다."]
+]

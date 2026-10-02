@@ -23,9 +23,9 @@ any missing key. `ModTranslations.Apply()` scans the calling assembly via
 reflection and rebinds all matching static `LocStr` fields from the loaded
 localization tables.
 
-There are 57 static `LocStr` fields covering the designation panel, ore
-composition panel, farmland preparation panel, corner toolbox items, notification
-prototype messages, and farming session status strings.
+Static `LocStr` fields cover the designation panel, ore composition panel,
+farmland preparation panel, corner toolbox items, notification prototype
+messages, and farming session status strings.
 
 ---
 
@@ -103,11 +103,12 @@ Files live under `translations/`. Each file is a JSON tuple array:
 ]
 ```
 
-Supported locales: `en.json`, `de.json`, `ru.json`, `sv.json`.
+ATD currently ships `en.json`, `de.json`, `es.json`, `it.json`,
+`pt.json`, `ru.json`, `sv.json`, `zh.json`, and `ko.json`.
 
 The English file is the source of truth for key names and default text. New keys
-must be added to all four files. Untranslated entries in non-English files can
-use the English text verbatim.
+must be added to every supported locale file. Untranslated entries in
+non-English files can use the English text verbatim.
 
 ---
 

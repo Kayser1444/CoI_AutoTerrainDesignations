@@ -1,3 +1,9 @@
+v0.9.0 | 2026-10-02
+* Added: The off-by-default **Unassigned excavators excavate** World Settings option lets unassigned excavators work Mining designations outside Mine Tower areas and use available global trucks for delivery
+* Added: The off-by-default **Show predicted mining collapse area** overlay for live Mining designations while the game's terrain designation overlay is visible
+* Added: A Korean translation
+* Improved: Mining disturbance prediction and nearby tree-cleanup coverage around designation boundaries
+
 v0.8.2 | 2026-09-05
 * Improved: **Reduce oversized areas** under **Performance** so very large or effectively unbounded tower areas can still make a best-effort accessway attempt through a geometry-only sparse corridor
 * Fixed: Reduced access snapshots now use the available memory ceiling to build one larger useful corridor while keeping capture within the same conservative memory accounting as snapshot preflight

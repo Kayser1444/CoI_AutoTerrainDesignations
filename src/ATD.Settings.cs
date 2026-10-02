@@ -595,6 +595,21 @@ namespace AutoTerrainDesignations
                 if (accessAvoidOcean.HasValue && ShouldPreserveBool(accessAvoidOcean.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetAccessAvoidOcean(accessAvoidOcean.Value);
 
+                bool? miningHazardOverlayEnabled = ParseBool(json, "miningHazardOverlayEnabled");
+                if (miningHazardOverlayEnabled.HasValue
+                    && ShouldPreserveBool(miningHazardOverlayEnabled.Value,
+                        migrateGeneratedDefaults, false))
+                    AutoTerrainDesignationsMod.SetMiningHazardOverlayEnabled(
+                        miningHazardOverlayEnabled.Value);
+
+                bool? miningHazardFencePreviewEnabled = ParseBool(
+                    json, "miningHazardFencePreviewEnabled");
+                if (miningHazardFencePreviewEnabled.HasValue
+                    && ShouldPreserveBool(miningHazardFencePreviewEnabled.Value,
+                        migrateGeneratedDefaults, false))
+                    AutoTerrainDesignationsMod.SetMiningHazardFencePreviewEnabled(
+                        miningHazardFencePreviewEnabled.Value);
+
                 bool? filterOreSpikes = ParseBool(json, "filterOreSpikes");
                 if (filterOreSpikes.HasValue && ShouldPreserveBool(filterOreSpikes.Value, migrateGeneratedDefaults, true))
                     AutoTerrainDesignationsMod.SetFilterOreSpikes(filterOreSpikes.Value);
@@ -1147,6 +1162,12 @@ namespace AutoTerrainDesignations
             sb.AppendLine();
             sb.AppendLine("  \"_comment_accessAvoidOcean\": \"New-game default for the per-world option that avoids ocean in accessways and Mining Designations. Mining cells directly overlapping ocean are excluded and projected underwater cutting is avoided. Default: true.\",");
             sb.AppendLine($"  \"accessAvoidOcean\": {BoolToJsonStr(AutoTerrainDesignationsMod.AccessAvoidOcean)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_miningHazardOverlayEnabled\": \"New-world default for Show predicted mining collapse area. The per-world option is saved in the current save. Default: false.\",");
+            sb.AppendLine($"  \"miningHazardOverlayEnabled\": {BoolToJsonStr(AutoTerrainDesignationsMod.MiningHazardOverlayEnabled)},");
+            sb.AppendLine();
+            sb.AppendLine("  \"_comment_miningHazardFencePreviewEnabled\": \"Developer-only new-world default for the mining hazard fence-point preview. Toggle the current world with atd_mining_hazard_fence_preview. Default: false.\",");
+            sb.AppendLine($"  \"miningHazardFencePreviewEnabled\": {BoolToJsonStr(AutoTerrainDesignationsMod.MiningHazardFencePreviewEnabled)},");
             sb.AppendLine();
             sb.AppendLine("  \"_comment_filterOreSpikes\": \"New-game default for the per-world Filter ore spikes option. It corrects isolated ultra-thin vanilla ore spikes before Ore quality and bottom flattening. Default: true.\",");
             sb.AppendLine($"  \"filterOreSpikes\": {BoolToJsonStr(AutoTerrainDesignationsMod.FilterOreSpikes)},");

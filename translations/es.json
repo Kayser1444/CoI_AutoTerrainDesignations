@@ -232,6 +232,18 @@
     "Seguridad del terreno"
   ],
   [
+    "settings.world.mining_visualization",
+    "Visualización de minería"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Mostrar el área prevista de derrumbe minero"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Muestra una superposición rayada en el terreno que ATD prevé que podría verse afectado por derrumbes de designaciones de minería activas. Solo se muestra cuando está visible la superposición de designaciones de terreno del juego."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Correcciones del juego base"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Mayús + Alt + clic para solicitar un nuevo {0} para {2} en {1}"
   ]
+,
+  ["settings.world.default_mine.label", "Las excavadoras sin asignar excavan"],
+  ["settings.world.default_mine.tooltip", "Las excavadoras sin asignar trabajan en designaciones de minería fuera de las áreas de todas las torres de mina."]
 ]

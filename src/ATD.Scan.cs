@@ -1031,28 +1031,28 @@ namespace AutoTerrainDesignations
                     disturbed.UnionWith(projection.FillTiles);
                 }
 
-                // The shared projection traces each 4x4 edge from its corners. Trees are
-                // point objects, however, and an excavated edge can disturb every intervening
-                // world tile. Sweep all five samples on every exposed edge so harvesting is
-                // conservative even on a tilted designation or a stepped mine boundary.
+                // Keep tree cleanup conservative beyond the shared terrain-work projection:
+                // trees are point objects, and every crossed tile plus the ray's safety tail
+                // can be affected. Sweep the four tile lanes on every exposed edge; the far
+                // profile corner is not a fifth tile lane.
                 foreach (KeyValuePair<Tile2i, TerrainDesignation> pair in finalizedDesignations)
                 {
                     Tile2i origin = pair.Key;
                     AccessHeightProfile profile = ProfileFromDesignation(pair.Value);
                     if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(-4, 0)))
-                        for (int y = 0; y <= 4; y++)
+                        for (int y = 0; y < 4; y++)
                             AddBoundarySweep(origin + new RelTile2i(0, y),
                                 profile.GetHeight2NumeratorAt(0, y) / 32f, new Tile2i(-1, 0));
                     if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(4, 0)))
-                        for (int y = 0; y <= 4; y++)
+                        for (int y = 0; y < 4; y++)
                             AddBoundarySweep(origin + new RelTile2i(4, y),
                                 profile.GetHeight2NumeratorAt(4, y) / 32f, new Tile2i(1, 0));
                     if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(0, -4)))
-                        for (int x = 0; x <= 4; x++)
+                        for (int x = 0; x < 4; x++)
                             AddBoundarySweep(origin + new RelTile2i(x, 0),
                                 profile.GetHeight2NumeratorAt(x, 0) / 32f, new Tile2i(0, -1));
                     if (!finalizedDesignations.ContainsKey(origin + new RelTile2i(0, 4)))
-                        for (int x = 0; x <= 4; x++)
+                        for (int x = 0; x < 4; x++)
                             AddBoundarySweep(origin + new RelTile2i(x, 4),
                                 profile.GetHeight2NumeratorAt(x, 4) / 32f, new Tile2i(0, 1));
                 }
@@ -1087,9 +1087,14 @@ namespace AutoTerrainDesignations
                 int maxDistance = Math.Min(
                     Math.Max(1, AutoTerrainDesignationsMod.AccessCandidateRayMaxDistance),
                     mapDistance);
+                int positiveDirectionOffset =
+                    direction.X > 0 || direction.Y > 0 ? 1 : 0;
                 for (int distance = 1; distance <= maxDistance; distance++)
                 {
-                    Tile2i tile = start + new RelTile2i(direction.X * distance, direction.Y * distance);
+                    int tileDistance = distance - positiveDirectionOffset;
+                    Tile2i tile = start + new RelTile2i(
+                        direction.X * tileDistance,
+                        direction.Y * tileDistance);
                     float slope = dumpingSlope;
                     if (operation == AccessSideRayOperation.Cut)
                     {
@@ -1106,7 +1111,9 @@ namespace AutoTerrainDesignations
                         continue;
                     for (int tail = 1; tail <= AutoTerrainDesignationsMod.AccessRayEndBuffer; tail++)
                     {
-                        Tile2i buffered = tile + new RelTile2i(direction.X * tail, direction.Y * tail);
+                        Tile2i buffered = start + new RelTile2i(
+                            direction.X * (distance + tail - positiveDirectionOffset),
+                            direction.Y * (distance + tail - positiveDirectionOffset));
                         if (terrMgr.IsValidCoord(buffered))
                             disturbed.Add(buffered);
                     }

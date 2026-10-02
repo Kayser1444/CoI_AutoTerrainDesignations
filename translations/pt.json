@@ -232,6 +232,18 @@
     "Segurança do terreno"
   ],
   [
+    "settings.world.mining_visualization",
+    "Visualização da mineração"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Mostrar área prevista de desmoronamento da mineração"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Mostra uma sobreposição listrada no terreno que a ATD prevê que possa ser afetado por desmoronamentos causados por designações de mineração ativas. Visível apenas quando a sobreposição de designações de terreno do jogo estiver aberta."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Correções do jogo base"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-clique para solicitar um novo {0} para {2} em {1}"
   ]
+,
+  ["settings.world.default_mine.label", "Escavadeiras sem atribuição escavam"],
+  ["settings.world.default_mine.tooltip", "Escavadeiras sem atribuição trabalham em designações de mineração fora das áreas de todas as torres de mineração."]
 ]

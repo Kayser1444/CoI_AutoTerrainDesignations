@@ -232,6 +232,18 @@
     "Terrain safety"
   ],
   [
+    "settings.world.mining_visualization",
+    "Mining visualization"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Show predicted mining collapse area"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Show a striped overlay on terrain ATD predicts may be affected by collapse from live Mining designations. Visible only while the game's terrain designation overlay is shown."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Vanilla fixes"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Shift-Alt-click to order a new {0} for {2} at {1}"
   ]
+,
+  ["settings.world.default_mine.label", "Unassigned excavators excavate"],
+  ["settings.world.default_mine.tooltip", "Unassigned excavators excavate terrain designations outside Mine Tower areas."]
 ]

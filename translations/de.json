@@ -232,6 +232,18 @@
     "Geländesicherheit"
   ],
   [
+    "settings.world.mining_visualization",
+    "Abbauvisualisierung"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Voraussichtlichen Abbaueinsturzbereich anzeigen"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Zeigt ein gestreiftes Overlay auf Gelände, das laut ATD durch Einstürze aus aktiven Abbau-Markierungen betroffen sein könnte. Nur sichtbar, wenn das Geländemarkierungs-Overlay des Spiels angezeigt wird."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Korrekturen am Basisspiel"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
   ]
+,
+  ["settings.world.default_mine.label", "Nicht zugewiesene Bagger graben"],
+  ["settings.world.default_mine.tooltip", "Nicht zugewiesene Bagger bearbeiten Abbau-Markierungen außerhalb der Bereiche aller Mine Control Towers."]
 ]

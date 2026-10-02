@@ -6,6 +6,8 @@ Kayser’s Automatic Terrain Designations is a quality-of-life mod for Captain o
 
 ## :gear: Features
 - **Create Designations** — Scan and plan on a dedicated worker thread, then place the complete mine in one fast batch
+- **Excavation without a Mine Tower** — An off-by-default World Settings option lets unassigned excavators work Mining designations outside all tower areas using compatible global trucks
+- **Predicted collapse overlay** — An off-by-default overlay helps inspect possible collapse around live Mining designations while the game's terrain designation overlay is visible
 - **Filter ore spikes** — Correct isolated ultra-thin vanilla ore tails before they drag a mine deep into high-yield bedrock
 - **Generate Ramps** — Generate access ramps to connect new dig areas to the surface
 - **Clear Designations** — Easily clear ATD mining designations within a tower's area
@@ -30,6 +32,7 @@ Leave a :heart: if you found this mod useful.
 ## Documentation
 
 ### Player guides
+- [Excavation without a Mine Tower](docs/player/default-mine.md)
 - [Corner Designations](docs/player/corner-designations.md)
 - [Mining Designations](docs/player/mining-designations.md)
 - [Farmland preparation](docs/player/farming-designations.md)
@@ -49,6 +52,7 @@ Leave a :heart: if you found this mod useful.
 - Extract the mod folder into your Captain of Industry mods directory (`%AppData%\Captain of Industry\Mods`)
 - Enable the mod when loading or starting a new game
 - Can be safely removed from saves
+- Removing ATD while unassigned excavation is active may discard transient cargo in excavator buckets or trucks
 - Works with other mods that don't conflict with mining tower inspector
 - Requires Captain of Industry `0.8.5` or newer; older versions may work but are not supported or tested.
 

@@ -106,6 +106,12 @@ namespace AutoTerrainDesignations
             AppendJsonBool(sb, AccessHarvestDisruptedTrees);
             sb.Append(",\"allowDigToRemoveDebris\":");
             AppendJsonBool(sb, AccessAllowDigToRemoveDebris);
+            sb.Append(",\"miningHazardOverlayEnabled\":");
+            AppendJsonBool(sb, MiningHazardOverlayEnabled);
+            sb.Append(",\"miningHazardFencePreviewEnabled\":");
+            AppendJsonBool(sb, MiningHazardFencePreviewEnabled);
+            sb.Append(",\"defaultMineEnabled\":");
+            AppendJsonBool(sb, DefaultMineEnabled);
             sb.Append(",\"quickRemoveDebrisPolicy\":")
                 .Append(((int)AccessQuickRemoveDebrisPolicy)
                     .ToString(CultureInfo.InvariantCulture));
@@ -244,6 +250,7 @@ namespace AutoTerrainDesignations
             sb.Append(']');
             AppendPendingFarmPlacementBatchesJson(sb);
             s_propRemovalManager?.AppendPendingRequestsJson(sb);
+            AppendDefaultMineState(sb);
             sb.Append('}');
             return sb.ToString();
         }
@@ -285,6 +292,10 @@ namespace AutoTerrainDesignations
                     SetAccessHarvestDisruptedTrees(harvestDisruptedTrees);
                 if (TryGetBool(worldSettings, "allowDigToRemoveDebris", out bool allowDigToRemoveDebris))
                     SetAccessAllowDigToRemoveDebris(allowDigToRemoveDebris);
+                if (TryGetBool(worldSettings, "miningHazardOverlayEnabled", out bool miningHazardOverlayEnabled))
+                    SetMiningHazardOverlayEnabled(miningHazardOverlayEnabled);
+                if (TryGetBool(worldSettings, "miningHazardFencePreviewEnabled", out bool miningHazardFencePreviewEnabled))
+                    SetMiningHazardFencePreviewEnabled(miningHazardFencePreviewEnabled);
                 if (TryGetInt(worldSettings, "quickRemoveDebrisPolicy", out int quickRemovePolicy))
                     SetAccessQuickRemoveDebrisPolicy(
                         (QuickRemoveDebrisPolicy)Math.Max(
@@ -421,6 +432,8 @@ namespace AutoTerrainDesignations
                 loadedCount++;
             }
 
+            // Pair restoration needs the loaded tower release policies first.
+            LoadDefaultMineState(root);
             return true;
         }
 

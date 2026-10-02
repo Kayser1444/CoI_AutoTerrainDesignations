@@ -1,4 +1,15 @@
-v0.8.3 [unreleased]
+v0.9.0 [unreleased]
+
+* Added the default-off **Unassigned excavators excavate** World Settings option. Unassigned excavators work Mining designations outside every Mine Tower area and request available global trucks for delivery, while remaining visibly unassigned. Native patch installation and zone fixtures pass; in-game logistics, save/load continuity, and playable removal still need validation. Transient cargo loss on removal is acceptable; the save must remain playable.
+
+* Added the default-off **Show predicted mining collapse area** overlay for live Mining designations. It is visible only while the game's terrain designation overlay is shown; in-game visual validation remains pending.
+
+* Updated combined designation disturbance prediction to trace all four terrain-tile lanes along exposed edges, reuse sampled heights and slopes, and yield during ray processing. Mining tree-cleanup sweeps use the same four-lane edge alignment and safety-tail offset. These predictions feed both the new overlay and accessway planning; in-game coverage checks remain pending.
+
+* Added a Korean translation bundle from a community submission, preserving notification substitution tokens and covering the current mining visualization strings.
+
+* Agreed on a background-worker and in-memory cache plan for mining hazard visualization, with Mining designation edits as the only automatic refresh trigger.
+* Removed terrain-disruption-triggered hazard rebuilds and raised cooperative projection slices to 30 ms for an in-game throughput and responsiveness trial.
 
 * Verified compatibility with Captain of Industry 0.8.7d (build 619).
 

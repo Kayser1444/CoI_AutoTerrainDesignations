@@ -99,6 +99,13 @@ namespace AutoTerrainDesignations
             AddScanBehaviorSection(content, refreshers);
             AddPerformanceSection(content, refreshers);
             AddWorldSafetySection(content, refreshers);
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsDefaultMineLabel.AsFormatted,
+                AtdLocalization.SettingsDefaultMineTooltip.AsFormatted,
+                () => AutoDepthDesignation.DefaultMineEnabled,
+                AutoDepthDesignation.SetDefaultMineEnabled,
+                refreshers));
+            AddMiningVisualizationSection(content, refreshers);
             AddNotificationsSection(content, refreshers);
 
             content.Add(BuildFooter(refreshers));
@@ -478,6 +485,17 @@ namespace AutoTerrainDesignations
                 AtdLocalization.SettingsAllowDigToRemoveDebrisTooltip.AsFormatted,
                 () => AutoDepthDesignation.AccessAllowDigToRemoveDebris,
                 AutoDepthDesignation.SetAccessAllowDigToRemoveDebris,
+                refreshers));
+        }
+
+        private static void AddMiningVisualizationSection(Column content, List<Action> refreshers)
+        {
+            content.Add(BuildSectionHeading(AtdLocalization.SettingsHeadingMiningVisualization.AsFormatted));
+            content.Add(BuildToggleRow(
+                AtdLocalization.SettingsMiningHazardOverlayLabel.AsFormatted,
+                AtdLocalization.SettingsMiningHazardOverlayTooltip.AsFormatted,
+                () => AutoDepthDesignation.MiningHazardOverlayEnabled,
+                AutoDepthDesignation.SetMiningHazardOverlayEnabled,
                 refreshers));
         }
 

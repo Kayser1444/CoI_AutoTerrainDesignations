@@ -232,6 +232,18 @@
     "地形安全"
   ],
   [
+    "settings.world.mining_visualization",
+    "采矿可视化"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "显示预计采矿塌方区域"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "在 ATD 预测可能受现有采矿标记引发的塌方影响的地形上显示条纹叠加层。仅在游戏的地形标记叠加层显示时可见。"
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "原版问题修复"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "按住 Shift-Alt 键并单击即可在 {1} 为 {2} 订购新的 {0}"
   ]
+,
+  ["settings.world.default_mine.label", "未分配的挖掘机进行挖掘"],
+  ["settings.world.default_mine.tooltip", "未分配的挖掘机可处理所有矿塔区域以外的采矿标记。"]
 ]

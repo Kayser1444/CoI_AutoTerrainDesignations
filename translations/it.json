@@ -232,6 +232,18 @@
     "Sicurezza del terreno"
   ],
   [
+    "settings.world.mining_visualization",
+    "Visualizzazione mineraria"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Mostra l'area prevista di crollo minerario"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Mostra una sovrapposizione tratteggiata sul terreno che ATD prevede possa essere interessato da crolli dovuti a designazioni minerarie attive. Visibile solo quando è mostrata la sovrapposizione delle designazioni del terreno del gioco."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Correzioni del gioco base"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Fai clic tenendo premuto Maiusc-Alt per ordinare un nuovo {0} per {2} presso {1}"
   ]
+,
+  ["settings.world.default_mine.label", "Gli escavatori non assegnati scavano"],
+  ["settings.world.default_mine.tooltip", "Gli escavatori non assegnati lavorano sulle designazioni minerarie fuori dalle aree di tutte le torri minerarie."]
 ]

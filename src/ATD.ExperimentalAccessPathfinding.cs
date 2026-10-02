@@ -6135,6 +6135,8 @@ namespace AutoTerrainDesignations
         {
             string criticalFailure = string.Empty;
             var result = new ProjectedDesignationDisturbance();
+            var rayTerrainHeightCache = new Dictionary<Tile2i, float>();
+            var raySurfaceCutSlopeCache = new Dictionary<Tile2i, float>();
             Stopwatch phaseTimer = Stopwatch.StartNew();
             foreach (KeyValuePair<Tile2i, TerrainDesignation> pair in designations)
             {
@@ -6153,26 +6155,15 @@ namespace AutoTerrainDesignations
                 bool northExposed = IsBoundaryExposed(new Tile2i(0, -4));
                 bool southExposed = IsBoundaryExposed(new Tile2i(0, 4));
 
-                if (!TraceBoundary(westExposed,
-                    origin, profile.Nw2 / 2f,
-                    origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
-                    new Tile2i(-1, 0)))
-                { output.FailureReason = criticalFailure; output.Disturbance = result; yield break; }
-                if (!TraceBoundary(eastExposed,
-                    origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
-                    origin + new RelTile2i(4, 4), profile.Se2 / 2f,
-                    new Tile2i(1, 0)))
-                { output.FailureReason = criticalFailure; output.Disturbance = result; yield break; }
-                if (!TraceBoundary(northExposed,
-                    origin, profile.Nw2 / 2f,
-                    origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
-                    new Tile2i(0, -1)))
-                { output.FailureReason = criticalFailure; output.Disturbance = result; yield break; }
-                if (!TraceBoundary(southExposed,
-                    origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
-                    origin + new RelTile2i(4, 4), profile.Se2 / 2f,
-                    new Tile2i(0, 1)))
-                { output.FailureReason = criticalFailure; output.Disturbance = result; yield break; }
+                IEnumerator boundaryRoutine = TraceExposedBoundaries();
+                while (boundaryRoutine.MoveNext())
+                    yield return boundaryRoutine.Current;
+                if (!string.IsNullOrEmpty(criticalFailure))
+                {
+                    output.FailureReason = criticalFailure;
+                    output.Disturbance = result;
+                    yield break;
+                }
 
                 if (sliceControl != null
                     && phaseTimer.ElapsedMilliseconds
@@ -6234,7 +6225,48 @@ namespace AutoTerrainDesignations
                         origin.X + neighborOffset.X,
                         origin.Y + neighborOffset.Y));
 
-                bool TraceBoundary(
+                IEnumerator TraceExposedBoundaries()
+                {
+                    IEnumerator boundary = TraceBoundary(
+                        westExposed,
+                        origin, profile.Nw2 / 2f,
+                        origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
+                        new Tile2i(-1, 0));
+                    while (boundary.MoveNext())
+                        yield return boundary.Current;
+                    if (!string.IsNullOrEmpty(criticalFailure))
+                        yield break;
+
+                    boundary = TraceBoundary(
+                        eastExposed,
+                        origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
+                        origin + new RelTile2i(4, 4), profile.Se2 / 2f,
+                        new Tile2i(1, 0));
+                    while (boundary.MoveNext())
+                        yield return boundary.Current;
+                    if (!string.IsNullOrEmpty(criticalFailure))
+                        yield break;
+
+                    boundary = TraceBoundary(
+                        northExposed,
+                        origin, profile.Nw2 / 2f,
+                        origin + new RelTile2i(4, 0), profile.Ne2 / 2f,
+                        new Tile2i(0, -1));
+                    while (boundary.MoveNext())
+                        yield return boundary.Current;
+                    if (!string.IsNullOrEmpty(criticalFailure))
+                        yield break;
+
+                    boundary = TraceBoundary(
+                        southExposed,
+                        origin + new RelTile2i(0, 4), profile.Sw2 / 2f,
+                        origin + new RelTile2i(4, 4), profile.Se2 / 2f,
+                        new Tile2i(0, 1));
+                    while (boundary.MoveNext())
+                        yield return boundary.Current;
+                }
+
+                IEnumerator TraceBoundary(
                     bool isExposed,
                     Tile2i firstCorner,
                     float firstHeight,
@@ -6243,12 +6275,33 @@ namespace AutoTerrainDesignations
                     Tile2i direction)
                 {
                     if (!isExposed)
-                        return true;
-                    return TraceCorner(firstCorner, firstHeight, direction)
-                        && TraceCorner(secondCorner, secondHeight, direction);
+                        yield break;
+                    // A 4x4 designation has four tile lanes along each edge.
+                    // The fifth profile sample is the far corner vertex, not
+                    // another terrain tile to project as a full-width lane.
+                    for (int sample = 0; sample < 4; sample++)
+                    {
+                        float t = sample / 4f;
+                        var boundaryTile = new Tile2i(
+                            firstCorner.X
+                                + (secondCorner.X - firstCorner.X) * sample / 4,
+                            firstCorner.Y
+                                + (secondCorner.Y - firstCorner.Y) * sample / 4);
+                        float plannedHeight = firstHeight
+                            + (secondHeight - firstHeight) * t;
+                        IEnumerator rayRoutine = TraceEdgeRay(
+                            boundaryTile, plannedHeight, direction);
+                        while (rayRoutine.MoveNext())
+                            yield return rayRoutine.Current;
+                        if (!string.IsNullOrEmpty(criticalFailure))
+                            yield break;
+                    }
                 }
 
-                bool TraceCorner(Tile2i corner, float plannedHeight, Tile2i direction)
+                IEnumerator TraceEdgeRay(
+                    Tile2i corner,
+                    float plannedHeight,
+                    Tile2i direction)
                 {
                     int relevantMinX = relevantTerrainMin.X - vehicleDisturbanceRadius;
                     int relevantMaxX = relevantTerrainMax.X + vehicleDisturbanceRadius;
@@ -6264,12 +6317,12 @@ namespace AutoTerrainDesignations
                                 ? corner.Y <= relevantMaxY
                                 : corner.Y >= relevantMinY);
                     if (!canReachRelevant)
-                        return true;
+                        yield break;
                     if (!TryResolveCornerRay(
                         corner, plannedHeight,
                         out AccessSideRayOperation operation,
                         out float materialSlope))
-                        return true;
+                        yield break;
 
                     int postTerminationSafetyMargin =
                         AutoTerrainDesignationsMod.AccessRayEndBuffer;
@@ -6280,64 +6333,154 @@ namespace AutoTerrainDesignations
                             : direction.Y < 0
                                 ? corner.Y - physicalTerrainMin.Y
                                 : physicalTerrainMax.Y - corner.Y;
-                    for (int distance = 1; distance <= physicalDistance; distance++)
+                    int positiveDirectionOffset =
+                        direction.X > 0 || direction.Y > 0 ? 1 : 0;
+                    float raySlope = materialSlope;
+                    while (true)
                     {
-                        Tile2i tile = new Tile2i(
-                            corner.X + direction.X * distance,
-                            corner.Y + direction.Y * distance);
-                        float sampledHeight = terrMgr.GetHeight(tile).Value.ToFloat();
-                        // Immutable FV rays share the same projected-ground
-                        // semantics as generated rays. An equal or stronger
-                        // same-sort surface resolves this ray; a deeper cut or
-                        // higher fill continues from that projected surface.
-                        if (result.TryGetWorkHeight(
-                                operation, tile,
-                                out float projectedGroundHeight))
-                            sampledHeight = operation
-                                == AccessSideRayOperation.Cut
-                                    ? Math.Min(
-                                        sampledHeight,
-                                        projectedGroundHeight)
-                                    : Math.Max(
-                                        sampledHeight,
-                                        projectedGroundHeight);
-                        float rayHeight = operation == AccessSideRayOperation.Fill
-                            ? plannedHeight - distance * materialSlope
-                            : plannedHeight + distance * materialSlope;
-                        float gap = operation == AccessSideRayOperation.Fill
-                            ? rayHeight - sampledHeight
-                            : sampledHeight - rayHeight;
-                        bool hasPassedTerrain = gap <= 0f;
-                        bool hasReachedDryCutHeight =
-                            operation != AccessSideRayOperation.Cut
-                            || rayHeight >= 1f;
-                        if (gap > 0f)
-                            AddProjected(operation, tile, rayHeight);
-                        else if (!hasReachedDryCutHeight)
-                            AddSafety(operation, tile);
-                        if (hasPassedTerrain && hasReachedDryCutHeight)
+                        var pendingTiles = new List<(
+                            Tile2i Tile, float Height, bool IsSafety)>();
+                        bool restartWithMoreMobileMaterial = false;
+                        bool resolved = false;
+                        for (int distance = 1;
+                            distance <= physicalDistance;
+                            distance++)
                         {
-                            int safetyEnd = Math.Min(
-                                physicalDistance,
-                                distance + postTerminationSafetyMargin);
-                            for (int safetyDistance = distance;
-                                safetyDistance <= safetyEnd;
-                                safetyDistance++)
-                                AddSafety(
-                                    operation,
-                                    new Tile2i(
-                                        corner.X + direction.X * safetyDistance,
-                                        corner.Y + direction.Y * safetyDistance));
-                            return true;
+                            if (sliceControl?.CancellationRequested == true)
+                            {
+                                criticalFailure = "SearchCancelled";
+                                yield break;
+                            }
+
+                            int tileDistance = distance - positiveDirectionOffset;
+                            Tile2i tile = new Tile2i(
+                                corner.X + direction.X * tileDistance,
+                                corner.Y + direction.Y * tileDistance);
+                            float terrainSurfaceHeight = GetRayTerrainHeight(tile);
+                            if (UsesMaterialAwareMiningCut(operation)
+                                && raySlope > fallbackMiningSlope + 0.0001f
+                                && TryGetSurfaceCutSlope(tile, out float encounteredSlope)
+                                && encounteredSlope + 0.0001f < raySlope)
+                            {
+                                // Re-run from the origin using the shallower
+                                // material slope. This backtracks the ray so
+                                // newly exposed material also expands its
+                                // already-traced portion.
+                                raySlope = encounteredSlope;
+                                restartWithMoreMobileMaterial = true;
+                                if (sliceControl != null
+                                    && distance % 16 == 0
+                                    && phaseTimer.ElapsedMilliseconds
+                                        >= sliceControl.SliceBudgetMilliseconds)
+                                {
+                                    sliceControl.ReportAtomicStep(
+                                        "projection:edge-ray-material-transition");
+                                    phaseTimer.Restart();
+                                    yield return null;
+                                    phaseTimer.Restart();
+                                }
+                                break;
+                            }
+
+                            float sampledHeight = terrainSurfaceHeight;
+                            // Immutable FV rays share the same projected-ground
+                            // semantics as generated rays. An equal or stronger
+                            // same-sort surface resolves this ray; a deeper cut or
+                            // higher fill continues from that projected surface.
+                            if (result.TryGetWorkHeight(
+                                    operation, tile,
+                                    out float projectedGroundHeight))
+                                sampledHeight = operation
+                                    == AccessSideRayOperation.Cut
+                                        ? Math.Min(
+                                            sampledHeight,
+                                            projectedGroundHeight)
+                                        : Math.Max(
+                                            sampledHeight,
+                                            projectedGroundHeight);
+                            float rayHeight = operation == AccessSideRayOperation.Fill
+                                ? plannedHeight - distance * materialSlope
+                                : plannedHeight + distance * raySlope;
+                            float gap = operation == AccessSideRayOperation.Fill
+                                ? rayHeight - sampledHeight
+                                : sampledHeight - rayHeight;
+                            bool hasPassedTerrain = gap <= 0f;
+                            bool hasReachedDryCutHeight =
+                                operation != AccessSideRayOperation.Cut
+                                || rayHeight >= 1f;
+                            if (gap > 0f)
+                                pendingTiles.Add((tile, rayHeight, false));
+                            else if (!hasReachedDryCutHeight)
+                                pendingTiles.Add((tile, 0f, true));
+                            if (hasPassedTerrain && hasReachedDryCutHeight)
+                            {
+                                resolved = true;
+                                int safetyEnd = Math.Min(
+                                    physicalDistance,
+                                    distance + postTerminationSafetyMargin);
+                                for (int safetyDistance = distance;
+                                    safetyDistance <= safetyEnd;
+                                    safetyDistance++)
+                                    pendingTiles.Add((
+                                        new Tile2i(
+                                            corner.X + direction.X
+                                                * (safetyDistance - positiveDirectionOffset),
+                                            corner.Y + direction.Y
+                                                * (safetyDistance - positiveDirectionOffset)),
+                                        0f,
+                                        true));
+                                break;
+                            }
+
+                            if (sliceControl != null
+                                && distance % 16 == 0
+                                && phaseTimer.ElapsedMilliseconds
+                                    >= sliceControl.SliceBudgetMilliseconds)
+                            {
+                                sliceControl.ReportAtomicStep(
+                                    "projection:edge-ray");
+                                phaseTimer.Restart();
+                                yield return null;
+                                phaseTimer.Restart();
+                            }
                         }
+
+                        if (restartWithMoreMobileMaterial)
+                            continue;
+                        if (!resolved)
+                        {
+                            criticalFailure =
+                                "ProjectedRayUnresolvedAtMapEdge:" + operation
+                                + "@(" + corner.X.ToString(CultureInfo.InvariantCulture)
+                                + "," + corner.Y.ToString(CultureInfo.InvariantCulture) + ")"
+                                + " dir=(" + direction.X.ToString(CultureInfo.InvariantCulture)
+                                + "," + direction.Y.ToString(CultureInfo.InvariantCulture) + ")";
+                            yield break;
+                        }
+
+                        int committed = 0;
+                        foreach (var pending in pendingTiles)
+                        {
+                            if (pending.IsSafety)
+                                AddSafety(operation, pending.Tile);
+                            else
+                                AddProjected(
+                                    operation, pending.Tile, pending.Height);
+                            committed++;
+                            if (sliceControl != null
+                                && committed % 64 == 0
+                                && phaseTimer.ElapsedMilliseconds
+                                    >= sliceControl.SliceBudgetMilliseconds)
+                            {
+                                sliceControl.ReportAtomicStep(
+                                    "projection:edge-ray-commit");
+                                phaseTimer.Restart();
+                                yield return null;
+                                phaseTimer.Restart();
+                            }
+                        }
+                        yield break;
                     }
-                    criticalFailure =
-                        "ProjectedRayUnresolvedAtMapEdge:" + operation
-                        + "@(" + corner.X.ToString(CultureInfo.InvariantCulture)
-                        + "," + corner.Y.ToString(CultureInfo.InvariantCulture) + ")"
-                        + " dir=(" + direction.X.ToString(CultureInfo.InvariantCulture)
-                        + "," + direction.Y.ToString(CultureInfo.InvariantCulture) + ")";
-                    return false;
 
                 }
 
@@ -6366,31 +6509,119 @@ namespace AutoTerrainDesignations
                         physicalTerrainMax.Y,
                         relevantTerrainMax.Y + vehicleDisturbanceRadius);
                     int firstX = outwardX > 0
-                        ? Math.Max(scanMinX, corner.X + 1)
+                        ? Math.Max(scanMinX, corner.X)
                         : scanMinX;
                     int lastX = outwardX > 0
                         ? scanMaxX
                         : Math.Min(scanMaxX, corner.X - 1);
                     int firstY = outwardY > 0
-                        ? Math.Max(scanMinY, corner.Y + 1)
+                        ? Math.Max(scanMinY, corner.Y)
                         : scanMinY;
                     int lastY = outwardY > 0
                         ? scanMaxY
                         : Math.Min(scanMaxY, corner.Y - 1);
                     if (firstX > lastX || firstY > lastY)
                         yield break;
+
+                    if (UsesMaterialAwareMiningCut(operation)
+                        && materialSlope > fallbackMiningSlope + 0.0001f)
+                    {
+                        int firstDx = (firstX - corner.X) * outwardX
+                            + (outwardX > 0 ? 1 : 0);
+                        int lastDx = (lastX - corner.X) * outwardX
+                            + (outwardX > 0 ? 1 : 0);
+                        int firstDy = (firstY - corner.Y) * outwardY
+                            + (outwardY > 0 ? 1 : 0);
+                        int lastDy = (lastY - corner.Y) * outwardY
+                            + (outwardY > 0 ? 1 : 0);
+                        int minDx = Math.Min(firstDx, lastDx);
+                        int maxDx = Math.Max(firstDx, lastDx);
+                        int minDy = Math.Min(firstDy, lastDy);
+                        int maxDy = Math.Max(firstDy, lastDy);
+                        var previousRaySlopes = new float[maxDx + 1];
+                        var currentRaySlopes = new float[maxDx + 1];
+                        for (int dy = 1; dy <= maxDy; dy++)
+                        {
+                            for (int dx = 1; dx <= maxDx; dx++)
+                            {
+                                float predecessorSlope = materialSlope;
+                                if (dx > 1 && dy > 1)
+                                    predecessorSlope = previousRaySlopes[dx - 1];
+                                else if (dx > 1)
+                                    predecessorSlope = currentRaySlopes[dx - 1];
+                                else if (dy > 1)
+                                    predecessorSlope = previousRaySlopes[dx];
+
+                                float raySlope = predecessorSlope;
+                                if (raySlope > fallbackMiningSlope + 0.0001f)
+                                {
+                                    Tile2i rayTile = new Tile2i(
+                                        corner.X + outwardX
+                                            * (dx - (outwardX > 0 ? 1 : 0)),
+                                        corner.Y + outwardY
+                                            * (dy - (outwardY > 0 ? 1 : 0)));
+                                    if (TryGetSurfaceCutSlope(
+                                            rayTile, out float encounteredSlope)
+                                        && encounteredSlope < raySlope)
+                                        raySlope = encounteredSlope;
+                                }
+                                currentRaySlopes[dx] = raySlope;
+
+                                if (dx >= minDx && dx <= maxDx
+                                    && dy >= minDy && dy <= maxDy)
+                                {
+                                    Tile2i tile = new Tile2i(
+                                        corner.X + outwardX
+                                            * (dx - (outwardX > 0 ? 1 : 0)),
+                                        corner.Y + outwardY
+                                            * (dy - (outwardY > 0 ? 1 : 0)));
+                                    float slopeDistance = Math.Max(dx, dy)
+                                        + Math.Min(dx, dy) * 0.41421356f;
+                                    float sampledHeight = GetRayTerrainHeight(tile);
+                                    float projectedHeight = plannedHeight
+                                        + slopeDistance * raySlope;
+                                    float gap = sampledHeight - projectedHeight;
+                                    if (gap > 0f)
+                                        AddProjected(
+                                            AccessSideRayOperation.Cut,
+                                            tile,
+                                            projectedHeight);
+                                }
+
+                                if (sliceControl != null
+                                    && phaseTimer.ElapsedMilliseconds
+                                        >= sliceControl.SliceBudgetMilliseconds)
+                                {
+                                    if (sliceControl.CancellationRequested)
+                                        yield break;
+                                    sliceControl.ReportAtomicStep(
+                                        "projection:outside-corner-material-grid");
+                                    phaseTimer.Restart();
+                                    yield return null;
+                                    phaseTimer.Restart();
+                                }
+                            }
+                            float[] previous = previousRaySlopes;
+                            previousRaySlopes = currentRaySlopes;
+                            currentRaySlopes = previous;
+                        }
+                        yield break;
+                    }
+
                     for (int y = firstY; y <= lastY; y++)
                     {
-                        int dy = (y - corner.Y) * outwardY;
+                        int dy = (y - corner.Y) * outwardY
+                            + (outwardY > 0 ? 1 : 0);
                         for (int x = firstX; x <= lastX; x++)
                         {
-                            int dx = (x - corner.X) * outwardX;
-                            int slopeDistance = Math.Max(dx, dy);
+                            int dx = (x - corner.X) * outwardX
+                                + (outwardX > 0 ? 1 : 0);
+                            // Octile distance keeps cardinal rays at one tile per step
+                            // while linearly blending diagonal travel toward sqrt(2).
+                            float slopeDistance = Math.Max(dx, dy)
+                                + Math.Min(dx, dy) * 0.41421356f;
                             Tile2i tile = new Tile2i(x, y);
-                            float sampledHeight = terrainHeights.TryGetValue(
-                                    tile, out float capturedHeight)
-                                ? capturedHeight
-                                : terrMgr.GetHeight(tile).Value.ToFloat();
+                            float sampledHeight = GetRayTerrainHeight(tile);
                             float projectedHeight = operation == AccessSideRayOperation.Fill
                                 ? plannedHeight - slopeDistance * materialSlope
                                 : plannedHeight + slopeDistance * materialSlope;
@@ -6423,6 +6654,54 @@ namespace AutoTerrainDesignations
                             phaseTimer.Restart();
                         }
                     }
+                }
+
+                bool UsesMaterialAwareMiningCut(
+                    AccessSideRayOperation operation)
+                    => workOperation == AccessHandoffOperation.Mining
+                        && operation == AccessSideRayOperation.Cut;
+
+                bool TryGetSurfaceCutSlope(
+                    Tile2i tile,
+                    out float slope)
+                {
+                    if (raySurfaceCutSlopeCache.TryGetValue(tile, out slope))
+                        return slope > 0f;
+
+                    float terrainSurfaceHeight = GetRayTerrainHeight(tile);
+                    if (terrainColumns.TryGetValue(tile, out AccessTerrainColumn column)
+                        && column.TryGetNormalSlopeAt(
+                            terrainSurfaceHeight, out slope, out _)
+                        && slope > 0f)
+                    {
+                        raySurfaceCutSlopeCache[tile] = slope;
+                        return true;
+                    }
+
+                    TerrainLayerEnumerator layers = terrMgr.EnumerateLayers(
+                        terrMgr.GetTileIndex(tile));
+                    if (layers.MoveNext())
+                    {
+                        TerrainMaterialProto material =
+                            layers.Current.SlimId.ToFull(terrMgr);
+                        slope = GetCutMaterialSlope(material);
+                    }
+                    else
+                        slope = 0f;
+                    raySurfaceCutSlopeCache[tile] = slope;
+                    return slope > 0f;
+                }
+
+                float GetRayTerrainHeight(Tile2i tile)
+                {
+                    if (terrainHeights.TryGetValue(tile, out float capturedHeight))
+                        return capturedHeight;
+                    if (!rayTerrainHeightCache.TryGetValue(tile, out float height))
+                    {
+                        height = terrMgr.GetHeight(tile).Value.ToFloat();
+                        rayTerrainHeightCache[tile] = height;
+                    }
+                    return height;
                 }
 
                 bool TryResolveCornerRay(

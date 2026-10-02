@@ -285,6 +285,8 @@ namespace AutoTerrainDesignations
         private static bool s_allowRampsOutsideTowerAreas = true;
         private static bool s_accessHarvestDisruptedTrees = true;
         private static bool s_accessAllowDigToRemoveDebris = true;
+        private static bool s_miningHazardOverlayEnabled;
+        private static bool s_miningHazardFencePreviewEnabled;
         private static QuickRemoveDebrisPolicy s_accessQuickRemoveDebrisPolicy =
             QuickRemoveDebrisPolicy.Restrictive;
         private static int s_dumpingPriorityWorldDefault =
@@ -305,6 +307,9 @@ namespace AutoTerrainDesignations
             s_allowRampsOutsideTowerAreas;
         internal static bool AccessHarvestDisruptedTrees => s_accessHarvestDisruptedTrees;
         internal static bool AccessAllowDigToRemoveDebris => s_accessAllowDigToRemoveDebris;
+        internal static bool MiningHazardOverlayEnabled => s_miningHazardOverlayEnabled;
+        internal static bool MiningHazardFencePreviewEnabled =>
+            s_miningHazardFencePreviewEnabled;
         internal static QuickRemoveDebrisPolicy AccessQuickRemoveDebrisPolicy =>
             s_accessQuickRemoveDebrisPolicy;
         internal static int DumpingPriorityWorldDefault => s_dumpingPriorityWorldDefault;
@@ -345,6 +350,22 @@ namespace AutoTerrainDesignations
             s_allowRampsOutsideTowerAreas = value;
         internal static void SetAccessHarvestDisruptedTrees(bool value) => s_accessHarvestDisruptedTrees = value;
         internal static void SetAccessAllowDigToRemoveDebris(bool value) => s_accessAllowDigToRemoveDebris = value;
+        internal static void SetMiningHazardOverlayEnabled(bool value)
+        {
+            if (s_miningHazardOverlayEnabled == value)
+                return;
+            s_miningHazardOverlayEnabled = value;
+            s_miningHazardOverlay?.SetEnabled(value);
+            LogInfo($"Mining hazard overlay setting changed: enabled={value}.");
+        }
+        internal static void SetMiningHazardFencePreviewEnabled(bool value)
+        {
+            if (s_miningHazardFencePreviewEnabled == value)
+                return;
+            s_miningHazardFencePreviewEnabled = value;
+            s_miningHazardOverlay?.SetFencePointPreviewEnabled(value);
+            LogInfo($"Mining hazard fence-point preview setting changed: enabled={value}.");
+        }
         internal static void SetAccessQuickRemoveDebrisPolicy(
             QuickRemoveDebrisPolicy value) => s_accessQuickRemoveDebrisPolicy = value;
         internal static void SetDumpingPriorityWorldDefault(int value) =>
@@ -362,6 +383,12 @@ namespace AutoTerrainDesignations
                 AutoTerrainDesignationsMod.AllowRampsOutsideTowerAreas;
             s_accessHarvestDisruptedTrees = AutoTerrainDesignationsMod.AccessHarvestDisruptedTrees;
             s_accessAllowDigToRemoveDebris = AutoTerrainDesignationsMod.AccessAllowDigToRemoveDebris;
+            s_miningHazardOverlayEnabled = AutoTerrainDesignationsMod.MiningHazardOverlayEnabled;
+            s_miningHazardFencePreviewEnabled =
+                AutoTerrainDesignationsMod.MiningHazardFencePreviewEnabled;
+            s_miningHazardOverlay?.SetEnabled(s_miningHazardOverlayEnabled);
+            s_miningHazardOverlay?.SetFencePointPreviewEnabled(
+                s_miningHazardFencePreviewEnabled);
             s_accessQuickRemoveDebrisPolicy =
                 AutoTerrainDesignationsMod.AccessQuickRemoveDebrisPolicy;
             s_dumpingPriorityWorldDefault =
@@ -415,6 +442,9 @@ namespace AutoTerrainDesignations
                 s_allowRampsOutsideTowerAreas);
             AutoTerrainDesignationsMod.SetAccessHarvestDisruptedTrees(s_accessHarvestDisruptedTrees);
             AutoTerrainDesignationsMod.SetAccessAllowDigToRemoveDebris(s_accessAllowDigToRemoveDebris);
+            AutoTerrainDesignationsMod.SetMiningHazardOverlayEnabled(s_miningHazardOverlayEnabled);
+            AutoTerrainDesignationsMod.SetMiningHazardFencePreviewEnabled(
+                s_miningHazardFencePreviewEnabled);
             AutoTerrainDesignationsMod.SetAccessQuickRemoveDebrisPolicy(
                 s_accessQuickRemoveDebrisPolicy);
             AutoTerrainDesignationsMod.SetDumpingPriority(
@@ -1128,6 +1158,8 @@ namespace AutoTerrainDesignations
 
         internal static void ResetWorldRuntimeState()
         {
+            ResetDefaultMine();
+            StopMiningHazardOverlay();
             ClearOreSpikeReviewMarkers();
             ResetAccesswayManagerRuntime("WorldReset");
             s_propRemovalManager?.Dispose(restoreOriginals: true);

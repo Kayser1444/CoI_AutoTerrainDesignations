@@ -5,6 +5,18 @@ Captain of Industry structures accessible.
 
 ## Mining planning
 
+**Predicted mining-hazard area**:
+Derived tile coverage where ATD estimates mining-related ground disturbance
+from live Mining designations. It is advisory visualization, not a terrain
+designation or gameplay restriction.
+_Avoid_: Hazard designation, protected area, authoritative hazard zone
+
+**Combined designation projection**:
+An ordered projection pass whose designations accumulate a shared projected
+work surface; later rays can read work projected by earlier rays. Its output
+can depend on designation processing order.
+_Avoid_: Independent per-designation projections unioned after the fact
+
 **Captured planning world**:
 A recorded set of world facts in a common format usable by mining and access
 planning, distinct from either planner's request, policy, or proposed work.
@@ -44,6 +56,20 @@ The nondominated candidate configurations when final mine plans are compared
 by avoided waste-rock excavation and foregone target product. It preserves the
 two outcomes separately instead of assuming one fixed rock-to-product value.
 _Avoid_: Spike detection accuracy, blended spike-filter score
+
+## Excavator operations
+
+**Default Mine**:
+The internal mining scope for excavators with no entity assignment. These
+excavators remain player-facing unassigned; a Logistics Zone assignment does
+not change that status.
+_Avoid_: Default Mine Tower, free-miner pool
+
+**Unassigned excavator**:
+An excavator with no entity assignment, whether idle or performing Default Mine
+work. “Free excavator” is informal shorthand here and does not mean idle or
+available for a truck job.
+_Avoid_: Idle excavator
 
 ## Farmland preparation
 

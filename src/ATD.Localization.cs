@@ -16,6 +16,10 @@ namespace AutoTerrainDesignations
     /// </summary>
     internal static class AtdLocalization
     {
+        public static LocStr SettingsDefaultMineLabel =
+            Loc.Str("settings.world.default_mine.label", "Unassigned excavators excavate", "World setting for automatic excavation outside Mine Tower areas.");
+        public static LocStr SettingsDefaultMineTooltip =
+            Loc.Str("settings.world.default_mine.tooltip", "Unassigned excavators excavate terrain designations outside Mine Tower areas.", "World setting tooltip for unassigned excavator mining.");
         /// <summary>
         /// Returns a <see cref="LocStrFormatted"/> for general tooltip text without the mod marker.
         /// </summary>
@@ -162,6 +166,12 @@ namespace AutoTerrainDesignations
             Loc.Str("settings.heading.experimental_access", "Accessways", "Settings section heading for accessway settings.");
         public static LocStr SettingsHeadingWorldSafety =
             Loc.Str("settings.world.safety", "Terrain safety", "Settings section heading for world terrain-safety settings.");
+        public static LocStr SettingsHeadingMiningVisualization =
+            Loc.Str("settings.world.mining_visualization", "Mining visualization", "Settings section heading for mining hazard visualization.");
+        public static LocStr SettingsMiningHazardOverlayLabel =
+            Loc.Str("settings.world.mining_hazard_overlay.label", "Show predicted mining collapse area", "Toggle label for the predicted collapse overlay around live mining designations.");
+        public static LocStr SettingsMiningHazardOverlayTooltip =
+            Loc.Str("settings.world.mining_hazard_overlay.tooltip", "Show a striped overlay on terrain ATD predicts may be affected by collapse from live Mining designations. Visible only while the game's terrain designation overlay is shown.", "Tooltip for the predicted mining collapse overlay toggle.");
         public static LocStr SettingsHeadingVanillaIssueCorrection =
             Loc.Str("settings.world.vanilla_issue_correction", "Vanilla fixes", "Settings section heading for fixes to known vanilla terrain-generation issues.");
         public static LocStr SettingsFilterOreSpikesLabel =

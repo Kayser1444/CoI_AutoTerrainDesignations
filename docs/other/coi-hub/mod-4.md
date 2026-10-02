@@ -12,15 +12,19 @@
 
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
-Version 0.8.2 adds **Reduce oversized areas** under **Performance**, allowing very large or effectively unbounded tower areas to make a best-effort accessway attempt through a geometry-only sparse corridor. It also fixes Ore Sorting Plant route persistence and strengthens debris cleanup safety. The previous release's per-world **Use worker thread** setting remains enabled by default, so new planning requests can use either responsive background planning or game-thread planning when needed.
+Version 0.9.0 adds optional excavation by unassigned excavators outside Mine Tower areas, a predicted mining-collapse overlay, and a Korean translation. Both new World Settings options are off by default.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
-All tower settings are persisted in the vanilla save file. The mod can be added to or removed from games at any time. 100% open source.
+All tower settings are persisted in the vanilla save file. The mod can be added to or removed from games at any time. Removing ATD while unassigned excavation is active may discard transient cargo in excavator buckets or trucks. 100% open source.
 
 ## ⚙️ Feature List
 
 [⛏️ **Create designations**](#create-designations)
+
+[🚜 **Excavation without a Mine Tower**](#excavation-without-a-mine-tower)
+
+[👁️ **Predicted collapse overlay**](#predicted-collapse-overlay)
 
 [🛠️ **Vanilla fixes**](#vanilla-fixes)
 
@@ -54,6 +58,8 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 4. If needed, clear the result, adjust the settings, and create it again.
 5. Watch your mining crews work through the deposit.
 
+For excavation without a tower, enable **Unassigned excavators excavate** in ATD's **World Settings**, then place Mining designations outside all Mine Tower areas.
+
 ### ⛏️ Create designations
 
 ![image.png](/content-images/6a163b2490b58242716c5cb752bd79f20010b349e7379e732de75221c6d922a3/image.png)
@@ -69,6 +75,18 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 ![image.png](/content-images/a0997d7fab775c43c4a570b8315c89e9bd9e0513fcea4fc63c08b3e50ec6a79a/image.png)
 
 *The completed excavation follows the deposit with minimal unnecessary digging.*
+
+### 🚜 Excavation without a Mine Tower
+
+Enable **Unassigned excavators excavate** in ATD's **World Settings** to let unassigned excavators work existing Mining designations outside every Mine Tower area. The option is **off by default** and saved per world. Excavators remain visibly unassigned and can be assigned to a tower at any time; paused towers still exclude their areas.
+
+Each excavator requests an available compatible global truck to collect its scoops and deliver the material. The truck follows the excavator until full. If a later scoop is incompatible with its current cargo, it delivers the partial load while the excavator holds the scoop for a replacement. Without an available truck, the excavator holds one scoop and waits.
+
+Pickup and delivery use the Logistics Zones containing the excavator when it requests the truck. Moving later does not change those permissions. Deleted zones lose permission; remaining captured zones still apply, with Default Zone used when none remain.
+
+### 👁️ Predicted collapse overlay
+
+Enable **Show predicted mining collapse area** in **World Settings → Mining visualization** to see a striped overlay on terrain ATD predicts may be affected by collapse around live Mining designations. It is **off by default** and visible only while the game's terrain designation overlay is shown. This is a prediction to help inspect mining work, rather than a simulation of the eventual collapse.
 
 ### 🛠️ Vanilla fixes
 
@@ -148,6 +166,8 @@ Turn flat leveling work into farmable ground with per-tower automation. ATD mana
 
 Open ATD in the Mod Settings window for controls that are not available directly from an individual Mine Tower:
 
+- **Unassigned excavation** — Optionally let unassigned excavators work Mining designations outside Mine Tower areas. Off by default.
+- **Mining visualization** — Optionally show the predicted mining-collapse area with the terrain designation overlay. Off by default.
 - **Terrain safety** — Choose how cautiously ATD predicts landslides and keeps generated work away from oceans and buildings.
 - **Vanilla fixes** — Keep the ore-spike correction enabled, or disable it for exact unfiltered vanilla deposit geometry.
 - **Ramps outside tower areas** — Allow a bounded retry just beyond the tower boundary when no valid in-area accessway can be found.

@@ -232,6 +232,18 @@
     "Terrängsäkerhet"
   ],
   [
+    "settings.world.mining_visualization",
+    "Gruvvisualisering"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.label",
+    "Visa förutsett rasområde vid brytning"
+  ],
+  [
+    "settings.world.mining_hazard_overlay.tooltip",
+    "Visar ett randigt överlägg på terräng som ATD förutser kan påverkas av ras från aktiva gruvmarkeringar. Syns bara när spelets terrängmarkeringsöverlägg visas."
+  ],
+  [
     "settings.world.vanilla_issue_correction",
     "Vanillakorrigeringar"
   ],
@@ -811,4 +823,7 @@
     "vehicle_order.shortcut.tooltip",
     "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
   ]
+,
+  ["settings.world.default_mine.label", "Ej tilldelade grävmaskiner gräver"],
+  ["settings.world.default_mine.tooltip", "Ej tilldelade grävmaskiner arbetar med gruvmarkeringar utanför alla gruvtorns områden."]
 ]

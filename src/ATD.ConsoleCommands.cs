@@ -24,6 +24,9 @@ namespace AutoTerrainDesignations;
 [GlobalDependency(RegistrationMode.AsSelf, false, false)]
 public sealed class AtdConsoleCommands
 {
+    [ConsoleCommand(false, false, "Prints Default Mine ownership, save suspension, and truck pairing state.", "atd_default_mine_status")]
+    private string atdDefaultMineStatus() => AutoDepthDesignation.DescribeDefaultMine();
+
     [ConsoleCommand(false, false, "Arms one replay capture: case name, scenario family, and optional case kind (access or mining).", "atd_access_replay_arm")]
     private string atdAccessReplayArm(
         string? caseName = null,
@@ -59,6 +62,8 @@ public sealed class AtdConsoleCommands
         sb.AppendLine($"  BottomFlatteningStrength = {AutoTerrainDesignationsMod.BottomFlatteningStrength}");
         sb.AppendLine($"  FilterOreSpikesDefault = {AutoTerrainDesignationsMod.FilterOreSpikes}");
         sb.AppendLine($"  FilterOreSpikesWorld   = {AutoDepthDesignation.FilterOreSpikes}");
+        sb.AppendLine($"  MiningHazardOverlay    = {AutoDepthDesignation.MiningHazardOverlayEnabled}");
+        sb.AppendLine($"  HazardFencePreview     = {AutoDepthDesignation.MiningHazardFencePreviewEnabled}");
         sb.AppendLine($"  MinCorridorClearance  = {AutoTerrainDesignationsMod.MinCorridorClearance}");
         sb.AppendLine($"  TerrainPanelCollapsed = {AutoTerrainDesignationsMod.TerrainDesignationsPanelCollapsed}");
         sb.AppendLine($"  OrePanelCollapsed     = {AutoTerrainDesignationsMod.OreCompositionPanelCollapsed}");
@@ -623,6 +628,21 @@ public sealed class AtdConsoleCommands
         return parsed
             ? "[ATD] Access cluster overlay ON. Re-run designation generation to populate it."
             : "[ATD] Access cluster overlay OFF.";
+    }
+
+    [ConsoleCommand(false, false, "Toggles the developer-only mining hazard fence-post preview for this world. Optionally pass 'on' or 'off'; the setting is saved with the world.", "atd_mining_hazard_fence_preview")]
+    private string atdMiningHazardFencePreview(string value = "")
+    {
+        bool current = AutoDepthDesignation.MiningHazardFencePreviewEnabled;
+        if (string.IsNullOrWhiteSpace(value))
+            value = (!current).ToString();
+        if (!TryParseConsoleBool(value, out bool parsed))
+            return "[ATD] Invalid value. Use true/false, on/off, yes/no, or 1/0.";
+
+        AutoDepthDesignation.SetMiningHazardFencePreviewEnabled(parsed);
+        return parsed
+            ? "[ATD] Mining hazard fence-post preview ON."
+            : "[ATD] Mining hazard fence-post preview OFF.";
     }
 
     [ConsoleCommand(false, false, "Builds the access useful-height hull and prunes generated-profile centers for newly created snapshots. Session-only. Optionally pass 'on' or 'off'.", null)]
