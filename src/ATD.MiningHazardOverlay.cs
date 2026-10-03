@@ -62,6 +62,7 @@ namespace AutoTerrainDesignations
         }
 
         private static bool TryPrepareMiningCollapseEnvelope(
+            Dictionary<Tile2i, TerrainDesignation> miningDesignations,
             out IEnumerator projectionRoutine,
             out ProjectedDesignationBuildResult projectionResult,
             out int miningDesignationCount,
@@ -79,13 +80,6 @@ namespace AutoTerrainDesignations
                 return false;
             }
 
-            var miningDesignations = new Dictionary<Tile2i, TerrainDesignation>();
-            foreach (TerrainDesignation designation in designationManager.Designations)
-            {
-                if (designation.Prototype != miningProto)
-                    continue;
-                miningDesignations[designation.Data.OriginTile] = designation;
-            }
             miningDesignationCount = miningDesignations.Count;
             if (miningDesignations.Count == 0)
             {
@@ -180,6 +174,8 @@ namespace AutoTerrainDesignations
             private readonly Dictionary<Vector2Int, ChunkView> m_chunks =
                 new Dictionary<Vector2Int, ChunkView>();
             private IEnumerator? m_rebuildRoutine;
+            private Dictionary<Tile2i, TerrainDesignation>? m_capturedDesignations;
+            private long m_capturedDesignationRevision = -1;
             private Mesh? m_fencePreviewMesh;
             private bool m_enabled;
             private bool m_fencePointPreviewEnabled;
@@ -251,7 +247,36 @@ namespace AutoTerrainDesignations
                 m_fencePreviewMeshRenderer.sharedMaterial =
                     m_fencePreviewMaterial;
 
+                m_gameLoopEvents.SyncUpdateStart.AddNonSaveable(this, OnSyncUpdateStart);
                 m_gameLoopEvents.RenderUpdate.AddNonSaveable(this, OnRenderUpdate);
+            }
+
+            private void OnSyncUpdateStart(GameTime _)
+            {
+                if (m_disposed
+                    || (!m_fencePointPreviewEnabled
+                        && !(m_enabled && m_isDesignationOverlayActive())))
+                    return;
+                if (m_capturedDesignations != null
+                    && m_capturedDesignationRevision == s_terrainDesignationRevision)
+                    return;
+                TerrainDesignationsManager? manager = s_desigManager;
+                TerrainDesignationProto? miningProto = s_miningProto;
+                if (manager == null || miningProto == null)
+                    return;
+
+                // SyncUpdateStart runs on the main thread with simulation stopped.
+                // Never enumerate the live dictionary in RenderUpdate. Copy Data
+                // as well: the simulation can replace it during sliced projection.
+                var captured = new Dictionary<Tile2i, TerrainDesignation>();
+                foreach (TerrainDesignation designation in manager.Designations)
+                {
+                    if (designation.Prototype == miningProto)
+                        captured.Add(designation.Data.OriginTile,
+                            new TerrainDesignation(miningProto, designation.Data));
+                }
+                m_capturedDesignations = captured;
+                m_capturedDesignationRevision = s_terrainDesignationRevision;
             }
 
             public void SetEnabled(bool enabled)
@@ -306,13 +331,14 @@ namespace AutoTerrainDesignations
                     return;
                 }
 
-                if (m_lastDesignationRevision != s_terrainDesignationRevision)
+                if (m_lastDesignationRevision != m_capturedDesignationRevision)
                 {
-                    m_lastDesignationRevision = s_terrainDesignationRevision;
+                    m_lastDesignationRevision = m_capturedDesignationRevision;
                     MarkDirty("designation-change");
                 }
 
-                if (m_dirty && m_rebuildRoutine == null)
+                if (m_dirty && m_rebuildRoutine == null
+                    && m_capturedDesignations != null)
                     StartRebuild();
                 AdvanceRebuild();
             }
@@ -338,6 +364,7 @@ namespace AutoTerrainDesignations
                 m_dirtyReason = string.Empty;
                 Stopwatch setupTimer = Stopwatch.StartNew();
                 if (!TryPrepareMiningCollapseEnvelope(
+                    m_capturedDesignations!,
                     out IEnumerator projectionRoutine,
                     out ProjectedDesignationBuildResult projectionResult,
                     out int miningDesignationCount,
@@ -920,7 +947,9 @@ namespace AutoTerrainDesignations
                     return;
                 m_disposed = true;
                 CancelRebuild();
+                m_gameLoopEvents.SyncUpdateStart.RemoveNonSaveable(this, OnSyncUpdateStart);
                 m_gameLoopEvents.RenderUpdate.RemoveNonSaveable(this, OnRenderUpdate);
+                m_capturedDesignations = null;
                 foreach (ChunkView chunk in m_chunks.Values)
                 {
                     if (chunk.Mesh != null)

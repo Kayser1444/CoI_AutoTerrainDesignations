@@ -1,3 +1,6 @@
+v0.9.1 | 2026-10-03
+* Fixed: The predicted mining collapse overlay now safely refreshes while mining designations change
+
 v0.9.0 | 2026-10-02
 * Added: The off-by-default **Unassigned excavators excavate** World Settings option lets unassigned excavators work Mining designations outside Mine Tower areas and use available global trucks for delivery
 * Added: The off-by-default **Show predicted mining collapse area** overlay for live Mining designations while the game's terrain designation overlay is visible
