@@ -22,7 +22,7 @@ All tower settings are persisted in the vanilla save file. The mod can be added 
 
 [⛏️ **Create designations**](#create-designations)
 
-[🚜 **Excavation without a Mine Tower**](#excavation-without-a-mine-tower)
+[🚜 **Free excavators**](#free-excavators)
 
 [👁️ **Predicted collapse overlay**](#predicted-collapse-overlay)
 
@@ -76,7 +76,7 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 
 *The completed excavation follows the deposit with minimal unnecessary digging.*
 
-### 🚜 Excavation without a Mine Tower
+### 🚜 Free excavators
 
 Enable **Unassigned excavators excavate** in ATD's **World Settings** to let unassigned excavators work existing Mining designations outside every Mine Tower area. The option is **off by default** and saved per world. Excavators remain visibly unassigned and can be assigned to a tower at any time; paused towers still exclude their areas.
 
@@ -166,7 +166,6 @@ Turn flat leveling work into farmable ground with per-tower automation. ATD mana
 
 Open ATD in the Mod Settings window for controls that are not available directly from an individual Mine Tower:
 
-- **Unassigned excavation** — Optionally let unassigned excavators work Mining designations outside Mine Tower areas. Off by default.
 - **Mining visualization** — Optionally show the predicted mining-collapse area with the terrain designation overlay. Off by default.
 - **Terrain safety** — Choose how cautiously ATD predicts landslides and keeps generated work away from oceans and buildings.
 - **Vanilla fixes** — Keep the ore-spike correction enabled, or disable it for exact unfiltered vanilla deposit geometry.
