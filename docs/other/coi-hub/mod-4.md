@@ -80,9 +80,9 @@ Choose a product or use **AUTO**, then scan the tower area and create a tailored
 
 Enable **Unassigned excavators excavate** in ATD's **World Settings** to let unassigned excavators work existing Mining designations outside every Mine Tower area. The option is **off by default** and saved per world. Excavators remain visibly unassigned and can be assigned to a tower at any time; paused towers still exclude their areas.
 
-Each excavator requests an available compatible global truck to collect its scoops and deliver the material. The truck follows the excavator until full. Trucks can carry mixed cargo when the products are mixable, up to eight distinct products. If a later scoop contains no product the truck can add under these rules, it delivers its current load while the excavator holds the scoop for a replacement. Without an available truck, the excavator holds one scoop and waits.
+Each excavator requests an available global truck to collect its scoops and deliver the material. The truck follows the excavator until it becomes full or the excavator runs out of designations to excavate. Without an available truck, the excavator holds one scoop and waits.
 
-Pickup and delivery use the Logistics Zones containing the excavator when it requests the truck. Moving later does not change those permissions. Deleted zones lose permission; remaining captured zones still apply, with Default Zone used when none remain.
+Truck pickup and delivery respect Logistics Zones.
 
 ### 👁️ Predicted collapse overlay
 
