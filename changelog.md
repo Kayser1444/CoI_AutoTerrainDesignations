@@ -1,4 +1,4 @@
-v0.9.1 [packaged]
+v0.9.1 [released]
 
 * Fixed a dictionary-modified-during-iteration exception in the predicted mining collapse overlay by capturing mining designations during the synchronized game-loop phase and projecting from an owned snapshot.
 
