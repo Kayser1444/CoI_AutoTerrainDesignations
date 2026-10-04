@@ -1,3 +1,5 @@
+v0.9.3 [unreleased]
+
 v0.9.2 [released]
 
 * Mitigated the idle vehicle release entity-enumerator assertion by seeding a runtime MineTower cache during mod initialization and maintaining immutable membership snapshots through non-saveable entity lifecycle events. Idle release, save restoration/re-release, and assigned-vehicle diagnostics now use those snapshots. Debug build passed; in-game lifecycle, save, and full-log verification remain pending.
