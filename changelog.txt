@@ -1,3 +1,6 @@
+v0.9.2 | 2026-10-04
+* Fixed: An entity enumeration assertion during automatic idle vehicle release
+
 v0.9.1 | 2026-10-03
 * Fixed: The predicted mining collapse overlay now safely refreshes while mining designations change
 

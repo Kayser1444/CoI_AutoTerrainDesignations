@@ -1,5 +1,7 @@
 v0.9.2 [unreleased]
 
+* Mitigated the idle vehicle release entity-enumerator assertion by seeding a runtime MineTower cache during mod initialization and maintaining immutable membership snapshots through non-saveable entity lifecycle events. Idle release, save restoration/re-release, and assigned-vehicle diagnostics now use those snapshots. Debug build passed; in-game lifecycle, save, and full-log verification remain pending.
+
 v0.9.1 [released]
 
 * Fixed a dictionary-modified-during-iteration exception in the predicted mining collapse overlay by capturing mining designations during the synchronized game-loop phase and projecting from an owned snapshot.

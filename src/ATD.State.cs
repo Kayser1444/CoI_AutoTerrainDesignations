@@ -1158,6 +1158,7 @@ namespace AutoTerrainDesignations
 
         internal static void ResetWorldRuntimeState()
         {
+            ResetIdleMineTowerCache();
             ResetDefaultMine();
             StopMiningHazardOverlay();
             ClearOreSpikeReviewMarkers();
@@ -1251,6 +1252,7 @@ namespace AutoTerrainDesignations
             s_protosDb = protosDb;
             s_worldMapManager = worldMapManager as WorldMapManager;
             s_entitiesManager = entitiesManager;
+            InitializeIdleMineTowerCache(entitiesManager);
             s_terrainPropsManager = terrainPropsManager;
             s_treesManager = treesManager;
             s_vehiclePathFindingManager = vehiclePathFindingManager;

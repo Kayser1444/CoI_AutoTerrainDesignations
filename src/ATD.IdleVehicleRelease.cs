@@ -1,4 +1,4 @@
-﻿// Auto Terrain Designations
+// Auto Terrain Designations
 // Copyright (c) 2026 Kayser
 // Licensed under the MIT License.
 //
@@ -26,6 +26,89 @@ namespace AutoTerrainDesignations
 {
     public static partial class AutoDepthDesignation
     {
+        // Runtime-only membership cache. Published arrays are never modified, and
+        // readers release our lock before accessing any game-owned entity state.
+        private static readonly object s_idleMineTowerCacheLock = new object();
+        private static readonly List<MineTower> s_idleMineTowers = new List<MineTower>();
+        private static MineTower[] s_idleMineTowerSnapshot = System.Array.Empty<MineTower>();
+        private static IEntitiesManager? s_idleMineTowerEntitiesManager;
+
+        private static void InitializeIdleMineTowerCache(IEntitiesManager entitiesManager)
+        {
+            // Mod initialization precedes GameRunner initialization. This is the
+            // only live entity-list scan; the lock does not synchronize that list.
+            s_idleMineTowerEntitiesManager = entitiesManager;
+            entitiesManager.EntityAdded.AddNonSaveable(s_idleMineTowerCacheLock, OnIdleMineTowerAdded);
+            entitiesManager.EntityRemoved.AddNonSaveable(s_idleMineTowerCacheLock, OnIdleMineTowerRemoved);
+            lock (s_idleMineTowerCacheLock)
+            {
+                foreach (MineTower tower in entitiesManager.GetAllEntitiesOfType<MineTower>())
+                    AddIdleMineTower(tower);
+                s_idleMineTowerSnapshot = s_idleMineTowers.ToArray();
+            }
+        }
+
+        private static void ResetIdleMineTowerCache()
+        {
+            if (s_idleMineTowerEntitiesManager != null)
+            {
+                s_idleMineTowerEntitiesManager.EntityAdded.RemoveNonSaveable(s_idleMineTowerCacheLock, OnIdleMineTowerAdded);
+                s_idleMineTowerEntitiesManager.EntityRemoved.RemoveNonSaveable(s_idleMineTowerCacheLock, OnIdleMineTowerRemoved);
+                s_idleMineTowerEntitiesManager = null;
+            }
+            lock (s_idleMineTowerCacheLock)
+            {
+                s_idleMineTowers.Clear();
+                s_idleMineTowerSnapshot = System.Array.Empty<MineTower>();
+            }
+        }
+
+        // Called only under s_idleMineTowerCacheLock. Replacement entities belong
+        // at the end, matching the entity manager's insertion order.
+        private static bool AddIdleMineTower(MineTower tower)
+        {
+            int index = s_idleMineTowers.FindIndex(cached => cached.Id == tower.Id);
+            if (index >= 0)
+            {
+                if (ReferenceEquals(s_idleMineTowers[index], tower))
+                    return false;
+                s_idleMineTowers.RemoveAt(index);
+            }
+            s_idleMineTowers.Add(tower);
+            return true;
+        }
+
+        private static void OnIdleMineTowerAdded(IEntity entity)
+        {
+            if (!(entity is MineTower tower))
+                return;
+            lock (s_idleMineTowerCacheLock)
+            {
+                if (AddIdleMineTower(tower))
+                    s_idleMineTowerSnapshot = s_idleMineTowers.ToArray();
+            }
+        }
+
+        private static void OnIdleMineTowerRemoved(IEntity entity)
+        {
+            if (!(entity is MineTower tower))
+                return;
+            lock (s_idleMineTowerCacheLock)
+            {
+                int index = s_idleMineTowers.FindIndex(cached => cached.Id == tower.Id);
+                if (index < 0 || !ReferenceEquals(s_idleMineTowers[index], tower))
+                    return;
+                s_idleMineTowers.RemoveAt(index);
+                s_idleMineTowerSnapshot = s_idleMineTowers.ToArray();
+            }
+        }
+
+        private static MineTower[] GetIdleMineTowerSnapshot()
+        {
+            lock (s_idleMineTowerCacheLock)
+                return s_idleMineTowerSnapshot;
+        }
+
         // Key present → vehicles for that tower are currently in the "released" state.
         // Value is the list of vehicles we released (may be empty if the tower had no vehicles at release time).
         private static readonly Dictionary<EntityId, List<Vehicle>> s_idleReleasedVehiclesByTower =
@@ -149,7 +232,7 @@ namespace AutoTerrainDesignations
                 }
             }
 
-            foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>())
+            foreach (MineTower tower in GetIdleMineTowerSnapshot())
             {
                 if (tower.IsDestroyed || !tower.IsConstructed)
                     continue;
@@ -313,7 +396,7 @@ namespace AutoTerrainDesignations
             if (s_entitiesManager == null || s_idleReleasedVehiclesByTower.Count == 0)
                 return;
 
-            foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>())
+            foreach (MineTower tower in GetIdleMineTowerSnapshot())
             {
                 if (tower.IsDestroyed)
                     continue;
@@ -366,7 +449,7 @@ namespace AutoTerrainDesignations
             if (s_entitiesManager == null || s_idleReleasedVehiclesByTower.Count == 0)
                 return;
 
-            foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>())
+            foreach (MineTower tower in GetIdleMineTowerSnapshot())
             {
                 if (tower.IsDestroyed)
                     continue;
@@ -407,7 +490,7 @@ namespace AutoTerrainDesignations
             sb.AppendLine("[ATD] Assigned vehicles per mine tower:");
 
             int towerIndex = 0;
-            foreach (MineTower tower in s_entitiesManager.GetAllEntitiesOfType<MineTower>()
+            foreach (MineTower tower in GetIdleMineTowerSnapshot()
                 .OrderBy(t => t.Position2f.Tile2i.Y)
                 .ThenBy(t => t.Position2f.Tile2i.X))
             {
