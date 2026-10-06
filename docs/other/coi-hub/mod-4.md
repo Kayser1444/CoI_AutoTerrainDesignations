@@ -12,7 +12,7 @@
 
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
-Version 0.9.0 adds optional excavation by unassigned excavators outside Mine Tower areas, a predicted mining-collapse overlay, and a Korean translation. Both new World Settings options are off by default.
+Version 0.9.3 adds a vehicle-order panel control for showing unlocked vehicle types the tower does not own, so you can queue them from that tower.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
@@ -130,7 +130,7 @@ ATD adds vanilla-style export controls to Ore Sorting Plants: configure compatib
 
 ![image.png](/content-images/f6de06a7d560d26012c3563b6fce2626a64f903dc024729dabc4ad7a160bd7b6/image.png)*Order and pre-assign excavators or trucks directly from the Mine Tower inspector.*
 
-Order vehicle construction from the tower's vehicle assignment UI. ATD selects the closest eligible Vehicle Depot, records the pre-assignment, and sends the completed vehicle to the tower automatically. Shift and Ctrl modifiers order 5 or 10 vehicles; Shift+Alt-click orders directly even when a free vehicle is available.
+Order vehicle construction from the tower's vehicle assignment UI. ATD selects the closest eligible Vehicle Depot, records the pre-assignment, and sends the completed vehicle to the tower automatically. Shift and Ctrl modifiers order 5 or 10 vehicles; Shift+Alt-click orders directly even when a free vehicle is available. Use the union/intersection control in vehicle-panel headers to show or hide unlocked types you do not own; owned vehicles and this tower's queued orders remain visible.
 
 ### 🚚 Idle vehicle management
 

@@ -1,5 +1,21 @@
 [
   [
+    "panel.vehicles.show_unowned",
+    "Visa upplåsta fordonstyper som du inte äger så att du kan beställa dem från det här tornet. Ägda fordon och tornets köade beställningar visas alltid."
+  ],
+  [
+    "panel.vehicles.hide_unowned",
+    "Dölj fordonstyper som du inte äger. Ägda fordon och tornets köade beställningar visas fortfarande."
+  ],
+  [
+    "settings.world.default_mine.label",
+    "Ej tilldelade grävmaskiner gräver"
+  ],
+  [
+    "settings.world.default_mine.tooltip",
+    "Ej tilldelade grävmaskiner arbetar med gruvmarkeringar utanför alla gruvtorns områden."
+  ],
+  [
     "common.level.off",
     "Av"
   ],
@@ -823,7 +839,4 @@
     "vehicle_order.shortcut.tooltip",
     "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
   ]
-,
-  ["settings.world.default_mine.label", "Ej tilldelade grävmaskiner gräver"],
-  ["settings.world.default_mine.tooltip", "Ej tilldelade grävmaskiner arbetar med gruvmarkeringar utanför alla gruvtorns områden."]
 ]

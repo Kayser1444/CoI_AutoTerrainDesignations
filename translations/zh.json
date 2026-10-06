@@ -1,5 +1,21 @@
 [
   [
+    "panel.vehicles.show_unowned",
+    "显示已解锁但尚未拥有的车辆类型，以便从此塔楼订购。已拥有的车辆和此塔楼排队中的订单始终显示。"
+  ],
+  [
+    "panel.vehicles.hide_unowned",
+    "隐藏尚未拥有的车辆类型。已拥有的车辆和此塔楼排队中的订单仍会显示。"
+  ],
+  [
+    "settings.world.default_mine.label",
+    "未分配的挖掘机进行挖掘"
+  ],
+  [
+    "settings.world.default_mine.tooltip",
+    "未分配的挖掘机可处理所有矿塔区域以外的采矿标记。"
+  ],
+  [
     "common.level.off",
     "关"
   ],
@@ -823,7 +839,4 @@
     "vehicle_order.shortcut.tooltip",
     "按住 Shift-Alt 键并单击即可在 {1} 为 {2} 订购新的 {0}"
   ]
-,
-  ["settings.world.default_mine.label", "未分配的挖掘机进行挖掘"],
-  ["settings.world.default_mine.tooltip", "未分配的挖掘机可处理所有矿塔区域以外的采矿标记。"]
 ]

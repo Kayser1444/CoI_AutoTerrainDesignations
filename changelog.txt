@@ -1,3 +1,6 @@
+v0.9.3 | 2026-10-06
+* Added a control to Mine Tower vehicle-order panels for showing unlocked vehicle types you do not own so you can order them from the tower
+
 v0.9.2 | 2026-10-04
 * Fixed: An entity enumeration assertion during automatic idle vehicle release
 

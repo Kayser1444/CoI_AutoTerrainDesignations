@@ -1,5 +1,21 @@
 [
   [
+    "panel.vehicles.show_unowned",
+    "Freigeschaltete Fahrzeugtypen anzeigen, die du nicht besitzt, damit du sie über diesen Turm bestellen kannst. Eigene Fahrzeuge und die vorgemerkten Aufträge dieses Turms werden immer angezeigt."
+  ],
+  [
+    "panel.vehicles.hide_unowned",
+    "Nicht eigene Fahrzeugtypen ausblenden. Eigene Fahrzeuge und die vorgemerkten Aufträge dieses Turms bleiben sichtbar."
+  ],
+  [
+    "settings.world.default_mine.label",
+    "Nicht zugewiesene Bagger graben"
+  ],
+  [
+    "settings.world.default_mine.tooltip",
+    "Nicht zugewiesene Bagger bearbeiten Abbau-Markierungen außerhalb der Bereiche aller Mine Control Towers."
+  ],
+  [
     "common.level.off",
     "Aus"
   ],
@@ -823,7 +839,4 @@
     "vehicle_order.shortcut.tooltip",
     "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
   ]
-,
-  ["settings.world.default_mine.label", "Nicht zugewiesene Bagger graben"],
-  ["settings.world.default_mine.tooltip", "Nicht zugewiesene Bagger bearbeiten Abbau-Markierungen außerhalb der Bereiche aller Mine Control Towers."]
 ]

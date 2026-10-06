@@ -1,5 +1,21 @@
 [
   [
+    "panel.vehicles.show_unowned",
+    "보유하지 않은 잠금 해제 차량 종류를 표시해 이 타워에서 주문할 수 있습니다. 보유한 차량과 이 타워의 대기 중인 주문은 항상 표시됩니다."
+  ],
+  [
+    "panel.vehicles.hide_unowned",
+    "보유하지 않은 차량 종류를 숨깁니다. 보유한 차량과 이 타워의 대기 중인 주문은 계속 표시됩니다."
+  ],
+  [
+    "settings.world.default_mine.label",
+    "미배정 굴착기가 채굴합니다"
+  ],
+  [
+    "settings.world.default_mine.tooltip",
+    "미배정 굴착기가 모든 광산 타워 영역 밖의 채굴 지정을 작업합니다."
+  ],
+  [
     "common.level.off",
     "끔"
   ],
@@ -823,7 +839,4 @@
     "vehicle_order.shortcut.tooltip",
     "Shift+Alt+클릭으로 {1}에서 {2}용 {0}을(를) 새로 주문"
   ]
-,
-  ["settings.world.default_mine.label", "미배정 굴착기가 채굴합니다"],
-  ["settings.world.default_mine.tooltip", "미배정 굴착기가 모든 광산 타워 영역 밖의 채굴 지정을 작업합니다."]
 ]

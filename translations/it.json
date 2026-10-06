@@ -1,5 +1,21 @@
 [
   [
+    "panel.vehicles.show_unowned",
+    "Mostra i tipi di veicolo sbloccati che non possiedi per poterli ordinare da questa torre. I veicoli posseduti e gli ordini in coda di questa torre sono sempre visibili."
+  ],
+  [
+    "panel.vehicles.hide_unowned",
+    "Nascondi i tipi di veicolo che non possiedi. I veicoli posseduti e gli ordini in coda di questa torre restano visibili."
+  ],
+  [
+    "settings.world.default_mine.label",
+    "Gli escavatori non assegnati scavano"
+  ],
+  [
+    "settings.world.default_mine.tooltip",
+    "Gli escavatori non assegnati lavorano sulle designazioni minerarie fuori dalle aree di tutte le torri minerarie."
+  ],
+  [
     "common.level.off",
     "Spento"
   ],
@@ -823,7 +839,4 @@
     "vehicle_order.shortcut.tooltip",
     "Fai clic tenendo premuto Maiusc-Alt per ordinare un nuovo {0} per {2} presso {1}"
   ]
-,
-  ["settings.world.default_mine.label", "Gli escavatori non assegnati scavano"],
-  ["settings.world.default_mine.tooltip", "Gli escavatori non assegnati lavorano sulle designazioni minerarie fuori dalle aree di tutte le torri minerarie."]
 ]
