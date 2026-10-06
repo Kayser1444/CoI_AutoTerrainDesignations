@@ -1,4 +1,4 @@
-v0.9.3 [unreleased]
+v0.9.3 [packaged]
 
 * Added a vehicle-order panel toggle that reveals unlocked vehicle types the tower does not own, so players can queue them from that tower. Owned vehicles and queued tower orders remain visible when unowned types are hidden.
 
