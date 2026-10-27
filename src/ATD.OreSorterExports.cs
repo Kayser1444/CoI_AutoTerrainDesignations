@@ -1923,6 +1923,7 @@ public static partial class AutoDepthDesignation
             "m_assignTool",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
+    // PRE_4_3_COMPAT: retire these legacy audio fields after Update 5 or when pre-4.3 support ends.
     private static readonly FieldInfo? s_buildingsAssignerAssignClickAudioField =
         typeof(BuildingsAssigner).GetField(
             "m_assignClickAudio",
@@ -1934,10 +1935,14 @@ public static partial class AutoDepthDesignation
             BindingFlags.Instance | BindingFlags.NonPublic);
 
     private static MethodInfo? s_oreSorterAudioPlayMethod;
-    private static MethodInfo? s_oreSorterGetSharedAudioUiMethod;
 
     private static void PlayOreSorterRouteAudio(object? audio)
     {
+        if (audio is Action play)
+        {
+            play();
+            return;
+        }
         if (audio == null)
             return;
 
@@ -1955,17 +1960,8 @@ public static partial class AutoDepthDesignation
 
     private static object? GetOreSorterRouteAudio(UiContext context, string assetPath)
     {
-        object audioDb = context.AudioDb;
-        if (s_oreSorterGetSharedAudioUiMethod == null)
-        {
-            s_oreSorterGetSharedAudioUiMethod = audioDb.GetType().GetMethod(
-                "GetSharedAudioUi",
-                BindingFlags.Instance | BindingFlags.Public,
-                null,
-                new[] { typeof(string) },
-                null);
-        }
-        return s_oreSorterGetSharedAudioUiMethod?.Invoke(audioDb, new object[] { assetPath });
+        string sound = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+        return CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, sound);
     }
 
     private sealed class OreSorterBuildingsAssignerHoverState
@@ -1993,11 +1989,13 @@ public static partial class AutoDepthDesignation
         if (route != null)
         {
             RemoveOreSorterExportRoute(sorter, route);
-            PlayOreSorterRouteAudio(s_buildingsAssignerUnassignClickAudioField?.GetValue(__instance));
+            PlayOreSorterRouteAudio(s_buildingsAssignerUnassignClickAudioField?.GetValue(__instance)
+                ?? CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "UnassignStructure"));
         }
         else if (AddOreSorterExportRoute(sorter, destination.Id, null))
         {
-            PlayOreSorterRouteAudio(s_buildingsAssignerAssignClickAudioField?.GetValue(__instance));
+            PlayOreSorterRouteAudio(s_buildingsAssignerAssignClickAudioField?.GetValue(__instance)
+                ?? CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "AssignStructure"));
         }
 
         return false;

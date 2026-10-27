@@ -1,3 +1,8 @@
+v0.9.4 | 2026-10-27
+
+* This release provides technical/experimental compatibility with Captain of Industry Update 4.3 (0.8.8), while retaining support for 0.8.7d; extensive playtesting remains
+* Fixed: The Corner designations shortcut now uses the full width of its Controls section
+
 v0.9.3 | 2026-10-06
 * Added a control to Mine Tower vehicle-order panels for showing unlocked vehicle types you do not own so you can order them from the tower
 

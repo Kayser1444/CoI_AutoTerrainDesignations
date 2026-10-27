@@ -1,10 +1,10 @@
 [
   [
-    "panel.vehicles.show_unowned",
+    "panel.atd.vehicles.show_unowned",
     "显示已解锁但尚未拥有的车辆类型，以便从此塔楼订购。已拥有的车辆和此塔楼排队中的订单始终显示。"
   ],
   [
-    "panel.vehicles.hide_unowned",
+    "panel.atd.vehicles.hide_unowned",
     "隐藏尚未拥有的车辆类型。已拥有的车辆和此塔楼排队中的订单仍会显示。"
   ],
   [

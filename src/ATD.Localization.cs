@@ -17,9 +17,9 @@ namespace AutoTerrainDesignations
     internal static class AtdLocalization
     {
         public static LocStr ShowUnownedVehicles =
-            Loc.Str("panel.vehicles.show_unowned", "Show unlocked vehicle types you do not own so you can order them from this tower. Owned vehicles and this tower's queued orders are always shown.", "Tooltip for the union symbol button in vehicle panel headers, when unowned types are hidden.");
+            Loc.Str("panel.atd.vehicles.show_unowned", "Show unlocked vehicle types you do not own so you can order them from this tower. Owned vehicles and this tower's queued orders are always shown.", "Tooltip for the union symbol button in vehicle panel headers, when unowned types are hidden.");
         public static LocStr HideUnownedVehicles =
-            Loc.Str("panel.vehicles.hide_unowned", "Hide vehicle types you do not own. Owned vehicles and this tower's queued orders remain visible.", "Tooltip for the intersection symbol button in vehicle panel headers, when unowned types are shown.");
+            Loc.Str("panel.atd.vehicles.hide_unowned", "Hide vehicle types you do not own. Owned vehicles and this tower's queued orders remain visible.", "Tooltip for the intersection symbol button in vehicle panel headers, when unowned types are shown.");
         public static LocStr SettingsDefaultMineLabel =
             Loc.Str("settings.world.default_mine.label", "Unassigned excavators excavate", "World setting for automatic excavation outside Mine Tower areas.");
         public static LocStr SettingsDefaultMineTooltip =

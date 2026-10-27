@@ -581,9 +581,7 @@ namespace AutoTerrainDesignations
 
         private static void PlayInvalidOpSound(UiContext context)
         {
-            var invalidOpSoundField = typeof(UiRoot).GetField("InvalidOpSound", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            object? invalidOpSound = invalidOpSoundField?.GetValue(context.UiRoot);
-            invalidOpSound?.GetType().GetMethod("Play", Type.EmptyTypes)?.Invoke(invalidOpSound, null);
+            CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, "InvalidOp")();
         }
 
         private static void FindQueueItems(UiComponent parent, List<UiComponent> results)

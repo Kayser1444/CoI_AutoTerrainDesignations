@@ -113,7 +113,12 @@ public static string Tt(string text) => text;
         MineTowerCloneConfigPatches.Apply(m_harmony);
         CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
             m_harmony,
+// PRE_4_3_COMPAT: legacy branches/API guards only; remove after Update 5 or when pre-4.3 support ends.
+#if COI_UPDATE_4_3
+            Manifest.Id,
+#else
             Manifest.DisplayName,
+#endif
             typeof(AutoTerrainDesignationsMod),
             persistInitialBindings: migrateLegacyCornerKey);
 
@@ -698,19 +703,31 @@ public static string Tt(string text) => text;
         => Access.AccessSearchPolicySnapshot.Capture().SemanticFingerprint;
 
     /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
+#if COI_UPDATE_4_3
+    [CoI.AutoHelpers.InputControl.ModKeybind("Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false)]
+#else
     [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
+#endif
     public static KeyBindings CornerDesignationMode { get; set; } = FromPrimaryKeys(KeyCode.K);
 
     public static void SetCornerDesignationMode(KeyBindings value)
     {
         CornerDesignationMode = value;
+#if COI_UPDATE_4_3
+        CustomKeybindsInjector.SetBindings(nameof(CornerDesignationMode), value);
+#endif
     }
 
     public static bool IsPressed(KeyBindings bindings)
     {
+#if COI_UPDATE_4_3
+        return CustomKeybindsInjector.IsPressed(bindings);
+#else
         return IsPressed(bindings.Primary) || IsPressed(bindings.Secondary);
+#endif
     }
 
+#if !COI_UPDATE_4_3
     private static bool IsPressed(KeyBinding binding)
     {
         if (binding.IsEmpty)
@@ -733,16 +750,24 @@ public static string Tt(string text) => text;
         return true;
     }
 
+#endif
     internal static KeyBindings FromPrimaryKeys(params KeyCode[] keys)
     {
+#if COI_UPDATE_4_3
+        return CustomKeybindsInjector.FromPrimaryKeys(keys);
+#else
         return new KeyBindings(
             ShortcutMode.Game,
             new KeyBinding(KbCategory.Designation, keys.ToImmutableArray()),
             KeyBinding.Empty(KbCategory.Designation));
+#endif
     }
 
     public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
     {
+#if COI_UPDATE_4_3
+        CustomKeybindsInjector.Register(resolver, this);
+#endif
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         try
         {
@@ -750,6 +775,7 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.SetModRootDirectoryPath(
                 Manifest.RootDirectoryPath);
             AutoDepthDesignation.s_log.RegisterAutoConsoleMirroring(this, resolver.Resolve<IGameLoopEvents>(), resolver.Resolve<GameConsoleCommandsExecutor>());
+            ModDebugWebApi.Register(this, resolver, "[ATD]");
             AutoTerrainDesignationsTicker.DestroyActive();
 
             RegisterAutoHelpersLocalizationLateApply(resolver);

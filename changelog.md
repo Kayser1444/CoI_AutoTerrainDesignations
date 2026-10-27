@@ -1,5 +1,15 @@
 v0.9.4 [unreleased]
 
+- Release scope: technical/experimental compatibility with Captain of Industry Update 4.3 (0.8.8), retaining support for 0.8.7d. Extensive playtesting remains; successful startup and focused checks do not certify extended gameplay.
+
+- Release preparation: owner confirms the current features and successful game/save loading on both 0.8.7d and 0.8.8. Ship one version-switching Release package with both implementations. Retain current version until public distribution is confirmed.
+
+* Added an experimental automatic selector with both 0.8.7d and 0.8.8 implementations in one installed mod. Native loader and binary-reference checks pass on both APIs; the owner subsequently confirmed game/save loading on both supported versions.
+
+* Fixed the single ATD shortcut appearing in the right half of Controls with an empty left column. The shared Update 4.3 layout correction keeps a one-shortcut group at full width; native column balancing for larger sets is preserved.
+
+* Prepared Captain of Industry 0.8.8 (Update 4.3, build 622) API compatibility: native shortcut registration and toolbox controls, UI sound fallbacks, plain logistics buffers and current cargo delivery APIs. Debug build and Default Mine integration fixtures pass; in-game verification remains pending. Retained the older source paths for separate builds.
+
 v0.9.3 [released]
 
 * Added a vehicle-order panel toggle that reveals unlocked vehicle types the tower does not own, so players can queue them from that tower. Owned vehicles and queued tower orders remain visible when unowned types are hidden.

@@ -108,16 +108,16 @@ public static partial class AutoDepthDesignation
     /// rejects every physical delivery; the selected cargo is dumped at a real
     /// terrain designation by the delivery adapter.
     /// </summary>
-    private sealed class ActiveDumpingDemandBuffer : IProductBuffer
+    private sealed class ActiveDumpingDemandBuffer : CoI.AutoHelpers.Compatibility.PlainProductBufferAdapter
     {
         private int m_openSlots;
 
-        public ProductProto Product { get; }
-        public Quantity Quantity => Quantity.Zero;
-        public Quantity Capacity => m_openSlots <= 0
+        public override ProductProto Product { get; }
+        public override Quantity Quantity => Quantity.Zero;
+        public override Quantity Capacity => m_openSlots <= 0
             ? Quantity.Zero
             : TruckCaps.LargeTruckCapacity * m_openSlots;
-        public Quantity UsableCapacity => Capacity;
+        public override Quantity UsableCapacity => Capacity;
         public int OpenSlots => m_openSlots;
 
         public ActiveDumpingDemandBuffer(LooseProductProto product)
@@ -127,9 +127,9 @@ public static partial class AutoDepthDesignation
 
         public void SetOpenSlots(int slots) => m_openSlots = Math.Max(0, slots);
 
-        public Quantity StoreAsMuchAs(Quantity quantity) => quantity;
+        public override Quantity StoreAsMuchAs(Quantity quantity) => quantity;
 
-        public Quantity RemoveAsMuchAs(Quantity maxQuantity) => Quantity.Zero;
+        public override Quantity RemoveAsMuchAs(Quantity maxQuantity) => Quantity.Zero;
     }
 
     private sealed class ActiveDumpingPriorityProvider : IInputBufferPriorityProvider

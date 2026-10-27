@@ -156,7 +156,12 @@ namespace AutoTerrainDesignations
 
             // R (or remapped rotate key): rotate among the 4 orientations within the current type.
             if (s_shortcutsManager != null
+// PRE_4_3_COMPAT: legacy branches/API guards only; remove after Update 5 or when pre-4.3 support ends.
+#if COI_UPDATE_4_3
+                    ? s_shortcutsManager.IsDown(Shortcuts.Rotate)
+#else
                     ? s_shortcutsManager.IsDown(s_shortcutsManager.Rotate)
+#endif
                     : Input.GetKeyDown(KeyCode.R))
             {
                 s_activeCornerVariant = RotateCornerVariant(s_activeCornerVariant);
@@ -946,7 +951,11 @@ namespace AutoTerrainDesignations
                     // Use no source asset: Icon loads its source asynchronously, which
                     // would otherwise remain underneath the embedded drawing.
                     var planarItem = new ToolboxItem(
+#if COI_UPDATE_4_3
+                        () => AutoTerrainDesignationsMod.CornerDesignationMode,
+#else
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
+#endif
                         (string)null!,
                         () => SelectCornerButton(CornerVariant.OriginHighPlusXyLow));
 
@@ -955,13 +964,21 @@ namespace AutoTerrainDesignations
 
                     // Outer corner button — ExpandScreen as-is, keybind K.
                     var outerItem = new ToolboxItem(
+#if COI_UPDATE_4_3
+                        () => AutoTerrainDesignationsMod.CornerDesignationMode,
+#else
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
+#endif
                         cornerIconPath,
                         () => SelectCornerButton(CornerVariant.OriginHigh));
 
                     // Inner corner button — ExpandScreen rotated 180°, keybind K (label only).
                     var innerItem = new ToolboxItem(
+#if COI_UPDATE_4_3
+                        () => AutoTerrainDesignationsMod.CornerDesignationMode,
+#else
                         _ => AutoTerrainDesignationsMod.CornerDesignationMode,
+#endif
                         cornerIconPath,
                         () => SelectCornerButton(CornerVariant.OriginLow));
 
@@ -978,7 +995,11 @@ namespace AutoTerrainDesignations
                     body.InsertAt(1, innerItem);
                     body.InsertAt(2, planarItem);
                     body.InsertAt(3, divider);
+#if COI_UPDATE_4_3
+                    planarItem.Update(); outerItem.Update(); innerItem.Update();
+#else
                     if (sm != null) { planarItem.Update(sm); outerItem.Update(sm); innerItem.Update(sm); }
+#endif
 
                     s_toolboxes[(int)capturedToolType] = (toolbox, planarItem, outerItem, innerItem, buttonsField);
                     LogDebug($"K-mode buttons (outer+inner+planar) injected into {capturedToolType} toolbox.");
