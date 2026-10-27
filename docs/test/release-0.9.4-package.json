@@ -1,0 +1,126 @@
+{
+  "version": "0.9.4",
+  "preparationCommit": "13ce44ba282db29a3e3878b2ee274697298ebc94",
+  "helpersCommit": "f216feac5684447bac8adff43f98f0a6ccafe6e5",
+  "branch": "main",
+  "package": "AutoTerrainDesignations-0.9.4.zip",
+  "bytes": 2262638,
+  "sha256": "F773750E538FD541A0B101CD331311F96A877A0E582EC92F4AD314A17FE3AE11",
+  "gameVersions": [
+    "0.8.7d",
+    "0.8.8"
+  ],
+  "compatibilityScope": "Technical/experimental Update 4.3 compatibility; extensive playtesting remains",
+  "publication": "Not published",
+  "verifiedInputs": [
+    {
+      "path": "0Harmony.dll",
+      "bytes": 2195456,
+      "sha256": "498EDE1D20A87AFAA6C7B1ED5B3BEB505B01DC418B952C1BE5C322204404B033"
+    },
+    {
+      "path": "AutoTerrainDesignations.Loader.dll",
+      "bytes": 10752,
+      "sha256": "FE4B7DF18BCBEB6E66A721BDB3ED35BCAC578F02229453A04298A702A9918168"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1063,
+      "sha256": "B94A282F8A6E25F57AB31097A7CCAA8EBC00976950B75AECB62A22E3F352022D"
+    },
+    {
+      "path": "Thumbnail.png",
+      "bytes": 40360,
+      "sha256": "939DB7732DBCD9FEBA40C82A32F4D2EEFBCCCF08C32DE0B9F8CC933713C08CF2"
+    },
+    {
+      "path": "changelog.txt",
+      "bytes": 34095,
+      "sha256": "E0A8CF4D9F4984C4C086A1779703E15B1378D6CCD6F6B066EC854B150CA61BB1"
+    },
+    {
+      "path": "config.json",
+      "bytes": 663,
+      "sha256": "46346F598FC181C51A6E767765BA8085DF8C8197F8A56E01CB94C209ADC853D4"
+    },
+    {
+      "path": "implementations/pre-update-4.3/AutoTerrainDesignations.dll",
+      "bytes": 1934848,
+      "sha256": "3F26229FA1BABA98B8FA3859D0EA398DFF64C0DAFBDC0D33E5E00D6463441F4B"
+    },
+    {
+      "path": "implementations/update-4.3/AutoTerrainDesignations.dll",
+      "bytes": 1936384,
+      "sha256": "7662C737B49E556DA3FA9E5365D287E2D8D4DE4C86DBF27B3034F68630F9ACE7"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 3081,
+      "sha256": "C662BEC35E31E51D95B1CF17627E88272339DAEE8FEA603E32E2E2D02DC55DEF"
+    },
+    {
+      "path": "readme.md",
+      "bytes": 4535,
+      "sha256": "3AEC667419D5B4F1169E5A0D2B8F0FB953DBE98CBD4D8428A33BC4F1F0C0A3C2"
+    },
+    {
+      "path": "translations/de.json",
+      "bytes": 29757,
+      "sha256": "3B8969005D2F5A9AA2A51108AA295A90D69AA7E4E62D33315347283A55898E2E"
+    },
+    {
+      "path": "translations/en.json",
+      "bytes": 27592,
+      "sha256": "CB3A4D3E3A779AE301C5250B01A5085FD398C380998D3BE3D0F90B2445E00412"
+    },
+    {
+      "path": "translations/es.json",
+      "bytes": 30436,
+      "sha256": "784A2FA2F7D4AD366C27FFCDC0670F65244C72CD19418B62955A4B64DE8FE7D7"
+    },
+    {
+      "path": "translations/it.json",
+      "bytes": 30317,
+      "sha256": "594E710446A6FD8D96FD458C8B83BF366D74708B415B68D500BCE7EBC5945221"
+    },
+    {
+      "path": "translations/ko.json",
+      "bytes": 31230,
+      "sha256": "9E07061A9B7D646FF429445379C109EDEF5D712CDF3CDC1EA0DEAB058925E124"
+    },
+    {
+      "path": "translations/pt.json",
+      "bytes": 29968,
+      "sha256": "4291FE5D26DA797E6809E2A1B2588B58579DCF68148795834204182A8A2449D8"
+    },
+    {
+      "path": "translations/ru.json",
+      "bytes": 46013,
+      "sha256": "FAC2A07CB8D03579AE8535DC19AB18F4B3FA14B24034490E1D8BA78EB2A306E1"
+    },
+    {
+      "path": "translations/sv.json",
+      "bytes": 28264,
+      "sha256": "52F16E623299C6B570AC56C5F56C6D1334D51EDC32768740F3C51897944327C8"
+    },
+    {
+      "path": "translations/zh.json",
+      "bytes": 25836,
+      "sha256": "6BDA4861A30ECF42909030606AD5C49276CC8B752D86545E41B07757EE9E25B6"
+    }
+  ],
+  "entries": 19,
+  "runtimeLocales": 9,
+  "verification": {
+    "zipCrc": "pass",
+    "portableUniquePaths": "pass",
+    "reviewedManifest": "pass",
+    "selectorAndBothImplementations": "pass",
+    "byteEqualityWithInstalledAndReleaseStaging": "pass",
+    "localeKeysAndPlaceholders": "pass",
+    "gameReferencesAndReleaseGating": "pass",
+    "nativeReleaseSelectorFixtureBothVersions": "pass",
+    "fullGameSaveLoadingBothVersions": "owner-confirmed",
+    "extensivePlaytesting": "remaining"
+  }
+}
