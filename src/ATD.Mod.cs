@@ -775,7 +775,6 @@ public static string Tt(string text) => text;
             AutoDepthDesignation.SetModRootDirectoryPath(
                 Manifest.RootDirectoryPath);
             AutoDepthDesignation.s_log.RegisterAutoConsoleMirroring(this, resolver.Resolve<IGameLoopEvents>(), resolver.Resolve<GameConsoleCommandsExecutor>());
-            ModDebugWebApi.Register(this, resolver, "[ATD]");
             AutoTerrainDesignationsTicker.DestroyActive();
 
             RegisterAutoHelpersLocalizationLateApply(resolver);
