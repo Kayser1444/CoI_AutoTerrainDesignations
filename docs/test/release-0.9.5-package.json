@@ -11,7 +11,7 @@
     "0.8.8 b625"
   ],
   "earlierUpdate43Builds": "not supported by this payload",
-  "publication": "Packaged; not uploaded",
+  "publication": "Released on CoI Hub; confirmed by owner and verified on 2026-11-01",
   "verified": [
     "ZIP CRC, portable paths and exact allowlist",
     "Every package entry byte-matches isolated build inputs",
@@ -39,5 +39,7 @@
     "translations/ru.json": "54DEBD0E99E1846E52E573FB0D88E83538BCC462E38698E43775307269473D80",
     "translations/sv.json": "470C15150602377854C64E3044A63341719585E8076630DB75E69D6A37B1BA96",
     "translations/zh.json": "66AD5BAEDFDF36CF9A0A31C5B9FC6E565D37BF0557599909334C5C8282BE8799"
-  }
+  },
+  "hubUrl": "https://coigame.com/Mod/4",
+  "hubDownloadUrl": "https://coigame.com/Mod/DownloadMod/3507"
 }
