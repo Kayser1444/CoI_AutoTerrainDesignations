@@ -1,7 +1,7 @@
 {
   "mod": "AutoTerrainDesignations",
   "source_file": "src\\ATD.Localization.cs",
-  "total_keys": 198,
+  "total_keys": 210,
   "skip_keys": [
     "dtk.mod.name",
     "dtk.rate_limit.items_per_min",
@@ -9,6 +9,221 @@
     "dtk.settings.language.local",
     "dtk.settings.number_format.auto"
   ],
-  "keys": {},
-  "keys_needing_translation": 0
+  "keys": {
+    "panel.designations.max_layers.tooltip": {
+      "en": "Maximum layers to excavate from the surface. (∞ = no limit.)",
+      "context": "Tooltip for the max layers setting.",
+      "de": "Maximale Anzahl von Schichten, die von der Oberfläche abgetragen werden. (∞ = keine Begrenzung.)",
+      "es": "Capas máximas a excavar desde la superficie. (∞ = sin límite).",
+      "it": "Numero massimo di strati da scavare dalla superficie. (∞ = nessun limite.)",
+      "pt": "Máximo de camadas para escavar a partir da superfície. (∞ = sem limite.)",
+      "ru": "Максимальное количество слоёв для выемки от поверхности. При зажатой клавише «Shift», щёлчок переключит 5 слоёв (+/-), а при зажатой клавише «Ctrl», щёлчок переключит 10 слоёв (+/-).<br>(∞ = без ограничений.)",
+      "sv": "Maximalt antal lager att gräva ut från ytan. (∞ = ingen gräns.)",
+      "zh": "从地表开始计算的最大挖掘层数。(∞ = 无限制)",
+      "references": {
+        "de": {
+          "No limit": "Keine Begrenzung",
+          "Layers": "Ebenen"
+        },
+        "es": {
+          "No limit": "Sin límite",
+          "Layers": "Capas",
+          "Limit": "Límite"
+        },
+        "it": {
+          "No limit": "Nessun limite",
+          "Layers": "Livelli",
+          "Limit": "max"
+        },
+        "pt": {
+          "No limit": "Sem limite",
+          "Layers": "Camadas",
+          "Limit": "Limite"
+        },
+        "ru": {
+          "No limit": "Не ограничено",
+          "Layers": "Отображение",
+          "Limit": "Ограничить"
+        },
+        "sv": {
+          "No limit": "Ingen begränsning",
+          "Layers": "Översikt",
+          "Limit": "Gräns"
+        },
+        "zh": {
+          "No limit": "无限制",
+          "Layers": "资源层",
+          "Limit": "上限"
+        }
+      }
+    },
+    "panel.designations.elevation_limit.tooltip": {
+      "en": "Maximum (absolute) excavation depth (-∞ = no limit.)",
+      "context": "Tooltip for the elevation limit setting.",
+      "de": "Maximale (absolute) Abbauhöhe (-∞ = keine Begrenzung.)",
+      "es": "Profundidad máxima (absoluta) de excavación (-∞ = sin límite).",
+      "it": "Profondità massima (assoluta) di scavo (-∞ = senza limiti)",
+      "pt": "Profundidade máxima (absoluta) de escavação (-∞ = sem limite.)",
+      "ru": "Максимальная (абсолютная) глубина выемки. При зажатой клавише «Shift», щёлчок переключит 5 слоёв (+/-), а при зажатой клавише «Ctrl», щёлчок переключит 10 слоёв (+/-).<br>(-∞ = без ограничений.)",
+      "sv": "Maximal (absolut) grävnivå (-∞ = ingen gräns.)",
+      "zh": "最大(绝对)挖掘深度。(-∞ = 无限制)",
+      "references": {
+        "de": {
+          "No limit": "Keine Begrenzung"
+        },
+        "es": {
+          "No limit": "Sin límite",
+          "Limit": "Límite"
+        },
+        "it": {
+          "No limit": "Nessun limite",
+          "Limit": "max"
+        },
+        "pt": {
+          "No limit": "Sem limite",
+          "Limit": "Limite"
+        },
+        "ru": {
+          "No limit": "Не ограничено",
+          "Limit": "Ограничить"
+        },
+        "sv": {
+          "No limit": "Ingen begränsning",
+          "Limit": "Gräns"
+        },
+        "zh": {
+          "No limit": "无限制",
+          "Limit": "上限"
+        }
+      }
+    },
+    "panel.designations.ore_purity.tooltip": {
+      "en": "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality — skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters.",
+      "context": "Tooltip for the ore purity setting.",
+      "de": "Wie streng der Scan Geländesäulen nach Erzgehalt filtert. Dies sagt nicht voraus, welches Materialgemisch die Bagger fördern werden.\nAus: alle Felder einbeziehen, bis zur vollen Tiefe graben.\nNiedrig: sehr spärliche Felder ausschließen, dünne Erzreste am unteren Rand abschneiden.\nMittel: mäßiger Gehalt — Felder mit starker Deckschicht oder wenig Erz überspringen.\nHoch: nur reiche Felder mit sauberer Erzsäule.\nMax: die strengsten Filter für Deckschicht, Tiefe und Erzdichte anwenden.",
+      "es": "Con qué rigor filtra el escaneo las columnas de terreno según la calidad del mineral. No predice la mezcla de materiales que producirán las excavadoras.\nDesactivado: incluye todas las casillas y excava hasta la profundidad completa.\nBajo: excluye casillas con muy poco mineral y recorta las vetas finas restantes en el fondo.\nMedio: calidad moderada — omite casillas con mucha sobrecarga o poco mineral.\nAlto: solo casillas ricas con una columna de mineral limpia.\nMáx.: aplica los filtros más estrictos de sobrecarga, profundidad y densidad del mineral.",
+      "it": "Quanto rigorosamente la scansione filtra le colonne di terreno in base alla qualità del minerale. Non prevede la miscela di materiali che gli escavatori produrranno.\nOff: include tutte le caselle e scava fino alla profondità massima.\nBasso: esclude le caselle con pochissimo minerale ed elimina le sottili strisce di minerale sul fondo.\nMedio: qualità moderata — salta le caselle con molto materiale di copertura o poco minerale.\nAlto: solo caselle ricche con una colonna di minerale pulita.\nMassimo: applica i filtri più rigorosi per materiale di copertura, profondità e densità del minerale.",
+      "pt": "Com que rigor a varredura filtra as colunas de terreno pela qualidade do minério. Isso não prevê a mistura de materiais que as escavadeiras produzirão.\nDesligado: inclui todos os quadrados e escava até a profundidade total.\nBaixo: exclui quadrados com pouquíssimo minério e apara os veios finos restantes no fundo.\nMédio: qualidade moderada — pula quadrados com muita cobertura ou pouco minério.\nAlto: apenas quadrados ricos com uma coluna de minério limpa.\nMáx.: aplica os filtros mais rigorosos de cobertura, profundidade e densidade do minério.",
+      "ru": "Насколько строго сканирование фильтрует столбцы грунта по качеству руды. Это не предсказывает состав материалов, которые добудут экскаваторы.\nОтключено: включать все клетки, копать на полную глубину.\nНизкое: исключать клетки с очень малым количеством руды, обрезать тонкие остатки руды снизу.\nСреднее: умеренное качество — пропускать клетки с большим слоем пустой породы или малым количеством руды.\nВысокое: только богатые клетки с чистым рудным столбом.\nМаксимум: применять самые строгие фильтры по слою пустой породы, глубине и плотности руды.",
+      "sv": "Hur strikt skanningen filtrerar terrängkolumner efter malmhalt. Detta förutsäger inte vilken materialblandning grävmaskinerna kommer att producera.\nAv: inkludera alla rutor, gräv till fullt djup.\nLåg: uteslut mycket glesa rutor, trimma tunna malmrester längst ned.\nMedel: måttlig halt — hoppa över rutor med mycket överlagring eller lite malm.\nHög: endast rika rutor med en ren malmkolumn.\nMax: tillämpa de striktaste filtren för överlagring, djup och malmdensitet.",
+      "zh": "扫描时根据矿石品质筛选地形柱的严格程度。此设置不预测挖掘机将产出的材料混合比例。\n关闭：包括所有地格，挖掘至完整深度。\n低：排除矿石极少的地格，裁去底部残留的薄矿层。\n中：中等品质 — 跳过覆盖层较厚或矿石较少的地格。\n高：仅保留矿石丰富且矿柱干净的地格。\n最大：对覆盖层、深度和矿石密度应用最严格的筛选。",
+      "references": {
+        "de": {
+          "All": "Alle",
+          "Off": "Aus",
+          "Excavator": "Bagger",
+          "High": "Hoch",
+          "Low": "Niedrig",
+          "AND": "UND",
+          "Skip": "Überspringen",
+          "Max": "Maximum",
+          "Full": "Voll",
+          "tiles": "Felder"
+        },
+        "es": {
+          "All": "Todos",
+          "Off": "Apagado",
+          "Excavator": "Excavadora",
+          "High": "Alto",
+          "Low": "Bajo",
+          "AND": "Y",
+          "Max": "Máximo",
+          "Skip": "Saltar",
+          "Full": "Lleno",
+          "tiles": "casillas"
+        },
+        "it": {
+          "All": "Tutti",
+          "Excavator": "Escavatore",
+          "High": "Alta",
+          "Low": "Bassa",
+          "AND": "E",
+          "Off": "Disattivo",
+          "Skip": "Salta",
+          "Full": "Pieno",
+          "tiles": "caselle"
+        },
+        "pt": {
+          "All": "Todos",
+          "Off": "Desligado",
+          "Excavator": "Escavadeira grande",
+          "High": "Alto",
+          "Low": "Baixo",
+          "AND": "E",
+          "Max": "Máx",
+          "Skip": "Pular",
+          "Full": "Cheio",
+          "tiles": "quadrados"
+        },
+        "ru": {
+          "All": "Все",
+          "Off": "Отключено",
+          "Excavator": "Экскаватор",
+          "High": "Высокая",
+          "Low": "Низкая",
+          "AND": "И",
+          "Max": "Всё время",
+          "Skip": "Пропустить",
+          "Full": "Полный",
+          "tiles": "плиток"
+        },
+        "sv": {
+          "All": "Alla",
+          "Off": "Av",
+          "Excavator": "Grävmaskin",
+          "High": "Hög",
+          "Low": "Låg",
+          "AND": "OCH",
+          "Skip": "Hoppa över",
+          "tiles": "rutor"
+        },
+        "zh": {
+          "All": "所有",
+          "Off": "关闭",
+          "Excavator": "挖掘机",
+          "High": "高",
+          "Low": "低",
+          "Max": "最大",
+          "Skip": "跳过",
+          "Full": "满载",
+          "tiles": "格"
+        }
+      }
+    },
+    "panel.ore.prompt_scan": {
+      "en": "Press ↺ to scan ore composition.",
+      "context": "Prompt shown before a scan is run.",
+      "de": "↺ drücken, um die Erzzusammensetzung zu scannen.",
+      "es": "Pulsa ↺ para escanear la composición del mineral.",
+      "it": "Premi ↺ per analizzare la composizione del minerale.",
+      "pt": "Pressione ↺ para escanear a composição do minério.",
+      "ru": "Нажмите ↺, чтобы просканировать состав руды.",
+      "sv": "Tryck ↺ för att skanna malmsammansättning.",
+      "zh": "按下 ↺ 以分析矿石组成。",
+      "references": {
+        "de": {
+          "Composition": "Zusammensetzung"
+        },
+        "es": {
+          "Composition": "Composición"
+        },
+        "it": {
+          "Composition": "Composizione"
+        },
+        "pt": {
+          "Composition": "Composição"
+        },
+        "ru": {
+          "Composition": "Состав"
+        },
+        "sv": {
+          "Composition": "Komposition"
+        },
+        "zh": {
+          "Composition": "成分"
+        }
+      }
+    }
+  },
+  "keys_needing_translation": 4
 }

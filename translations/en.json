@@ -137,7 +137,7 @@
   ],
   [
     "panel.designations.max_layers.tooltip",
-    "Maximum layers to excavate from the surface. (u221e = no limit.)"
+    "Maximum layers to excavate from the surface. (∞ = no limit.)"
   ],
   [
     "panel.designations.elevation_limit.label",
@@ -145,7 +145,7 @@
   ],
   [
     "panel.designations.elevation_limit.tooltip",
-    "Maximum (absolute) excavation depth (-u221e = no limit.)"
+    "Maximum (absolute) excavation depth (-∞ = no limit.)"
   ],
   [
     "panel.designations.ore_purity.label",
@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality u2014 skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters."
+    "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality — skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters."
   ],
   [
     "settings.ore_quality.value_tooltip",
@@ -661,7 +661,7 @@
   ],
   [
     "panel.ore.prompt_scan",
-    "Press u21ba to scan ore composition."
+    "Press ↺ to scan ore composition."
   ],
   [
     "panel.ore.scan_tooltip",

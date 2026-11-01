@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "O quão rigorosamente o scan filtra a qualidade do minério.\nDesligado: incluir todos os tiles, escavar até a profundidade total.\nBaixo: excluir tiles muito esparsos, aparar minério fino no fundo.\nMédio: qualidade moderada — pular tiles com muita sobrecarga ou pouco minério.\nAlto: apenas tiles ricos com uma coluna de minério limpa.\nMáx: minério quase puro — rigoroso com sobrecarga, profundidade e densidade do minério."
+    "Com que rigor a varredura filtra as colunas de terreno pela qualidade do minério. Isso não prevê a mistura de materiais que as escavadeiras produzirão.\nDesligado: inclui todos os quadrados e escava até a profundidade total.\nBaixo: exclui quadrados com pouquíssimo minério e apara os veios finos restantes no fundo.\nMédio: qualidade moderada — pula quadrados com muita cobertura ou pouco minério.\nAlto: apenas quadrados ricos com uma coluna de minério limpa.\nMáx.: aplica os filtros mais rigorosos de cobertura, profundidade e densidade do minério."
   ],
   [
     "settings.ore_quality.value_tooltip",

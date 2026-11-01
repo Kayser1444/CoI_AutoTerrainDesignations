@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "Wie streng der Scan nach Erzgehalt filtert.\nAus: alle Felder einbeziehen, bis zur vollen Tiefe graben.\nNiedrig: sehr spärliche Felder ausschließen, dünne Erzreste am unteren Rand abschneiden.\nMittel: mäßiger Gehalt — Felder mit starker Deckschicht oder wenig Erz überspringen.\nHoch: nur reiche Felder mit sauberer Erzsäule.\nMax: nur nahezu reines Erz — streng bei Deckschicht, Tiefe und Erzdichte."
+    "Wie streng der Scan Geländesäulen nach Erzgehalt filtert. Dies sagt nicht voraus, welches Materialgemisch die Bagger fördern werden.\nAus: alle Felder einbeziehen, bis zur vollen Tiefe graben.\nNiedrig: sehr spärliche Felder ausschließen, dünne Erzreste am unteren Rand abschneiden.\nMittel: mäßiger Gehalt — Felder mit starker Deckschicht oder wenig Erz überspringen.\nHoch: nur reiche Felder mit sauberer Erzsäule.\nMax: die strengsten Filter für Deckschicht, Tiefe und Erzdichte anwenden."
   ],
   [
     "settings.ore_quality.value_tooltip",

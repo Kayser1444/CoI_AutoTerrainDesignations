@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "Qué tan estrictamente filtra el escaneo la calidad del mineral.\nDesactivado: incluye todas las casillas, excava hasta la profundidad completa.\nBajo: excluye casillas muy dispersas, recorta vetas finas restantes en el fondo.\nMedio: calidad moderada — omite casillas con mucha sobrecarga o poco mineral.\nAlto: solo casillas ricas con una columna de mineral limpia.\nMáx.: mineral casi puro — estricto con la sobrecarga, la profundidad y la densidad del mineral."
+    "Con qué rigor filtra el escaneo las columnas de terreno según la calidad del mineral. No predice la mezcla de materiales que producirán las excavadoras.\nDesactivado: incluye todas las casillas y excava hasta la profundidad completa.\nBajo: excluye casillas con muy poco mineral y recorta las vetas finas restantes en el fondo.\nMedio: calidad moderada — omite casillas con mucha sobrecarga o poco mineral.\nAlto: solo casillas ricas con una columna de mineral limpia.\nMáx.: aplica los filtros más estrictos de sobrecarga, profundidad y densidad del mineral."
   ],
   [
     "settings.ore_quality.value_tooltip",

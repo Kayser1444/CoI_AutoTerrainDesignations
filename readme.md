@@ -48,6 +48,8 @@ Leave a :heart: if you found this mod useful.
 - [Runtime State and Save-Detached Attachments](docs/dev/done/runtime-state.md)
 
 ## Installation
+
+Update 4.3 compatibility remains **technical and experimental**, with extensive gameplay testing still outstanding. On Update 4.3, update the game to **Build 625** before using ATD 0.9.5. The download retains a separate legacy implementation for 0.8.7d.
 - Download the latest version of the mod from GitHub Releases
 - Extract the mod folder into your Captain of Industry mods directory (`%AppData%\Captain of Industry\Mods`)
 - Enable the mod when loading or starting a new game

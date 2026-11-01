@@ -1,3 +1,9 @@
+v0.9.5 | 2026-11-01
+
+* Fixed: Repeated truck logistics errors after updating Captain of Industry to Update 4.3 Build 625
+* This is a technical, experimental compatibility fix; extensive gameplay testing of the entire Update 4.3 patch remains outstanding
+* Update 4.3 users must update the game to Build 625; the package also retains the separate legacy implementation for 0.8.7d
+
 v0.9.4 | 2026-10-27
 
 * This release provides technical/experimental compatibility with Captain of Industry Update 4.3 (0.8.8), while retaining support for 0.8.7d; extensive playtesting remains

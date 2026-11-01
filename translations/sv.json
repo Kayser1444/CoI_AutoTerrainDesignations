@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "Hur strikt skanningen filtrerar efter malmhalt.\nAv: inkludera alla rutor, gräv till fullt djup.\nLåg: uteslut mycket glesa rutor, trimma tunna malmrester längst ned.\nMedel: måttlig halt — hoppa över rutor med mycket överlagring eller lite malm.\nHög: endast rika rutor med en ren malmkolumn.\nMax: nästan ren malm — strikt på överlagring, djup och malmdensitet."
+    "Hur strikt skanningen filtrerar terrängkolumner efter malmhalt. Detta förutsäger inte vilken materialblandning grävmaskinerna kommer att producera.\nAv: inkludera alla rutor, gräv till fullt djup.\nLåg: uteslut mycket glesa rutor, trimma tunna malmrester längst ned.\nMedel: måttlig halt — hoppa över rutor med mycket överlagring eller lite malm.\nHög: endast rika rutor med en ren malmkolumn.\nMax: tillämpa de striktaste filtren för överlagring, djup och malmdensitet."
   ],
   [
     "settings.ore_quality.value_tooltip",

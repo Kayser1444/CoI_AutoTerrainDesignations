@@ -153,7 +153,7 @@
   ],
   [
     "panel.designations.ore_purity.tooltip",
-    "Livello di rigore dei filtri di scansione per la qualità del minerale.\nOff: include tutte le caselle, scava fino alla profondità massima.\nBasso: esclude le caselle molto rade, elimina le sottili strisce di minerale sul fondo.\nMedio: qualità moderata — salta le caselle con molto materiale di copertura o poco minerale.\nAlto: solo caselle ricche con una colonna di minerale pulita.\nMassimo: solo minerale quasi puro — rigoroso su materiale di copertura, profondità e densità del minerale."
+    "Quanto rigorosamente la scansione filtra le colonne di terreno in base alla qualità del minerale. Non prevede la miscela di materiali che gli escavatori produrranno.\nOff: include tutte le caselle e scava fino alla profondità massima.\nBasso: esclude le caselle con pochissimo minerale ed elimina le sottili strisce di minerale sul fondo.\nMedio: qualità moderata — salta le caselle con molto materiale di copertura o poco minerale.\nAlto: solo caselle ricche con una colonna di minerale pulita.\nMassimo: applica i filtri più rigorosi per materiale di copertura, profondità e densità del minerale."
   ],
   [
     "settings.ore_quality.value_tooltip",
