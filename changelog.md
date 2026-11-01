@@ -1,5 +1,9 @@
 v0.9.5 [unreleased]
 
+- Experimental technical fix for Update 4.3 Build 625: rebuild against the changed DumpingJob.Factory.EnqueueJob product signature. The owner reports no further exceptions after rebuilding; extensive gameplay testing of the entire 4.3 compatibility patch remains outstanding. The Update 4.3 payload targets Build 625, not earlier 4.3 builds; retain the separate 0.8.7d payload.
+
+- Release preparation refreshed four pending translation-source entries, correcting escaped English symbols and aligning ore-quality tooltip translations with current source semantics; no gameplay behavior changed.
+
 v0.9.4 [released]
 
 - Release scope: technical/experimental compatibility with Captain of Industry Update 4.3 (0.8.8), retaining support for 0.8.7d. Extensive playtesting remains; successful startup and focused checks do not certify extended gameplay.
