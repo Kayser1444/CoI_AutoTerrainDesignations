@@ -1,0 +1,43 @@
+{
+  "version": "0.9.5",
+  "preparationCommit": "57d180eef9e126d9674175a82b5b14aba9d50ef0",
+  "helpersCommit": "e5afbdd7ceccbc9a0e052405aec829c1646d6cd5",
+  "package": "AutoTerrainDesignations-0.9.5.zip",
+  "bytes": 2307892,
+  "sha256": "3C1B744B52902261387E88B4EDA4E36235308C72F3F12D7FDEB95311CFA1C746",
+  "scope": "Experimental technical fix; extensive gameplay testing of the entire Update 4.3 patch remains outstanding",
+  "gameBuilds": [
+    "0.8.7d b619",
+    "0.8.8 b625"
+  ],
+  "earlierUpdate43Builds": "not supported by this payload",
+  "publication": "Packaged; not uploaded",
+  "verified": [
+    "ZIP CRC, portable paths and exact allowlist",
+    "Every package entry byte-matches isolated build inputs",
+    "Manifest version, save flags, primary DLLs and experimental notice",
+    "All nine locale bundles: 210 keys and matching numeric placeholders",
+    "Legacy b619 and current b625 Release payloads and selector: nested member references, assembly versions and optimization checks passed"
+  ],
+  "entrySha256": {
+    "0Harmony.dll": "498EDE1D20A87AFAA6C7B1ED5B3BEB505B01DC418B952C1BE5C322204404B033",
+    "AutoTerrainDesignations.Loader.dll": "8BFAFC65916C5131FA45B55559AF4C7BEC00660256540C05C52CD164BC444931",
+    "LICENSE": "B94A282F8A6E25F57AB31097A7CCAA8EBC00976950B75AECB62A22E3F352022D",
+    "Thumbnail.png": "939DB7732DBCD9FEBA40C82A32F4D2EEFBCCCF08C32DE0B9F8CC933713C08CF2",
+    "changelog.txt": "2815E9D8F1B15FFF30B677FD2E249E66167C71926C30BE58F843CB73E3C960A5",
+    "config.json": "D3ED146C6AD01D43276822AEBD846A37F869F1A342DFE12D89CA27F041D296AD",
+    "implementations/pre-update-4.3/AutoTerrainDesignations.dll": "7042E3FA93D10C03123523E46452FD8779739B1C9231C0E48FB160A4027792BF",
+    "implementations/update-4.3/AutoTerrainDesignations.dll": "5087E5CA634417089A247F6606F2927BA28603C83BA377F5FA7671C1329D6191",
+    "manifest.json": "5F21745EF5EFDDF1FA3308BDDC9732736E5E787B49F13CFFE6154C652607475B",
+    "readme.md": "2D95E2DC497026C73CF7A963ACC249FAD2918F985698917B06CDBDAABE7D3AE8",
+    "translations/de.json": "661C924F9EB8C69046DA87338C64C5B9B8EFFEB1C1309E83A2DBFD11C980280D",
+    "translations/en.json": "DF3C37C7B4A7C62F4E4CA4F6A22B7B1C00CE171B21AF1ACC5BD929583212EB08",
+    "translations/es.json": "DA9D2C24918C10578D0E0923A4B11EF27F94520C95AEABB849A73896446177F5",
+    "translations/it.json": "81541B44C8BC274DF0C6022DAF8A57DF8C359FDAED218C0806718A0F3485EF72",
+    "translations/ko.json": "FDE4690149BBC90DDD3B3ADC70DA8335CBE4E4ADC7E10CB9151278B3E93A5527",
+    "translations/pt.json": "72EF02E39C562455DB825B516A0C75C7E7134B8A438B4A12171050768DA2EDEE",
+    "translations/ru.json": "54DEBD0E99E1846E52E573FB0D88E83538BCC462E38698E43775307269473D80",
+    "translations/sv.json": "470C15150602377854C64E3044A63341719585E8076630DB75E69D6A37B1BA96",
+    "translations/zh.json": "66AD5BAEDFDF36CF9A0A31C5B9FC6E565D37BF0557599909334C5C8282BE8799"
+  }
+}

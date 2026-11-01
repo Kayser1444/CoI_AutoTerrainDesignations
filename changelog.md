@@ -1,4 +1,4 @@
-v0.9.5 [unreleased]
+v0.9.5 [packaged]
 
 - Experimental technical fix for Update 4.3 Build 625: rebuild against the changed DumpingJob.Factory.EnqueueJob product signature. The owner reports no further exceptions after rebuilding; extensive gameplay testing of the entire 4.3 compatibility patch remains outstanding. The Update 4.3 payload targets Build 625, not earlier 4.3 builds; retain the separate 0.8.7d payload.
 
