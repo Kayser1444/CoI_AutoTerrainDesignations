@@ -336,7 +336,7 @@ v0.5.12 [released]
 * Improved: The idle truck behavior tooltip now shows a clickable soft-released truck card; clicking it cycles through and pans to the released trucks.
 * Improved: The excavator idle-release tooltip now shows a clickable card for soft-released excavators.
 
-v0.5.11 [released]
+v0.5.11 [packaged]
 
 * Fixed: Right Alt keybindings no longer capture the keyboard layout's synthetic Ctrl and AltGr aliases.
 * Fixed: Settings migration now promotes legacy turning-ramp values to the enabled default without disabling users who already enabled experimental accessways; the revision-2 downgrade is repaired on the next launch.
@@ -346,7 +346,7 @@ v0.5.11 [released]
 * Improved: Request-scoped fixed-provider ground graph preparation reuses immutable snapshot topology and incrementally updates goal distances, reducing preparation time for existing provider networks.
 * Added: Deterministic access fixtures run during world initialization and fail managed access preparation closed if a core access invariant regresses.
 
-v0.5.10 [released]
+v0.5.10 [packaged]
 
 * Added: Manual Planar corner designations with four rotations, preview/drag support, a dedicated diagonal-plane toolbar icon, and K-key cycling alongside outer and inner corners.
 * Changed: Ordered the corner toolbar buttons and K-cycle as Outer, Inner, Planar; the Planar icon is now an embedded SVG rendered as a tintable runtime icon.
@@ -619,7 +619,7 @@ v0.4.5a | 2026-06-21
 * Changed: accessway placement rematerializes against the unchanged search snapshot instead of rebuilding an identical snapshot immediately before placement; successful placement remains transactional and the next cluster receives a fresh snapshot
 * Updated: access framework, pathfinding design, roadmap, English localization, and Chinese localization for the refined V1 behavior and settings limits
 
-v0.4.4 | 2026-06-20 [released]
+v0.4.4 | 2026-06-20 [packaged]
 * Added: **Experimental turning & switchback accessways** (least-work corridor pathfinding) for mine towers, enabled by default (only active when the tower's **Ramp Width** setting is set to 1) 
   - Uses a new 2.5D pathfinding search (supports reference Dijkstra and optimized A*) over the terrain heightfield to evaluate and select the cheapest access route
   - Automatically plans and places multi-directional, turning, and switchback corridors using vanilla flat and slope designations (requires a tower ramp width of 1; corridor clearance remains independent)
@@ -642,10 +642,10 @@ v0.4.3 | 2026-06-06
 * Added **bottomFlatteningStrength** global setting (1–10, default 5): controls which depth-percentile of each connected ore component is used as the flattening target during the bottom-flattening pass; 1 = mildest (90th-percentile depth, few tiles adjusted), 5 = median (default behavior), 10 = strongest (deepest tile, everything pulled down); configurable via `ATDsettings.json` or the new **atd_set_bottom_flattening_strength** console command
 * Changed: farming access ramps to back-row farmland clusters now lay a flat 1-cell bridge at the neighbor cluster's target z instead of a wedge climbing back to surface; clusters are processed closest-to-tower first with a fixpoint outer loop so each cluster can become reachable through previously-placed ramps and bridges, and `TryPlaceRamp` now references the mouth-approach designation's target z when the approach lands inside another non-ramp designation, producing a flat body row that designates the gap to the shared target z (true bridge) rather than wedging up to the unmodified surface
 
-v0.4.2c | 2026-05-30 [released]
+v0.4.2c | 2026-05-30 [packaged]
 * Added: **Farm Placement Assist** (experimental): when a farm building is placed inside a mine tower area, ATD intercepts the placement, automatically injects flat leveling designations for each tile the farm covers, and replays the placement once the site is fully prepared; farms placed on uneven or infertile terrain inside a tower area are handled without any manual designation step
 
-v0.4.2b | 2026-05-29 [released]
+v0.4.2b | 2026-05-29 [packaged]
 * Fixed: farming preparation access ramp was not generated when terrain was entirely above the designation target level (all-red perimeter on a fresh excavation pad); a physical-fallback BFS collected perimeter target tiles for all designations regardless of readiness and concluded the cluster was accessible from surrounding ground-level terrain; removing the fallback causes an empty target-tile set to correctly mark the cluster as inaccessible and trigger ramp placement
 * Fixed: farming filling access ramp was not generated for fill designations placed above current terrain; the vehicle-work readiness check used the mining fulfillment bitmap for both the preparation and filling passes; fresh fill designations have the mining bit set (terrain ≤ target) but the dumping bit unset, so the check incorrectly concluded the cluster was ready; the filling pass now gates on `IsReadyToDumpNonAmphibious()`, matching the vanilla truck dispatch condition, and correctly marks an unstarted fill cluster as inaccessible until a ramp is in place
 * Changed: ore composition cards now use the game's speckled panel background (matching the AFD forestry information panel style) and increased card padding from 4 to 6 pt
@@ -699,7 +699,7 @@ v0.4.0k | 2026-05-17
 * Fixed: one truck was always kept assigned to the tower during filling due to a leftover guard; all empty assigned trucks are now released when filling begins
 * Fixed: tiles already farmable at analysis time were set directly to the `Done` phase instead of `ReadyForFilling`; because filling only starts when at least one `ReadyForFilling` origin exists, those tiles were stuck hidden permanently with no way to trigger filling; analysis-time farmable tiles now enter `ReadyForFilling` so filling starts normally and the filling pass confirms them as `Done`
 
-v0.4.0j | 2026-05-17 [released]
+v0.4.0j | 2026-05-17 [packaged]
 * Added diagonal corner rim alignment designations: when both adjacent cardinal rim designations are placed and both outward probe tiles pass the height criteria, a corner rim is placed at the diagonal position to close the corner of the fill area
 * Fixed: completed farming origins (Done phase, designation restored after a previous fill cycle) were not re-hidden when a new adjacent preparation designation was placed; dirt sliding from the z tile into the z-1 preparation area caused the Done origin's terrain to drop, triggering trucks to continuously refill it while excavators dug it out again; Done origins adjacent to any active preparation designation are now re-hidden and will be restored together with the new tiles during the filling phase
 * Fixed: ramp failure/truncated notifications were not cleared when **Ramp Width** was set to 0; a stale notification from a previous scan could remain on the tower after re-scanning with ramp generation disabled
@@ -718,7 +718,7 @@ v0.4.0i | 2026-05-16
 v0.4.0h | 2026-05-16
 * Removed ramp warning icon from the **Terrain Designations** panel; ramp outcome warnings are now shown through the vanilla notification system
 
-v0.4.0g | 2026-05-16 [released]
+v0.4.0g | 2026-05-16 [packaged]
 * Farming automation performance pass for large auto-reactivated farming sessions:
     - Added throttling for farming access/pathability rechecks so thousand-origin sessions do not repeatedly run the expensive access scan every few ticks when designation state has not changed
     - Cached pending farming fill-area tile sets and rebuild them only when queued filling origins, shoulders, rims, or origin state changes
@@ -727,7 +727,7 @@ v0.4.0g | 2026-05-16 [released]
     - Added `tools/extract-atd-farming-perf.ps1` to extract relevant ATD farming performance rows from the newest Captain of Industry log
 * Findings from tester save: initial multi-second farming preparation freezes were reduced substantially; remaining slow rows are mostly access/ramp handling on very large unreachable farming areas, not origin analysis
 
-v0.4.0f | 2026-05-16 [released]
+v0.4.0f | 2026-05-16 [packaged]
 * Added **Auto-release when idle** toggle in the Terrain Designations panel: when enabled for a tower, all excavators and trucks are unassigned while none of the tower's managed mining or leveling designations have pending excavation work; released vehicles are tracked and automatically re-assigned when excavation work resumes
     - Global default is controlled by **autoReleaseVehiclesWhenIdle** in ATDsettings.json (default: false); the per-tower toggle in the inspector overrides this default
 * Added diagonal corner preparation shoulders: when both adjacent cardinal shoulders are needed, a corner shoulder is placed at the diagonal position with 3 outer corners at z-2 and the inner corner (facing the farming origin) at z-1
@@ -742,7 +742,7 @@ v0.4.0e | 2026-05-15
 * Added **rampNotificationsEnabled** global setting: suppresses ramp access warning notifications (Failed, Truncated, NotAccessible) on all towers; toggle in **ATDsettings.json** or with **atd_set_ramp_notifications on|off**
 * Added **farmingPanelCollapsed** global setting: the **Farmland Preparation** inspector panel now starts collapsed by default; toggle in **ATDsettings.json** or with **atd_set_farming_panel_collapsed on|off**
 
-v0.4.0d | 2026-05-15 [released]
+v0.4.0d | 2026-05-15 [packaged]
 * When multiple farming designation clusters are inaccessible at the same time, access ramps are now placed for all clusters in the same tick instead of one per tick; applies to both preparation and filling phases
 * Fixed: access ramps could overlap previously placed ramps from the same or another session, or land on any other existing designation
 * Fixed: shoulder designations could be placed on hidden (completed) farming origins belonging to another tower's session, potentially corrupting its designation tracking
