@@ -32,6 +32,15 @@ ATD-specific save-removability and notification constraints:
 
 ## Agent skills
 
+### Decompile and compatibility
+
+Use `$decompile` for reference refreshes and compatibility comparison reports.
+The maintained skill source is `tools/skills/decompile/SKILL.md`; tooling lives
+under `tools/compatibility/`. Read that source directly if skill discovery has
+not refreshed. The workflow cross-checks the official API Markdown diff,
+decompiled private APIs, Debug builds and compiled references. Decompilation
+does not by itself authorize verified-version metadata or changelog claims.
+
 ### Issue tracker
 
 Issues and PRDs are tracked in this repository's GitHub Issues. See

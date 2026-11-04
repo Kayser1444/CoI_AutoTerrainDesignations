@@ -1,842 +1,842 @@
 [
   [
-    "panel.atd.vehicles.show_unowned",
+    "AutoTerrainDesignations.ShowUnownedVehicles",
     "Show unlocked vehicle types you do not own so you can order them from this tower. Owned vehicles and this tower's queued orders are always shown."
   ],
   [
-    "panel.atd.vehicles.hide_unowned",
+    "AutoTerrainDesignations.HideUnownedVehicles",
     "Hide vehicle types you do not own. Owned vehicles and this tower's queued orders remain visible."
   ],
   [
-    "settings.world.default_mine.label",
+    "AutoTerrainDesignations.SettingsDefaultMineLabel",
     "Unassigned excavators excavate"
   ],
   [
-    "settings.world.default_mine.tooltip",
+    "AutoTerrainDesignations.SettingsDefaultMineTooltip",
     "Unassigned excavators excavate terrain designations outside Mine Tower areas."
   ],
   [
-    "common.level.off",
+    "AutoTerrainDesignations.LevelOff",
     "Off"
   ],
   [
-    "common.level.low",
+    "AutoTerrainDesignations.LevelLow",
     "Low"
   ],
   [
-    "common.level.med",
+    "AutoTerrainDesignations.LevelMed",
     "Med"
   ],
   [
-    "common.level.high",
+    "AutoTerrainDesignations.LevelHigh",
     "High"
   ],
   [
-    "common.level.max",
+    "AutoTerrainDesignations.LevelMax",
     "Max"
   ],
   [
-    "panel.designations.title",
+    "AutoTerrainDesignations.DesigTitle",
     "Mining designations"
   ],
   [
-    "panel.designations.description",
+    "AutoTerrainDesignations.DesigDescription",
     "Create automatic terrain designations for this tower."
   ],
   [
-    "panel.designations.create_button",
+    "AutoTerrainDesignations.DesigCreateBtn",
     "Create Designations"
   ],
   [
-    "panel.designations.create_tooltip",
+    "AutoTerrainDesignations.DesigCreateTip",
     "Scan and place mining designations in this tower's area."
   ],
   [
-    "panel.designations.debris_tooltip",
+    "AutoTerrainDesignations.DesigDebrisTip",
     "Request excavator removal of reachable debris through ATD's prop-removal manager. Existing designations are temporarily suspended and restored after removal. This button never spends Unity on Quick remove and follows Landscape to remove debris. Ctrl-click includes unreachable debris."
   ],
   [
-    "panel.designations.clear_tooltip",
+    "AutoTerrainDesignations.DesigClearTip",
     "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations."
   ],
   [
-    "panel.designations.clear_tooltip.shift_click",
+    "AutoTerrainDesignations.DesigClearTipWithShiftClick",
     "Clear this tower's ATD-generated terrain and tree-harvest designations. Shift-click to clear all terrain designations in the tower's area plus only this tower's generated tree-harvest designations."
   ],
   [
-    "panel.designations.ore_filter.auto",
+    "AutoTerrainDesignations.DesigOreFilterAuto",
     "AUTO"
   ],
   [
-    "panel.designations.accessway_mode.label",
+    "AutoTerrainDesignations.DesigAccesswayModeLabel",
     "Accessway mode"
   ],
   [
-    "settings.dumping_priority.label",
+    "AutoTerrainDesignations.DumpingPriorityLabel",
     "Dumping priority"
   ],
   [
-    "settings.dumping_priority.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityDescription",
     "Use vanilla import priorities 1–15 for active dumping; lower numbers are more urgent. Passive uses vanilla passive dumping and only imports from active exporters. Default: Passive. Farmland topsoil will always dump actively."
   ],
   [
-    "settings.dumping_priority.passive",
+    "AutoTerrainDesignations.DumpingPriorityPassiveLabel",
     "Passive"
   ],
   [
-    "settings.dumping_priority.passive.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityPassiveTooltip",
     "Only import from active exporters."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3",
+    "AutoTerrainDesignations.AccesswayModeLegacy3",
     "Legacy 3"
   ],
   [
-    "panel.designations.accessway_mode.legacy_4",
+    "AutoTerrainDesignations.AccesswayModeLegacy4",
     "Legacy 4"
   ],
   [
-    "panel.designations.accessway_mode.legacy_5",
+    "AutoTerrainDesignations.AccesswayModeLegacy5",
     "Legacy 5"
   ],
   [
-    "panel.designations.accessway_mode.off.tooltip",
+    "AutoTerrainDesignations.AccesswayModeOffTip",
     "Disable generated accessways and ramps."
   ],
   [
-    "panel.designations.accessway_mode.auto.tooltip",
+    "AutoTerrainDesignations.AccesswayModeAutoTip",
     "Use the largest excavator assigned or pre-assigned to this tower, then the largest excavator present on the map. With no excavators, AUTO behaves as OFF."
   ],
   [
-    "panel.designations.accessway_mode.t1.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT1Tip",
     "Generate routed accessways using T1 excavator pathability."
   ],
   [
-    "panel.designations.accessway_mode.t2.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT2Tip",
     "Generate routed accessways using T2 excavator pathability."
   ],
   [
-    "panel.designations.accessway_mode.t3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT3Tip",
     "Generate two-lane routed accessways using T3/Mega excavator pathability."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy3Tip",
     "Generate only a legacy straight ramp three designation cells wide, validated for T3/Mega excavators."
   ],
   [
-    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy4Tip",
     "Generate only a legacy straight ramp four designation cells wide, validated for T3/Mega excavators."
   ],
   [
-    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy5Tip",
     "Generate only a legacy straight ramp five designation cells wide, validated for T3/Mega excavators."
   ],
   [
-    "panel.designations.max_layers.label",
+    "AutoTerrainDesignations.DesigMaxLayersLabel",
     "Max layers to excavate"
   ],
   [
-    "panel.designations.max_layers.tooltip",
+    "AutoTerrainDesignations.DesigMaxLayersTip",
     "Maximum layers to excavate from the surface. (∞ = no limit.)"
   ],
   [
-    "panel.designations.elevation_limit.label",
+    "AutoTerrainDesignations.DesigElevLimitLabel",
     "Elevation limit"
   ],
   [
-    "panel.designations.elevation_limit.tooltip",
+    "AutoTerrainDesignations.DesigElevLimitTip",
     "Maximum (absolute) excavation depth (-∞ = no limit.)"
   ],
   [
-    "panel.designations.ore_purity.label",
+    "AutoTerrainDesignations.DesigOrePurityLabel",
     "Ore quality"
   ],
   [
-    "panel.designations.ore_purity.tooltip",
+    "AutoTerrainDesignations.DesigOrePurityTip",
     "How strictly the scan filters terrain columns for ore quality. This does not predict the material mix excavators will produce.\nOff: include all tiles, dig to full depth.\nLow: exclude very sparse tiles, trim thin trailing ore at the bottom.\nMed: moderate quality — skip tiles with heavy overburden or little ore.\nHigh: only rich tiles with a clean ore column.\nMax: apply the strictest overburden, depth, and ore-density filters."
   ],
   [
-    "settings.ore_quality.value_tooltip",
+    "AutoTerrainDesignations.OreQualityValueTooltip",
     "{0}: minimum ore height {1:0.##} terrain tiles; minimum bottom density {2:P0}; minimum ore purity {3:P0}; minimum component size {4} connected tiles."
   ],
   [
-    "settings.ore_quality.value.off",
+    "AutoTerrainDesignations.OreQualityOff",
     "Off"
   ],
   [
-    "settings.ore_quality.value.low",
+    "AutoTerrainDesignations.OreQualityLow",
     "Low"
   ],
   [
-    "settings.ore_quality.value.medium",
+    "AutoTerrainDesignations.OreQualityMedium",
     "Medium"
   ],
   [
-    "settings.ore_quality.value.high",
+    "AutoTerrainDesignations.OreQualityHigh",
     "High"
   ],
   [
-    "settings.ore_quality.value.maximum",
+    "AutoTerrainDesignations.OreQualityMaximum",
     "Maximum"
   ],
   [
-    "panel.designations.corridor_clearance.label",
+    "AutoTerrainDesignations.DesigCorridorClearanceLabel",
     "Corridor clearance"
   ],
   [
-    "panel.designations.corridor_clearance.tooltip",
+    "AutoTerrainDesignations.DesigCorridorClearanceTip",
     "Minimum corridor width for connecting ore regions and enforcing passability.\n0 = disabled (regions left separate, no corridors or hole-filling).\n1 = 1-tile corridors (small and medium vehicles).\n2 = 2-tile corridors (mega vehicles).\n"
   ],
   [
-    "panel.designations.scanning_filter.label",
+    "AutoTerrainDesignations.DesigScanningFilterLabel",
     "Scanning filter:"
   ],
   [
-    "panel.designations.scanning_filter.tooltip",
+    "AutoTerrainDesignations.DesigScanningFilterTip",
     "Choose what Create Designations scans for.\n\nAUTO:\n• If terrain designations already exist, preserve them and use unfinished terrain-work clusters as pathfinding starts. When an eligible unstarted mine control tower ghost exists, its entrance replaces the active tower as the pathfinding target.\n• Otherwise, use an eligible tower ghost as a natural accessway marker and commit the first valid route. A recognized ghost suppresses the product scan even when no route can be placed.\n• If neither terrain work nor an eligible ghost exists, scan for useful products and generate their mining plan.\n\nAUTO never falls back to debris or dirt. Select Dirt explicitly, or use the debris-clearance button, when that work is wanted."
   ],
   [
-    "settings.mod.name",
+    "AutoTerrainDesignations.SettingsModName",
     "Auto Terrain Designations"
   ],
   [
-    "settings.tab.defaults",
+    "AutoTerrainDesignations.SettingsTabDefaults",
     "Defaults"
   ],
   [
-    "settings.tab.world_settings",
+    "AutoTerrainDesignations.SettingsTabWorldSettings",
     "World settings"
   ],
   [
-    "settings.tab.ore_quality",
+    "AutoTerrainDesignations.SettingsTabOreQuality",
     "Ore quality"
   ],
   [
-    "settings.heading.mining_defaults",
+    "AutoTerrainDesignations.SettingsHeadingMiningDefaults",
     "Mine control tower defaults"
   ],
   [
-    "settings.heading.panel_defaults",
+    "AutoTerrainDesignations.SettingsHeadingPanelDefaults",
     "Panel defaults"
   ],
   [
-    "settings.heading.designations",
+    "AutoTerrainDesignations.SettingsHeadingDesignations",
     "Designations"
   ],
   [
-    "settings.heading.scan_performance",
+    "AutoTerrainDesignations.SettingsHeadingScanPerformance",
     "Scan performance"
   ],
   [
-    "settings.world.performance",
+    "AutoTerrainDesignations.SettingsHeadingPerformance",
     "PERFORMANCE"
   ],
   [
-    "settings.heading.keyboard_shortcuts",
+    "AutoTerrainDesignations.SettingsHeadingKeyboardShortcuts",
     "Keyboard shortcuts"
   ],
   [
-    "settings.heading.notifications",
+    "AutoTerrainDesignations.SettingsHeadingNotifications",
     "Notifications"
   ],
   [
-    "settings.heading.experimental_access",
+    "AutoTerrainDesignations.SettingsHeadingExperimentalAccess",
     "Accessways"
   ],
   [
-    "settings.world.safety",
+    "AutoTerrainDesignations.SettingsHeadingWorldSafety",
     "Terrain safety"
   ],
   [
-    "settings.world.mining_visualization",
+    "AutoTerrainDesignations.SettingsHeadingMiningVisualization",
     "Mining visualization"
   ],
   [
-    "settings.world.mining_hazard_overlay.label",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayLabel",
     "Show predicted mining collapse area"
   ],
   [
-    "settings.world.mining_hazard_overlay.tooltip",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayTooltip",
     "Show a striped overlay on terrain ATD predicts may be affected by collapse from live Mining designations. Visible only while the game's terrain designation overlay is shown."
   ],
   [
-    "settings.world.vanilla_issue_correction",
+    "AutoTerrainDesignations.SettingsHeadingVanillaIssueCorrection",
     "Vanilla fixes"
   ],
   [
-    "settings.world.filter_ore_spikes.label",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesLabel",
     "Filter ore spikes"
   ],
   [
-    "settings.world.filter_ore_spikes.tooltip",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesTooltip",
     "Ignore isolated ultra-thin ore spikes that extend far below the surrounding deposit when creating Mining Designations. This correction runs before Ore quality and bottom flattening. Raw terrain and existing designations are unchanged."
   ],
   [
-    "settings.world.avoid_ocean.label",
+    "AutoTerrainDesignations.SettingsAvoidOceanLabel",
     "Avoid ocean"
   ],
   [
-    "settings.world.avoid_ocean.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidOceanTooltip",
     "Avoid ocean in generated accessways and mining plans in this world. Mining cells that overlap ocean are excluded. Projected cutting below sea level is also avoided; dumping into ocean remains allowed. Turn this off to allow risky shoreline work."
   ],
   [
-    "settings.world.avoid_buildings.label",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsLabel",
     "Avoid buildings"
   ],
   [
-    "settings.world.avoid_buildings.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsTooltip",
     "Avoid buildings in generated accessways and mining plans in this world. Mining cells that overlap a building or its safety perimeter are excluded. Projected terrain disturbance near buildings is also avoided."
   ],
   [
-    "settings.world.use_worker_thread.label",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadLabel",
     "Use worker thread"
   ],
   [
-    "settings.world.use_worker_thread.tooltip",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadTooltip",
     "Use a background thread for access and mining planning. Enabled by default. Turn off for compatibility troubleshooting; planning then runs on the game thread and may cause pauses, especially in large mines. Applies to new planning requests."
   ],
   [
-    "settings.world.reduce_oversized_areas.label",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasLabel",
     "Reduce oversized areas"
   ],
   [
-    "settings.world.reduce_oversized_areas.tooltip",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasTooltip",
     "When the full access snapshot is too large for the memory ceiling, try one smaller geometry-only corridor around the current starts and goals. This aims to find some route; it may differ from a full-area route, and failure does not prove that no route exists."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesLabel",
     "Harvest disrupted trees"
   ],
   [
-    "settings.world.harvest_disrupted_trees.tooltip",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesTooltip",
     "Mark trees in finalized accessway and mining-designation disturbance zones for harvest. When disabled, ATD creates no tree harvest orders. Harvest orders placed by ATD are removed by either Clear action; unrelated player harvest orders are preserved."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.label",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisLabel",
     "Landscape to remove debris"
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisTooltip",
     "Allow debris removal to make the smallest workable terrain change when a prop cannot be excavated without landscaping. When disabled, the removal request fails and the requesting workflow is notified."
   ],
   [
-    "settings.world.quick_remove_debris.label",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisLabel",
     "Quick remove debris"
   ],
   [
-    "settings.world.quick_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisTooltip",
     "Controls when ATD uses the game's Quick remove action for routed accessway debris. Quick remove spends Unity only when the game is unpaused. This policy does not apply to the mine-tower Clear debris button."
   ],
   [
-    "settings.world.quick_remove_debris.always",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlways",
     "Always"
   ],
   [
-    "settings.world.quick_remove_debris.always.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlwaysTooltip",
     "Use Quick remove for all accessway debris except props that the planned dumping designation will sufficiently bury. This speeds up landscaping but spends Unity."
   ],
   [
-    "settings.world.quick_remove_debris.restrictive",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictive",
     "Restrictive"
   ],
   [
-    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictiveTooltip",
     "Prefer normal excavation but use Quick remove when excavation cannot guarantee post-work pathability."
   ],
   [
-    "settings.world.quick_remove_debris.never",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNever",
     "Never"
   ],
   [
-    "settings.world.quick_remove_debris.never.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNeverTooltip",
     "Never spend Unity on Quick remove for accessway debris. Removal relies on excavation and the Landscape to remove debris setting, and may need the player to provide Quick remove assistance."
   ],
   [
-    "settings.world.safety_policy.label",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLabel",
     "Safety policy"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.label",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasLabel",
     "Allow ramps outside tower areas"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasTooltip",
     "If an accessway search exhausts the available routes inside a tower area, retry within 16 tiles beyond its boundary. This fallback applies to both narrow and T3/Mega accessways, does not run after a timeout or other search interruption, and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
-    "settings.world.safety_policy.tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyTooltip",
     "Controls how cautiously ATD predicts landslides and how much distance it keeps from protected oceans and buildings. Higher policies reserve more space; lower policies allow terrain work closer to hazards. Default: BAL."
   ],
   [
-    "settings.world.safety_policy.value_tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyValueTooltip",
     "{0}: landslide predictor slope factor {1}; protected-area buffer {2} tiles."
   ],
   [
-    "settings.world.safety_policy.minimum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMinimum",
     "Minimum"
   ],
   [
-    "settings.world.safety_policy.low",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLow",
     "Low"
   ],
   [
-    "settings.world.safety_policy.balanced",
+    "AutoTerrainDesignations.SettingsSafetyPolicyBalanced",
     "Balanced"
   ],
   [
-    "settings.world.safety_policy.high",
+    "AutoTerrainDesignations.SettingsSafetyPolicyHigh",
     "High"
   ],
   [
-    "settings.world.safety_policy.maximum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMaximum",
     "Maximum"
   ],
   [
-    "settings.tab.pathfinder",
+    "AutoTerrainDesignations.SettingsTabPathfinder",
     "Accessways"
   ],
   [
-    "settings.pathfinder.costs",
+    "AutoTerrainDesignations.SettingsPathfinderCostsHeading",
     "Route costs"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostLabel",
     "Terrain designation cost"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.tooltip",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostTooltip",
     "Fixed cost charged for every generated terrain designation. Higher values favor fewer terrain designations, even when that increases travel distance and total landscaping cost."
   ],
   [
-    "settings.pathfinder.direct_work_weight.label",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightLabel",
     "Direct terrain-work weight"
   ],
   [
-    "settings.pathfinder.direct_work_weight.tooltip",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightTooltip",
     "Weight applied to digging or dumping terrain directly above or below generated terrain designations."
   ],
   [
-    "settings.pathfinder.side_ray_weight.label",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightLabel",
     "Side-ray work weight"
   ],
   [
-    "settings.pathfinder.side_ray_weight.tooltip",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightTooltip",
     "Weight applied to lateral and turn-corner landscaping rays."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceLabel",
     "Candidate ray max distance"
   ],
   [
-    "settings.pathfinder.candidate_distance.tooltip",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceTooltip",
     "Maximum candidate ray trace distance. Higher values protect and price very large side wedges but cost more search time. Default: 16."
   ],
   [
-    "settings.pathfinder.limits",
+    "AutoTerrainDesignations.SettingsPathfinderLimitsHeading",
     "Search limits"
   ],
   [
-    "settings.pathfinder.visited.label",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesLabel",
     "Maximum visited nodes"
   ],
   [
-    "settings.pathfinder.visited.tooltip",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesTooltip",
     "Maximum states examined. Higher values can solve harder routes but use more time and memory."
   ],
   [
-    "settings.pathfinder.timeout.label",
+    "AutoTerrainDesignations.SettingsSearchTimeoutLabel",
     "Search timeout (seconds)"
   ],
   [
-    "settings.pathfinder.timeout.tooltip",
+    "AutoTerrainDesignations.SettingsSearchTimeoutTooltip",
     "Maximum wall-clock time for one accessway search."
   ],
   [
-    "settings.pathfinder.frame_budget.label",
+    "AutoTerrainDesignations.SettingsFrameBudgetLabel",
     "Frame budget (ms)"
   ],
   [
-    "settings.pathfinder.frame_budget.tooltip",
+    "AutoTerrainDesignations.SettingsFrameBudgetTooltip",
     "Approximate search work budget per game frame. Higher values finish sooner but cause longer stalls."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "AutoTerrainDesignations.SettingsRayMaximumCostLabel",
     "Maximum cost per ray"
   ],
   [
-    "settings.pathfinder.ray_max_cost.tooltip",
+    "AutoTerrainDesignations.SettingsRayMaximumCostTooltip",
     "Caps the landscaping cost contributed by one unresolved ray."
   ],
   [
-    "settings.pathfinder.ray_unresolved.label",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyLabel",
     "Unresolved-ray penalty"
   ],
   [
-    "settings.pathfinder.ray_unresolved.tooltip",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyTooltip",
     "Penalty when a ray does not meet terrain inside its trace range."
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.label",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsLabel",
     "Suppress legacy ramps"
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsTooltip",
     "Disable the legacy straight-ramp generator so routed accessway results and failures can be tested directly. Leave off for normal fallback behavior."
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.label",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleLabel",
     "Landscaping cost vs. distance"
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleTooltip",
     "Tile-distance cost assigned to one unit of landscaping cost. One landscaping-cost unit is equivalent to dumping or digging one unit of rock. Range: 0-100; default: 1. A higher value promotes routes with less terraforming."
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostLabel",
     "Prop cleanup landscaping cost"
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostTooltip",
     "Landscaping cost charged once per prop cleanup origin used by access search. One unit equals one dumped or dug rock unit; default 8 reflects observed excavator cleanup effort. Higher values make cleanup routes less attractive."
   ],
   [
-    "settings.experimental_access.landslide_run.label",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunLabel",
     "Landslide protection slope factor"
   ],
   [
-    "settings.experimental_access.landslide_run.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunTooltip",
     "Horizontal exclusion distance per vertical terrain level. 1 translates to a 45-degree slope; higher values widen the exclusion zone (use in e.g. pure sand), while lower values narrow it. Range: 0.05-2; default: 1."
   ],
   [
-    "settings.max_slope.label",
+    "AutoTerrainDesignations.SettingsMaxSlopeLabel",
     "Max slope"
   ],
   [
-    "settings.max_slope.tooltip",
+    "AutoTerrainDesignations.SettingsMaxSlopeTooltip",
     "Maximum allowed height difference between adjacent designation corners. Range: 1-3."
   ],
   [
-    "settings.bottom_flattening.label",
+    "AutoTerrainDesignations.SettingsBottomFlatteningLabel",
     "Bottom flattening"
   ],
   [
-    "settings.bottom_flattening.tooltip",
+    "AutoTerrainDesignations.SettingsBottomFlatteningTooltip",
     "Bottom-flattening strength from 0 to 10. 0 disables the bottom-flattening pass."
   ],
   [
-    "settings.batch_size.label",
+    "AutoTerrainDesignations.SettingsBatchSizeLabel",
     "Batch size"
   ],
   [
-    "settings.batch_size.tooltip",
+    "AutoTerrainDesignations.SettingsBatchSizeTooltip",
     "Designations placed per coroutine frame while the game is unpaused. Range: 1-200."
   ],
   [
-    "settings.panel_defaults.mining_collapsed.label",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedLabel",
     "Mining panel collapsed"
   ],
   [
-    "settings.panel_defaults.mining_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedTooltip",
     "Whether the Mining designations panel starts collapsed by default."
   ],
   [
-    "settings.panel_defaults.ore_collapsed.label",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedLabel",
     "Ore panel collapsed"
   ],
   [
-    "settings.panel_defaults.ore_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedTooltip",
     "Whether the Ore composition panel starts collapsed by default."
   ],
   [
-    "settings.panel_defaults.farming_collapsed.label",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedLabel",
     "Farming panel collapsed"
   ],
   [
-    "settings.panel_defaults.farming_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedTooltip",
     "Whether the Farmland preparation panel starts collapsed by default."
   ],
   [
-    "settings.notifications.excavator_completion.label",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsLabel",
     "Excavator completion notifications"
   ],
   [
-    "settings.notifications.excavator_completion.tooltip",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsTooltip",
     "Whether ATD shows a green notification when any vehicle depot completes an unassigned (free) excavator."
   ],
   [
-    "settings.notifications.ramp_warning.label",
+    "AutoTerrainDesignations.SettingsRampNotificationsLabel",
     "Ramp warning notifications"
   ],
   [
-    "settings.notifications.ramp_warning.tooltip",
+    "AutoTerrainDesignations.SettingsRampNotificationsTooltip",
     "Whether ATD shows ramp access warning notifications on mine towers."
   ],
   [
-    "settings.ore_quality.min_ore_height.label",
+    "AutoTerrainDesignations.SettingsMinOreHeightLabel",
     "Minimum ore height"
   ],
   [
-    "settings.ore_quality.min_ore_height.tooltip",
+    "AutoTerrainDesignations.SettingsMinOreHeightTooltip",
     "Minimum ore thickness in terrain tiles for this quality level."
   ],
   [
-    "settings.ore_quality.min_bottom_density.label",
+    "AutoTerrainDesignations.SettingsMinBottomDensityLabel",
     "Minimum bottom density"
   ],
   [
-    "settings.ore_quality.min_bottom_density.tooltip",
+    "AutoTerrainDesignations.SettingsMinBottomDensityTooltip",
     "Minimum ore density from the previous ore bottom to this ore bottom. Clamped from 0 to 1."
   ],
   [
-    "settings.ore_quality.min_ore_purity.label",
+    "AutoTerrainDesignations.SettingsMinOrePurityLabel",
     "Minimum ore purity"
   ],
   [
-    "settings.ore_quality.min_ore_purity.tooltip",
+    "AutoTerrainDesignations.SettingsMinOrePurityTooltip",
     "Minimum ore-to-column ratio for this quality level. Clamped from 0 to 1."
   ],
   [
-    "settings.ore_quality.min_component_size.label",
+    "AutoTerrainDesignations.SettingsMinComponentSizeLabel",
     "Minimum component size"
   ],
   [
-    "settings.ore_quality.min_component_size.tooltip",
+    "AutoTerrainDesignations.SettingsMinComponentSizeTooltip",
     "Minimum connected designation tile count for a cluster to survive the isolation filter."
   ],
   [
-    "settings.corner_mode.label",
+    "AutoTerrainDesignations.SettingsCornerModeLabel",
     "Corner designations mode"
   ],
   [
-    "settings.corner_mode.tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeTooltip",
     "Key used to enter and toggle corner designation mode while a terrain designation tool is active."
   ],
   [
-    "settings.corner_mode.invalid_tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeInvalidTooltip",
     "Use a single key such as K, 1, F1, Space, or Escape."
   ],
   [
-    "settings.status.applied",
+    "AutoTerrainDesignations.SettingsApplied",
     "Applied"
   ],
   [
-    "settings.status.invalid_key",
+    "AutoTerrainDesignations.SettingsInvalidKey",
     "Invalid key"
   ],
   [
-    "settings.action.save_as_global",
+    "AutoTerrainDesignations.SettingsSaveAsGlobal",
     "Save as config"
   ],
   [
-    "settings.action.save_as_global.tooltip",
+    "AutoTerrainDesignations.SettingsSaveAsGlobalTooltip",
     "Save these settings to ATDsettings.json. They will be used as the defaults for all new games."
   ],
   [
-    "settings.action.restore_defaults",
+    "AutoTerrainDesignations.SettingsRestoreDefaults",
     "Restore defaults"
   ],
   [
-    "settings.action.restore_defaults.tooltip",
+    "AutoTerrainDesignations.SettingsRestoreDefaultsTooltip",
     "Restore the global mod defaults for all settings. (Does not automatically save them as config.)"
   ],
   [
-    "settings.status.saved_to_file",
+    "AutoTerrainDesignations.SettingsSavedToFile",
     "Saved to ATDsettings.json."
   ],
   [
-    "settings.status.save_failed",
+    "AutoTerrainDesignations.SettingsSaveFailed",
     "Save failed; check the log."
   ],
   [
-    "settings.status.restored_defaults",
+    "AutoTerrainDesignations.SettingsRestoredDefaults",
     "Restored built-in defaults in memory."
   ],
   [
-    "panel.ore.title",
+    "AutoTerrainDesignations.OreTitle",
     "Ore composition"
   ],
   [
-    "panel.ore.description",
+    "AutoTerrainDesignations.OreDescription",
     "Ore resources within this tower's current mining designations. (Does not account for potential landslides.)"
   ],
   [
-    "panel.ore.prompt_scan",
+    "AutoTerrainDesignations.OrePromptScan",
     "Press ↺ to scan ore composition."
   ],
   [
-    "panel.ore.scan_tooltip",
+    "AutoTerrainDesignations.OreScanTip",
     "Scan ore composition"
   ],
   [
-    "panel.ore.no_tower",
+    "AutoTerrainDesignations.OreNoTower",
     "No tower selected."
   ],
   [
-    "panel.ore.no_minable_designations",
+    "AutoTerrainDesignations.OreNoMinableDesig",
     "No minable designations found."
   ],
   [
-    "panel.ore.priority_selected_tooltip",
+    "AutoTerrainDesignations.OrePrioritySelectedTipFmt",
     "Tower mining priority set to {0}. Click to unset."
   ],
   [
-    "panel.ore.priority_set_tooltip",
+    "AutoTerrainDesignations.OrePrioritySetTipFmt",
     "Set tower mining priority to {0}."
   ],
   [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "AutoTerrainDesignations.OreSorterAssignedTrucksEnforceTip",
     "Only the assigned trucks (and trucks assigned to participating mine towers) will be allowed to collect or deliver cargo here."
   ],
   [
-    "panel.farming.title",
+    "AutoTerrainDesignations.FarmingTitle",
     "Farmland preparation"
   ],
   [
-    "panel.farming.description",
+    "AutoTerrainDesignations.FarmingDescription",
     "Automates the preparation and final filling of flat level designations so their top layer becomes farmable."
   ],
   [
-    "panel.farming.automation_toggle.label",
+    "AutoTerrainDesignations.FarmingToggleLabel",
     "Farmland preparation automation"
   ],
   [
-    "panel.farming.automation_toggle.tooltip",
+    "AutoTerrainDesignations.FarmingToggleTip",
     "Prepare flat level designations for farmland by clearing unsuitable top material, then restoring the final fill orders."
   ],
   [
-    "panel.farming.idle_release_excavators.label",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsLabel",
     "Auto-release excavators when idle"
   ],
   [
-    "panel.farming.idle_release_excavators.tooltip",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsTip",
     "Automatically unassign excavators from this tower when no designation has pending excavation work, or while the tower is paused.\nExcavators are tracked and re-assigned when excavation work returns."
   ],
   [
-    "panel.farming.truck_idle_policy.label",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyLabel",
     "Idle truck behavior"
   ],
   [
-    "panel.farming.truck_idle_policy.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyTip",
     "Choose what assigned trucks do when this tower has no pending excavation work, or while the tower is paused."
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTower",
     "Park at tower"
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTowerTip",
     "Vanilla behavior: keep trucks assigned and send them back to the tower when idle.\nPros: trucks stay close and ready for the next job.\nCons: idle trucks can occupy the tower area and make unnecessary return trips."
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPut",
     "Stay put"
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPutTip",
     "Keep trucks assigned without sending them back to the tower when idle.\nPros: avoids unnecessary return trips and keeps trucks near their last work area.\nCons: trucks may be scattered across the work area."
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftRelease",
     "Soft release"
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftReleaseTip",
     "Temporarily unassign idle trucks so they can assist with general hauling and construction jobs. Trucks are simply re-assigned to this tower when excavation work returns.\nPros: released trucks can help with general hauling and construction while idle.\nCons: if assigned to another tower, especially one not using Soft release, they may be unavailable when this tower's work resumes."
   ],
   [
-    "panel.farming.soft_released_excavators.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedExcavatorsLabel",
     "Soft released excavators: "
   ],
   [
-    "panel.farming.vehicle_status.assigned",
+    "AutoTerrainDesignations.FarmingVehicleStatusAssigned",
     "Assigned: {0}"
   ],
   [
-    "panel.farming.vehicle_status.none",
+    "AutoTerrainDesignations.FarmingVehicleStatusNone",
     "none"
   ],
   [
-    "panel.farming.soft_released_trucks.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedTrucksLabel",
     "Soft released trucks: "
   ],
   [
-    "panel.farming.vehicle_status.released",
+    "AutoTerrainDesignations.FarmingVehicleStatusReleased",
     "ATD-released: "
   ],
   [
-    "panel.farming.vehicle_status.destroyed",
+    "AutoTerrainDesignations.FarmingVehicleStatusDestroyed",
     "<destroyed>"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "AutoTerrainDesignations.CornerOuterTip",
     "Corner (outer): place convex corner ramps."
   ],
   [
-    "toolbox.corner_inner.tooltip",
+    "AutoTerrainDesignations.CornerInnerTip",
     "Corner (inner): place concave corner ramps."
   ],
   [
-    "toolbox.corner_planar.tooltip",
+    "AutoTerrainDesignations.CornerPlanarTip",
     "Planar corner: place a diagonal plane ramp."
   ],
   [
-    "notification.ramp_access_failed",
+    "AutoTerrainDesignations.NotifRampFailed",
     "[ATD] {entity} could not start an access ramp"
   ],
   [
-    "notification.ramp_access_truncated",
+    "AutoTerrainDesignations.NotifRampTruncated",
     "[ATD] {entity} could not fit a full access ramp"
   ],
   [
-    "notification.ramp_access_not_accessible",
+    "AutoTerrainDesignations.NotifRampNotAccessible",
     "[ATD] {entity} could not path to the ramp"
   ],
   [
-    "notification.ramp_access_snapshot_too_large",
+    "AutoTerrainDesignations.NotifRampSnapshotTooLarge",
     "[ATD] {entity} access area is too large for the turning-ramp search"
   ],
   [
-    "notification.farming_complete",
+    "AutoTerrainDesignations.NotifFarmingComplete",
     "[ATD] {entity} farming preparation and filling complete"
   ],
   [
-    "notification.excavator_completed",
+    "AutoTerrainDesignations.NotifExcavatorCompleted",
     "[ATD] {entity} completed an unassigned {0}"
   ],
   [
-    "notification.debris_cleanup_none_found",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneFound",
     "[ATD] {entity} found no debris to clear"
   ],
   [
-    "notification.debris_cleanup_none_reachable",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneReachable",
     "[ATD] {entity} found no reachable debris to clear. Ctrl-click to include unreachable debris"
   ],
   [
-    "vehicle_order.confirm.singular",
+    "AutoTerrainDesignations.EnqueueConfirmPromptSingular",
     "Order a new {0} for {2} at {1}?"
   ],
   [
-    "vehicle_order.confirm.plural",
+    "AutoTerrainDesignations.EnqueueConfirmPromptPlural",
     "Order {0} new {1}s for {3} at {2}?"
   ],
   [
-    "vehicle_order.confirm.button",
+    "AutoTerrainDesignations.EnqueueConfirmBtnText",
     "Order"
   ],
   [
-    "vehicle_order.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToDepotTooltip",
     "Zoom to {0}"
   ],
   [
-    "access_search.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToAccessActionTooltip",
     "Zoom to access action"
   ],
   [
-    "vehicle_order.preassigned.tooltip",
+    "AutoTerrainDesignations.PreAssignedTooltipFmt",
     "Pre-assigned to {0}"
   ],
   [
-    "vehicle_order.shortcut.tooltip",
+    "AutoTerrainDesignations.OrderConstructionShortcutHint",
     "Shift-Alt-click to order a new {0} for {2} at {1}"
   ]
 ]

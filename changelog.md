@@ -1,5 +1,15 @@
 v0.9.6 [unreleased]
 
+- Release verification on 0.8.8a b628: dual Debug/Release builds and current/legacy compiled references pass; same-process English/Swedish/English settings reload preserves unique tabs and leaves the save unchanged. See docs/test/release-preparation-0.9.6.md for checks and limits.
+
+- Release preparation includes the shared stable-tab/world-reset fix and completed native localization review. Laboratory designs and hazard-projection laboratory extensions are excluded from this release.
+
+- Migrate all 210 localization IDs to the native AutoTerrainDesignations namespace and native Portuguese/Chinese filenames, preserving locale text. Use native loading on 0.8.8 and retain the existing late rebind on 0.8.7d; verify native language changes and legacy Swedish/Portuguese/Chinese bundles.
+
+- Migrated the decompile/compatibility skill into a discoverable Codex workflow. Capture official API signature diffs with provenance, correlate source references and combine reflection triage, builds and optional binary checks. Stop treating decompilation as verified compatibility or automatically editing manifests/changelogs; make reference Git snapshots opt-in.
+
+- Move test web API startup to the game launch command; retain early AutoHelpers console mirroring for version and DLL timestamp rows.
+
 v0.9.5 [released]
 
 - Experimental technical fix for Update 4.3 Build 625: rebuild against the changed DumpingJob.Factory.EnqueueJob product signature. The owner reports no further exceptions after rebuilding; extensive gameplay testing of the entire 4.3 compatibility patch remains outstanding. The Update 4.3 payload targets Build 625, not earlier 4.3 builds; retain the separate 0.8.7d payload.

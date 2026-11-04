@@ -1,842 +1,842 @@
 [
   [
-    "panel.atd.vehicles.show_unowned",
+    "AutoTerrainDesignations.ShowUnownedVehicles",
     "Показывать открытые типы машин, которых у вас нет, чтобы заказывать их с этой башни. Имеющиеся машины и заказы этой башни в очереди видны всегда."
   ],
   [
-    "panel.atd.vehicles.hide_unowned",
+    "AutoTerrainDesignations.HideUnownedVehicles",
     "Скрыть типы машин, которых у вас нет. Имеющиеся машины и заказы этой башни в очереди останутся видны."
   ],
   [
-    "settings.world.default_mine.label",
+    "AutoTerrainDesignations.SettingsDefaultMineLabel",
     "Незакреплённые экскаваторы копают"
   ],
   [
-    "settings.world.default_mine.tooltip",
+    "AutoTerrainDesignations.SettingsDefaultMineTooltip",
     "Незакреплённые экскаваторы выполняют горные задания за пределами зон всех шахтных башен."
   ],
   [
-    "common.level.off",
+    "AutoTerrainDesignations.LevelOff",
     "Выкл."
   ],
   [
-    "common.level.low",
+    "AutoTerrainDesignations.LevelLow",
     "Низкое"
   ],
   [
-    "common.level.med",
+    "AutoTerrainDesignations.LevelMed",
     "Среднее"
   ],
   [
-    "common.level.high",
+    "AutoTerrainDesignations.LevelHigh",
     "Высокое"
   ],
   [
-    "common.level.max",
+    "AutoTerrainDesignations.LevelMax",
     "Максимальное"
   ],
   [
-    "panel.designations.title",
+    "AutoTerrainDesignations.DesigTitle",
     "Разметка карьеров"
   ],
   [
-    "panel.designations.description",
+    "AutoTerrainDesignations.DesigDescription",
     "Создать автоматическую разметку рельефа для этой вышки."
   ],
   [
-    "panel.designations.create_button",
+    "AutoTerrainDesignations.DesigCreateBtn",
     "Создать разметку"
   ],
   [
-    "panel.designations.create_tooltip",
+    "AutoTerrainDesignations.DesigCreateTip",
     "Сканирует и размещает разметку карьерных работ в области действия этой вышки."
   ],
   [
-    "panel.designations.debris_tooltip",
+    "AutoTerrainDesignations.DesigDebrisTip",
     "Пометить удаление доступного мусора в области, через менеджер удаления объектов «ATD». Существующие разметки временно приостанавливаются и восстанавливаются после удаления. Эта операция никогда не тратит «Единство» на быстрое удаление и следует настройке «Изменять рельеф для удаления мусора» для удаления мусора. Удерживая клавишу «Ctrl», щёлкните, чтобы включить недоступный мусор."
   ],
   [
-    "panel.designations.clear_tooltip",
+    "AutoTerrainDesignations.DesigClearTip",
     "Очистить сгенерированную «ATD» разметку выравнивания рельефа и вырубки деревьев для этой вышки. Удерживая клавишу «Shift», щелкните, чтобы очистить всю разметку рельефа в области вышки, а также только сгенерированные этой вышкой разметку области лесозаготовок."
   ],
   [
-    "panel.designations.clear_tooltip.shift_click",
+    "AutoTerrainDesignations.DesigClearTipWithShiftClick",
     "Очистить сгенерированную «ATD» разметку выравнивания рельефа и вырубки деревьев для этой вышки. Удерживая клавишу «Shift», щелкните, чтобы очистить всю разметку рельефа в области вышки, а также только сгенерированные этой вышкой разметку области лесозаготовок."
   ],
   [
-    "panel.designations.ore_filter.auto",
+    "AutoTerrainDesignations.DesigOreFilterAuto",
     "АВТО"
   ],
   [
-    "panel.designations.accessway_mode.label",
+    "AutoTerrainDesignations.DesigAccesswayModeLabel",
     "Режим подъездных путей"
   ],
   [
-    "settings.dumping_priority.label",
+    "AutoTerrainDesignations.DumpingPriorityLabel",
     "Приоритет отсыпки"
   ],
   [
-    "settings.dumping_priority.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityDescription",
     "Использует ванильные приоритеты импорта 1–15 для активной отсыпки; меньшие числа важнее. Пассивный режим использует пассивную ванильную отсыпку и импортирует только от активных экспортёров. Во время заполнения сельхозугодий пассивный режим временно использует активный приоритет 14, пока правила отсыпки ограничены сельскохозяйственными продуктами. По умолчанию: пассивный режим."
   ],
   [
-    "settings.dumping_priority.passive",
+    "AutoTerrainDesignations.DumpingPriorityPassiveLabel",
     "Пассивный"
   ],
   [
-    "settings.dumping_priority.passive.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityPassiveTooltip",
     "Импортировать только от активных экспортёров."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3",
+    "AutoTerrainDesignations.AccesswayModeLegacy3",
     "Устаревший 3"
   ],
   [
-    "panel.designations.accessway_mode.legacy_4",
+    "AutoTerrainDesignations.AccesswayModeLegacy4",
     "Устаревший 4"
   ],
   [
-    "panel.designations.accessway_mode.legacy_5",
+    "AutoTerrainDesignations.AccesswayModeLegacy5",
     "Устаревший 5"
   ],
   [
-    "panel.designations.accessway_mode.off.tooltip",
+    "AutoTerrainDesignations.AccesswayModeOffTip",
     "Отключить создание подъездных путей и рамп."
   ],
   [
-    "panel.designations.accessway_mode.auto.tooltip",
+    "AutoTerrainDesignations.AccesswayModeAutoTip",
     "Использовать самый большой экскаватор, назначенный или предварительно назначенный для этой вышки, а затем самый большой экскаватор, присутствующий на карте. При отсутствии экскаваторов режим «АВТО» работает как ВЫКЛ."
   ],
   [
-    "panel.designations.accessway_mode.t1.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT1Tip",
     "Создавать проложенные подъездные пути с учётом проходимости «Экскаватора, ур. I»."
   ],
   [
-    "panel.designations.accessway_mode.t2.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT2Tip",
     "Создавать проложенные подъездные пути с учётом проходимости «Экскаватора, ур. II»."
   ],
   [
-    "panel.designations.accessway_mode.t3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT3Tip",
     "Создавать двухполосные подъездные пути с учётом проходимости «Экскаватора, ур. III / Огромный экскаватор»."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy3Tip",
     "Создавать только устаревшую прямую рампу шириной три ячейки обозначения, проверенную для «Экскаватора, ур. III / Огромного экскаватора»."
   ],
   [
-    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy4Tip",
     "Создавать только устаревшую прямую рампу шириной четыре ячейки обозначения, проверенную для «Экскаватора, ур. III / Огромного экскаватора»."
   ],
   [
-    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy5Tip",
     "Создавать только устаревшую прямую рампу шириной пять ячеек обозначения, проверенную для «Экскаватора, ур. III / Огромного экскаватора»."
   ],
   [
-    "panel.designations.max_layers.label",
+    "AutoTerrainDesignations.DesigMaxLayersLabel",
     "Макс. слоёв для выемки"
   ],
   [
-    "panel.designations.max_layers.tooltip",
+    "AutoTerrainDesignations.DesigMaxLayersTip",
     "Максимальное количество слоёв для выемки от поверхности. При зажатой клавише «Shift», щёлчок переключит 5 слоёв (+/-), а при зажатой клавише «Ctrl», щёлчок переключит 10 слоёв (+/-).<br>(∞ = без ограничений.)"
   ],
   [
-    "panel.designations.elevation_limit.label",
+    "AutoTerrainDesignations.DesigElevLimitLabel",
     "Предел высоты"
   ],
   [
-    "panel.designations.elevation_limit.tooltip",
+    "AutoTerrainDesignations.DesigElevLimitTip",
     "Максимальная (абсолютная) глубина выемки. При зажатой клавише «Shift», щёлчок переключит 5 слоёв (+/-), а при зажатой клавише «Ctrl», щёлчок переключит 10 слоёв (+/-).<br>(-∞ = без ограничений.)"
   ],
   [
-    "panel.designations.ore_purity.label",
+    "AutoTerrainDesignations.DesigOrePurityLabel",
     "Качество руды"
   ],
   [
-    "panel.designations.ore_purity.tooltip",
+    "AutoTerrainDesignations.DesigOrePurityTip",
     "Насколько строго сканирование фильтрует столбцы грунта по качеству руды. Это не предсказывает состав материалов, которые добудут экскаваторы.\nОтключено: включать все клетки, копать на полную глубину.\nНизкое: исключать клетки с очень малым количеством руды, обрезать тонкие остатки руды снизу.\nСреднее: умеренное качество — пропускать клетки с большим слоем пустой породы или малым количеством руды.\nВысокое: только богатые клетки с чистым рудным столбом.\nМаксимум: применять самые строгие фильтры по слою пустой породы, глубине и плотности руды."
   ],
   [
-    "settings.ore_quality.value_tooltip",
+    "AutoTerrainDesignations.OreQualityValueTooltip",
     "<b>{0}</b>:<br>минимальная высота руды — {1:0.##} плиток;<br>Минимальная плотность нижнего слоя — {2:P0};<br>Минимальная чистота руды — {3:P0};<br>Минимальный размер кластера — {4} связанных плиток."
   ],
   [
-    "settings.ore_quality.value.off",
+    "AutoTerrainDesignations.OreQualityOff",
     "Отключено"
   ],
   [
-    "settings.ore_quality.value.low",
+    "AutoTerrainDesignations.OreQualityLow",
     "Низкое"
   ],
   [
-    "settings.ore_quality.value.medium",
+    "AutoTerrainDesignations.OreQualityMedium",
     "Среднее"
   ],
   [
-    "settings.ore_quality.value.high",
+    "AutoTerrainDesignations.OreQualityHigh",
     "Высокое"
   ],
   [
-    "settings.ore_quality.value.maximum",
+    "AutoTerrainDesignations.OreQualityMaximum",
     "Максимум"
   ],
   [
-    "panel.designations.corridor_clearance.label",
+    "AutoTerrainDesignations.DesigCorridorClearanceLabel",
     "Ширина коридора"
   ],
   [
-    "panel.designations.corridor_clearance.tooltip",
+    "AutoTerrainDesignations.DesigCorridorClearanceTip",
     "Минимальная ширина коридора для соединения рудных областей и обеспечения проходимости.<br>0 = отключено (области остаются раздельными, без коридоров и заполнения ям).<br>1 = коридоры шириной в 1 плитку (малая и средняя техника).<br>2 = коридоры шириной в 2 плитки (огромная техника).<br>"
   ],
   [
-    "panel.designations.scanning_filter.label",
+    "AutoTerrainDesignations.DesigScanningFilterLabel",
     "Фильтр сканирования:"
   ],
   [
-    "panel.designations.scanning_filter.tooltip",
+    "AutoTerrainDesignations.DesigScanningFilterTip",
     "Выберите, что сканирует кнопка «Создать разметку».<br><br>«АВТО»:<br>• Если разметка рельефа уже существует, она сохраняется и используется как отправная точка для поиска пути, по незавершённым кластерам карьерных работ. При наличии подходящего не построенного «призрака» диспетчерской вышки, его въезд заменяет активную вышку в качестве цели поиска пути.<br>• В противном случае подходящий «призрак» диспетчерской вышки используется как естественный маркер подъездного пути, и фиксируется первый допустимый маршрут. Найденный «призрак» блокирует сканирование продуктов, даже если маршрут не может быть проложен.<br>• Если ни работ по рельефу, ни подходящего «призрака» нет, сканирование ищет полезные продукты и строит план их добычи.<br><br>«АВТО» никогда не переключается на мусор или грунт. Выбирайте «Грунт» вручную или используйте кнопку очистки мусора, если нужна именно эта работа."
   ],
   [
-    "settings.mod.name",
+    "AutoTerrainDesignations.SettingsModName",
     "Автоматическая разметка рельефа"
   ],
   [
-    "settings.tab.defaults",
+    "AutoTerrainDesignations.SettingsTabDefaults",
     "По умолчанию"
   ],
   [
-    "settings.tab.world_settings",
+    "AutoTerrainDesignations.SettingsTabWorldSettings",
     "Настройки мира"
   ],
   [
-    "settings.tab.ore_quality",
+    "AutoTerrainDesignations.SettingsTabOreQuality",
     "Качество руды"
   ],
   [
-    "settings.heading.mining_defaults",
+    "AutoTerrainDesignations.SettingsHeadingMiningDefaults",
     "Настройки диспетчерской вышки по умолчанию"
   ],
   [
-    "settings.heading.panel_defaults",
+    "AutoTerrainDesignations.SettingsHeadingPanelDefaults",
     "Настройки панелей по умолчанию"
   ],
   [
-    "settings.heading.designations",
+    "AutoTerrainDesignations.SettingsHeadingDesignations",
     "Разметка рельефа"
   ],
   [
-    "settings.heading.scan_performance",
+    "AutoTerrainDesignations.SettingsHeadingScanPerformance",
     "Производительность сканирования"
   ],
   [
-    "settings.world.performance",
+    "AutoTerrainDesignations.SettingsHeadingPerformance",
     "ПРОИЗВОДИТЕЛЬНОСТЬ"
   ],
   [
-    "settings.heading.keyboard_shortcuts",
+    "AutoTerrainDesignations.SettingsHeadingKeyboardShortcuts",
     "Горячие клавиши"
   ],
   [
-    "settings.heading.notifications",
+    "AutoTerrainDesignations.SettingsHeadingNotifications",
     "Уведомления"
   ],
   [
-    "settings.heading.experimental_access",
+    "AutoTerrainDesignations.SettingsHeadingExperimentalAccess",
     "Подъездные пути"
   ],
   [
-    "settings.world.safety",
+    "AutoTerrainDesignations.SettingsHeadingWorldSafety",
     "Безопасность местности"
   ],
   [
-    "settings.world.mining_visualization",
+    "AutoTerrainDesignations.SettingsHeadingMiningVisualization",
     "Визуализация добычи"
   ],
   [
-    "settings.world.mining_hazard_overlay.label",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayLabel",
     "Показывать предполагаемую зону обрушения"
   ],
   [
-    "settings.world.mining_hazard_overlay.tooltip",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayTooltip",
     "Показывает полосатую область на местности, которая, по прогнозу ATD, может пострадать от обрушения из-за активных горных заданий. Видна только при включённом игровом слое обозначений местности."
   ],
   [
-    "settings.world.vanilla_issue_correction",
+    "AutoTerrainDesignations.SettingsHeadingVanillaIssueCorrection",
     "Исправления базовой игры"
   ],
   [
-    "settings.world.filter_ore_spikes.label",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesLabel",
     "Фильтровать рудные шипы"
   ],
   [
-    "settings.world.filter_ore_spikes.tooltip",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesTooltip",
     "Игнорирует изолированные сверхтонкие рудные шипы, уходящие далеко ниже окружающего месторождения, при создании горных обозначений. Исправление применяется до фильтра качества руды и выравнивания дна. Исходный рельеф и существующие обозначения не изменяются."
   ],
   [
-    "settings.world.avoid_ocean.label",
+    "AutoTerrainDesignations.SettingsAvoidOceanLabel",
     "Избегать океана"
   ],
   [
-    "settings.world.avoid_ocean.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidOceanTooltip",
     "Исключать океан в создаваемых подъездных путях и карьерных работах для добычи полезных ископаемых в этом мире. Разметка карьерных работ, пересекающаяся с океаном, исключается. Также избегается проектная выемка ниже уровня моря — сброс в океан при этом остаётся разрешённым. Отключите эту функцию, чтобы разрешить рискованные работы у береговой линии."
   ],
   [
-    "settings.world.avoid_buildings.label",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsLabel",
     "Избегать зданий"
   ],
   [
-    "settings.world.avoid_buildings.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsTooltip",
     "Избегать зданий в создаваемых подъездных путях и карьерных работ для добычи полезных ископаемых в этом мире. Исключается разметка карьерных работ, пересекающаяся со зданием или его периметром безопасности. Также исключается предполагаемое нарушение рельефа вблизи зданий."
   ],
   [
-    "settings.world.use_worker_thread.label",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadLabel",
     "Использовать рабочий поток"
   ],
   [
-    "settings.world.use_worker_thread.tooltip",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadTooltip",
     "Использовать фоновый поток для планирования проходов и добычи. Включено по умолчанию. Отключите для устранения проблем совместимости; после этого планирование будет выполняться в потоке игры и может вызывать паузы, особенно в больших шахтах. Применяется к новым запросам планирования."
   ],
   [
-    "settings.world.reduce_oversized_areas.label",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasLabel",
     "Уменьшать слишком большие области"
   ],
   [
-    "settings.world.reduce_oversized_areas.tooltip",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasTooltip",
     "Если полный снимок доступа слишком велик для ограничения памяти, попробуйте меньший коридор только на основе геометрии вокруг текущих начальных точек и целей. Это должно найти какой-нибудь маршрут; он может отличаться от маршрута по всей области, а неудача не доказывает отсутствие маршрута."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesLabel",
     "Вырубать мешающие деревья"
   ],
   [
-    "settings.world.harvest_disrupted_trees.tooltip",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesTooltip",
     "Помечать для вырубки деревья в зонах нарушения рельефа, возникающих при прокладывании подъездных путей и карьерных работ. Если отключено, «ATD» не будет размечать деревья для вырубки. Операции на вырубку деревьев, размещённые «ATD», удаляются любым действием «Очистить»; операции на вырубку деревьев, созданные игроком, сохраняются."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.label",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisLabel",
     "Изменять рельеф для удаления мусора"
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisTooltip",
     "Разрешить удаление мусора с минимально возможным изменением рельефа, когда объект нельзя выкопать без изменения ландшафта. Если отключено, запрос на удаление завершится неудачей, а запрашивающий процесс получит уведомление."
   ],
   [
-    "settings.world.quick_remove_debris.label",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisLabel",
     "Быстрое удаление мусора"
   ],
   [
-    "settings.world.quick_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisTooltip",
     "Управляет тем, когда «ATD» использует игровое действие «Быстрое удаление» для имеющегося мусора на подъездных путях. Быстрое удаление тратит «Единство» только когда игра не на паузе. Эта настройка не действует на кнопку «Очистить мусор» у диспетчерской вышки."
   ],
   [
-    "settings.world.quick_remove_debris.always",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlways",
     "Всегда"
   ],
   [
-    "settings.world.quick_remove_debris.always.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlwaysTooltip",
     "Использовать функцию «Быстрое удаление» для всего мусора на подъездных путях, за исключением объектов, которые в запланированном месте отвала будут достаточно засыпаны. Это ускоряет изменение ландшафта, но расходует «Единство»."
   ],
   [
-    "settings.world.quick_remove_debris.restrictive",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictive",
     "Частично"
   ],
   [
-    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictiveTooltip",
     "Предпочитать обычные раскопки, но использовать функцию «Быстрое удаление», если раскопки не могут гарантировать проходимость путей после завершения работ."
   ],
   [
-    "settings.world.quick_remove_debris.never",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNever",
     "Никогда"
   ],
   [
-    "settings.world.quick_remove_debris.never.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNeverTooltip",
     "Никогда не тратить «Единство» на быстрое удаление мусора на подъездных путях. Удаление зависит от раскопок и настройки «Изменять рельеф для удаления мусора», и может потребоваться, чтобы игрок оказал помощь в быстром удалении."
   ],
   [
-    "settings.world.safety_policy.label",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLabel",
     "Политика безопасности"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.label",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasLabel",
     "Разрешить пандусы за пределами башен"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasTooltip",
     "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
-    "settings.world.safety_policy.tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyTooltip",
     "Определяет, насколько осторожно «ATD» прогнозирует оползни и какое расстояние сохраняет до защищаемого океана и зданий. Более высокие уровни резервируют больше пространства; более низкие позволяют проводить карьерные работы ближе к опасным зонам. По умолчанию: Сбалансированная."
   ],
   [
-    "settings.world.safety_policy.value_tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyValueTooltip",
     "<b>{0}</b>:<br>коэффициент уклона для прогнозирования оползней — {1};<br>буфер безопасности — {2} плиток."
   ],
   [
-    "settings.world.safety_policy.minimum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMinimum",
     "Минимальная"
   ],
   [
-    "settings.world.safety_policy.low",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLow",
     "Низкая"
   ],
   [
-    "settings.world.safety_policy.balanced",
+    "AutoTerrainDesignations.SettingsSafetyPolicyBalanced",
     "Сбалансированная"
   ],
   [
-    "settings.world.safety_policy.high",
+    "AutoTerrainDesignations.SettingsSafetyPolicyHigh",
     "Высокая"
   ],
   [
-    "settings.world.safety_policy.maximum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMaximum",
     "Максимум"
   ],
   [
-    "settings.tab.pathfinder",
+    "AutoTerrainDesignations.SettingsTabPathfinder",
     "Подъездные пути"
   ],
   [
-    "settings.pathfinder.costs",
+    "AutoTerrainDesignations.SettingsPathfinderCostsHeading",
     "Стоимость маршрута"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostLabel",
     "Стоимость разметки рельефа"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.tooltip",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostTooltip",
     "Фиксированная стоимость, начисляемая за каждое созданное обозначение разметки рельефа. Более высокие значения способствуют уменьшению количества обозначений разметки рельефа, даже если это увеличивает расстояние перемещения и общую стоимость изменения ландшафта."
   ],
   [
-    "settings.pathfinder.direct_work_weight.label",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightLabel",
     "Прямой вес для работы на местности"
   ],
   [
-    "settings.pathfinder.direct_work_weight.tooltip",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightTooltip",
     "Вес, применяемый к карьерным работам или отвалам непосредственно над или под созданной разметкой рельефа."
   ],
   [
-    "settings.pathfinder.side_ray_weight.label",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightLabel",
     "Вес боковых лучей работ"
   ],
   [
-    "settings.pathfinder.side_ray_weight.tooltip",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightTooltip",
     "Вес, применяемый к боковым и поворотным лучам ландшафтных работ."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceLabel",
     "Максимальное расстояние луча-кандидата"
   ],
   [
-    "settings.pathfinder.candidate_distance.tooltip",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceTooltip",
     "Максимальное расстояние трассировки лучей-кандидатов. Более высокие значения защищают и снижают цену очень больших боковых клиньев, но требуют больше времени на поиск. По умолчанию: 16."
   ],
   [
-    "settings.pathfinder.limits",
+    "AutoTerrainDesignations.SettingsPathfinderLimitsHeading",
     "Ограничения поиска"
   ],
   [
-    "settings.pathfinder.visited.label",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesLabel",
     "Максимум посещённых узлов"
   ],
   [
-    "settings.pathfinder.visited.tooltip",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesTooltip",
     "Максимальное число рассматриваемых состояний. Большие значения могут находить более сложные маршруты, но требуют больше времени и памяти."
   ],
   [
-    "settings.pathfinder.timeout.label",
+    "AutoTerrainDesignations.SettingsSearchTimeoutLabel",
     "Тайм-аут поиска (секунды)"
   ],
   [
-    "settings.pathfinder.timeout.tooltip",
+    "AutoTerrainDesignations.SettingsSearchTimeoutTooltip",
     "Максимальное реальное время для одного поиска подъездного пути."
   ],
   [
-    "settings.pathfinder.frame_budget.label",
+    "AutoTerrainDesignations.SettingsFrameBudgetLabel",
     "Бюджет кадра (мс)"
   ],
   [
-    "settings.pathfinder.frame_budget.tooltip",
+    "AutoTerrainDesignations.SettingsFrameBudgetTooltip",
     "Примерный бюджет вычислений поиска на игровой кадр. Большие значения завершают поиск быстрее, но вызывают более долгие задержки."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "AutoTerrainDesignations.SettingsRayMaximumCostLabel",
     "Максимальная стоимость за луч"
   ],
   [
-    "settings.pathfinder.ray_max_cost.tooltip",
+    "AutoTerrainDesignations.SettingsRayMaximumCostTooltip",
     "Ограничивает затраты на изменение ландшафта, вносимые одним неразрешённым лучом."
   ],
   [
-    "settings.pathfinder.ray_unresolved.label",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyLabel",
     "Штраф за неразрешённый луч"
   ],
   [
-    "settings.pathfinder.ray_unresolved.tooltip",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyTooltip",
     "Штраф, когда луч не пересекает местность в пределах своего диапазона трассировки."
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.label",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsLabel",
     "Подавить устаревшие рампы"
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsTooltip",
     "Отключить устаревший генератор прямых рамп, чтобы можно было напрямую протестировать результаты и сбои подъездных путей. Оставьте выключенным для нормального резервного поведения."
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.label",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleLabel",
     "Стоимость ландшафтных работ к расстоянию"
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleTooltip",
     "Стоимость в плитках расстояния, приравненная к одной единице стоимости ландшафтных работ. Одна единица соответствует отсыпке или выемке одной единицы породы. Диапазон: от 0 до 100; по умолчанию: 1. Более высокое значение способствует маршрутам с меньшим объёмом карьерных работ."
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostLabel",
     "Стоимость уборки препятствий"
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostTooltip",
     "Стоимость ландшафтных работ, начисляемая один раз за каждый источник расчистки объектов, используемый поиском подъездных путей. Одна единица соответствует одной единице отсыпанной или выкопанной породы; значение по умолчанию 8 отражает наблюдаемые трудозатраты экскаватора на расчистку. Более высокие значения делают маршруты расчистки менее привлекательными."
   ],
   [
-    "settings.experimental_access.landslide_run.label",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunLabel",
     "Коэффициент уклона защиты от оползней"
   ],
   [
-    "settings.experimental_access.landslide_run.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunTooltip",
     "Горизонтальное расстояние исключения на каждый вертикальный уровень рельефа. Значение 1 — соответствует уклону 45 градусов; более высокие значения расширяют область исключения (например, на чистом песке), а более низкие сужают её. Диапазон: от 0,05 до 2; по умолчанию: 1."
   ],
   [
-    "settings.max_slope.label",
+    "AutoTerrainDesignations.SettingsMaxSlopeLabel",
     "Макс. уклон"
   ],
   [
-    "settings.max_slope.tooltip",
+    "AutoTerrainDesignations.SettingsMaxSlopeTooltip",
     "Максимально допустимая разница высот между соседними углами разметки. Диапазон: 1-3."
   ],
   [
-    "settings.bottom_flattening.label",
+    "AutoTerrainDesignations.SettingsBottomFlatteningLabel",
     "Выравнивание дна"
   ],
   [
-    "settings.bottom_flattening.tooltip",
+    "AutoTerrainDesignations.SettingsBottomFlatteningTooltip",
     "Сила выравнивания дна, допустимый диапазон от 0 до 10.<br>0 отключает проход выравнивания дна."
   ],
   [
-    "settings.batch_size.label",
+    "AutoTerrainDesignations.SettingsBatchSizeLabel",
     "Размер пакета"
   ],
   [
-    "settings.batch_size.tooltip",
+    "AutoTerrainDesignations.SettingsBatchSizeTooltip",
     "Количество разметок, размещаемых за один кадр корутины, пока игра не на паузе. Диапазон: от 1 до 200."
   ],
   [
-    "settings.panel_defaults.mining_collapsed.label",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedLabel",
     "Панель карьерных работ свёрнута"
   ],
   [
-    "settings.panel_defaults.mining_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedTooltip",
     "Будет ли панель разметки карьерных работ свёрнута по умолчанию."
   ],
   [
-    "settings.panel_defaults.ore_collapsed.label",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedLabel",
     "Панель состава руды свёрнута"
   ],
   [
-    "settings.panel_defaults.ore_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedTooltip",
     "Будет ли панель состава руды свёрнута по умолчанию."
   ],
   [
-    "settings.panel_defaults.farming_collapsed.label",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedLabel",
     "Панель подготовки полей для посевов свёрнута"
   ],
   [
-    "settings.panel_defaults.farming_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedTooltip",
     "Будет ли панель подготовки полей для посевов свёрнута по умолчанию."
   ],
   [
-    "settings.notifications.excavator_completion.label",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsLabel",
     "Уведомления о завершении сборки экскаватора"
   ],
   [
-    "settings.notifications.excavator_completion.tooltip",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsTooltip",
     "Показывает ли ATD зеленое уведомление, когда какая-либо автобаза завершает неназначенный (бесплатный) экскаватор."
   ],
   [
-    "settings.notifications.ramp_warning.label",
+    "AutoTerrainDesignations.SettingsRampNotificationsLabel",
     "Уведомления о предупреждениях по рампах"
   ],
   [
-    "settings.notifications.ramp_warning.tooltip",
+    "AutoTerrainDesignations.SettingsRampNotificationsTooltip",
     "Показывает ли «ATD» предупреждения о доступе к рампе на диспетчерских вышках."
   ],
   [
-    "settings.ore_quality.min_ore_height.label",
+    "AutoTerrainDesignations.SettingsMinOreHeightLabel",
     "Минимальная высота руды"
   ],
   [
-    "settings.ore_quality.min_ore_height.tooltip",
+    "AutoTerrainDesignations.SettingsMinOreHeightTooltip",
     "Минимальная высота (толщина) руды в слоях рельефа для этого уровня качества."
   ],
   [
-    "settings.ore_quality.min_bottom_density.label",
+    "AutoTerrainDesignations.SettingsMinBottomDensityLabel",
     "Минимальная плотность дна"
   ],
   [
-    "settings.ore_quality.min_bottom_density.tooltip",
+    "AutoTerrainDesignations.SettingsMinBottomDensityTooltip",
     "Минимальная плотность руды от предыдущего дна руды до текущего. Ограничено диапазоном от 0 до 1."
   ],
   [
-    "settings.ore_quality.min_ore_purity.label",
+    "AutoTerrainDesignations.SettingsMinOrePurityLabel",
     "Минимальная чистота руды"
   ],
   [
-    "settings.ore_quality.min_ore_purity.tooltip",
+    "AutoTerrainDesignations.SettingsMinOrePurityTooltip",
     "Минимальное соотношение руды к столбцу для этого уровня качества. Ограничено диапазоном от 0 до 1."
   ],
   [
-    "settings.ore_quality.min_component_size.label",
+    "AutoTerrainDesignations.SettingsMinComponentSizeLabel",
     "Минимальный размер компонента"
   ],
   [
-    "settings.ore_quality.min_component_size.tooltip",
+    "AutoTerrainDesignations.SettingsMinComponentSizeTooltip",
     "Минимальное количество связанных плиток разметки, чтобы кластер прошёл фильтр изоляции."
   ],
   [
-    "settings.corner_mode.label",
+    "AutoTerrainDesignations.SettingsCornerModeLabel",
     "Режим угловых разметок"
   ],
   [
-    "settings.corner_mode.tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeTooltip",
     "Клавиша, используемая для входа и переключения режима угловых разметок, когда активен инструмент разметки рельефа."
   ],
   [
-    "settings.corner_mode.invalid_tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeInvalidTooltip",
     "Используйте одну клавишу, например K, 1, F1, Пробел или Escape."
   ],
   [
-    "settings.status.applied",
+    "AutoTerrainDesignations.SettingsApplied",
     "Применено"
   ],
   [
-    "settings.status.invalid_key",
+    "AutoTerrainDesignations.SettingsInvalidKey",
     "Недопустимая клавиша"
   ],
   [
-    "settings.action.save_as_global",
+    "AutoTerrainDesignations.SettingsSaveAsGlobal",
     "Сохранить как конфигурацию"
   ],
   [
-    "settings.action.save_as_global.tooltip",
+    "AutoTerrainDesignations.SettingsSaveAsGlobalTooltip",
     "Сохранить эти настройки в «ATDsettings.json». Они будут использоваться как значения по умолчанию для всех новых игр."
   ],
   [
-    "settings.action.restore_defaults",
+    "AutoTerrainDesignations.SettingsRestoreDefaults",
     "Восстановить значения<br>по умолчанию"
   ],
   [
-    "settings.action.restore_defaults.tooltip",
+    "AutoTerrainDesignations.SettingsRestoreDefaultsTooltip",
     "Восстановить глобальные значения мода по умолчанию для всех настроек. (Не сохраняет их автоматически как конфигурацию.)"
   ],
   [
-    "settings.status.saved_to_file",
+    "AutoTerrainDesignations.SettingsSavedToFile",
     "Сохранено в «ATDsettings.json»."
   ],
   [
-    "settings.status.save_failed",
+    "AutoTerrainDesignations.SettingsSaveFailed",
     "Не удалось сохранить — проверьте журнал."
   ],
   [
-    "settings.status.restored_defaults",
+    "AutoTerrainDesignations.SettingsRestoredDefaults",
     "Встроенные значения по умолчанию восстановлены в памяти."
   ],
   [
-    "panel.ore.title",
+    "AutoTerrainDesignations.OreTitle",
     "Состав руды"
   ],
   [
-    "panel.ore.description",
+    "AutoTerrainDesignations.OreDescription",
     "Отображение рудных ресурсов в текущей разметке карьерных работ для этой вышки. (Не учитывает возможные оползни.)"
   ],
   [
-    "panel.ore.prompt_scan",
+    "AutoTerrainDesignations.OrePromptScan",
     "Нажмите ↺, чтобы просканировать состав руды."
   ],
   [
-    "panel.ore.scan_tooltip",
+    "AutoTerrainDesignations.OreScanTip",
     "Сканировать состав руды"
   ],
   [
-    "panel.ore.no_tower",
+    "AutoTerrainDesignations.OreNoTower",
     "Вышка не выбрана."
   ],
   [
-    "panel.ore.no_minable_designations",
+    "AutoTerrainDesignations.OreNoMinableDesig",
     "Разметка для карьерных работ не найдена."
   ],
   [
-    "panel.ore.priority_selected_tooltip",
+    "AutoTerrainDesignations.OrePrioritySelectedTipFmt",
     "Приоритет вышки для карьерных работ установлен на {0}. Нажмите, чтобы снять."
   ],
   [
-    "panel.ore.priority_set_tooltip",
+    "AutoTerrainDesignations.OrePrioritySetTipFmt",
     "Установить приоритет вышки для карьерных работ на {0}."
   ],
   [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "AutoTerrainDesignations.OreSorterAssignedTrucksEnforceTip",
     "Здесь смогут забирать или доставлять грузы только назначенные грузовики (а также грузовики, назначенные участвующим шахтным вышкам)."
   ],
   [
-    "panel.farming.title",
+    "AutoTerrainDesignations.FarmingTitle",
     "Подготовка полей для посевов"
   ],
   [
-    "panel.farming.description",
+    "AutoTerrainDesignations.FarmingDescription",
     "Автоматизирует подготовку и финальную засыпку плоских разметок выравнивания, чтобы их верхний слой стал плодородным."
   ],
   [
-    "panel.farming.automation_toggle.label",
+    "AutoTerrainDesignations.FarmingToggleLabel",
     "Автоматическая подготовка полей для посевов"
   ],
   [
-    "panel.farming.automation_toggle.tooltip",
+    "AutoTerrainDesignations.FarmingToggleTip",
     "Подготавливает плоские разметки выравнивания под поля, удаляя неподходящий верхний материал, а затем восстанавливая финальный слой засыпки."
   ],
   [
-    "panel.farming.idle_release_excavators.label",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsLabel",
     "Авто-освобождение экскаваторов при простое"
   ],
   [
-    "panel.farming.idle_release_excavators.tooltip",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsTip",
     "Автоматически снимает назначение экскаваторов с этой вышки, когда ни у одной разметки нет ожидающих задач по карьерным работам или когда вышка приостановлена.<br>Экскаваторы отслеживаются и назначаются заново, когда задачи по карьерным работам возобновляются."
   ],
   [
-    "panel.farming.truck_idle_policy.label",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyLabel",
     "Поведение грузовика на холостом ходу"
   ],
   [
-    "panel.farming.truck_idle_policy.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyTip",
     "Выберите, что будут делать назначенные грузовики, когда на этой башне нет незавершенных земляных работ или когда работа башни приостановлена."
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTower",
     "Парк у башни"
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTowerTip",
     "Стандартное поведение: оставляйте грузовики назначенными и отправляйте их обратно в башню, когда они простаивают.\nПлюсы: грузовики остаются рядом и готовы к следующей работе.\nМинусы: простаивающие грузовики могут занимать территорию башни и совершать ненужные обратные рейсы."
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPut",
     "Оставайся на месте"
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPutTip",
     "Сохраняйте назначение грузовиков, не отправляя их обратно в башню, когда они простаивают.\nПлюсы: позволяет избежать ненужных обратных поездок и держать грузовики рядом с местом их последней работы.\nМинусы: грузовики могут быть разбросаны по рабочей зоне."
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftRelease",
     "Мягкий выпуск"
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftReleaseTip",
     "Временно отмените назначение простаивающих грузовиков, чтобы они могли помочь с общими транспортными и строительными работами. Грузовики просто переназначаются на эту башню, когда возобновляются раскопки.\nПлюсы: выпущенные грузовики могут помочь с общими перевозками и строительством во время простоя.\nМинусы: если они назначены на другую вышку, особенно на ту, где не используется Soft Release, они могут быть недоступны, когда работа этой вышки возобновится."
   ],
   [
-    "panel.farming.soft_released_excavators.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedExcavatorsLabel",
     "Экскаваторы с мягким выпуском:"
   ],
   [
-    "panel.farming.vehicle_status.assigned",
+    "AutoTerrainDesignations.FarmingVehicleStatusAssigned",
     "Назначено: {0}"
   ],
   [
-    "panel.farming.vehicle_status.none",
+    "AutoTerrainDesignations.FarmingVehicleStatusNone",
     "нет"
   ],
   [
-    "panel.farming.soft_released_trucks.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedTrucksLabel",
     "Мягко выпущенные грузовики:"
   ],
   [
-    "panel.farming.vehicle_status.released",
+    "AutoTerrainDesignations.FarmingVehicleStatusReleased",
     "Освобождено ATD: "
   ],
   [
-    "panel.farming.vehicle_status.destroyed",
+    "AutoTerrainDesignations.FarmingVehicleStatusDestroyed",
     "<уничтожен>"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "AutoTerrainDesignations.CornerOuterTip",
     "Угол (внешний): размещать выпуклые угловые рампы."
   ],
   [
-    "toolbox.corner_inner.tooltip",
+    "AutoTerrainDesignations.CornerInnerTip",
     "Угол (внутренний): размещать вогнутые угловые рампы."
   ],
   [
-    "toolbox.corner_planar.tooltip",
+    "AutoTerrainDesignations.CornerPlanarTip",
     "Плоский угол: разместите диагональный скат плоскости."
   ],
   [
-    "notification.ramp_access_failed",
+    "AutoTerrainDesignations.NotifRampFailed",
     "[ATD] {entity} не удалось начать строительство подъездной рампы"
   ],
   [
-    "notification.ramp_access_truncated",
+    "AutoTerrainDesignations.NotifRampTruncated",
     "[ATD] {entity} не удалось разместить полную подъездную рампу"
   ],
   [
-    "notification.ramp_access_not_accessible",
+    "AutoTerrainDesignations.NotifRampNotAccessible",
     "[ATD] {entity} не удалось проложить путь к рампе"
   ],
   [
-    "notification.ramp_access_snapshot_too_large",
+    "AutoTerrainDesignations.NotifRampSnapshotTooLarge",
     "[ATD] Область доступа {entity} слишком велика для поиска поворотной рампы"
   ],
   [
-    "notification.farming_complete",
+    "AutoTerrainDesignations.NotifFarmingComplete",
     "[ATD] {entity} завершил подготовку и засыпку полей для посевов"
   ],
   [
-    "notification.excavator_completed",
+    "AutoTerrainDesignations.NotifExcavatorCompleted",
     "[ATD] Пользователь {entity} завершил неназначенное задание {0}"
   ],
   [
-    "notification.debris_cleanup_none_found",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneFound",
     "[ATD] {entity} не обнаружил мусора для расчистки"
   ],
   [
-    "notification.debris_cleanup_none_reachable",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneReachable",
     "[ATD] {entity} не обнаружил доступного мусора для расчистки. Удерживая клавишу «Ctrl», щёлкните, чтобы включить расчистку недоступного мусора."
   ],
   [
-    "vehicle_order.confirm.singular",
+    "AutoTerrainDesignations.EnqueueConfirmPromptSingular",
     "Поставить {0} в очередь для {2} в {1}?"
   ],
   [
-    "vehicle_order.confirm.plural",
+    "AutoTerrainDesignations.EnqueueConfirmPromptPlural",
     "Поставить в очередь {0} единиц техники типа {1} для {3} в {2}?"
   ],
   [
-    "vehicle_order.confirm.button",
+    "AutoTerrainDesignations.EnqueueConfirmBtnText",
     "Заказать"
   ],
   [
-    "vehicle_order.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToDepotTooltip",
     "Приблизить к {0}"
   ],
   [
-    "access_search.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToAccessActionTooltip",
     "Приблизить к действию доступа"
   ],
   [
-    "vehicle_order.preassigned.tooltip",
+    "AutoTerrainDesignations.PreAssignedTooltipFmt",
     "Предварительно назначено {0}"
   ],
   [
-    "vehicle_order.shortcut.tooltip",
+    "AutoTerrainDesignations.OrderConstructionShortcutHint",
     "Щёлкните, удерживая клавиши «Shift+Alt», чтобы заказать новый {0} для {2} в {1}"
   ]
 ]

@@ -1,842 +1,842 @@
 [
   [
-    "panel.atd.vehicles.show_unowned",
+    "AutoTerrainDesignations.ShowUnownedVehicles",
     "Visa upplåsta fordonstyper som du inte äger så att du kan beställa dem från det här tornet. Ägda fordon och tornets köade beställningar visas alltid."
   ],
   [
-    "panel.atd.vehicles.hide_unowned",
+    "AutoTerrainDesignations.HideUnownedVehicles",
     "Dölj fordonstyper som du inte äger. Ägda fordon och tornets köade beställningar visas fortfarande."
   ],
   [
-    "settings.world.default_mine.label",
+    "AutoTerrainDesignations.SettingsDefaultMineLabel",
     "Ej tilldelade grävmaskiner gräver"
   ],
   [
-    "settings.world.default_mine.tooltip",
+    "AutoTerrainDesignations.SettingsDefaultMineTooltip",
     "Ej tilldelade grävmaskiner arbetar med gruvmarkeringar utanför alla gruvtorns områden."
   ],
   [
-    "common.level.off",
+    "AutoTerrainDesignations.LevelOff",
     "Av"
   ],
   [
-    "common.level.low",
+    "AutoTerrainDesignations.LevelLow",
     "Låg"
   ],
   [
-    "common.level.med",
+    "AutoTerrainDesignations.LevelMed",
     "Medel"
   ],
   [
-    "common.level.high",
+    "AutoTerrainDesignations.LevelHigh",
     "Hög"
   ],
   [
-    "common.level.max",
+    "AutoTerrainDesignations.LevelMax",
     "Maxvärde"
   ],
   [
-    "panel.designations.title",
+    "AutoTerrainDesignations.DesigTitle",
     "Gruvanvisningar"
   ],
   [
-    "panel.designations.description",
+    "AutoTerrainDesignations.DesigDescription",
     "Skapa automatiska terränganvisningar för det här tornet."
   ],
   [
-    "panel.designations.create_button",
+    "AutoTerrainDesignations.DesigCreateBtn",
     "Skapa anvisningar"
   ],
   [
-    "panel.designations.create_tooltip",
+    "AutoTerrainDesignations.DesigCreateTip",
     "Skanna tornets område och placera grävanvisningar."
   ],
   [
-    "panel.designations.debris_tooltip",
+    "AutoTerrainDesignations.DesigDebrisTip",
     "Placera skräpborttagningsbeteckningar på lediga celler som kan nås. Ctrl-klicka för att ta med oåtkomliga skräp. Skift-klicka för att även ersätta befintliga terräng- och skogsbruksbeteckningar."
   ],
   [
-    "panel.designations.clear_tooltip",
+    "AutoTerrainDesignations.DesigClearTip",
     "Rensa detta torns ATD-genererade beteckningar. Skift-klicka för att rensa alla terrängbeteckningar i tornets område."
   ],
   [
-    "panel.designations.clear_tooltip.shift_click",
+    "AutoTerrainDesignations.DesigClearTipWithShiftClick",
     "Rensa detta torns ATD-genererade beteckningar. Skift-klicka för att rensa alla terrängbeteckningar i tornets område."
   ],
   [
-    "panel.designations.ore_filter.auto",
+    "AutoTerrainDesignations.DesigOreFilterAuto",
     "AUTOMATISK"
   ],
   [
-    "panel.designations.accessway_mode.label",
+    "AutoTerrainDesignations.DesigAccesswayModeLabel",
     "Accessway-läge"
   ],
   [
-    "settings.dumping_priority.label",
+    "AutoTerrainDesignations.DumpingPriorityLabel",
     "Tippningsprioritet"
   ],
   [
-    "settings.dumping_priority.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityDescription",
     "Använder vaniljens importprioriteter 1–15 för aktiv tippning; lägre tal är mer brådskande. Passiv använder vaniljens passiva tippning och importerar bara från aktiva exportörer. Under fyllning av jordbruksmark använder Passiv tillfälligt aktiv prioritet 14 medan tippningsreglerna är begränsade till jordbruksprodukter. Standard: Passiv."
   ],
   [
-    "settings.dumping_priority.passive",
+    "AutoTerrainDesignations.DumpingPriorityPassiveLabel",
     "Passiv"
   ],
   [
-    "settings.dumping_priority.passive.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityPassiveTooltip",
     "Importera endast från aktiva exportörer."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3",
+    "AutoTerrainDesignations.AccesswayModeLegacy3",
     "Äldre 3"
   ],
   [
-    "panel.designations.accessway_mode.legacy_4",
+    "AutoTerrainDesignations.AccesswayModeLegacy4",
     "Arv 4"
   ],
   [
-    "panel.designations.accessway_mode.legacy_5",
+    "AutoTerrainDesignations.AccesswayModeLegacy5",
     "Äldre 5"
   ],
   [
-    "panel.designations.accessway_mode.off.tooltip",
+    "AutoTerrainDesignations.AccesswayModeOffTip",
     "Inaktivera genererade tillfarter och ramper."
   ],
   [
-    "panel.designations.accessway_mode.auto.tooltip",
+    "AutoTerrainDesignations.AccesswayModeAutoTip",
     "Använd den största grävmaskinen som är tilldelad eller förtilldelad till detta torn, sedan den största grävmaskinen som finns på kartan. Utan grävmaskiner beter sig AUTO som AV."
   ],
   [
-    "panel.designations.accessway_mode.t1.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT1Tip",
     "Generera ruttade tillfartsvägar med hjälp av T1-grävmaskinens framkomlighet."
   ],
   [
-    "panel.designations.accessway_mode.t2.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT2Tip",
     "Generera ruttade tillfartsvägar med hjälp av T2-grävmaskinens framkomlighet."
   ],
   [
-    "panel.designations.accessway_mode.t3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT3Tip",
     "Skapa tvåfiliga tillfartsvägar med hjälp av T3/Mega-grävmaskinens framkomlighet."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy3Tip",
     "Generera endast en gammal rak ramp med tre beteckningsceller bred, validerad för T3/Mega grävmaskiner."
   ],
   [
-    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy4Tip",
     "Generera endast en gammal rak ramp med fyra beteckningsceller bred, validerad för T3/Mega grävmaskiner."
   ],
   [
-    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy5Tip",
     "Generera endast en gammal rak ramp med fem beteckningsceller bred, validerad för T3/Mega grävmaskiner."
   ],
   [
-    "panel.designations.max_layers.label",
+    "AutoTerrainDesignations.DesigMaxLayersLabel",
     "Max lager att gräva ut"
   ],
   [
-    "panel.designations.max_layers.tooltip",
+    "AutoTerrainDesignations.DesigMaxLayersTip",
     "Maximalt antal lager att gräva ut från ytan. (∞ = ingen gräns.)"
   ],
   [
-    "panel.designations.elevation_limit.label",
+    "AutoTerrainDesignations.DesigElevLimitLabel",
     "Höjdgräns"
   ],
   [
-    "panel.designations.elevation_limit.tooltip",
+    "AutoTerrainDesignations.DesigElevLimitTip",
     "Maximal (absolut) grävnivå (-∞ = ingen gräns.)"
   ],
   [
-    "panel.designations.ore_purity.label",
+    "AutoTerrainDesignations.DesigOrePurityLabel",
     "Malmkvalitet"
   ],
   [
-    "panel.designations.ore_purity.tooltip",
+    "AutoTerrainDesignations.DesigOrePurityTip",
     "Hur strikt skanningen filtrerar terrängkolumner efter malmhalt. Detta förutsäger inte vilken materialblandning grävmaskinerna kommer att producera.\nAv: inkludera alla rutor, gräv till fullt djup.\nLåg: uteslut mycket glesa rutor, trimma tunna malmrester längst ned.\nMedel: måttlig halt — hoppa över rutor med mycket överlagring eller lite malm.\nHög: endast rika rutor med en ren malmkolumn.\nMax: tillämpa de striktaste filtren för överlagring, djup och malmdensitet."
   ],
   [
-    "settings.ore_quality.value_tooltip",
+    "AutoTerrainDesignations.OreQualityValueTooltip",
     "{0}: minsta malmhöjd {1:0.##} terrängrutor; minsta bottendensitet {2:P0}; minsta malmrenhet {3:P0}; minsta klusterstorlek {4} sammanhängande rutor."
   ],
   [
-    "settings.ore_quality.value.off",
+    "AutoTerrainDesignations.OreQualityOff",
     "Av"
   ],
   [
-    "settings.ore_quality.value.low",
+    "AutoTerrainDesignations.OreQualityLow",
     "Låg"
   ],
   [
-    "settings.ore_quality.value.medium",
+    "AutoTerrainDesignations.OreQualityMedium",
     "Medel"
   ],
   [
-    "settings.ore_quality.value.high",
+    "AutoTerrainDesignations.OreQualityHigh",
     "Hög"
   ],
   [
-    "settings.ore_quality.value.maximum",
+    "AutoTerrainDesignations.OreQualityMaximum",
     "Maximal"
   ],
   [
-    "panel.designations.corridor_clearance.label",
+    "AutoTerrainDesignations.DesigCorridorClearanceLabel",
     "Korridorutrymme"
   ],
   [
-    "panel.designations.corridor_clearance.tooltip",
+    "AutoTerrainDesignations.DesigCorridorClearanceTip",
     "Minsta korridorbredd för att koppla ihop malmområden och säkerställa framkomlighet.\n0 = inaktiverat (områden lämnas separata, inga korridorer eller hålfyllning).\n1 = 1-rutas korridorer (små och medelstora fordon).\n2 = 2-rutors korridorer (megafordon).\n"
   ],
   [
-    "panel.designations.scanning_filter.label",
+    "AutoTerrainDesignations.DesigScanningFilterLabel",
     "Skanningsfilter:"
   ],
   [
-    "panel.designations.scanning_filter.tooltip",
+    "AutoTerrainDesignations.DesigScanningFilterTip",
     "Välj en produkt att skapa grävanvisningar för. AUTO söker efter användbara produkter när området saknar terränganvisningar; annars blir befintliga terränganvisningar mål för vägletningen. Skräp och jord väljs endast manuellt."
   ],
   [
-    "settings.mod.name",
+    "AutoTerrainDesignations.SettingsModName",
     "Automatiska terrängmarkeringar"
   ],
   [
-    "settings.tab.defaults",
+    "AutoTerrainDesignations.SettingsTabDefaults",
     "Standardvärden"
   ],
   [
-    "settings.tab.world_settings",
+    "AutoTerrainDesignations.SettingsTabWorldSettings",
     "Världsinställningar"
   ],
   [
-    "settings.tab.ore_quality",
+    "AutoTerrainDesignations.SettingsTabOreQuality",
     "Malmkvalitet"
   ],
   [
-    "settings.heading.mining_defaults",
+    "AutoTerrainDesignations.SettingsHeadingMiningDefaults",
     "Standardvärden för gruvkontrolltorn"
   ],
   [
-    "settings.heading.panel_defaults",
+    "AutoTerrainDesignations.SettingsHeadingPanelDefaults",
     "Panelstandard"
   ],
   [
-    "settings.heading.designations",
+    "AutoTerrainDesignations.SettingsHeadingDesignations",
     "Markeringar"
   ],
   [
-    "settings.heading.scan_performance",
+    "AutoTerrainDesignations.SettingsHeadingScanPerformance",
     "Skanningsprestanda"
   ],
   [
-    "settings.world.performance",
+    "AutoTerrainDesignations.SettingsHeadingPerformance",
     "PRESTANDA"
   ],
   [
-    "settings.heading.keyboard_shortcuts",
+    "AutoTerrainDesignations.SettingsHeadingKeyboardShortcuts",
     "Kortkommandon"
   ],
   [
-    "settings.heading.notifications",
+    "AutoTerrainDesignations.SettingsHeadingNotifications",
     "Aviseringar"
   ],
   [
-    "settings.heading.experimental_access",
+    "AutoTerrainDesignations.SettingsHeadingExperimentalAccess",
     "Tillfarter"
   ],
   [
-    "settings.world.safety",
+    "AutoTerrainDesignations.SettingsHeadingWorldSafety",
     "Terrängsäkerhet"
   ],
   [
-    "settings.world.mining_visualization",
+    "AutoTerrainDesignations.SettingsHeadingMiningVisualization",
     "Gruvvisualisering"
   ],
   [
-    "settings.world.mining_hazard_overlay.label",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayLabel",
     "Visa förutsett rasområde vid brytning"
   ],
   [
-    "settings.world.mining_hazard_overlay.tooltip",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayTooltip",
     "Visar ett randigt överlägg på terräng som ATD förutser kan påverkas av ras från aktiva gruvmarkeringar. Syns bara när spelets terrängmarkeringsöverlägg visas."
   ],
   [
-    "settings.world.vanilla_issue_correction",
+    "AutoTerrainDesignations.SettingsHeadingVanillaIssueCorrection",
     "Vanillakorrigeringar"
   ],
   [
-    "settings.world.filter_ore_spikes.label",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesLabel",
     "Filtrera malmspikar"
   ],
   [
-    "settings.world.filter_ore_spikes.tooltip",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesTooltip",
     "Ignorera isolerade, ultratunna malmspikar som sträcker sig långt under den omgivande fyndigheten när gruvbeteckningar skapas. Korrigeringen körs före Malmkvalitet och bottenutjämning. Ursprungliga terrängdata och befintliga beteckningar ändras inte."
   ],
   [
-    "settings.world.avoid_ocean.label",
+    "AutoTerrainDesignations.SettingsAvoidOceanLabel",
     "Undvik havet"
   ],
   [
-    "settings.world.avoid_ocean.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidOceanTooltip",
     "Undvik hav i genererade tillfarter och gruvplaner i denna värld. Gruvceller som överlappar havet utesluts. Planerad schaktning under havsnivån undviks också; dumpning i havet är fortfarande tillåten. Stäng av detta för att tillåta riskfyllt arbete vid stranden."
   ],
   [
-    "settings.world.avoid_buildings.label",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsLabel",
     "Undvik byggnader"
   ],
   [
-    "settings.world.avoid_buildings.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsTooltip",
     "Undvik byggnader i genererade tillfarter och gruvplaner i den här världen. Gruvceller som överlappar en byggnad eller dess säkerhetsmarginal utesluts. Även beräknad terrängstörning nära byggnader undviks."
   ],
   [
-    "settings.world.use_worker_thread.label",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadLabel",
     "Använd arbetstråd"
   ],
   [
-    "settings.world.use_worker_thread.tooltip",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadTooltip",
     "Använd en bakgrundstråd för planering av tillfarter och gruvdrift. Aktiverad som standard. Stäng av för felsökning av kompatibilitet; planeringen körs då i speltråden och kan orsaka pauser, särskilt i stora gruvor. Gäller nya planeringsförfrågningar."
   ],
   [
-    "settings.world.reduce_oversized_areas.label",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasLabel",
     "Minska överdimensionerade områden"
   ],
   [
-    "settings.world.reduce_oversized_areas.tooltip",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasTooltip",
     "När den fullständiga åtkomstögonblicksbilden är för stor för minnesgränsen, försök med en mindre korridor baserad enbart på geometri runt de aktuella starterna och målen. Målet är att hitta någon väg; den kan skilja sig från en väg över hela området, och ett misslyckande bevisar inte att ingen väg finns."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesLabel",
     "Skörda störda träd"
   ],
   [
-    "settings.world.harvest_disrupted_trees.tooltip",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesTooltip",
     "Markera träd i färdigställda tillfarter och gruvanvisningarnas störningszoner för skörd. När inställningen är avstängd skapar ATD inga skördeordrar för träd. Skördeordrar som lagts av ATD tas bort med någon av Rensa-åtgärderna; orelaterade skördeordrar från spelaren bevaras."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.label",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisLabel",
     "Landskap för att ta bort skräp"
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisTooltip",
     "Tillåt borttagning av skräp för att göra den minsta möjliga terrängförändringen när ett stöd inte kan grävas ut utan landskapsplanering. När den är inaktiverad misslyckas begäran om borttagning och det begärande arbetsflödet meddelas."
   ],
   [
-    "settings.world.quick_remove_debris.label",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisLabel",
     "Ta snabbt bort skräp"
   ],
   [
-    "settings.world.quick_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisTooltip",
     "Styr när ATD använder spelets snabbborttagningsåtgärd för skräp från åtkomstvägar. Snabb bort spenderar Unity endast när spelet inte är pausat. Denna policy gäller inte knappen Rensa skräp i mintornet."
   ],
   [
-    "settings.world.quick_remove_debris.always",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlways",
     "Alltid"
   ],
   [
-    "settings.world.quick_remove_debris.always.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlwaysTooltip",
     "Använd Snabbborttagning för allt skräp från tillfartsvägen utom rekvisita som den planerade dumpningsbeteckningen kommer att begrava tillräckligt. Detta påskyndar landskapsarkitektur men spenderar Unity."
   ],
   [
-    "settings.world.quick_remove_debris.restrictive",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictive",
     "Restriktiv"
   ],
   [
-    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictiveTooltip",
     "Föredrar normal grävning men använd Quick Remove när schaktning inte kan garantera framkomlighet efter arbete."
   ],
   [
-    "settings.world.quick_remove_debris.never",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNever",
     "Aldrig"
   ],
   [
-    "settings.world.quick_remove_debris.never.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNeverTooltip",
     "Spendera aldrig Unity på Snabbborttagning för skräp från accessway. Borttagning är beroende av utgrävning och inställningen Landscape för att ta bort skräp, och spelaren kan behöva hjälpa till med snabb borttagning."
   ],
   [
-    "settings.world.safety_policy.label",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLabel",
     "Säkerhetspolicy"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.label",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasLabel",
     "Tillåt ramper utanför tornområden"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasTooltip",
     "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
-    "settings.world.safety_policy.tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyTooltip",
     "Styr hur försiktigt ATD förutsäger jordskred och hur långt avstånd den håller från skyddade hav och byggnader. Högre policyer reserverar mer utrymme; lägre policyer tillåter terrängarbete närmare faror. Standard: BAL."
   ],
   [
-    "settings.world.safety_policy.value_tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyValueTooltip",
     "{0}: lutningsfaktor för skredprognos {1}; skyddsavstånd {2} rutor."
   ],
   [
-    "settings.world.safety_policy.minimum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMinimum",
     "Minsta"
   ],
   [
-    "settings.world.safety_policy.low",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLow",
     "Låg"
   ],
   [
-    "settings.world.safety_policy.balanced",
+    "AutoTerrainDesignations.SettingsSafetyPolicyBalanced",
     "Balanserad"
   ],
   [
-    "settings.world.safety_policy.high",
+    "AutoTerrainDesignations.SettingsSafetyPolicyHigh",
     "Hög"
   ],
   [
-    "settings.world.safety_policy.maximum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMaximum",
     "Maximal"
   ],
   [
-    "settings.tab.pathfinder",
+    "AutoTerrainDesignations.SettingsTabPathfinder",
     "Tillfartsvägar"
   ],
   [
-    "settings.pathfinder.costs",
+    "AutoTerrainDesignations.SettingsPathfinderCostsHeading",
     "Ruttkostnader"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostLabel",
     "Kostnad för terränganvisning"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.tooltip",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostTooltip",
     "Fast kostnad för varje genererad terränganvisning. Högre värden gynnar färre terränganvisningar, även om det ökar resavståndet och den totala kostnaden för terrängarbete."
   ],
   [
-    "settings.pathfinder.direct_work_weight.label",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightLabel",
     "Vikt för direkt terrängarbete"
   ],
   [
-    "settings.pathfinder.direct_work_weight.tooltip",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightTooltip",
     "Vikt som används för att gräva eller dumpa terräng direkt ovanför eller under genererade terränganvisningar."
   ],
   [
-    "settings.pathfinder.side_ray_weight.label",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightLabel",
     "Vikt för sidostrålsarbete"
   ],
   [
-    "settings.pathfinder.side_ray_weight.tooltip",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightTooltip",
     "Vikt som tillämpas på terrängarbetsstrålar i sidled och kurvor."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceLabel",
     "Maxavstånd för kandidatstråle"
   ],
   [
-    "settings.pathfinder.candidate_distance.tooltip",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceTooltip",
     "Maximalt avstånd för kandidatstrålespårning. Högre värden skyddar och prissätter mycket stora sidokilar men kostar mer söktid. Standard: 16."
   ],
   [
-    "settings.pathfinder.limits",
+    "AutoTerrainDesignations.SettingsPathfinderLimitsHeading",
     "Sökgränser"
   ],
   [
-    "settings.pathfinder.visited.label",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesLabel",
     "Maximalt antal besökta noder"
   ],
   [
-    "settings.pathfinder.visited.tooltip",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesTooltip",
     "Maximalt antal granskade tillstånd. Högre värden kan lösa svårare rutter men använder mer tid och minne."
   ],
   [
-    "settings.pathfinder.timeout.label",
+    "AutoTerrainDesignations.SettingsSearchTimeoutLabel",
     "Tidsgräns för sökning (sekunder)"
   ],
   [
-    "settings.pathfinder.timeout.tooltip",
+    "AutoTerrainDesignations.SettingsSearchTimeoutTooltip",
     "Maximal verklig tid för en tillfartsvägssökning."
   ],
   [
-    "settings.pathfinder.frame_budget.label",
+    "AutoTerrainDesignations.SettingsFrameBudgetLabel",
     "Bildramsbudget (ms)"
   ],
   [
-    "settings.pathfinder.frame_budget.tooltip",
+    "AutoTerrainDesignations.SettingsFrameBudgetTooltip",
     "Ungefärlig sökarbetsbudget per spelbildruta. Högre värden blir klara snabbare men orsakar längre stopp."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "AutoTerrainDesignations.SettingsRayMaximumCostLabel",
     "Högsta kostnad per stråle"
   ],
   [
-    "settings.pathfinder.ray_max_cost.tooltip",
+    "AutoTerrainDesignations.SettingsRayMaximumCostTooltip",
     "Begränsar landskapskostnaden som bidrar med en olöst stråle."
   ],
   [
-    "settings.pathfinder.ray_unresolved.label",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyLabel",
     "Straff för olöst stråle"
   ],
   [
-    "settings.pathfinder.ray_unresolved.tooltip",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyTooltip",
     "Straff när en stråle inte möter terräng inom sitt spårområde."
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.label",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsLabel",
     "Dämpa äldre ramper"
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsTooltip",
     "Inaktivera den äldre generatorn för raka ramper så att resultat och fel för tillfarter kan testas direkt. Lämna avstängt för normalt reservbeteende."
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.label",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleLabel",
     "Terrängkostnad vs. avstånd"
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleTooltip",
     "Avståndskostnad som tilldelas en enhet terrängkostnad. En terrängkostnadsenhet motsvarar att dumpa eller gräva en enhet sten. Intervall: 0-100; standard: 1. Ett högre värde gynnar rutter med mindre terrängarbete."
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostLabel",
     "Terrängkostnad för propprensning"
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostTooltip",
     "Terrängkostnad som debiteras en gång per rensningsursprung för objekt som används av åtkomstsökningen. En enhet motsvarar en dumpad eller grävd enhet sten; standard 6 gynnar att köra runt rensningshinder när en rimlig omväg finns. Högre värden gör rensningsrutter mindre attraktiva."
   ],
   [
-    "settings.experimental_access.landslide_run.label",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunLabel",
     "Släntfaktor för skredskydd"
   ],
   [
-    "settings.experimental_access.landslide_run.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunTooltip",
     "Horisontellt uteslutningsavstånd per vertikal terrängnivå. 1 motsvarar en 45-graders lutning; högre värden vidgar uteslutningszonen (t.ex. i ren sand), medan lägre värden gör den smalare. Intervall: 0,05-2; standard: 1."
   ],
   [
-    "settings.max_slope.label",
+    "AutoTerrainDesignations.SettingsMaxSlopeLabel",
     "Maxlutning"
   ],
   [
-    "settings.max_slope.tooltip",
+    "AutoTerrainDesignations.SettingsMaxSlopeTooltip",
     "Största tillåtna höjdskillnad mellan intilliggande markeringshörn. Intervall: 1-3."
   ],
   [
-    "settings.bottom_flattening.label",
+    "AutoTerrainDesignations.SettingsBottomFlatteningLabel",
     "Bottenutjämning"
   ],
   [
-    "settings.bottom_flattening.tooltip",
+    "AutoTerrainDesignations.SettingsBottomFlatteningTooltip",
     "Styrka för bottenutjämning från 0 till 10. 0 stänger av utjämningspasset."
   ],
   [
-    "settings.batch_size.label",
+    "AutoTerrainDesignations.SettingsBatchSizeLabel",
     "Batchstorlek"
   ],
   [
-    "settings.batch_size.tooltip",
+    "AutoTerrainDesignations.SettingsBatchSizeTooltip",
     "Markeringar som placeras per coroutine-bildruta när spelet inte är pausat. Intervall: 1-200."
   ],
   [
-    "settings.panel_defaults.mining_collapsed.label",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedLabel",
     "Brytningspanel hopfälld"
   ],
   [
-    "settings.panel_defaults.mining_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedTooltip",
     "Om panelen för brytningsmarkeringar ska börja hopfälld som standard."
   ],
   [
-    "settings.panel_defaults.ore_collapsed.label",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedLabel",
     "Malmpanel hopfälld"
   ],
   [
-    "settings.panel_defaults.ore_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedTooltip",
     "Om panelen för malmsammansättning ska börja hopfälld som standard."
   ],
   [
-    "settings.panel_defaults.farming_collapsed.label",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedLabel",
     "Jordbrukspanel hopfälld"
   ],
   [
-    "settings.panel_defaults.farming_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedTooltip",
     "Om panelen för jordbruksförberedelse ska börja hopfälld som standard."
   ],
   [
-    "settings.notifications.excavator_completion.label",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsLabel",
     "Aviseringar för färdiga grävmaskiner"
   ],
   [
-    "settings.notifications.excavator_completion.tooltip",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsTooltip",
     "Om ATD visar ett grönt meddelande när någon fordonsdepå slutför en otilldelad (gratis) grävmaskin."
   ],
   [
-    "settings.notifications.ramp_warning.label",
+    "AutoTerrainDesignations.SettingsRampNotificationsLabel",
     "Rampvarningar"
   ],
   [
-    "settings.notifications.ramp_warning.tooltip",
+    "AutoTerrainDesignations.SettingsRampNotificationsTooltip",
     "Om ATD visar varningar för rampåtkomst på gruvtorn."
   ],
   [
-    "settings.ore_quality.min_ore_height.label",
+    "AutoTerrainDesignations.SettingsMinOreHeightLabel",
     "Minsta malmhöjd"
   ],
   [
-    "settings.ore_quality.min_ore_height.tooltip",
+    "AutoTerrainDesignations.SettingsMinOreHeightTooltip",
     "Minsta malmtjocklek i terrängrutor för den här kvalitetsnivån."
   ],
   [
-    "settings.ore_quality.min_bottom_density.label",
+    "AutoTerrainDesignations.SettingsMinBottomDensityLabel",
     "Minsta bottendensitet"
   ],
   [
-    "settings.ore_quality.min_bottom_density.tooltip",
+    "AutoTerrainDesignations.SettingsMinBottomDensityTooltip",
     "Minsta malmdensitet från föregående malmbotten till denna malmbotten. Begränsad från 0 till 1."
   ],
   [
-    "settings.ore_quality.min_ore_purity.label",
+    "AutoTerrainDesignations.SettingsMinOrePurityLabel",
     "Minsta malmrenhet"
   ],
   [
-    "settings.ore_quality.min_ore_purity.tooltip",
+    "AutoTerrainDesignations.SettingsMinOrePurityTooltip",
     "Minsta förhållande malm/kolumn för den här kvalitetsnivån. Begränsad från 0 till 1."
   ],
   [
-    "settings.ore_quality.min_component_size.label",
+    "AutoTerrainDesignations.SettingsMinComponentSizeLabel",
     "Minsta komponentstorlek"
   ],
   [
-    "settings.ore_quality.min_component_size.tooltip",
+    "AutoTerrainDesignations.SettingsMinComponentSizeTooltip",
     "Minsta antal sammanhängande markeringsrutor för att ett kluster ska överleva isoleringsfiltret."
   ],
   [
-    "settings.corner_mode.label",
+    "AutoTerrainDesignations.SettingsCornerModeLabel",
     "Läge för hörnmarkeringar"
   ],
   [
-    "settings.corner_mode.tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeTooltip",
     "Tangent för att gå in i och växla läget för hörnmarkeringar när ett terrängmarkeringsverktyg är aktivt."
   ],
   [
-    "settings.corner_mode.invalid_tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeInvalidTooltip",
     "Använd en enskild tangent, till exempel K, 1, F1, Space eller Escape."
   ],
   [
-    "settings.status.applied",
+    "AutoTerrainDesignations.SettingsApplied",
     "Tillämpat"
   ],
   [
-    "settings.status.invalid_key",
+    "AutoTerrainDesignations.SettingsInvalidKey",
     "Ogiltig tangent"
   ],
   [
-    "settings.action.save_as_global",
+    "AutoTerrainDesignations.SettingsSaveAsGlobal",
     "Spara som konfig"
   ],
   [
-    "settings.action.save_as_global.tooltip",
+    "AutoTerrainDesignations.SettingsSaveAsGlobalTooltip",
     "Spara dessa inställningar till ATDsettings.json. De används som standardvärden för alla nya spel."
   ],
   [
-    "settings.action.restore_defaults",
+    "AutoTerrainDesignations.SettingsRestoreDefaults",
     "Återställ standard"
   ],
   [
-    "settings.action.restore_defaults.tooltip",
+    "AutoTerrainDesignations.SettingsRestoreDefaultsTooltip",
     "Återställer moddens globala standardvärden för alla inställningar. (Sparar dem inte automatiskt som konfig.)"
   ],
   [
-    "settings.status.saved_to_file",
+    "AutoTerrainDesignations.SettingsSavedToFile",
     "Sparat i ATDsettings.json."
   ],
   [
-    "settings.status.save_failed",
+    "AutoTerrainDesignations.SettingsSaveFailed",
     "Det gick inte att spara; kontrollera loggen."
   ],
   [
-    "settings.status.restored_defaults",
+    "AutoTerrainDesignations.SettingsRestoredDefaults",
     "Inbyggda standardvärden återställda i minnet."
   ],
   [
-    "panel.ore.title",
+    "AutoTerrainDesignations.OreTitle",
     "Malmsammansättning"
   ],
   [
-    "panel.ore.description",
+    "AutoTerrainDesignations.OreDescription",
     "Malmresurser inom tornets aktuella grävanvisningar. (Tar inte hänsyn till potentiella ras.)"
   ],
   [
-    "panel.ore.prompt_scan",
+    "AutoTerrainDesignations.OrePromptScan",
     "Tryck ↺ för att skanna malmsammansättning."
   ],
   [
-    "panel.ore.scan_tooltip",
+    "AutoTerrainDesignations.OreScanTip",
     "Skanna malmsammansättning"
   ],
   [
-    "panel.ore.no_tower",
+    "AutoTerrainDesignations.OreNoTower",
     "Inget torn valt."
   ],
   [
-    "panel.ore.no_minable_designations",
+    "AutoTerrainDesignations.OreNoMinableDesig",
     "Inga grävanvisningar hittades."
   ],
   [
-    "panel.ore.priority_selected_tooltip",
+    "AutoTerrainDesignations.OrePrioritySelectedTipFmt",
     "Tornets gruvprioritet satt till {0}. Klicka för att ta bort."
   ],
   [
-    "panel.ore.priority_set_tooltip",
+    "AutoTerrainDesignations.OrePrioritySetTipFmt",
     "Sätt tornets gruvprioritet till {0}."
   ],
   [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "AutoTerrainDesignations.OreSorterAssignedTrucksEnforceTip",
     "Endast tilldelade lastbilar (och lastbilar tilldelade till deltagande gruvtorn) får hämta eller leverera last här."
   ],
   [
-    "panel.farming.title",
+    "AutoTerrainDesignations.FarmingTitle",
     "Förberedelse av odlingsmark"
   ],
   [
-    "panel.farming.description",
+    "AutoTerrainDesignations.FarmingDescription",
     "Automatiserar förberedelse och slutlig fyllning av plana utjämningsanvisningar så att det översta lagret blir odlingsbart."
   ],
   [
-    "panel.farming.automation_toggle.label",
+    "AutoTerrainDesignations.FarmingToggleLabel",
     "Automatisk förberedelse av odlingsmark"
   ],
   [
-    "panel.farming.automation_toggle.tooltip",
+    "AutoTerrainDesignations.FarmingToggleTip",
     "Förbered plana utjämningsanvisningar för odlingsmark genom att rensa olämpligt ytmaterial och sedan återställa de slutliga fyllningsanvisningarna."
   ],
   [
-    "panel.farming.idle_release_excavators.label",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsLabel",
     "Släpp grävmaskiner vid inaktivitet"
   ],
   [
-    "panel.farming.idle_release_excavators.tooltip",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsTip",
     "Släpp tillfälligt grävmaskiner från detta torn när ingen anvisning har väntande grävarbete, eller när tornet är pausat.\nGrävmaskiner spåras och tilldelas igen när grävarbetet återkommer."
   ],
   [
-    "panel.farming.truck_idle_policy.label",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyLabel",
     "Inaktiv lastbils beteende"
   ],
   [
-    "panel.farming.truck_idle_policy.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyTip",
     "Välj vad tilldelade lastbilar gör när det här tornet inte har något pågående grävarbete eller när tornet är pausat."
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTower",
     "Parkera vid tornet"
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTowerTip",
     "Vaniljbeteende: behåll lastbilar tilldelade och skicka tillbaka dem till tornet när de är inaktiva.\nFördelar: lastbilar håller sig nära och redo för nästa jobb.\nNackdelar: lediga lastbilar kan ockupera tornområdet och göra onödiga returresor."
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPut",
     "Stanna kvar"
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPutTip",
     "Håll lastbilar tilldelade utan att skicka dem tillbaka till tornet när de är inaktiva.\nFördelar: undviker onödiga returresor och håller lastbilar nära deras senaste arbetsområde.\nNackdelar: lastbilar kan vara utspridda över arbetsområdet."
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftRelease",
     "Mjuk släppning"
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftReleaseTip",
     "Ta tillfälligt bort tilldelningen av lediga lastbilar så att de kan hjälpa till med allmänna transport- och byggjobb. Lastbilar flyttas helt enkelt om till detta torn när grävarbetet återvänder.\nFördelar: släppta lastbilar kan hjälpa till med allmän transport och konstruktion när de är på tomgång.\nNackdelar: om de tilldelas ett annat torn, särskilt ett som inte använder Soft Release, kan de vara otillgängliga när det här tornets arbete återupptas."
   ],
   [
-    "panel.farming.soft_released_excavators.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedExcavatorsLabel",
     "Mjukfrigjorda grävmaskiner:"
   ],
   [
-    "panel.farming.vehicle_status.assigned",
+    "AutoTerrainDesignations.FarmingVehicleStatusAssigned",
     "Tilldelad: {0}"
   ],
   [
-    "panel.farming.vehicle_status.none",
+    "AutoTerrainDesignations.FarmingVehicleStatusNone",
     "inga"
   ],
   [
-    "panel.farming.soft_released_trucks.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedTrucksLabel",
     "Mjuksläppta lastbilar:"
   ],
   [
-    "panel.farming.vehicle_status.released",
+    "AutoTerrainDesignations.FarmingVehicleStatusReleased",
     "Frigjord av ATD: "
   ],
   [
-    "panel.farming.vehicle_status.destroyed",
+    "AutoTerrainDesignations.FarmingVehicleStatusDestroyed",
     "<förstörd>"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "AutoTerrainDesignations.CornerOuterTip",
     "Hörn (yttre): placera konvexa hörnramper."
   ],
   [
-    "toolbox.corner_inner.tooltip",
+    "AutoTerrainDesignations.CornerInnerTip",
     "Hörn (inre): placera konkava hörnramper."
   ],
   [
-    "toolbox.corner_planar.tooltip",
+    "AutoTerrainDesignations.CornerPlanarTip",
     "Planar hörna: placera en diagonal planramp."
   ],
   [
-    "notification.ramp_access_failed",
+    "AutoTerrainDesignations.NotifRampFailed",
     "[ATD] {entity} kunde inte påbörja en åtkomstramp"
   ],
   [
-    "notification.ramp_access_truncated",
+    "AutoTerrainDesignations.NotifRampTruncated",
     "[ATD] {entity} kunde inte få plats med en fullständig åtkomstramp"
   ],
   [
-    "notification.ramp_access_not_accessible",
+    "AutoTerrainDesignations.NotifRampNotAccessible",
     "[ATD] {entity} kunde inte hitta en väg till rampen"
   ],
   [
-    "notification.ramp_access_snapshot_too_large",
+    "AutoTerrainDesignations.NotifRampSnapshotTooLarge",
     "[ATD] {entity}s åtkomstområde är för stort för sökningen efter svängramper"
   ],
   [
-    "notification.farming_complete",
+    "AutoTerrainDesignations.NotifFarmingComplete",
     "[ATD] {entity} har slutfört förberedelse och fyllning av odlingsmark"
   ],
   [
-    "notification.excavator_completed",
+    "AutoTerrainDesignations.NotifExcavatorCompleted",
     "[ATD] {entity} slutförde en otilldelad {0}"
   ],
   [
-    "notification.debris_cleanup_none_found",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneFound",
     "[ATD] {entity} hittade inget skräp att rensa"
   ],
   [
-    "notification.debris_cleanup_none_reachable",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneReachable",
     "[ATD] {entity} hittade inget nåbart skräp att rensa. Ctrl-klicka för att ta med oåtkomliga skräp"
   ],
   [
-    "vehicle_order.confirm.singular",
+    "AutoTerrainDesignations.EnqueueConfirmPromptSingular",
     "Beställa en ny {0} för {2} vid {1}?"
   ],
   [
-    "vehicle_order.confirm.plural",
+    "AutoTerrainDesignations.EnqueueConfirmPromptPlural",
     "Beställa {0} nya fordon av typen {1} för {3} vid {2}?"
   ],
   [
-    "vehicle_order.confirm.button",
+    "AutoTerrainDesignations.EnqueueConfirmBtnText",
     "Beställ"
   ],
   [
-    "vehicle_order.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToDepotTooltip",
     "Zooma till {0}"
   ],
   [
-    "access_search.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToAccessActionTooltip",
     "Zooma till åtkomståtgärden"
   ],
   [
-    "vehicle_order.preassigned.tooltip",
+    "AutoTerrainDesignations.PreAssignedTooltipFmt",
     "Förtilldelad till {0}"
   ],
   [
-    "vehicle_order.shortcut.tooltip",
+    "AutoTerrainDesignations.OrderConstructionShortcutHint",
     "Skift-Alt-klicka för att beställa en ny {0} för {2} på {1}"
   ]
 ]

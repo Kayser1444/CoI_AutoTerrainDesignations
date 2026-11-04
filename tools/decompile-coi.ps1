@@ -7,9 +7,16 @@
 # Usage:
 #   .\tools\decompile-coi.ps1            # skip DLLs whose output is already newer than the source DLL
 #   .\tools\decompile-coi.ps1 -Force     # always re-decompile all DLLs
+#   -SnapshotGit explicitly enables local reference snapshots/tags; run elevated
+#   when repository policy requires access to .git/index.lock. No mod metadata is changed.
 
+[CmdletBinding()]
 param(
-    [switch]$Force
+    [switch]$Force,
+    [string]$ManagedPath,
+    [string]$OutputRoot = (Join-Path $env:APPDATA 'Captain of Industry\Mafi'),
+    [switch]$SnapshotGit,
+    [switch]$SkipToolUpdateCheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,7 +60,7 @@ if (Test-Path -LiteralPath $lastCheckFile) {
     }
 }
 
-if ($needsCheck) {
+if ($needsCheck -and -not $SkipToolUpdateCheck) {
     try {
         $response = Invoke-RestMethod -Uri "https://api.nuget.org/v3-flatcontainer/ilspycmd/index.json" -UseBasicParsing -TimeoutSec 3
         if ($response -and $response.versions) {
@@ -85,14 +92,17 @@ if ($needsCheck) {
 # ---------------------------------------------------------------------------
 # 2. Resolve paths
 # ---------------------------------------------------------------------------
-$managedPath = if ($env:CAPTAIN_INDUSTRY_MANAGED_PATH) {
+$managedPath = if ($ManagedPath) {
+    $ManagedPath
+}
+elseif ($env:CAPTAIN_INDUSTRY_MANAGED_PATH) {
     $env:CAPTAIN_INDUSTRY_MANAGED_PATH
 }
 else {
     Join-Path ${env:ProgramFiles(x86)} 'Steam\steamapps\common\Captain of Industry\Captain of Industry_Data\Managed'
 }
 
-$outputRoot = Join-Path $env:APPDATA 'Captain of Industry\Mafi'
+$outputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 
 if (-not (Test-Path -LiteralPath $managedPath)) {
     Write-Error "CoI Managed directory not found: $managedPath`nSet CAPTAIN_INDUSTRY_MANAGED_PATH to override."
@@ -124,16 +134,18 @@ if (Test-Path -LiteralPath $gameVersionCsPath) {
 # ---------------------------------------------------------------------------
 # 2.6. Git pre-snapshot — commit current state before wiping
 # ---------------------------------------------------------------------------
-$useGit = Test-Path -LiteralPath (Join-Path $outputRoot '.git')
+$useGit = $SnapshotGit -and (Test-Path -LiteralPath (Join-Path $outputRoot '.git'))
 if ($useGit) {
     Push-Location $outputRoot
     $dirty = git status --porcelain 2>&1
     if ($dirty) {
         Write-Host '[git] Committing current decompiled state before update...'
         git add -A | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not stage decompiled snapshot.' }
         $snapLabel = if ($buildNumber) { "$gameVersion-b$buildNumber" } elseif ($gameVersion) { $gameVersion } else { 'unknown' }
         $snapMsg = "CoI $snapLabel"
         git commit -m $snapMsg --quiet
+        if ($LASTEXITCODE -ne 0) { throw 'Could not commit decompiled snapshot.' }
     }
     Pop-Location
 }
@@ -173,7 +185,13 @@ foreach ($name in $dlls) {
 
     Write-Host "[decompile] $name ..."
     if (Test-Path -LiteralPath $outputDir) {
-        Remove-Item -LiteralPath $outputDir -Recurse -Force
+        $resolvedOutput = [System.IO.Path]::GetFullPath($outputDir)
+        $expectedOutput = Join-Path $outputRoot $name
+        if ($resolvedOutput -ne $expectedOutput -or
+            (Get-Item -LiteralPath $outputDir).Attributes.HasFlag([System.IO.FileAttributes]::ReparsePoint)) {
+            throw "Refusing to remove unexpected/junction output directory: $outputDir"
+        }
+        Remove-Item -LiteralPath $resolvedOutput -Recurse -Force
     }
 
     & $ilspy $dllPath --project --outputdir $outputDir --nested-directories
@@ -297,6 +315,7 @@ if ($useGit -and ($decompiled.Count -gt 0 -or $assetCatalogChanged)) {
     }
     $versionLabel = if ($gameVersion -and $buildNumber) { "$gameVersion-b$buildNumber" } elseif ($gameVersion) { $gameVersion } else { $null }
     git add -A | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not stage decompiled update.' }
     git diff --cached --quiet 2>$null
     if ($LASTEXITCODE -ne 0) {
         $commitMsg = if ($decompiled.Count -gt 0 -and $versionLabel) {
@@ -309,7 +328,12 @@ if ($useGit -and ($decompiled.Count -gt 0 -or $assetCatalogChanged)) {
             'Update asset catalog'
         }
         git commit -m $commitMsg --quiet
-        if ($decompiled.Count -gt 0 -and $versionLabel) { git tag -f "v$versionLabel" }
+        if ($LASTEXITCODE -ne 0) { throw 'Could not commit decompiled update.' }
+        if ($decompiled.Count -gt 0 -and $versionLabel) {
+            $tag = "v$versionLabel"
+            git rev-parse --verify --quiet "refs/tags/$tag" *> $null
+            if ($LASTEXITCODE -ne 0) { git tag $tag }
+        }
         $commitCount = [int](git rev-list --count HEAD 2>$null)
         Write-Host ''
         Write-Host "[git] Committed: $commitMsg  (tag: v$versionLabel)"
@@ -325,98 +349,8 @@ if ($useGit -and ($decompiled.Count -gt 0 -or $assetCatalogChanged)) {
     Pop-Location
 }
 
-# ---------------------------------------------------------------------------
-# 6. Sync max_verified_game_version in all maintained mod manifests
-# ---------------------------------------------------------------------------
-if ($null -ne $gameVersion) {
-    $modsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $maintainedModNames = @(
-        'AutoTerrainDesignations'
-        'AutoForestryDesignations'
-        'DesignerToolkit'
-        'KaysersPreIndustrialEra'
-    )
-
-    foreach ($modName in $maintainedModNames) {
-        $manifestPath = Join-Path (Join-Path $modsRoot $modName) 'manifest.json'
-        if (-not (Test-Path -LiteralPath $manifestPath)) {
-            Write-Warning "Maintained mod manifest not found, skipping: $manifestPath"
-            continue
-        }
-
-        $manifestContent = Get-Content -LiteralPath $manifestPath -Raw
-        $current = if ($manifestContent -match '"max_verified_game_version"\s*:\s*"([^"]*)"') { $Matches[1] } else { $null }
-
-        if ($current -ne $gameVersion) {
-            $updated = $manifestContent -replace '("max_verified_game_version"\s*:\s*")[^"]*"', "`${1}$gameVersion`""
-            Set-Content -LiteralPath $manifestPath -Value $updated -NoNewline
-            Write-Host ''
-            Write-Host "${modName}\manifest.json: max_verified_game_version  $current  ->  $gameVersion"
-        }
-        else {
-            Write-Host ''
-            Write-Host "${modName}\manifest.json: max_verified_game_version already $gameVersion"
-        }
-    }
-}
-
-# ---------------------------------------------------------------------------
-# 7. Record game version compatibility verification in maintained changelogs
-# ---------------------------------------------------------------------------
-if ($null -ne $gameVersion) {
-    $modsRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $allMaintainedMods = @(
-        'AutoTerrainDesignations'
-        'AutoForestryDesignations'
-        'DesignerToolkit'
-        'KaysersPreIndustrialEra'
-        'CoI_AutoHelpers'
-    )
-
-    $versionLabel = if ($buildNumber) { "$gameVersion (build $buildNumber)" } else { $gameVersion }
-
-    foreach ($modName in $allMaintainedMods) {
-        $modRoot = Join-Path $modsRoot $modName
-        $changelogPath = $null
-        foreach ($name in @('changelog.md', 'CHANGELOG.md')) {
-            $candidate = Join-Path $modRoot $name
-            if (Test-Path -LiteralPath $candidate) {
-                $changelogPath = $candidate
-                break
-            }
-        }
-
-        if (-not $changelogPath) { continue }
-
-        $content = Get-Content -LiteralPath $changelogPath -Raw
-        if (-not $content) { continue }
-
-        if ($content -match [regex]::Escape("Captain of Industry $gameVersion")) {
-            Write-Host ''
-            Write-Host "${modName}\$((Split-Path $changelogPath -Leaf)): compatibility already recorded for $gameVersion"
-            continue
-        }
-
-        $starCount = ([regex]::Matches($content, '(?m)^\*\s')).Count
-        $dashCount = ([regex]::Matches($content, '(?m)^-\s')).Count
-        $bullet = if ($starCount -gt $dashCount) { '* ' } else { '- ' }
-        $entryText = "${bullet}Verified compatibility with Captain of Industry $versionLabel."
-
-        $updated = $null
-        if ($content -match '(?si)(##\s*\[Unreleased\].*?###\s*Changed\r?\n)') {
-            $rx = [regex]::new('(?si)(##\s*\[Unreleased\].*?###\s*Changed\r?\n\r?\n?)')
-            $updated = $rx.Replace($content, "`${1}$entryText`n", 1)
-        }
-        elseif ($content -match '(?mi)^(?<header>#{0,3}\s*.*\[unreleased\].*)$') {
-            $rx = [regex]::new('(?mi)^(?<header>#{0,3}\s*.*\[unreleased\].*)\r?\n')
-            $updated = $rx.Replace($content, "`${header}`n`n$entryText`n", 1)
-        }
-
-        if ($updated -and $updated -ne $content) {
-            Set-Content -LiteralPath $changelogPath -Value $updated -NoNewline -Encoding UTF8
-            Write-Host ''
-            Write-Host "${modName}\$((Split-Path $changelogPath -Leaf)): added verification entry for $versionLabel"
-        }
-    }
-}
-
+# Decompilation updates references, not compatibility evidence. Manifest verified
+# versions and changelog assertions are maintained only after actual verification.
+Write-Host ''
+Write-Host 'Reference refresh complete. No mod manifests or changelogs were changed.'
+Write-Host 'For the compatibility report: tools\compatibility\check-coi-compatibility.ps1 -ApiRelease <release>'

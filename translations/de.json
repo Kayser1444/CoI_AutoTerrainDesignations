@@ -1,842 +1,842 @@
 [
   [
-    "panel.atd.vehicles.show_unowned",
+    "AutoTerrainDesignations.ShowUnownedVehicles",
     "Freigeschaltete Fahrzeugtypen anzeigen, die du nicht besitzt, damit du sie über diesen Turm bestellen kannst. Eigene Fahrzeuge und die vorgemerkten Aufträge dieses Turms werden immer angezeigt."
   ],
   [
-    "panel.atd.vehicles.hide_unowned",
+    "AutoTerrainDesignations.HideUnownedVehicles",
     "Nicht eigene Fahrzeugtypen ausblenden. Eigene Fahrzeuge und die vorgemerkten Aufträge dieses Turms bleiben sichtbar."
   ],
   [
-    "settings.world.default_mine.label",
+    "AutoTerrainDesignations.SettingsDefaultMineLabel",
     "Nicht zugewiesene Bagger graben"
   ],
   [
-    "settings.world.default_mine.tooltip",
+    "AutoTerrainDesignations.SettingsDefaultMineTooltip",
     "Nicht zugewiesene Bagger bearbeiten Abbau-Markierungen außerhalb der Bereiche aller Mine Control Towers."
   ],
   [
-    "common.level.off",
+    "AutoTerrainDesignations.LevelOff",
     "Aus"
   ],
   [
-    "common.level.low",
+    "AutoTerrainDesignations.LevelLow",
     "Niedrig"
   ],
   [
-    "common.level.med",
+    "AutoTerrainDesignations.LevelMed",
     "Mittel"
   ],
   [
-    "common.level.high",
+    "AutoTerrainDesignations.LevelHigh",
     "Hoch"
   ],
   [
-    "common.level.max",
+    "AutoTerrainDesignations.LevelMax",
     "Maximum"
   ],
   [
-    "panel.designations.title",
+    "AutoTerrainDesignations.DesigTitle",
     "Bergbaugebiete"
   ],
   [
-    "panel.designations.description",
+    "AutoTerrainDesignations.DesigDescription",
     "Erstellt automatische Geländegebiete für diesen Turm."
   ],
   [
-    "panel.designations.create_button",
+    "AutoTerrainDesignations.DesigCreateBtn",
     "Gebiete erstellen"
   ],
   [
-    "panel.designations.create_tooltip",
+    "AutoTerrainDesignations.DesigCreateTip",
     "Scannt den Bereich dieses Turms und platziert Bergbaugebiete."
   ],
   [
-    "panel.designations.debris_tooltip",
+    "AutoTerrainDesignations.DesigDebrisTip",
     "Platzieren Sie Markierungen zur Trümmerentfernung auf erreichbaren, unbesetzten Zellen. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen. Klicken Sie bei gedrückter Umschalttaste, um auch vorhandene Gelände- und Forstbezeichnungen zu ersetzen."
   ],
   [
-    "panel.designations.clear_tooltip",
+    "AutoTerrainDesignations.DesigClearTip",
     "Löschen Sie die ATD-generierten Bezeichnungen dieses Turms. Klicken Sie bei gedrückter Umschalttaste, um alle Geländebezeichnungen im Bereich des Turms zu löschen."
   ],
   [
-    "panel.designations.clear_tooltip.shift_click",
+    "AutoTerrainDesignations.DesigClearTipWithShiftClick",
     "Löschen Sie die ATD-generierten Bezeichnungen dieses Turms. Klicken Sie bei gedrückter Umschalttaste, um alle Geländebezeichnungen im Bereich des Turms zu löschen."
   ],
   [
-    "panel.designations.ore_filter.auto",
+    "AutoTerrainDesignations.DesigOreFilterAuto",
     "AUTOMATISCH"
   ],
   [
-    "panel.designations.accessway_mode.label",
+    "AutoTerrainDesignations.DesigAccesswayModeLabel",
     "Accessway-Modus"
   ],
   [
-    "settings.dumping_priority.label",
+    "AutoTerrainDesignations.DumpingPriorityLabel",
     "Abladepriorität"
   ],
   [
-    "settings.dumping_priority.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityDescription",
     "Verwendet die Vanilla-Importprioritäten 1–15 für aktives Abladen; kleinere Zahlen sind dringender. Passiv verwendet passives Vanilla-Abladen und importiert nur von aktiven Exporteuren. Während des Ackerland-Füllens verwendet Passiv vorübergehend die aktive Priorität 14, solange die Ablageregeln auf landwirtschaftliche Produkte beschränkt sind. Standard: Passiv."
   ],
   [
-    "settings.dumping_priority.passive",
+    "AutoTerrainDesignations.DumpingPriorityPassiveLabel",
     "Passiv"
   ],
   [
-    "settings.dumping_priority.passive.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityPassiveTooltip",
     "Nur von aktiven Exporteuren importieren."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3",
+    "AutoTerrainDesignations.AccesswayModeLegacy3",
     "Altmodus 3"
   ],
   [
-    "panel.designations.accessway_mode.legacy_4",
+    "AutoTerrainDesignations.AccesswayModeLegacy4",
     "Vermächtnis 4"
   ],
   [
-    "panel.designations.accessway_mode.legacy_5",
+    "AutoTerrainDesignations.AccesswayModeLegacy5",
     "Altmodus 5"
   ],
   [
-    "panel.designations.accessway_mode.off.tooltip",
+    "AutoTerrainDesignations.AccesswayModeOffTip",
     "Deaktivieren Sie generierte Zufahrten und Rampen."
   ],
   [
-    "panel.designations.accessway_mode.auto.tooltip",
+    "AutoTerrainDesignations.AccesswayModeAutoTip",
     "Verwenden Sie den größten Bagger, der diesem Turm zugewiesen oder vorab zugewiesen wurde, und dann den größten Bagger auf der Karte. Ohne Bagger verhält sich AUTO wie AUS."
   ],
   [
-    "panel.designations.accessway_mode.t1.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT1Tip",
     "Generieren Sie verlegte Zufahrtswege mithilfe der T1-Bagger-Pfadbarkeit."
   ],
   [
-    "panel.designations.accessway_mode.t2.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT2Tip",
     "Generieren Sie verlegte Zufahrtswege mithilfe der T2-Bagger-Pfadbarkeit."
   ],
   [
-    "panel.designations.accessway_mode.t3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT3Tip",
     "Generieren Sie zweispurige Zufahrtswege mithilfe der Befahrbarkeit von T3/Mega-Baggern."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy3Tip",
     "Generieren Sie nur eine ältere gerade Rampe mit einer Breite von drei Bezeichnungszellen, validiert für T3-/Mega-Bagger."
   ],
   [
-    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy4Tip",
     "Generieren Sie nur eine alte gerade Rampe mit einer Breite von vier Bezeichnungszellen, validiert für T3-/Mega-Bagger."
   ],
   [
-    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy5Tip",
     "Generieren Sie nur eine alte gerade Rampe mit einer Breite von fünf Bezeichnungszellen, validiert für T3-/Mega-Bagger."
   ],
   [
-    "panel.designations.max_layers.label",
+    "AutoTerrainDesignations.DesigMaxLayersLabel",
     "Max. abzutragende Schichten"
   ],
   [
-    "panel.designations.max_layers.tooltip",
+    "AutoTerrainDesignations.DesigMaxLayersTip",
     "Maximale Anzahl von Schichten, die von der Oberfläche abgetragen werden. (∞ = keine Begrenzung.)"
   ],
   [
-    "panel.designations.elevation_limit.label",
+    "AutoTerrainDesignations.DesigElevLimitLabel",
     "Höhengrenze"
   ],
   [
-    "panel.designations.elevation_limit.tooltip",
+    "AutoTerrainDesignations.DesigElevLimitTip",
     "Maximale (absolute) Abbauhöhe (-∞ = keine Begrenzung.)"
   ],
   [
-    "panel.designations.ore_purity.label",
+    "AutoTerrainDesignations.DesigOrePurityLabel",
     "Erzqualität"
   ],
   [
-    "panel.designations.ore_purity.tooltip",
+    "AutoTerrainDesignations.DesigOrePurityTip",
     "Wie streng der Scan Geländesäulen nach Erzgehalt filtert. Dies sagt nicht voraus, welches Materialgemisch die Bagger fördern werden.\nAus: alle Felder einbeziehen, bis zur vollen Tiefe graben.\nNiedrig: sehr spärliche Felder ausschließen, dünne Erzreste am unteren Rand abschneiden.\nMittel: mäßiger Gehalt — Felder mit starker Deckschicht oder wenig Erz überspringen.\nHoch: nur reiche Felder mit sauberer Erzsäule.\nMax: die strengsten Filter für Deckschicht, Tiefe und Erzdichte anwenden."
   ],
   [
-    "settings.ore_quality.value_tooltip",
+    "AutoTerrainDesignations.OreQualityValueTooltip",
     "{0}: minimale Erzmächtigkeit {1:0.##} Geländekacheln; minimale Bodendichte {2:P0}; minimale Erzreinheit {3:P0}; minimale Clustergröße {4} verbundene Kacheln."
   ],
   [
-    "settings.ore_quality.value.off",
+    "AutoTerrainDesignations.OreQualityOff",
     "Aus"
   ],
   [
-    "settings.ore_quality.value.low",
+    "AutoTerrainDesignations.OreQualityLow",
     "Niedrig"
   ],
   [
-    "settings.ore_quality.value.medium",
+    "AutoTerrainDesignations.OreQualityMedium",
     "Mittel"
   ],
   [
-    "settings.ore_quality.value.high",
+    "AutoTerrainDesignations.OreQualityHigh",
     "Hoch"
   ],
   [
-    "settings.ore_quality.value.maximum",
+    "AutoTerrainDesignations.OreQualityMaximum",
     "Maximal"
   ],
   [
-    "panel.designations.corridor_clearance.label",
+    "AutoTerrainDesignations.DesigCorridorClearanceLabel",
     "Korridorfreiraum"
   ],
   [
-    "panel.designations.corridor_clearance.tooltip",
+    "AutoTerrainDesignations.DesigCorridorClearanceTip",
     "Mindestbreite für Korridore, um Erzbereiche zu verbinden und Passierbarkeit sicherzustellen.\n0 = deaktiviert (Bereiche bleiben getrennt, keine Korridore oder Lochfüllung).\n1 = 1-Feld-Korridore (kleine und mittlere Fahrzeuge).\n2 = 2-Feld-Korridore (Mega-Fahrzeuge).\n"
   ],
   [
-    "panel.designations.scanning_filter.label",
+    "AutoTerrainDesignations.DesigScanningFilterLabel",
     "Scanfilter:"
   ],
   [
-    "panel.designations.scanning_filter.tooltip",
+    "AutoTerrainDesignations.DesigScanningFilterTip",
     "Wählt ein Produkt für Abbau-Markierungen. AUTO sucht nach nützlichen Produkten, wenn keine Gelände-Markierungen vorhanden sind; andernfalls werden vorhandene Gelände-Markierungen zu Wegfindungszielen. Schutt und Erde sind nur manuell wählbar."
   ],
   [
-    "settings.mod.name",
+    "AutoTerrainDesignations.SettingsModName",
     "Automatische Geländemarkierungen"
   ],
   [
-    "settings.tab.defaults",
+    "AutoTerrainDesignations.SettingsTabDefaults",
     "Standardwerte"
   ],
   [
-    "settings.tab.world_settings",
+    "AutoTerrainDesignations.SettingsTabWorldSettings",
     "Welteinstellungen"
   ],
   [
-    "settings.tab.ore_quality",
+    "AutoTerrainDesignations.SettingsTabOreQuality",
     "Erzqualität"
   ],
   [
-    "settings.heading.mining_defaults",
+    "AutoTerrainDesignations.SettingsHeadingMiningDefaults",
     "Standardwerte für Minenkontrollturm"
   ],
   [
-    "settings.heading.panel_defaults",
+    "AutoTerrainDesignations.SettingsHeadingPanelDefaults",
     "Panel-Standardwerte"
   ],
   [
-    "settings.heading.designations",
+    "AutoTerrainDesignations.SettingsHeadingDesignations",
     "Markierungen"
   ],
   [
-    "settings.heading.scan_performance",
+    "AutoTerrainDesignations.SettingsHeadingScanPerformance",
     "Scan-Leistung"
   ],
   [
-    "settings.world.performance",
+    "AutoTerrainDesignations.SettingsHeadingPerformance",
     "LEISTUNG"
   ],
   [
-    "settings.heading.keyboard_shortcuts",
+    "AutoTerrainDesignations.SettingsHeadingKeyboardShortcuts",
     "Tastenkürzel"
   ],
   [
-    "settings.heading.notifications",
+    "AutoTerrainDesignations.SettingsHeadingNotifications",
     "Benachrichtigungen"
   ],
   [
-    "settings.heading.experimental_access",
+    "AutoTerrainDesignations.SettingsHeadingExperimentalAccess",
     "Zugänge"
   ],
   [
-    "settings.world.safety",
+    "AutoTerrainDesignations.SettingsHeadingWorldSafety",
     "Geländesicherheit"
   ],
   [
-    "settings.world.mining_visualization",
+    "AutoTerrainDesignations.SettingsHeadingMiningVisualization",
     "Abbauvisualisierung"
   ],
   [
-    "settings.world.mining_hazard_overlay.label",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayLabel",
     "Voraussichtlichen Abbaueinsturzbereich anzeigen"
   ],
   [
-    "settings.world.mining_hazard_overlay.tooltip",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayTooltip",
     "Zeigt ein gestreiftes Overlay auf Gelände, das laut ATD durch Einstürze aus aktiven Abbau-Markierungen betroffen sein könnte. Nur sichtbar, wenn das Geländemarkierungs-Overlay des Spiels angezeigt wird."
   ],
   [
-    "settings.world.vanilla_issue_correction",
+    "AutoTerrainDesignations.SettingsHeadingVanillaIssueCorrection",
     "Korrekturen am Basisspiel"
   ],
   [
-    "settings.world.filter_ore_spikes.label",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesLabel",
     "Erzspitzen filtern"
   ],
   [
-    "settings.world.filter_ore_spikes.tooltip",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesTooltip",
     "Ignoriert beim Erstellen von Abbaubezeichnungen isolierte, extrem dünne Erzspitzen, die weit unter die umliegende Lagerstätte reichen. Diese Korrektur wird vor Erzqualität und Bodenglättung angewendet. Die ursprünglichen Geländedaten und vorhandenen Bezeichnungen bleiben unverändert."
   ],
   [
-    "settings.world.avoid_ocean.label",
+    "AutoTerrainDesignations.SettingsAvoidOceanLabel",
     "Vermeiden Sie das Meer"
   ],
   [
-    "settings.world.avoid_ocean.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidOceanTooltip",
     "Vermeiden Sie das Meer in erstellten Zugangswegen und Bergbauplänen auf dieser Welt. Bergbauzellen, die den Ozean überlappen, sind ausgeschlossen. Auch geplante Einschnitte unterhalb des Meeresspiegels werden vermieden; Das Ablassen ins Meer ist weiterhin erlaubt. Schalten Sie dies aus, um riskante Arbeiten am Ufer zu ermöglichen."
   ],
   [
-    "settings.world.avoid_buildings.label",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsLabel",
     "Vermeiden Sie Gebäude"
   ],
   [
-    "settings.world.avoid_buildings.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsTooltip",
     "Vermeiden Sie Gebäude in generierten Zugangswegen und Bergbauplänen auf dieser Welt. Ausgenommen sind Bergbauzellen, die ein Gebäude oder dessen Sicherheitsperimeter überlappen. Auch geplante Geländestörungen in der Nähe von Gebäuden werden vermieden."
   ],
   [
-    "settings.world.use_worker_thread.label",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadLabel",
     "Worker-Thread verwenden"
   ],
   [
-    "settings.world.use_worker_thread.tooltip",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadTooltip",
     "Einen Hintergrundthread für die Zugangs- und Bergbauplanung verwenden. Standardmäßig aktiviert. Zur Kompatibilitätsdiagnose deaktivieren; die Planung läuft dann im Spielthread und kann besonders bei großen Minen Pausen verursachen. Gilt für neue Planungsanfragen."
   ],
   [
-    "settings.world.reduce_oversized_areas.label",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasLabel",
     "Übergroße Bereiche reduzieren"
   ],
   [
-    "settings.world.reduce_oversized_areas.tooltip",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasTooltip",
     "Wenn der vollständige Zugangs-Schnappschuss zu groß für die Speichergrenze ist, wird ein kleinerer, rein geometrischer Korridor um die aktuellen Starts und Ziele versucht. Dies soll irgendeinen Weg finden; er kann sich vom Weg im Gesamtbereich unterscheiden, und ein Fehlschlag beweist nicht, dass kein Weg existiert."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesLabel",
     "Ernten Sie zerstörte Bäume"
   ],
   [
-    "settings.world.harvest_disrupted_trees.tooltip",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesTooltip",
     "Markieren Sie Bäume in den endgültigen Zufahrts- und Abbaugebieten zur Ernte. Wenn deaktiviert, erstellt ATD keine Baumernteaufträge. Von ATD erteilte Ernteaufträge werden durch eine der Clear-Aktionen entfernt; Unabhängige Erntebefehle der Spieler bleiben erhalten."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.label",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisLabel",
     "Landschaft zum Entfernen von Trümmern"
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisTooltip",
     "Ermöglichen Sie die Beseitigung von Trümmern, um die kleinste verarbeitbare Geländeveränderung vorzunehmen, wenn eine Stütze nicht ohne Landschaftsgestaltung ausgegraben werden kann. Wenn diese Option deaktiviert ist, schlägt die Entfernungsanforderung fehl und der anfordernde Workflow wird benachrichtigt."
   ],
   [
-    "settings.world.quick_remove_debris.label",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisLabel",
     "Schmutz schnell entfernen"
   ],
   [
-    "settings.world.quick_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisTooltip",
     "Steuert, wann ATD die Schnellentfernungsaktion des Spiels für verlegte Zugangsschutt verwendet. Durch schnelles Entfernen wird Unity nur ausgegeben, wenn das Spiel nicht pausiert ist. Diese Richtlinie gilt nicht für die Schaltfläche „Trümmer entfernen“ im Minenturm."
   ],
   [
-    "settings.world.quick_remove_debris.always",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlways",
     "Stets"
   ],
   [
-    "settings.world.quick_remove_debris.always.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlwaysTooltip",
     "Verwenden Sie „Quick Removal“ für alle Zugangsreste mit Ausnahme von Stützen, die durch die geplante Deponie ausreichend vergraben werden. Dies beschleunigt die Landschaftsgestaltung, kostet aber Einheit."
   ],
   [
-    "settings.world.quick_remove_debris.restrictive",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictive",
     "Restriktiv"
   ],
   [
-    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictiveTooltip",
     "Bevorzugen Sie den normalen Aushub, verwenden Sie jedoch die Schnellentfernung, wenn der Aushub die Befahrbarkeit nach der Arbeit nicht gewährleisten kann."
   ],
   [
-    "settings.world.quick_remove_debris.never",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNever",
     "Niemals"
   ],
   [
-    "settings.world.quick_remove_debris.never.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNeverTooltip",
     "Geben Sie Unity niemals für die schnelle Entfernung von Zugangsschutt aus. Die Entfernung hängt vom Aushub und der Einstellung „Landschaft zum Entfernen von Trümmern“ ab und erfordert möglicherweise die schnelle Hilfe des Spielers beim Entfernen."
   ],
   [
-    "settings.world.safety_policy.label",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLabel",
     "Sicherheitspolitik"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.label",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasLabel",
     "Rampen außerhalb von Turmbereichen zulassen"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasTooltip",
     "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
-    "settings.world.safety_policy.tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyTooltip",
     "Steuert, wie vorsichtig ATD Erdrutsche vorhersagt und welchen Abstand es zu geschützten Ozeanen und Gebäuden hält. Höhere Stufen reservieren mehr Platz; niedrigere Stufen erlauben Geländearbeiten näher an Gefahren. Standard: BAL."
   ],
   [
-    "settings.world.safety_policy.value_tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyValueTooltip",
     "{0}: Neigungsfaktor der Erdrutschprognose {1}; Schutzabstand {2} Kacheln."
   ],
   [
-    "settings.world.safety_policy.minimum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMinimum",
     "Mindestwert"
   ],
   [
-    "settings.world.safety_policy.low",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLow",
     "Niedrig"
   ],
   [
-    "settings.world.safety_policy.balanced",
+    "AutoTerrainDesignations.SettingsSafetyPolicyBalanced",
     "Ausgeglichen"
   ],
   [
-    "settings.world.safety_policy.high",
+    "AutoTerrainDesignations.SettingsSafetyPolicyHigh",
     "Hoch"
   ],
   [
-    "settings.world.safety_policy.maximum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMaximum",
     "Maximal"
   ],
   [
-    "settings.tab.pathfinder",
+    "AutoTerrainDesignations.SettingsTabPathfinder",
     "Zufahrtswege"
   ],
   [
-    "settings.pathfinder.costs",
+    "AutoTerrainDesignations.SettingsPathfinderCostsHeading",
     "Routenkosten"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostLabel",
     "Kosten für die Geländeausweisung"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.tooltip",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostTooltip",
     "Für jede generierte Geländebezeichnung werden feste Kosten berechnet. Höhere Werte begünstigen weniger Geländebezeichnungen, auch wenn dadurch die Reisestrecke und die Gesamtkosten für die Landschaftsgestaltung steigen."
   ],
   [
-    "settings.pathfinder.direct_work_weight.label",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightLabel",
     "Direktes Arbeitsgewicht im Gelände"
   ],
   [
-    "settings.pathfinder.direct_work_weight.tooltip",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightTooltip",
     "Gewicht, das beim Graben oder Abladen von Gelände direkt über oder unter den generierten Geländebezeichnungen angewendet wird."
   ],
   [
-    "settings.pathfinder.side_ray_weight.label",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightLabel",
     "Gewicht der seitlichen Strahlenarbeit"
   ],
   [
-    "settings.pathfinder.side_ray_weight.tooltip",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightTooltip",
     "Gewicht, das auf seitliche und Kurven-Landschaftsstrahlen angewendet wird."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceLabel",
     "Maximale Entfernung des Kandidatenstrahls"
   ],
   [
-    "settings.pathfinder.candidate_distance.tooltip",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceTooltip",
     "Maximale Raytrace-Entfernung des Kandidaten. Höhere Werte schützen und bepreisen sehr große Seitenkeile, kosten aber mehr Suchzeit. Standard: 16."
   ],
   [
-    "settings.pathfinder.limits",
+    "AutoTerrainDesignations.SettingsPathfinderLimitsHeading",
     "Suchgrenzen"
   ],
   [
-    "settings.pathfinder.visited.label",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesLabel",
     "Maximale besuchte Knoten"
   ],
   [
-    "settings.pathfinder.visited.tooltip",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesTooltip",
     "Maximale Anzahl untersuchter Zustände. Höhere Werte können schwierigere Routen lösen, benötigen aber mehr Zeit und Speicher."
   ],
   [
-    "settings.pathfinder.timeout.label",
+    "AutoTerrainDesignations.SettingsSearchTimeoutLabel",
     "Suchzeitlimit (Sekunden)"
   ],
   [
-    "settings.pathfinder.timeout.tooltip",
+    "AutoTerrainDesignations.SettingsSearchTimeoutTooltip",
     "Maximale Echtzeit für eine Zufahrtswegsuche."
   ],
   [
-    "settings.pathfinder.frame_budget.label",
+    "AutoTerrainDesignations.SettingsFrameBudgetLabel",
     "Frame-Budget (ms)"
   ],
   [
-    "settings.pathfinder.frame_budget.tooltip",
+    "AutoTerrainDesignations.SettingsFrameBudgetTooltip",
     "Ungefähres Sucharbeitsbudget pro Spielframe. Höhere Werte schließen früher ab, verursachen aber längere Hänger."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "AutoTerrainDesignations.SettingsRayMaximumCostLabel",
     "Maximale Kosten pro Strahl"
   ],
   [
-    "settings.pathfinder.ray_max_cost.tooltip",
+    "AutoTerrainDesignations.SettingsRayMaximumCostTooltip",
     "Begrenzt die Landschaftsgestaltungskosten, die durch einen ungelösten Strahl verursacht werden."
   ],
   [
-    "settings.pathfinder.ray_unresolved.label",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyLabel",
     "Ungelöste Strahlenstrafe"
   ],
   [
-    "settings.pathfinder.ray_unresolved.tooltip",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyTooltip",
     "Strafe, wenn ein Strahl innerhalb seiner Spurweite kein Gelände trifft."
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.label",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsLabel",
     "Unterdrücken Sie alte Rampen"
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsTooltip",
     "Deaktiviert den alten Generator für gerade Rampen, damit Ergebnisse und Fehler der gerouteten Zugangswege direkt getestet werden können. Für normales Fallback-Verhalten ausgeschaltet lassen."
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.label",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleLabel",
     "Landschaftsbaukosten vs. Entfernung"
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleTooltip",
     "Entfernungskosten pro Einheit Landschaftsbaukosten. Eine Einheit Landschaftsbaukosten entspricht dem Aufschütten oder Abtragen einer Einheit Gestein. Bereich: 0-100; Standard: 1. Ein höherer Wert bevorzugt Routen mit weniger Geländeänderung."
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostLabel",
     "Landschaftsbaukosten für Prop-Bereinigung"
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostTooltip",
     "Landschaftsbaukosten, die einmal pro Prop-Bereinigungsursprung in der Zufahrtssuche berechnet werden. Eine Einheit entspricht einer aufgeschütteten oder abgetragenen Einheit Gestein; Standard 6 bevorzugt Umfahrungen von Bereinigungshindernissen, wenn ein sinnvoller Umweg existiert. Höhere Werte machen Bereinigungsrouten weniger attraktiv."
   ],
   [
-    "settings.experimental_access.landslide_run.label",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunLabel",
     "Erdrutschschutz-Neigungsfaktor"
   ],
   [
-    "settings.experimental_access.landslide_run.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunTooltip",
     "Horizontaler Ausschlussabstand pro vertikaler Geländestufe. 1 entspricht einer 45-Grad-Neigung; höhere Werte vergrößern die Ausschlusszone (z. B. bei reinem Sand), niedrigere Werte verkleinern sie. Bereich: 0,05-2; Standard: 1."
   ],
   [
-    "settings.max_slope.label",
+    "AutoTerrainDesignations.SettingsMaxSlopeLabel",
     "Max. Neigung"
   ],
   [
-    "settings.max_slope.tooltip",
+    "AutoTerrainDesignations.SettingsMaxSlopeTooltip",
     "Maximal erlaubter Höhenunterschied zwischen benachbarten Markierungsecken. Bereich: 1-3."
   ],
   [
-    "settings.bottom_flattening.label",
+    "AutoTerrainDesignations.SettingsBottomFlatteningLabel",
     "Sohle ebnen"
   ],
   [
-    "settings.bottom_flattening.tooltip",
+    "AutoTerrainDesignations.SettingsBottomFlatteningTooltip",
     "Stärke der Sohlenglättung von 0 bis 10. 0 deaktiviert den Glättungsdurchlauf."
   ],
   [
-    "settings.batch_size.label",
+    "AutoTerrainDesignations.SettingsBatchSizeLabel",
     "Stapelgröße"
   ],
   [
-    "settings.batch_size.tooltip",
+    "AutoTerrainDesignations.SettingsBatchSizeTooltip",
     "Markierungen pro Coroutine-Frame, während das Spiel nicht pausiert ist. Bereich: 1-200."
   ],
   [
-    "settings.panel_defaults.mining_collapsed.label",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedLabel",
     "Abbau-Panel eingeklappt"
   ],
   [
-    "settings.panel_defaults.mining_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedTooltip",
     "Ob das Panel für Abbaumarkierungen standardmäßig eingeklappt startet."
   ],
   [
-    "settings.panel_defaults.ore_collapsed.label",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedLabel",
     "Erz-Panel eingeklappt"
   ],
   [
-    "settings.panel_defaults.ore_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedTooltip",
     "Ob das Erz-Zusammensetzungs-Panel standardmäßig eingeklappt startet."
   ],
   [
-    "settings.panel_defaults.farming_collapsed.label",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedLabel",
     "Farm-Panel eingeklappt"
   ],
   [
-    "settings.panel_defaults.farming_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedTooltip",
     "Ob das Panel für Ackerlandvorbereitung standardmäßig eingeklappt startet."
   ],
   [
-    "settings.notifications.excavator_completion.label",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsLabel",
     "Bagger-Fertigstellungsbenachrichtigungen"
   ],
   [
-    "settings.notifications.excavator_completion.tooltip",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsTooltip",
     "Ob ATD eine grüne Benachrichtigung anzeigt, wenn ein Fahrzeugdepot einen nicht zugewiesenen (kostenlosen) Bagger fertigstellt."
   ],
   [
-    "settings.notifications.ramp_warning.label",
+    "AutoTerrainDesignations.SettingsRampNotificationsLabel",
     "Rampenwarnungen"
   ],
   [
-    "settings.notifications.ramp_warning.tooltip",
+    "AutoTerrainDesignations.SettingsRampNotificationsTooltip",
     "Ob ATD Rampenzugangs-Warnungen an Minentürmen anzeigt."
   ],
   [
-    "settings.ore_quality.min_ore_height.label",
+    "AutoTerrainDesignations.SettingsMinOreHeightLabel",
     "Minimale Erzhöhe"
   ],
   [
-    "settings.ore_quality.min_ore_height.tooltip",
+    "AutoTerrainDesignations.SettingsMinOreHeightTooltip",
     "Minimale Erzdicke in Geländekacheln für diese Qualitätsstufe."
   ],
   [
-    "settings.ore_quality.min_bottom_density.label",
+    "AutoTerrainDesignations.SettingsMinBottomDensityLabel",
     "Minimale Sohldichte"
   ],
   [
-    "settings.ore_quality.min_bottom_density.tooltip",
+    "AutoTerrainDesignations.SettingsMinBottomDensityTooltip",
     "Minimale Erzdichte vom vorherigen Erzboden bis zu diesem Erzboden. Auf 0 bis 1 begrenzt."
   ],
   [
-    "settings.ore_quality.min_ore_purity.label",
+    "AutoTerrainDesignations.SettingsMinOrePurityLabel",
     "Minimale Erzreinheit"
   ],
   [
-    "settings.ore_quality.min_ore_purity.tooltip",
+    "AutoTerrainDesignations.SettingsMinOrePurityTooltip",
     "Minimales Erz-zu-Spalte-Verhältnis für diese Qualitätsstufe. Auf 0 bis 1 begrenzt."
   ],
   [
-    "settings.ore_quality.min_component_size.label",
+    "AutoTerrainDesignations.SettingsMinComponentSizeLabel",
     "Minimale Komponentengröße"
   ],
   [
-    "settings.ore_quality.min_component_size.tooltip",
+    "AutoTerrainDesignations.SettingsMinComponentSizeTooltip",
     "Minimale Anzahl verbundener Markierungskacheln, damit ein Cluster den Isolationsfilter übersteht."
   ],
   [
-    "settings.corner_mode.label",
+    "AutoTerrainDesignations.SettingsCornerModeLabel",
     "Eckmarkierungsmodus"
   ],
   [
-    "settings.corner_mode.tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeTooltip",
     "Taste zum Aktivieren und Umschalten des Eckmarkierungsmodus, während ein Geländemarkierungswerkzeug aktiv ist."
   ],
   [
-    "settings.corner_mode.invalid_tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeInvalidTooltip",
     "Nutze eine einzelne Taste wie K, 1, F1, Space oder Escape."
   ],
   [
-    "settings.status.applied",
+    "AutoTerrainDesignations.SettingsApplied",
     "Angewendet"
   ],
   [
-    "settings.status.invalid_key",
+    "AutoTerrainDesignations.SettingsInvalidKey",
     "Ungültige Taste"
   ],
   [
-    "settings.action.save_as_global",
+    "AutoTerrainDesignations.SettingsSaveAsGlobal",
     "Als Konfig speichern"
   ],
   [
-    "settings.action.save_as_global.tooltip",
+    "AutoTerrainDesignations.SettingsSaveAsGlobalTooltip",
     "Speichert diese Einstellungen in ATDsettings.json. Sie werden als Standardwerte für alle neuen Spiele verwendet."
   ],
   [
-    "settings.action.restore_defaults",
+    "AutoTerrainDesignations.SettingsRestoreDefaults",
     "Standardwerte wiederherstellen"
   ],
   [
-    "settings.action.restore_defaults.tooltip",
+    "AutoTerrainDesignations.SettingsRestoreDefaultsTooltip",
     "Stellt die globalen Mod-Standardwerte für alle Einstellungen wieder her. (Speichert sie nicht automatisch als Konfig.)"
   ],
   [
-    "settings.status.saved_to_file",
+    "AutoTerrainDesignations.SettingsSavedToFile",
     "In ATDsettings.json gespeichert."
   ],
   [
-    "settings.status.save_failed",
+    "AutoTerrainDesignations.SettingsSaveFailed",
     "Speichern fehlgeschlagen; prüfe das Log."
   ],
   [
-    "settings.status.restored_defaults",
+    "AutoTerrainDesignations.SettingsRestoredDefaults",
     "Eingebaute Standardwerte im Speicher wiederhergestellt."
   ],
   [
-    "panel.ore.title",
+    "AutoTerrainDesignations.OreTitle",
     "Erzzusammensetzung"
   ],
   [
-    "panel.ore.description",
+    "AutoTerrainDesignations.OreDescription",
     "Erzressourcen innerhalb der aktuellen Bergbaugebiete dieses Turms. (Berücksichtigt keine möglichen Erdrutsche.)"
   ],
   [
-    "panel.ore.prompt_scan",
+    "AutoTerrainDesignations.OrePromptScan",
     "↺ drücken, um die Erzzusammensetzung zu scannen."
   ],
   [
-    "panel.ore.scan_tooltip",
+    "AutoTerrainDesignations.OreScanTip",
     "Erzzusammensetzung scannen"
   ],
   [
-    "panel.ore.no_tower",
+    "AutoTerrainDesignations.OreNoTower",
     "Kein Turm ausgewählt."
   ],
   [
-    "panel.ore.no_minable_designations",
+    "AutoTerrainDesignations.OreNoMinableDesig",
     "Keine abbaubaren Gebiete gefunden."
   ],
   [
-    "panel.ore.priority_selected_tooltip",
+    "AutoTerrainDesignations.OrePrioritySelectedTipFmt",
     "Abbaupriorität des Turms auf {0} gesetzt. Klicken, um die Priorität zu entfernen."
   ],
   [
-    "panel.ore.priority_set_tooltip",
+    "AutoTerrainDesignations.OrePrioritySetTipFmt",
     "Abbaupriorität des Turms auf {0} setzen."
   ],
   [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "AutoTerrainDesignations.OreSorterAssignedTrucksEnforceTip",
     "Nur die zugewiesenen Lkw (und Lkw, die teilnehmenden Minentürmen zugewiesen sind) dürfen hier Fracht aufnehmen oder abliefern."
   ],
   [
-    "panel.farming.title",
+    "AutoTerrainDesignations.FarmingTitle",
     "Feldvorbereitung"
   ],
   [
-    "panel.farming.description",
+    "AutoTerrainDesignations.FarmingDescription",
     "Automatisiert die Vorbereitung und endgültige Auffüllung flacher Planierungsgebiete, damit ihre oberste Schicht fruchtbar wird."
   ],
   [
-    "panel.farming.automation_toggle.label",
+    "AutoTerrainDesignations.FarmingToggleLabel",
     "Automatische Feldvorbereitung"
   ],
   [
-    "panel.farming.automation_toggle.tooltip",
+    "AutoTerrainDesignations.FarmingToggleTip",
     "Bereitet flache Planierungsgebiete für Felder vor, indem ungeeignetes Oberflächenmaterial entfernt und anschließend die endgültigen Auffüllgebiete wiederhergestellt werden."
   ],
   [
-    "panel.farming.idle_release_excavators.label",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsLabel",
     "Bagger freigeben bei Leerlauf"
   ],
   [
-    "panel.farming.idle_release_excavators.tooltip",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsTip",
     "Hebt automatisch die Zuweisung von Baggern von diesem Turm auf, wenn kein Gebiet ausstehende Aushubarbeiten hat oder wenn der Turm pausiert ist.\nBagger werden verfolgt und erneut zugewiesen, sobald wieder Aushubarbeiten anstehen."
   ],
   [
-    "panel.farming.truck_idle_policy.label",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyLabel",
     "Verhalten des Lkw im Leerlauf"
   ],
   [
-    "panel.farming.truck_idle_policy.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyTip",
     "Wählen Sie aus, was zugewiesene LKWs tun sollen, wenn für diesen Turm keine Aushubarbeiten anstehen oder während der Turm angehalten ist."
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTower",
     "Parken Sie am Turm"
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTowerTip",
     "Vanilla-Verhalten: Behalten Sie die zugewiesenen Lastwagen bei und schicken Sie sie im Leerlauf zum Turm zurück.\nVorteile: Die LKWs bleiben in der Nähe und sind für den nächsten Einsatz bereit.\nNachteile: Stillstehende LKWs können den Turmbereich belegen und unnötige Rückfahrten machen."
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPut",
     "Bleib dran"
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPutTip",
     "Behalten Sie die zugewiesenen Lastwagen bei, ohne sie im Leerlauf zum Turm zurückzuschicken.\nVorteile: vermeidet unnötige Rückfahrten und hält die LKWs in der Nähe ihres letzten Arbeitsbereichs.\nNachteile: LKWs können über den Arbeitsbereich verstreut sein."
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftRelease",
     "Sanfte Freigabe"
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftReleaseTip",
     "Heben Sie die Zuweisung freier LKWs vorübergehend auf, damit diese bei allgemeinen Transport- und Bauarbeiten helfen können. Sobald die Aushubarbeiten wieder aufgenommen werden, werden die LKWs einfach wieder diesem Turm zugewiesen.\nVorteile: Freigegebene Lkw können im Leerlauf bei allgemeinen Transport- und Bauarbeiten helfen.\nNachteile: Wenn sie einem anderen Turm zugewiesen werden, insbesondere einem, der die Soft-Release nicht verwendet, sind sie möglicherweise nicht verfügbar, wenn die Arbeit dieses Turms wieder aufgenommen wird."
   ],
   [
-    "panel.farming.soft_released_excavators.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedExcavatorsLabel",
     "Sanft freigegebene Bagger:"
   ],
   [
-    "panel.farming.vehicle_status.assigned",
+    "AutoTerrainDesignations.FarmingVehicleStatusAssigned",
     "Zugewiesen: {0}"
   ],
   [
-    "panel.farming.vehicle_status.none",
+    "AutoTerrainDesignations.FarmingVehicleStatusNone",
     "keine"
   ],
   [
-    "panel.farming.soft_released_trucks.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedTrucksLabel",
     "Soft Release Trucks:"
   ],
   [
-    "panel.farming.vehicle_status.released",
+    "AutoTerrainDesignations.FarmingVehicleStatusReleased",
     "Von ATD freigegeben: "
   ],
   [
-    "panel.farming.vehicle_status.destroyed",
+    "AutoTerrainDesignations.FarmingVehicleStatusDestroyed",
     "<zerstört>"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "AutoTerrainDesignations.CornerOuterTip",
     "Ecke (außen): konvexe Eckrampen platzieren."
   ],
   [
-    "toolbox.corner_inner.tooltip",
+    "AutoTerrainDesignations.CornerInnerTip",
     "Ecke (innen): konkave Eckrampen platzieren."
   ],
   [
-    "toolbox.corner_planar.tooltip",
+    "AutoTerrainDesignations.CornerPlanarTip",
     "Planare Ecke: Platzieren Sie eine diagonale Ebenenrampe."
   ],
   [
-    "notification.ramp_access_failed",
+    "AutoTerrainDesignations.NotifRampFailed",
     "[ATD] {entity} konnte keine Zugangsrampe beginnen"
   ],
   [
-    "notification.ramp_access_truncated",
+    "AutoTerrainDesignations.NotifRampTruncated",
     "[ATD] {entity} konnte keine vollständige Zugangsrampe platzieren"
   ],
   [
-    "notification.ramp_access_not_accessible",
+    "AutoTerrainDesignations.NotifRampNotAccessible",
     "[ATD] {entity} konnte keinen Weg zur Rampe finden"
   ],
   [
-    "notification.ramp_access_snapshot_too_large",
+    "AutoTerrainDesignations.NotifRampSnapshotTooLarge",
     "[ATD] Der Zugangsbereich von {entity} ist für die Suche nach Wenderampen zu groß"
   ],
   [
-    "notification.farming_complete",
+    "AutoTerrainDesignations.NotifFarmingComplete",
     "[ATD] {entity} hat Feldvorbereitung und Auffüllung abgeschlossen"
   ],
   [
-    "notification.excavator_completed",
+    "AutoTerrainDesignations.NotifExcavatorCompleted",
     "[ATD] {entity} hat einen nicht zugewiesenen {0} abgeschlossen"
   ],
   [
-    "notification.debris_cleanup_none_found",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneFound",
     "[ATD] {entity} hat keine zu beseitigenden Trümmer gefunden"
   ],
   [
-    "notification.debris_cleanup_none_reachable",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneReachable",
     "[ATD] {entity} hat keine erreichbaren Trümmer zum Entfernen gefunden. Klicken Sie bei gedrückter Strg-Taste, um nicht erreichbare Trümmer einzubeziehen"
   ],
   [
-    "vehicle_order.confirm.singular",
+    "AutoTerrainDesignations.EnqueueConfirmPromptSingular",
     "Ein neues {0} für {2} bei {1} bestellen?"
   ],
   [
-    "vehicle_order.confirm.plural",
+    "AutoTerrainDesignations.EnqueueConfirmPromptPlural",
     "{0} neue Fahrzeuge vom Typ {1} für {3} bei {2} bestellen?"
   ],
   [
-    "vehicle_order.confirm.button",
+    "AutoTerrainDesignations.EnqueueConfirmBtnText",
     "Bestellen"
   ],
   [
-    "vehicle_order.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToDepotTooltip",
     "Auf {0} zoomen"
   ],
   [
-    "access_search.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToAccessActionTooltip",
     "Zur Zugangsaktion zoomen"
   ],
   [
-    "vehicle_order.preassigned.tooltip",
+    "AutoTerrainDesignations.PreAssignedTooltipFmt",
     "Vorab zugewiesen an {0}"
   ],
   [
-    "vehicle_order.shortcut.tooltip",
+    "AutoTerrainDesignations.OrderConstructionShortcutHint",
     "Umschalt-Alt-Klick, um ein neues {0} für {2} bei {1} zu bestellen"
   ]
 ]

@@ -1,842 +1,842 @@
 [
   [
-    "panel.atd.vehicles.show_unowned",
+    "AutoTerrainDesignations.ShowUnownedVehicles",
     "Mostrar los tipos de vehículo desbloqueados que no tienes para poder pedirlos desde esta torre. Los vehículos que tienes y los pedidos en cola de esta torre siempre se muestran."
   ],
   [
-    "panel.atd.vehicles.hide_unowned",
+    "AutoTerrainDesignations.HideUnownedVehicles",
     "Ocultar los tipos de vehículo que no tienes. Los vehículos que tienes y los pedidos en cola de esta torre seguirán visibles."
   ],
   [
-    "settings.world.default_mine.label",
+    "AutoTerrainDesignations.SettingsDefaultMineLabel",
     "Las excavadoras sin asignar excavan"
   ],
   [
-    "settings.world.default_mine.tooltip",
+    "AutoTerrainDesignations.SettingsDefaultMineTooltip",
     "Las excavadoras sin asignar trabajan en designaciones de minería fuera de las áreas de todas las torres de mina."
   ],
   [
-    "common.level.off",
+    "AutoTerrainDesignations.LevelOff",
     "Desactivado"
   ],
   [
-    "common.level.low",
+    "AutoTerrainDesignations.LevelLow",
     "Bajo"
   ],
   [
-    "common.level.med",
+    "AutoTerrainDesignations.LevelMed",
     "Medio"
   ],
   [
-    "common.level.high",
+    "AutoTerrainDesignations.LevelHigh",
     "Alto"
   ],
   [
-    "common.level.max",
+    "AutoTerrainDesignations.LevelMax",
     "máx."
   ],
   [
-    "panel.designations.title",
+    "AutoTerrainDesignations.DesigTitle",
     "Designaciones mineras"
   ],
   [
-    "panel.designations.description",
+    "AutoTerrainDesignations.DesigDescription",
     "Crea designaciones automáticas de terreno para esta torre."
   ],
   [
-    "panel.designations.create_button",
+    "AutoTerrainDesignations.DesigCreateBtn",
     "Crear designaciones"
   ],
   [
-    "panel.designations.create_tooltip",
+    "AutoTerrainDesignations.DesigCreateTip",
     "Escanea y coloca designaciones de minería en el área de esta torre."
   ],
   [
-    "panel.designations.debris_tooltip",
+    "AutoTerrainDesignations.DesigDebrisTip",
     "Coloque designaciones de eliminación de escombros en celdas desocupadas accesibles. Ctrl-clic para incluir escombros inalcanzables. Presione Mayús y haga clic para reemplazar también las designaciones de terreno y bosques existentes."
   ],
   [
-    "panel.designations.clear_tooltip",
+    "AutoTerrainDesignations.DesigClearTip",
     "Elimina las designaciones generadas por ATD de esta torre. Presione Mayús y haga clic para borrar todas las designaciones de terreno en el área de la torre."
   ],
   [
-    "panel.designations.clear_tooltip.shift_click",
+    "AutoTerrainDesignations.DesigClearTipWithShiftClick",
     "Elimina las designaciones generadas por ATD de esta torre. Presione Mayús y haga clic para borrar todas las designaciones de terreno en el área de la torre."
   ],
   [
-    "panel.designations.ore_filter.auto",
+    "AutoTerrainDesignations.DesigOreFilterAuto",
     "AUTOMÁTICO"
   ],
   [
-    "panel.designations.accessway_mode.label",
+    "AutoTerrainDesignations.DesigAccesswayModeLabel",
     "Modo de acceso"
   ],
   [
-    "settings.dumping_priority.label",
+    "AutoTerrainDesignations.DumpingPriorityLabel",
     "Prioridad de vertido"
   ],
   [
-    "settings.dumping_priority.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityDescription",
     "Usa las prioridades de importación de vanilla 1–15 para el vertido activo; los números menores son más urgentes. Pasiva usa el vertido pasivo de vanilla y solo importa de exportadores activos. Durante el llenado de tierras de cultivo, Pasiva usa temporalmente la prioridad activa 14 mientras las reglas de vertido están limitadas a productos agrícolas. Predeterminada: Pasiva."
   ],
   [
-    "settings.dumping_priority.passive",
+    "AutoTerrainDesignations.DumpingPriorityPassiveLabel",
     "Pasiva"
   ],
   [
-    "settings.dumping_priority.passive.tooltip",
+    "AutoTerrainDesignations.DumpingPriorityPassiveTooltip",
     "Importar solo de exportadores activos."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3",
+    "AutoTerrainDesignations.AccesswayModeLegacy3",
     "Legado 3"
   ],
   [
-    "panel.designations.accessway_mode.legacy_4",
+    "AutoTerrainDesignations.AccesswayModeLegacy4",
     "Legado 4"
   ],
   [
-    "panel.designations.accessway_mode.legacy_5",
+    "AutoTerrainDesignations.AccesswayModeLegacy5",
     "Legado 5"
   ],
   [
-    "panel.designations.accessway_mode.off.tooltip",
+    "AutoTerrainDesignations.AccesswayModeOffTip",
     "Deshabilitar accesos y rampas generadas."
   ],
   [
-    "panel.designations.accessway_mode.auto.tooltip",
+    "AutoTerrainDesignations.AccesswayModeAutoTip",
     "Utilice la excavadora más grande asignada o preasignada a esta torre y luego la excavadora más grande presente en el mapa. Sin excavadoras, AUTO se comporta como APAGADO."
   ],
   [
-    "panel.designations.accessway_mode.t1.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT1Tip",
     "Genere accesos enrutados utilizando la transitabilidad de la excavadora T1."
   ],
   [
-    "panel.designations.accessway_mode.t2.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT2Tip",
     "Genere accesos enrutados utilizando la transitabilidad de la excavadora T2."
   ],
   [
-    "panel.designations.accessway_mode.t3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeT3Tip",
     "Genere accesos enrutados de dos carriles utilizando la transitabilidad de la excavadora T3/Mega."
   ],
   [
-    "panel.designations.accessway_mode.legacy_3.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy3Tip",
     "Genere solo una rampa recta heredada de tres celdas de designación de ancho, validada para excavadoras T3/Mega."
   ],
   [
-    "panel.designations.accessway_mode.legacy_4.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy4Tip",
     "Genere solo una rampa recta heredada de cuatro celdas de designación de ancho, validada para excavadoras T3/Mega."
   ],
   [
-    "panel.designations.accessway_mode.legacy_5.tooltip",
+    "AutoTerrainDesignations.AccesswayModeLegacy5Tip",
     "Genere solo una rampa recta heredada de cinco celdas de designación de ancho, validada para excavadoras T3/Mega."
   ],
   [
-    "panel.designations.max_layers.label",
+    "AutoTerrainDesignations.DesigMaxLayersLabel",
     "Capas máx. a excavar"
   ],
   [
-    "panel.designations.max_layers.tooltip",
+    "AutoTerrainDesignations.DesigMaxLayersTip",
     "Capas máximas a excavar desde la superficie. (∞ = sin límite)."
   ],
   [
-    "panel.designations.elevation_limit.label",
+    "AutoTerrainDesignations.DesigElevLimitLabel",
     "Límite de elevación"
   ],
   [
-    "panel.designations.elevation_limit.tooltip",
+    "AutoTerrainDesignations.DesigElevLimitTip",
     "Profundidad máxima (absoluta) de excavación (-∞ = sin límite)."
   ],
   [
-    "panel.designations.ore_purity.label",
+    "AutoTerrainDesignations.DesigOrePurityLabel",
     "Calidad del mineral"
   ],
   [
-    "panel.designations.ore_purity.tooltip",
+    "AutoTerrainDesignations.DesigOrePurityTip",
     "Con qué rigor filtra el escaneo las columnas de terreno según la calidad del mineral. No predice la mezcla de materiales que producirán las excavadoras.\nDesactivado: incluye todas las casillas y excava hasta la profundidad completa.\nBajo: excluye casillas con muy poco mineral y recorta las vetas finas restantes en el fondo.\nMedio: calidad moderada — omite casillas con mucha sobrecarga o poco mineral.\nAlto: solo casillas ricas con una columna de mineral limpia.\nMáx.: aplica los filtros más estrictos de sobrecarga, profundidad y densidad del mineral."
   ],
   [
-    "settings.ore_quality.value_tooltip",
+    "AutoTerrainDesignations.OreQualityValueTooltip",
     "{0}: altura mínima del mineral {1:0.##} casillas de terreno; densidad mínima inferior {2:P0}; pureza mínima del mineral {3:P0}; tamaño mínimo del grupo {4} casillas conectadas."
   ],
   [
-    "settings.ore_quality.value.off",
+    "AutoTerrainDesignations.OreQualityOff",
     "Desactivado"
   ],
   [
-    "settings.ore_quality.value.low",
+    "AutoTerrainDesignations.OreQualityLow",
     "Bajo"
   ],
   [
-    "settings.ore_quality.value.medium",
+    "AutoTerrainDesignations.OreQualityMedium",
     "Medio"
   ],
   [
-    "settings.ore_quality.value.high",
+    "AutoTerrainDesignations.OreQualityHigh",
     "Alto"
   ],
   [
-    "settings.ore_quality.value.maximum",
+    "AutoTerrainDesignations.OreQualityMaximum",
     "Máximo"
   ],
   [
-    "panel.designations.corridor_clearance.label",
+    "AutoTerrainDesignations.DesigCorridorClearanceLabel",
     "Espacio libre de corredor"
   ],
   [
-    "panel.designations.corridor_clearance.tooltip",
+    "AutoTerrainDesignations.DesigCorridorClearanceTip",
     "Ancho mínimo de corredor para conectar regiones de mineral y asegurar la transitabilidad.\n0 = desactivado (las regiones quedan separadas, sin corredores ni rellenado de huecos).\n1 = corredores de 1 casilla (vehículos pequeños y medianos).\n2 = corredores de 2 casillas (megavehículos).\n"
   ],
   [
-    "panel.designations.scanning_filter.label",
+    "AutoTerrainDesignations.DesigScanningFilterLabel",
     "Filtro de escaneo:"
   ],
   [
-    "panel.designations.scanning_filter.tooltip",
+    "AutoTerrainDesignations.DesigScanningFilterTip",
     "Selecciona un producto para generar designaciones de minería. AUTO busca productos útiles si no hay designaciones de terreno; de lo contrario, usa las designaciones existentes como objetivos de ruta. Los escombros y la tierra son solo manuales."
   ],
   [
-    "settings.mod.name",
+    "AutoTerrainDesignations.SettingsModName",
     "Designaciones automáticas de terreno"
   ],
   [
-    "settings.tab.defaults",
+    "AutoTerrainDesignations.SettingsTabDefaults",
     "Predeterminados"
   ],
   [
-    "settings.tab.world_settings",
+    "AutoTerrainDesignations.SettingsTabWorldSettings",
     "Configuración mundial"
   ],
   [
-    "settings.tab.ore_quality",
+    "AutoTerrainDesignations.SettingsTabOreQuality",
     "Calidad del mineral"
   ],
   [
-    "settings.heading.mining_defaults",
+    "AutoTerrainDesignations.SettingsHeadingMiningDefaults",
     "Predeterminados de la torre de control minera"
   ],
   [
-    "settings.heading.panel_defaults",
+    "AutoTerrainDesignations.SettingsHeadingPanelDefaults",
     "Predeterminados de paneles"
   ],
   [
-    "settings.heading.designations",
+    "AutoTerrainDesignations.SettingsHeadingDesignations",
     "Designaciones"
   ],
   [
-    "settings.heading.scan_performance",
+    "AutoTerrainDesignations.SettingsHeadingScanPerformance",
     "Rendimiento del escaneo"
   ],
   [
-    "settings.world.performance",
+    "AutoTerrainDesignations.SettingsHeadingPerformance",
     "RENDIMIENTO"
   ],
   [
-    "settings.heading.keyboard_shortcuts",
+    "AutoTerrainDesignations.SettingsHeadingKeyboardShortcuts",
     "Atajos de teclado"
   ],
   [
-    "settings.heading.notifications",
+    "AutoTerrainDesignations.SettingsHeadingNotifications",
     "Notificaciones"
   ],
   [
-    "settings.heading.experimental_access",
+    "AutoTerrainDesignations.SettingsHeadingExperimentalAccess",
     "Vías de acceso"
   ],
   [
-    "settings.world.safety",
+    "AutoTerrainDesignations.SettingsHeadingWorldSafety",
     "Seguridad del terreno"
   ],
   [
-    "settings.world.mining_visualization",
+    "AutoTerrainDesignations.SettingsHeadingMiningVisualization",
     "Visualización de minería"
   ],
   [
-    "settings.world.mining_hazard_overlay.label",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayLabel",
     "Mostrar el área prevista de derrumbe minero"
   ],
   [
-    "settings.world.mining_hazard_overlay.tooltip",
+    "AutoTerrainDesignations.SettingsMiningHazardOverlayTooltip",
     "Muestra una superposición rayada en el terreno que ATD prevé que podría verse afectado por derrumbes de designaciones de minería activas. Solo se muestra cuando está visible la superposición de designaciones de terreno del juego."
   ],
   [
-    "settings.world.vanilla_issue_correction",
+    "AutoTerrainDesignations.SettingsHeadingVanillaIssueCorrection",
     "Correcciones del juego base"
   ],
   [
-    "settings.world.filter_ore_spikes.label",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesLabel",
     "Filtrar picos de mineral"
   ],
   [
-    "settings.world.filter_ore_spikes.tooltip",
+    "AutoTerrainDesignations.SettingsFilterOreSpikesTooltip",
     "Ignora los picos de mineral aislados y ultrafinos que se extienden muy por debajo del yacimiento circundante al crear designaciones de minería. Esta corrección se aplica antes de Calidad del mineral y Aplanado del fondo. El terreno original y las designaciones existentes no se modifican."
   ],
   [
-    "settings.world.avoid_ocean.label",
+    "AutoTerrainDesignations.SettingsAvoidOceanLabel",
     "Evite el océano"
   ],
   [
-    "settings.world.avoid_ocean.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidOceanTooltip",
     "Evite el océano en los accesos generados y los planes mineros en este mundo. Se excluyen las celdas mineras que se superponen al océano. También se evitan los cortes proyectados por debajo del nivel del mar; Sigue estando permitido el vertido al océano. Desactívelo para permitir trabajos arriesgados en la costa."
   ],
   [
-    "settings.world.avoid_buildings.label",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsLabel",
     "Evite los edificios"
   ],
   [
-    "settings.world.avoid_buildings.tooltip",
+    "AutoTerrainDesignations.SettingsAvoidBuildingsTooltip",
     "Evite los edificios en los accesos generados y los planes mineros en este mundo. Se excluyen las celdas mineras que se superpongan a un edificio o a su perímetro de seguridad. También se evitan las perturbaciones previstas del terreno cerca de los edificios."
   ],
   [
-    "settings.world.use_worker_thread.label",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadLabel",
     "Usar subproceso de trabajo"
   ],
   [
-    "settings.world.use_worker_thread.tooltip",
+    "AutoTerrainDesignations.SettingsUseWorkerThreadTooltip",
     "Usar un subproceso en segundo plano para planificar accesos y minería. Está activado de forma predeterminada. Desactívalo para solucionar problemas de compatibilidad; la planificación se ejecutará en el subproceso del juego y puede causar pausas, especialmente en minas grandes. Se aplica a las nuevas solicitudes de planificación."
   ],
   [
-    "settings.world.reduce_oversized_areas.label",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasLabel",
     "Reducir áreas sobredimensionadas"
   ],
   [
-    "settings.world.reduce_oversized_areas.tooltip",
+    "AutoTerrainDesignations.SettingsReduceOversizedAreasTooltip",
     "Cuando la instantánea completa de acceso es demasiado grande para el límite de memoria, se intenta un corredor más pequeño y basado solo en geometría alrededor de los inicios y objetivos actuales. El objetivo es encontrar alguna ruta; puede diferir de la ruta del área completa, y un fallo no demuestra que no exista ninguna ruta."
   ],
   [
-    "settings.world.harvest_disrupted_trees.label",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesLabel",
     "Cosecha de árboles interrumpidos"
   ],
   [
-    "settings.world.harvest_disrupted_trees.tooltip",
+    "AutoTerrainDesignations.SettingsHarvestDisruptedTreesTooltip",
     "Marcar árboles en vías de acceso finalizadas y zonas de perturbación designadas para minería para su cosecha. Cuando está deshabilitado, ATD no crea órdenes de tala de árboles. Las órdenes de cosecha realizadas por ATD se eliminan mediante una acción de Borrar; Se conservan las órdenes de recolección de jugadores no relacionados."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.label",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisLabel",
     "Paisaje para eliminar escombros."
   ],
   [
-    "settings.world.allow_dig_to_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsAllowDigToRemoveDebrisTooltip",
     "Permitir la remoción de escombros para realizar el cambio más pequeño en el terreno viable cuando no se pueda excavar un puntal sin paisajismo. Cuando está deshabilitado, la solicitud de eliminación falla y se notifica al flujo de trabajo solicitante."
   ],
   [
-    "settings.world.quick_remove_debris.label",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisLabel",
     "Eliminación rápida de escombros"
   ],
   [
-    "settings.world.quick_remove_debris.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisTooltip",
     "Controla cuándo ATD usa la acción de eliminación rápida del juego para los desechos enrutados en las vías de acceso. La eliminación rápida gasta Unity solo cuando el juego no está en pausa. Esta política no se aplica al botón Limpiar escombros de la torre de la mina."
   ],
   [
-    "settings.world.quick_remove_debris.always",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlways",
     "Siempre"
   ],
   [
-    "settings.world.quick_remove_debris.always.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisAlwaysTooltip",
     "Utilice la eliminación rápida para todos los desechos de las vías de acceso, excepto los accesorios que la designación de vertido planificado enterrará lo suficiente. Esto acelera el paisajismo pero gasta Unity."
   ],
   [
-    "settings.world.quick_remove_debris.restrictive",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictive",
     "Restrictivo"
   ],
   [
-    "settings.world.quick_remove_debris.restrictive.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisRestrictiveTooltip",
     "Prefiera la excavación normal, pero utilice la extracción rápida cuando la excavación no pueda garantizar la transitabilidad posterior al trabajo."
   ],
   [
-    "settings.world.quick_remove_debris.never",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNever",
     "Nunca"
   ],
   [
-    "settings.world.quick_remove_debris.never.tooltip",
+    "AutoTerrainDesignations.SettingsQuickRemoveDebrisNeverTooltip",
     "Nunca gastes Unity en eliminación rápida de residuos de vías de acceso. La eliminación depende de la excavación y la configuración del paisaje para eliminar los escombros, y es posible que sea necesario que el jugador brinde asistencia para la eliminación rápida."
   ],
   [
-    "settings.world.safety_policy.label",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLabel",
     "Política de seguridad"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.label",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasLabel",
     "Permitir rampas fuera de las áreas de la torre"
   ],
   [
-    "settings.world.allow_ramps_outside_tower_areas.tooltip",
+    "AutoTerrainDesignations.SettingsAllowRampsOutsideTowerAreasTooltip",
     "If no V2 ramp can fit inside a tower area, retry within 16 tiles beyond its boundary. This fallback runs only after the in-area search fails and may trigger the game's normal outside-area alarm. Default: enabled."
   ],
   [
-    "settings.world.safety_policy.tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyTooltip",
     "Controla con qué cautela ATD predice los deslizamientos y la distancia que mantiene respecto a océanos y edificios protegidos. Los niveles superiores reservan más espacio; los inferiores permiten trabajar el terreno más cerca de los peligros. Predeterminado: BAL."
   ],
   [
-    "settings.world.safety_policy.value_tooltip",
+    "AutoTerrainDesignations.SettingsSafetyPolicyValueTooltip",
     "{0}: factor de pendiente para la predicción de deslizamientos {1}; margen de seguridad {2} casillas."
   ],
   [
-    "settings.world.safety_policy.minimum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMinimum",
     "Mínimo"
   ],
   [
-    "settings.world.safety_policy.low",
+    "AutoTerrainDesignations.SettingsSafetyPolicyLow",
     "Bajo"
   ],
   [
-    "settings.world.safety_policy.balanced",
+    "AutoTerrainDesignations.SettingsSafetyPolicyBalanced",
     "Equilibrado"
   ],
   [
-    "settings.world.safety_policy.high",
+    "AutoTerrainDesignations.SettingsSafetyPolicyHigh",
     "Alto"
   ],
   [
-    "settings.world.safety_policy.maximum",
+    "AutoTerrainDesignations.SettingsSafetyPolicyMaximum",
     "Máximo"
   ],
   [
-    "settings.tab.pathfinder",
+    "AutoTerrainDesignations.SettingsTabPathfinder",
     "Accesos"
   ],
   [
-    "settings.pathfinder.costs",
+    "AutoTerrainDesignations.SettingsPathfinderCostsHeading",
     "Costes de ruta"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.label",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostLabel",
     "Costo de designación del terreno"
   ],
   [
-    "settings.pathfinder.generated_v_fixed.tooltip",
+    "AutoTerrainDesignations.SettingsTerrainDesignationCostTooltip",
     "Costo fijo cobrado por cada designación de terreno generada. Los valores más altos favorecen menos designaciones de terreno, incluso cuando eso aumenta la distancia de viaje y el costo total de jardinería."
   ],
   [
-    "settings.pathfinder.direct_work_weight.label",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightLabel",
     "Peso directo del trabajo en el terreno"
   ],
   [
-    "settings.pathfinder.direct_work_weight.tooltip",
+    "AutoTerrainDesignations.SettingsDirectTerrainWorkWeightTooltip",
     "Peso aplicado al terreno de excavación o vertido directamente encima o debajo de las designaciones de terreno generadas."
   ],
   [
-    "settings.pathfinder.side_ray_weight.label",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightLabel",
     "Peso de trabajo de rayos laterales"
   ],
   [
-    "settings.pathfinder.side_ray_weight.tooltip",
+    "AutoTerrainDesignations.SettingsSideRayWorkWeightTooltip",
     "Peso aplicado a los rayos de trabajo de paisajismo laterales y de giros."
   ],
   [
-    "settings.pathfinder.candidate_distance.label",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceLabel",
     "Distancia máxima del rayo candidato"
   ],
   [
-    "settings.pathfinder.candidate_distance.tooltip",
+    "AutoTerrainDesignations.SettingsCandidateRayMaxDistanceTooltip",
     "Distancia máxima de traza de rayo candidato. Los valores más altos protegen y ponen precio a las cuñas laterales muy grandes, pero cuestan más tiempo de búsqueda. Predeterminado: 16."
   ],
   [
-    "settings.pathfinder.limits",
+    "AutoTerrainDesignations.SettingsPathfinderLimitsHeading",
     "Límites de búsqueda"
   ],
   [
-    "settings.pathfinder.visited.label",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesLabel",
     "Máximo de nodos visitados"
   ],
   [
-    "settings.pathfinder.visited.tooltip",
+    "AutoTerrainDesignations.SettingsMaximumVisitedNodesTooltip",
     "Máximo de estados examinados. Los valores más altos pueden resolver rutas más difíciles, pero usan más tiempo y memoria."
   ],
   [
-    "settings.pathfinder.timeout.label",
+    "AutoTerrainDesignations.SettingsSearchTimeoutLabel",
     "Tiempo límite de búsqueda (segundos)"
   ],
   [
-    "settings.pathfinder.timeout.tooltip",
+    "AutoTerrainDesignations.SettingsSearchTimeoutTooltip",
     "Tiempo máximo de reloj para una búsqueda de acceso."
   ],
   [
-    "settings.pathfinder.frame_budget.label",
+    "AutoTerrainDesignations.SettingsFrameBudgetLabel",
     "Presupuesto por fotograma (ms)"
   ],
   [
-    "settings.pathfinder.frame_budget.tooltip",
+    "AutoTerrainDesignations.SettingsFrameBudgetTooltip",
     "Presupuesto aproximado de trabajo de búsqueda por fotograma del juego. Los valores más altos terminan antes, pero provocan pausas más largas."
   ],
   [
-    "settings.pathfinder.ray_max_cost.label",
+    "AutoTerrainDesignations.SettingsRayMaximumCostLabel",
     "Costo máximo por rayo"
   ],
   [
-    "settings.pathfinder.ray_max_cost.tooltip",
+    "AutoTerrainDesignations.SettingsRayMaximumCostTooltip",
     "Limita el costo de paisajismo aportado por un rayo no resuelto."
   ],
   [
-    "settings.pathfinder.ray_unresolved.label",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyLabel",
     "Penalización de rayos no resueltos"
   ],
   [
-    "settings.pathfinder.ray_unresolved.tooltip",
+    "AutoTerrainDesignations.SettingsUnresolvedRayPenaltyTooltip",
     "Penalización cuando un rayo no encuentra terreno dentro de su alcance de traza."
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.label",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsLabel",
     "Suprimir rampas heredadas"
   ],
   [
-    "settings.experimental_access.suppress_legacy_ramps.tooltip",
+    "AutoTerrainDesignations.SettingsSuppressLegacyRampsTooltip",
     "Desactiva el generador heredado de rampas rectas para que los resultados y fallos de las vías de acceso enrutadas puedan probarse directamente. Déjalo desactivado para el comportamiento normal de reserva."
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.label",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleLabel",
     "Coste de paisajismo vs. distancia"
   ],
   [
-    "settings.experimental_access.landscaping_cost_scale.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandscapingCostScaleTooltip",
     "Coste de distancia asignado a una unidad de coste de paisajismo. Una unidad de coste de paisajismo equivale a verter o excavar una unidad de roca. Rango: 0-100; predeterminado: 1. Un valor más alto favorece rutas con menos modificación del terreno."
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.label",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostLabel",
     "Coste de paisajismo para limpiar objetos"
   ],
   [
-    "settings.experimental_access.prop_cleanup_landscaping_cost.tooltip",
+    "AutoTerrainDesignations.SettingsAccessPropCleanupLandscapingCostTooltip",
     "Coste de paisajismo cobrado una vez por cada origen de limpieza de objetos usado por la búsqueda de vías de acceso. Una unidad equivale a una unidad de roca vertida o excavada; el valor predeterminado 6 favorece rodear obstáculos de limpieza cuando existe un desvío razonable. Valores más altos hacen menos atractivas las rutas con limpieza."
   ],
   [
-    "settings.experimental_access.landslide_run.label",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunLabel",
     "Factor de pendiente contra desprendimientos"
   ],
   [
-    "settings.experimental_access.landslide_run.tooltip",
+    "AutoTerrainDesignations.SettingsAccessLandslideRunTooltip",
     "Distancia de exclusión horizontal por nivel vertical de terreno. 1 equivale a una pendiente de 45 grados; los valores más altos amplían la zona de exclusión (por ejemplo, en arena pura), mientras que los valores más bajos la reducen. Rango: 0,05-2; predeterminado: 1."
   ],
   [
-    "settings.max_slope.label",
+    "AutoTerrainDesignations.SettingsMaxSlopeLabel",
     "Pendiente máxima"
   ],
   [
-    "settings.max_slope.tooltip",
+    "AutoTerrainDesignations.SettingsMaxSlopeTooltip",
     "Diferencia máxima de altura permitida entre esquinas de designación adyacentes. Rango: 1-3."
   ],
   [
-    "settings.bottom_flattening.label",
+    "AutoTerrainDesignations.SettingsBottomFlatteningLabel",
     "Aplanado del fondo"
   ],
   [
-    "settings.bottom_flattening.tooltip",
+    "AutoTerrainDesignations.SettingsBottomFlatteningTooltip",
     "Fuerza del aplanado del fondo de 0 a 10. 0 desactiva la pasada de aplanado."
   ],
   [
-    "settings.batch_size.label",
+    "AutoTerrainDesignations.SettingsBatchSizeLabel",
     "Tamaño de lote"
   ],
   [
-    "settings.batch_size.tooltip",
+    "AutoTerrainDesignations.SettingsBatchSizeTooltip",
     "Designaciones colocadas por fotograma de corrutina mientras el juego no está en pausa. Rango: 1-200."
   ],
   [
-    "settings.panel_defaults.mining_collapsed.label",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedLabel",
     "Panel de minería contraído"
   ],
   [
-    "settings.panel_defaults.mining_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsMiningPanelCollapsedTooltip",
     "Si el panel de designaciones de minería empieza contraído de forma predeterminada."
   ],
   [
-    "settings.panel_defaults.ore_collapsed.label",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedLabel",
     "Panel de mineral contraído"
   ],
   [
-    "settings.panel_defaults.ore_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsOrePanelCollapsedTooltip",
     "Si el panel de composición del mineral empieza contraído de forma predeterminada."
   ],
   [
-    "settings.panel_defaults.farming_collapsed.label",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedLabel",
     "Panel agrícola contraído"
   ],
   [
-    "settings.panel_defaults.farming_collapsed.tooltip",
+    "AutoTerrainDesignations.SettingsFarmingPanelCollapsedTooltip",
     "Si el panel de preparación de tierras de cultivo empieza contraído de forma predeterminada."
   ],
   [
-    "settings.notifications.excavator_completion.label",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsLabel",
     "Notificaciones de excavadora terminada"
   ],
   [
-    "settings.notifications.excavator_completion.tooltip",
+    "AutoTerrainDesignations.SettingsExcavatorNotificationsTooltip",
     "Si ATD muestra una notificación verde cuando cualquier depósito de vehículos completa una excavadora no asignada (gratuita)."
   ],
   [
-    "settings.notifications.ramp_warning.label",
+    "AutoTerrainDesignations.SettingsRampNotificationsLabel",
     "Notificaciones de advertencia de rampa"
   ],
   [
-    "settings.notifications.ramp_warning.tooltip",
+    "AutoTerrainDesignations.SettingsRampNotificationsTooltip",
     "Si ATD muestra advertencias de acceso por rampa en las torres mineras."
   ],
   [
-    "settings.ore_quality.min_ore_height.label",
+    "AutoTerrainDesignations.SettingsMinOreHeightLabel",
     "Altura mínima del mineral"
   ],
   [
-    "settings.ore_quality.min_ore_height.tooltip",
+    "AutoTerrainDesignations.SettingsMinOreHeightTooltip",
     "Espesor mínimo del mineral en casillas de terreno para este nivel de calidad."
   ],
   [
-    "settings.ore_quality.min_bottom_density.label",
+    "AutoTerrainDesignations.SettingsMinBottomDensityLabel",
     "Densidad mínima del fondo"
   ],
   [
-    "settings.ore_quality.min_bottom_density.tooltip",
+    "AutoTerrainDesignations.SettingsMinBottomDensityTooltip",
     "Densidad mínima de mineral desde el fondo de mineral anterior hasta este fondo. Limitada de 0 a 1."
   ],
   [
-    "settings.ore_quality.min_ore_purity.label",
+    "AutoTerrainDesignations.SettingsMinOrePurityLabel",
     "Pureza mínima del mineral"
   ],
   [
-    "settings.ore_quality.min_ore_purity.tooltip",
+    "AutoTerrainDesignations.SettingsMinOrePurityTooltip",
     "Relación mínima mineral/columna para este nivel de calidad. Limitada de 0 a 1."
   ],
   [
-    "settings.ore_quality.min_component_size.label",
+    "AutoTerrainDesignations.SettingsMinComponentSizeLabel",
     "Tamaño mínimo de componente"
   ],
   [
-    "settings.ore_quality.min_component_size.tooltip",
+    "AutoTerrainDesignations.SettingsMinComponentSizeTooltip",
     "Cantidad mínima de casillas de designación conectadas para que un grupo sobreviva al filtro de aislamiento."
   ],
   [
-    "settings.corner_mode.label",
+    "AutoTerrainDesignations.SettingsCornerModeLabel",
     "Modo de designaciones de esquina"
   ],
   [
-    "settings.corner_mode.tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeTooltip",
     "Tecla para entrar y alternar el modo de designaciones de esquina mientras una herramienta de designación de terreno está activa."
   ],
   [
-    "settings.corner_mode.invalid_tooltip",
+    "AutoTerrainDesignations.SettingsCornerModeInvalidTooltip",
     "Usa una sola tecla, como K, 1, F1, Space o Escape."
   ],
   [
-    "settings.status.applied",
+    "AutoTerrainDesignations.SettingsApplied",
     "Aplicado"
   ],
   [
-    "settings.status.invalid_key",
+    "AutoTerrainDesignations.SettingsInvalidKey",
     "Tecla no válida"
   ],
   [
-    "settings.action.save_as_global",
+    "AutoTerrainDesignations.SettingsSaveAsGlobal",
     "Guardar como config"
   ],
   [
-    "settings.action.save_as_global.tooltip",
+    "AutoTerrainDesignations.SettingsSaveAsGlobalTooltip",
     "Guarda estos ajustes en ATDsettings.json. Se usarán como valores predeterminados para todas las partidas nuevas."
   ],
   [
-    "settings.action.restore_defaults",
+    "AutoTerrainDesignations.SettingsRestoreDefaults",
     "Restaurar predeterminados"
   ],
   [
-    "settings.action.restore_defaults.tooltip",
+    "AutoTerrainDesignations.SettingsRestoreDefaultsTooltip",
     "Restaura los valores globales predeterminados del mod para todos los ajustes. (No los guarda automáticamente como config.)"
   ],
   [
-    "settings.status.saved_to_file",
+    "AutoTerrainDesignations.SettingsSavedToFile",
     "Guardado en ATDsettings.json."
   ],
   [
-    "settings.status.save_failed",
+    "AutoTerrainDesignations.SettingsSaveFailed",
     "Error al guardar; revisa el registro."
   ],
   [
-    "settings.status.restored_defaults",
+    "AutoTerrainDesignations.SettingsRestoredDefaults",
     "Predeterminados integrados restaurados en memoria."
   ],
   [
-    "panel.ore.title",
+    "AutoTerrainDesignations.OreTitle",
     "Composición del mineral"
   ],
   [
-    "panel.ore.description",
+    "AutoTerrainDesignations.OreDescription",
     "Recursos minerales dentro de las designaciones de minería actuales de esta torre. (No tiene en cuenta posibles desprendimientos)."
   ],
   [
-    "panel.ore.prompt_scan",
+    "AutoTerrainDesignations.OrePromptScan",
     "Pulsa ↺ para escanear la composición del mineral."
   ],
   [
-    "panel.ore.scan_tooltip",
+    "AutoTerrainDesignations.OreScanTip",
     "Escanear composición del mineral"
   ],
   [
-    "panel.ore.no_tower",
+    "AutoTerrainDesignations.OreNoTower",
     "No hay ninguna torre seleccionada."
   ],
   [
-    "panel.ore.no_minable_designations",
+    "AutoTerrainDesignations.OreNoMinableDesig",
     "No se encontraron designaciones minables."
   ],
   [
-    "panel.ore.priority_selected_tooltip",
+    "AutoTerrainDesignations.OrePrioritySelectedTipFmt",
     "Prioridad de minería de la torre establecida en {0}. Haz clic para quitarla."
   ],
   [
-    "panel.ore.priority_set_tooltip",
+    "AutoTerrainDesignations.OrePrioritySetTipFmt",
     "Establecer la prioridad de minería de la torre en {0}."
   ],
   [
-    "panel.atd.ore_sorter.assigned_trucks_enforce.tooltip",
+    "AutoTerrainDesignations.OreSorterAssignedTrucksEnforceTip",
     "Solo los camiones asignados (y los camiones asignados a torres mineras participantes) podrán recoger o entregar carga aquí."
   ],
   [
-    "panel.farming.title",
+    "AutoTerrainDesignations.FarmingTitle",
     "Preparación de tierra de cultivo"
   ],
   [
-    "panel.farming.description",
+    "AutoTerrainDesignations.FarmingDescription",
     "Automatiza la preparación y el rellenado final de designaciones planas para que su capa superior sea cultivable."
   ],
   [
-    "panel.farming.automation_toggle.label",
+    "AutoTerrainDesignations.FarmingToggleLabel",
     "Automatización de preparación de tierra de cultivo"
   ],
   [
-    "panel.farming.automation_toggle.tooltip",
+    "AutoTerrainDesignations.FarmingToggleTip",
     "Prepara designaciones planas para tierra de cultivo retirando el material superior no apto y restaurando después las órdenes finales de rellenado."
   ],
   [
-    "panel.farming.idle_release_excavators.label",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsLabel",
     "Liberar excavadoras al estar inactivas"
   ],
   [
-    "panel.farming.idle_release_excavators.tooltip",
+    "AutoTerrainDesignations.FarmingIdleReleaseExcavatorsTip",
     "Desasigna automáticamente las excavadoras de esta torre cuando ninguna designación tiene trabajos de excavación pendientes o cuando la torre está pausada.\nLas excavadoras se registran y se reasignan cuando vuelve a haber trabajos de excavación."
   ],
   [
-    "panel.farming.truck_idle_policy.label",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyLabel",
     "Comportamiento del camión inactivo"
   ],
   [
-    "panel.farming.truck_idle_policy.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyTip",
     "Elija qué hacen los camiones asignados cuando esta torre no tiene trabajos de excavación pendientes o mientras la torre está en pausa."
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTower",
     "Estacionar en la torre"
   ],
   [
-    "panel.farming.truck_idle_policy.park_at_tower.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyParkAtTowerTip",
     "Comportamiento estándar: mantenga los camiones asignados y envíelos de regreso a la torre cuando estén inactivos.\nVentajas: los camiones permanecen cerca y listos para el siguiente trabajo.\nDesventajas: los camiones inactivos pueden ocupar el área de la torre y realizar viajes de regreso innecesarios."
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPut",
     "Quedarse en el mismo sitio"
   ],
   [
-    "panel.farming.truck_idle_policy.stay_put.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicyStayPutTip",
     "Mantenga los camiones asignados sin enviarlos de regreso a la torre cuando estén inactivos.\nVentajas: evita viajes de regreso innecesarios y mantiene los camiones cerca de su última zona de trabajo.\nDesventajas: los camiones pueden estar dispersos por el área de trabajo."
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftRelease",
     "liberación suave"
   ],
   [
-    "panel.farming.truck_idle_policy.soft_release.tooltip",
+    "AutoTerrainDesignations.FarmingTruckIdlePolicySoftReleaseTip",
     "Cancelar temporalmente la asignación de camiones inactivos para que puedan ayudar con trabajos generales de transporte y construcción. Los camiones simplemente se reasignan a esta torre cuando regresan los trabajos de excavación.\nVentajas: los camiones liberados pueden ayudar con el transporte general y la construcción mientras están inactivos.\nDesventajas: si se asignan a otra torre, especialmente a una que no utilice la versión suave, es posible que no estén disponibles cuando se reanude el trabajo de esta torre."
   ],
   [
-    "panel.farming.soft_released_excavators.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedExcavatorsLabel",
     "Excavadoras de liberación suave:"
   ],
   [
-    "panel.farming.vehicle_status.assigned",
+    "AutoTerrainDesignations.FarmingVehicleStatusAssigned",
     "Asignado: {0}"
   ],
   [
-    "panel.farming.vehicle_status.none",
+    "AutoTerrainDesignations.FarmingVehicleStatusNone",
     "ninguno"
   ],
   [
-    "panel.farming.soft_released_trucks.label",
+    "AutoTerrainDesignations.FarmingSoftReleasedTrucksLabel",
     "Camiones con liberación suave:"
   ],
   [
-    "panel.farming.vehicle_status.released",
+    "AutoTerrainDesignations.FarmingVehicleStatusReleased",
     "Liberado por ATD: "
   ],
   [
-    "panel.farming.vehicle_status.destroyed",
+    "AutoTerrainDesignations.FarmingVehicleStatusDestroyed",
     "<destruido>"
   ],
   [
-    "toolbox.corner_outer.tooltip",
+    "AutoTerrainDesignations.CornerOuterTip",
     "Esquina (exterior): coloca rampas de esquina convexas."
   ],
   [
-    "toolbox.corner_inner.tooltip",
+    "AutoTerrainDesignations.CornerInnerTip",
     "Esquina (interior): coloca rampas de esquina cóncavas."
   ],
   [
-    "toolbox.corner_planar.tooltip",
+    "AutoTerrainDesignations.CornerPlanarTip",
     "Esquina plana: coloque una rampa de plano diagonal."
   ],
   [
-    "notification.ramp_access_failed",
+    "AutoTerrainDesignations.NotifRampFailed",
     "[ATD] {entity} no pudo iniciar una rampa de acceso"
   ],
   [
-    "notification.ramp_access_truncated",
+    "AutoTerrainDesignations.NotifRampTruncated",
     "[ATD] {entity} no pudo colocar una rampa de acceso completa"
   ],
   [
-    "notification.ramp_access_not_accessible",
+    "AutoTerrainDesignations.NotifRampNotAccessible",
     "[ATD] {entity} no pudo encontrar una ruta hasta la rampa"
   ],
   [
-    "notification.ramp_access_snapshot_too_large",
+    "AutoTerrainDesignations.NotifRampSnapshotTooLarge",
     "[ATD] El área de acceso de {entity} es demasiado grande para buscar rampas de giro"
   ],
   [
-    "notification.farming_complete",
+    "AutoTerrainDesignations.NotifFarmingComplete",
     "[ATD] {entity} completó la preparación y el rellenado de tierra de cultivo"
   ],
   [
-    "notification.excavator_completed",
+    "AutoTerrainDesignations.NotifExcavatorCompleted",
     "[ATD] {entity} completó un {0} no asignado"
   ],
   [
-    "notification.debris_cleanup_none_found",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneFound",
     "[ATD] {entity} no encontró escombros que limpiar"
   ],
   [
-    "notification.debris_cleanup_none_reachable",
+    "AutoTerrainDesignations.NotifDebrisCleanupNoneReachable",
     "[ATD] {entity} no encontró escombros accesibles para limpiar. Ctrl-clic para incluir escombros inalcanzables"
   ],
   [
-    "vehicle_order.confirm.singular",
+    "AutoTerrainDesignations.EnqueueConfirmPromptSingular",
     "¿Pedir un nuevo {0} para {2} en {1}?"
   ],
   [
-    "vehicle_order.confirm.plural",
+    "AutoTerrainDesignations.EnqueueConfirmPromptPlural",
     "¿Pedir {0} unidades nuevas de {1} para {3} en {2}?"
   ],
   [
-    "vehicle_order.confirm.button",
+    "AutoTerrainDesignations.EnqueueConfirmBtnText",
     "Pedir"
   ],
   [
-    "vehicle_order.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToDepotTooltip",
     "Ampliar a {0}"
   ],
   [
-    "access_search.zoom.tooltip",
+    "AutoTerrainDesignations.ZoomToAccessActionTooltip",
     "Acercar a la acción de acceso"
   ],
   [
-    "vehicle_order.preassigned.tooltip",
+    "AutoTerrainDesignations.PreAssignedTooltipFmt",
     "Preasignado a {0}"
   ],
   [
-    "vehicle_order.shortcut.tooltip",
+    "AutoTerrainDesignations.OrderConstructionShortcutHint",
     "Mayús + Alt + clic para solicitar un nuevo {0} para {2} en {1}"
   ]
 ]

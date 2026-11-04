@@ -122,4 +122,9 @@ is included by mistake, I intend to correct it promptly upon discovery or notice
   </ItemGroup>
 
   <Import Project="external\CoI_AutoHelpers\build\CoI.Compatibility.targets" />
+  <Target Name="SelectLocalizationImplementation" BeforeTargets="CoreCompile" DependsOnTargets="DetectCaptainIndustryApi">
+    <ItemGroup Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(_CoIGameVersion)', '0.8.8.0'))">
+      <Compile Remove="external\CoI_AutoHelpers\src\CoI.AutoHelpers\Localization\**\*.cs" />
+    </ItemGroup>
+  </Target>
 </Project>

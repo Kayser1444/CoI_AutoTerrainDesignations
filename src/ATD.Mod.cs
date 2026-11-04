@@ -39,7 +39,9 @@ using Mafi.Localization;
 using Mafi.Unity.UiStatic;
 using Mafi.Unity.UiStatic.Cursors;
 using UnityEngine;
+#if !COI_UPDATE_4_3
 using CoI.AutoHelpers.Localization;
+#endif
 using CoI.AutoHelpers.InputControl;
 using CoI.AutoHelpers.Logging;
 using CoI.AutoHelpers.Persistence;
@@ -1015,8 +1017,12 @@ public static string Tt(string text) => text;
         {
             AutoDepthDesignation.s_log.Info($"AutoTerrainDesignations v{ModVersion} | dll: {ModLogger.GetDllBuildTimestamp(typeof(AutoTerrainDesignationsMod).Assembly)}");
             AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Diagnostics: {AtdDiagnostics.Describe()}.");
+#if COI_UPDATE_4_3
+            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: native mod translations, culture='{LocalizationManager.CurrentLangInfo.CultureInfoId}'.");
+#else
             AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Localization: late apply at renderer init state.");
             ApplyAutoHelpersLocalization();
+#endif
             RegisterSettingsTabs(resolver);
         });
     }
@@ -1044,6 +1050,8 @@ public static string Tt(string text) => text;
         }
     }
 
+#if !COI_UPDATE_4_3
+    // PRE_4_3_COMPAT: keep the proven late splice/rebind on older games only.
     private void ApplyAutoHelpersLocalization()
     {
         string translationsDirectory = Path.Combine(Manifest.RootDirectoryPath, "translations");
@@ -1087,6 +1095,8 @@ public static string Tt(string text) => text;
                 AutoDepthDesignation.s_log.Warning(message);
         }
     }
+
+#endif
 
     public void MigrateJsonConfig(VersionSlim savedVersion, Dict<string, object> savedValues)
     {

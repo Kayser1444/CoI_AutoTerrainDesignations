@@ -1,0 +1,6 @@
+interface:
+  display_name: "CoI Decompile and Compatibility"
+  short_description: "Check CoI compatibility and new modding opportunities"
+  default_prompt: "Use $decompile to refresh CoI references, check maintained mod compatibility, and assess new API opportunities for robustness, performance and base-game integration. Scale the report to the update."
+policy:
+  allow_implicit_invocation: true
