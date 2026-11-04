@@ -18,3 +18,12 @@ Release evidence is retained locally in the workspace .scratch/shipping-20261104
 
 No public upload or Hub page publication is part of preparation. Historical Hub checkpoints remain preserved. No extended simulation, complete visual review, or new older-game runtime session was performed. Existing earlier owner confirmation of legacy game/save loading is separate from these build checks.
 Laboratory and hazard-projection laboratory proposals are excluded. Default Mine zone/IL/Harmony contracts passed.
+
+## Verified shipping package
+
+- ZIP: AutoTerrainDesignations-0.9.6.zip
+- Entries: 19; bytes: 2297706
+- SHA-256: 320FE4FAC6A4B74D1062D293AB3BEAF279148D43A9D1A468F9250B59F9D13E1D
+- Exact runtime whitelist and every entry's source bytes verified; both implementation DLLs match the Release build overlays
+- No debug symbols, authoring tools, laboratory proposals or translation metadata in the ZIP
+- Preparation commit: 1052517; shared AutoHelpers commit: 765d2c1
