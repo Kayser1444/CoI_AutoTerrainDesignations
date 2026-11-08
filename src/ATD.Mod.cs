@@ -39,9 +39,6 @@ using Mafi.Localization;
 using Mafi.Unity.UiStatic;
 using Mafi.Unity.UiStatic.Cursors;
 using UnityEngine;
-#if !COI_UPDATE_4_3
-using CoI.AutoHelpers.Localization;
-#endif
 using CoI.AutoHelpers.InputControl;
 using CoI.AutoHelpers.Logging;
 using CoI.AutoHelpers.Persistence;
@@ -115,12 +112,7 @@ public static string Tt(string text) => text;
         MineTowerCloneConfigPatches.Apply(m_harmony);
         CoI.AutoHelpers.InputControl.CustomKeybindsInjector.ApplyPatches(
             m_harmony,
-// PRE_4_3_COMPAT: legacy branches/API guards only; remove after Update 5 or when pre-4.3 support ends.
-#if COI_UPDATE_4_3
             Manifest.Id,
-#else
-            Manifest.DisplayName,
-#endif
             typeof(AutoTerrainDesignationsMod),
             persistInitialBindings: migrateLegacyCornerKey);
 
@@ -705,71 +697,28 @@ public static string Tt(string text) => text;
         => Access.AccessSearchPolicySnapshot.Capture().SemanticFingerprint;
 
     /// <summary>Keybinding used to enter and toggle corner designation mode. Default: K.</summary>
-#if COI_UPDATE_4_3
     [CoI.AutoHelpers.InputControl.ModKeybind("Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false)]
-#else
-    [Kb(KbCategory.Designation, "Atd_CornerDesignationMode", "Corner designations mode", "Enters and toggles corner designation mode", false, false, null)]
-#endif
     public static KeyBindings CornerDesignationMode { get; set; } = FromPrimaryKeys(KeyCode.K);
 
     public static void SetCornerDesignationMode(KeyBindings value)
     {
         CornerDesignationMode = value;
-#if COI_UPDATE_4_3
         CustomKeybindsInjector.SetBindings(nameof(CornerDesignationMode), value);
-#endif
     }
 
     public static bool IsPressed(KeyBindings bindings)
     {
-#if COI_UPDATE_4_3
         return CustomKeybindsInjector.IsPressed(bindings);
-#else
-        return IsPressed(bindings.Primary) || IsPressed(bindings.Secondary);
-#endif
     }
 
-#if !COI_UPDATE_4_3
-    private static bool IsPressed(KeyBinding binding)
-    {
-        if (binding.IsEmpty)
-            return false;
-
-        ImmutableArray<KeyCode> keys = binding.Keys;
-        if (keys.Length == 0)
-            return false;
-
-        KeyCode trigger = keys[keys.Length - 1];
-        if (!CustomKeybindsInjector.IsLogicalKeyDownThisFrame(trigger))
-            return false;
-
-        for (int i = 0; i < keys.Length - 1; i++)
-        {
-            if (!CustomKeybindsInjector.IsLogicalKeyDown(keys[i]))
-                return false;
-        }
-
-        return true;
-    }
-
-#endif
     internal static KeyBindings FromPrimaryKeys(params KeyCode[] keys)
     {
-#if COI_UPDATE_4_3
         return CustomKeybindsInjector.FromPrimaryKeys(keys);
-#else
-        return new KeyBindings(
-            ShortcutMode.Game,
-            new KeyBinding(KbCategory.Designation, keys.ToImmutableArray()),
-            KeyBinding.Empty(KbCategory.Designation));
-#endif
     }
 
     public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
     {
-#if COI_UPDATE_4_3
         CustomKeybindsInjector.Register(resolver, this);
-#endif
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
         try
         {
@@ -1017,12 +966,7 @@ public static string Tt(string text) => text;
         {
             AutoDepthDesignation.s_log.Info($"AutoTerrainDesignations v{ModVersion} | dll: {ModLogger.GetDllBuildTimestamp(typeof(AutoTerrainDesignationsMod).Assembly)}");
             AtdDiagnostics.Info(AutoDepthDesignation.s_log, $"Diagnostics: {AtdDiagnostics.Describe()}.");
-#if COI_UPDATE_4_3
             AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: native mod translations, culture='{LocalizationManager.CurrentLangInfo.CultureInfoId}'.");
-#else
-            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, "Localization: late apply at renderer init state.");
-            ApplyAutoHelpersLocalization();
-#endif
             RegisterSettingsTabs(resolver);
         });
     }
@@ -1050,53 +994,6 @@ public static string Tt(string text) => text;
         }
     }
 
-#if !COI_UPDATE_4_3
-    // PRE_4_3_COMPAT: keep the proven late splice/rebind on older games only.
-    private void ApplyAutoHelpersLocalization()
-    {
-        string translationsDirectory = Path.Combine(Manifest.RootDirectoryPath, "translations");
-        AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: probing directory '{translationsDirectory}'.");
-
-        if (!Directory.Exists(translationsDirectory))
-        {
-            AutoDepthDesignation.s_log.Warning("Localization: translations directory does not exist; skipping.");
-            return;
-        }
-
-        string[] jsonFiles = Array.FindAll(
-            Directory.GetFiles(translationsDirectory, "*.json", SearchOption.TopDirectoryOnly),
-            filePath => !Path.GetFileName(filePath).StartsWith(".", StringComparison.Ordinal));
-        Array.Sort(jsonFiles, StringComparer.OrdinalIgnoreCase);
-        if (jsonFiles.Length == 0)
-            AutoDepthDesignation.s_log.Warning("Localization: no translation JSON files found.");
-        else
-            AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: discovered {jsonFiles.Length} file(s): {string.Join(", ", jsonFiles)}");
-
-        string currentCulture;
-        try { currentCulture = LocalizationManager.CurrentLangInfo.CultureInfoId; }
-        catch { currentCulture = "<unavailable>"; }
-        AtdDiagnostics.Debug(AutoDepthDesignation.s_log, $"Localization: current game culture before apply = '{currentCulture}'.");
-
-        ModTranslationsApplyResult result = new ModTranslations().Apply(new ModTranslationsApplyOptions(
-            translationsDirectory,
-            typeof(AutoTerrainDesignationsMod).Assembly,
-            Array.Empty<string>()));
-
-        AtdDiagnostics.Info(AutoDepthDesignation.s_log,
-            $"Localization: applied locale='{result.AppliedLocaleCode}', upserted={result.UpsertedEntryCount}, scannedFields={result.ScannedFieldCount}, reboundFields={result.ReboundFieldCount}, readonlySkipped={result.SkippedReadonlyFieldCount}, missingTranslationSkipped={result.SkippedMissingTranslationFieldCount}, failedWrites={result.FailedFieldCount}, diagnostics={result.Diagnostics.Count}.");
-
-        foreach (TranslationDiagnostic diagnostic in result.Diagnostics)
-        {
-            string itemInfo = diagnostic.ItemIndex.HasValue ? $", itemIndex={diagnostic.ItemIndex.Value}" : string.Empty;
-            string message = $"Localization diagnostic [{diagnostic.Severity}] source='{diagnostic.SourcePath}'{itemInfo}: {diagnostic.Message}";
-            if (diagnostic.Severity == TranslationDiagnosticSeverity.Info)
-                AtdDiagnostics.Debug(AutoDepthDesignation.s_log, message);
-            else
-                AutoDepthDesignation.s_log.Warning(message);
-        }
-    }
-
-#endif
 
     public void MigrateJsonConfig(VersionSlim savedVersion, Dict<string, object> savedValues)
     {

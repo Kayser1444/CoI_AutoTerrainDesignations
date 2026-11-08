@@ -1764,6 +1764,15 @@ public static partial class AutoDepthDesignation
 
         Column importColumn = new Column(1.pt()).AlignItemsStretch().FlexGrow(1f, Percent.Fifty);
         importColumn.Add(importBodyChildren);
+        for (int index = importPanel.Header.ChildrenCount - 1; index >= 0; index--)
+        {
+            if (importPanel.Header.ChildAtOrDefault(index) is Toggle importEnforcement)
+            {
+                // Preserve vanilla bindings, but remove the header's absolute right offset.
+                importEnforcement.RemoveFromHierarchy();
+                importColumn.Add(importEnforcement.AbsolutePosition(top: (Px?)null).RelativePosition());
+            }
+        }
         Column exportColumn = new Column(1.pt()).AlignItemsStretch().FlexGrow(1f, Percent.Fifty);
         exportColumn.Add(new OreSorterExportRoutesUi(context, entityProvider, highlighter));
         Row routeRow = new Row(1.pt())
@@ -1923,47 +1932,6 @@ public static partial class AutoDepthDesignation
             "m_assignTool",
             BindingFlags.Instance | BindingFlags.NonPublic);
 
-    // PRE_4_3_COMPAT: retire these legacy audio fields after Update 5 or when pre-4.3 support ends.
-    private static readonly FieldInfo? s_buildingsAssignerAssignClickAudioField =
-        typeof(BuildingsAssigner).GetField(
-            "m_assignClickAudio",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-    private static readonly FieldInfo? s_buildingsAssignerUnassignClickAudioField =
-        typeof(BuildingsAssigner).GetField(
-            "m_unassignClickAudio",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-    private static MethodInfo? s_oreSorterAudioPlayMethod;
-
-    private static void PlayOreSorterRouteAudio(object? audio)
-    {
-        if (audio is Action play)
-        {
-            play();
-            return;
-        }
-        if (audio == null)
-            return;
-
-        if (s_oreSorterAudioPlayMethod == null)
-        {
-            s_oreSorterAudioPlayMethod = audio.GetType().GetMethod(
-                "Play",
-                BindingFlags.Instance | BindingFlags.Public,
-                null,
-                Type.EmptyTypes,
-                null);
-        }
-        s_oreSorterAudioPlayMethod?.Invoke(audio, null);
-    }
-
-    private static object? GetOreSorterRouteAudio(UiContext context, string assetPath)
-    {
-        string sound = System.IO.Path.GetFileNameWithoutExtension(assetPath);
-        return CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, sound);
-    }
-
     private sealed class OreSorterBuildingsAssignerHoverState
     {
         public OreSortingPlant? Sorter;
@@ -1989,13 +1957,11 @@ public static partial class AutoDepthDesignation
         if (route != null)
         {
             RemoveOreSorterExportRoute(sorter, route);
-            PlayOreSorterRouteAudio(s_buildingsAssignerUnassignClickAudioField?.GetValue(__instance)
-                ?? CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "UnassignStructure"));
+            CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "UnassignStructure")();
         }
         else if (AddOreSorterExportRoute(sorter, destination.Id, null))
         {
-            PlayOreSorterRouteAudio(s_buildingsAssignerAssignClickAudioField?.GetValue(__instance)
-                ?? CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "AssignStructure"));
+            CoI.AutoHelpers.Compatibility.UiAudio.Bind(__instance, "AssignStructure")();
         }
 
         return false;
@@ -2295,9 +2261,9 @@ public static partial class AutoDepthDesignation
         private readonly Cursoor m_unassignCursor;
         private readonly Cursoor m_assignCursor;
         private readonly Cursoor m_assignTool;
-        private readonly object? m_assignClickAudio;
-        private readonly object? m_unassignClickAudio;
-        private readonly object? m_invalidClickAudio;
+        private readonly Action m_assignClickAudio;
+        private readonly Action m_unassignClickAudio;
+        private readonly Action m_invalidClickAudio;
 
         private IEntityAssignedAsInput? m_hoveredDestination;
         private OreSortingPlant? m_sorter;
@@ -2314,12 +2280,9 @@ public static partial class AutoDepthDesignation
             m_unassignCursor = context.CursorManager.RegisterCursor(CursorsStyles.Unassign);
             m_assignCursor = context.CursorManager.RegisterCursor(CursorsStyles.Assign);
             m_assignTool = context.CursorManager.RegisterCursor(CursorsStyles.AssignGeneric);
-            m_assignClickAudio = GetOreSorterRouteAudio(context,
-                "Assets/Unity/UserInterface/Audio/AssignStructure.prefab");
-            m_unassignClickAudio = GetOreSorterRouteAudio(context,
-                "Assets/Unity/UserInterface/Audio/UnassignStructure.prefab");
-            m_invalidClickAudio = GetOreSorterRouteAudio(context,
-                "Assets/Unity/UserInterface/Audio/InvalidOp.prefab");
+            m_assignClickAudio = CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, "AssignStructure");
+            m_unassignClickAudio = CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, "UnassignStructure");
+            m_invalidClickAudio = CoI.AutoHelpers.Compatibility.UiAudio.Bind(context.UiRoot, "InvalidOp");
             m_linePreview = context.LinesFactory.CreateLine(
                 Vector3.zero,
                 Vector3.zero,
@@ -2403,7 +2366,7 @@ public static partial class AutoDepthDesignation
                 || destination.Id == sorter.Id
                 || !CanOreSorterExportTo(sorter, destination))
             {
-                PlayOreSorterRouteAudio(m_invalidClickAudio);
+                m_invalidClickAudio();
                 return true;
             }
 
@@ -2411,11 +2374,11 @@ public static partial class AutoDepthDesignation
             if (existingRoute != null)
             {
                 RemoveOreSorterExportRoute(sorter, existingRoute);
-                PlayOreSorterRouteAudio(m_unassignClickAudio);
+                m_unassignClickAudio();
             }
             else if (AddOreSorterExportRoute(sorter, destination.Id, null))
             {
-                PlayOreSorterRouteAudio(m_assignClickAudio);
+                m_assignClickAudio();
             }
 
             RefreshSorterHighlight(sorter);

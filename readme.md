@@ -49,7 +49,7 @@ Leave a :heart: if you found this mod useful.
 
 ## Installation
 
-Update 4.3 compatibility remains **technical and experimental**, with extensive gameplay testing still outstanding. On Update 4.3, use **Build 625 or newer**. The download retains a separate legacy implementation for 0.8.7d.
+Update 4.3 compatibility remains **technical and experimental**, with extensive gameplay testing still outstanding. On Update 4.3, use **Build 625 or newer**. This version requires Update 4.3.
 - Download the latest version of the mod from GitHub Releases
 - Extract the mod folder into your Captain of Industry mods directory (`%AppData%\Captain of Industry\Mods`)
 - Enable the mod when loading or starting a new game

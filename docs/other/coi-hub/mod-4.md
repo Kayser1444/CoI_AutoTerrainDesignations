@@ -2,9 +2,7 @@
 
 # ⛏️ Automatic Terrain Designations
 
-> **Why is the code analysis red?**
->
-> To handle the transition to Update 4.3 gracefully, the mod temporarily ships with a loader DLL that selects the compatible mod DLL based on the installed version of the base game.
+> **ATD 0.10.0 requires Captain of Industry Update 4.3 (0.8.8), Build 625 or newer.** Earlier ATD versions are available under Versions.
 
 *One Mine, One Click — Once You Plop, You Can’t Stop.*
 

@@ -1,4 +1,8 @@
-v0.9.7 [unreleased]
+v0.10.0 [unreleased]
+
+- Require Captain of Industry Update 4.3 and load the mod DLL directly. Remove the pre-4.3 implementation and dual-version loader.
+
+- Move the ore sorter's existing "Accept assigned only" import toggle beneath the import-route list so it no longer overlaps the export-route header (Hub topics 21241 and 21324). Preserve vanilla visibility and command bindings. The German screenshot from the local 0.10.0 build shows the import checkbox clear of the export header.
 
 v0.9.6 [released]
 

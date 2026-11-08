@@ -454,12 +454,7 @@ namespace AutoTerrainDesignations
                     if (context.OreSortingPlantsManager.TryGetMixedDeliveryJobFor(truck, Option<MineTower>.None,
                         out bool hasMatchingPlant, out _))
                     { truck.DeactivateCannotDeliver(); return true; }
-// PRE_4_3_COMPAT: legacy branches/API guards only; remove after Update 5 or when pre-4.3 support ends.
-#if COI_UPDATE_4_3
                     if (truck.MemberCount > 1)
-#else
-                    if (truck.Cargo.Count > 1)
-#endif
                     {
                         if (context.DumpJobFactory.TryCreateAndEnqueueJob(truck, Option.None, truck.ZoneMask))
                         { truck.DeactivateCannotDeliver(); return true; }
@@ -467,7 +462,6 @@ namespace AutoTerrainDesignations
                         return false;
                     }
                 }
-#if COI_UPDATE_4_3
                 var products = new Mafi.Collections.Lyst<ProductQuantity>(8);
                 truck.GetCargoProducts(products);
                 foreach (var quantity in products)
@@ -485,24 +479,6 @@ namespace AutoTerrainDesignations
                     { truck.DeactivateCannotDeliver(); return true; }
                 truck.NotifyIffCannotDeliver(true, truck.Cargo.Product);
 
-#else
-                foreach (var cargo in truck.Cargo)
-                {
-                    var quantity = new ProductQuantity(cargo.Key, cargo.Value);
-                    var buffer = context.VehicleBuffersRegistry.TryGetProductInputForVehicle(
-                        truck, quantity, Option.None, out _);
-                    if (buffer.HasValue)
-                    { context.DeliveryJobFactory.EnqueueJob(truck, quantity, buffer.Value); truck.DeactivateCannotDeliver(); return true; }
-                }
-                foreach (var cargo in truck.Cargo)
-                    if (context.DumpJobFactory.TryCreateAndEnqueueJob(truck, cargo.Key, truck.ZoneMask))
-                    { truck.DeactivateCannotDeliver(); return true; }
-                foreach (var cargo in truck.Cargo)
-                    if (context.SurfaceJobFactory.TryCreateAndEnqueuePlacementJob(cargo.Key, truck))
-                    { truck.DeactivateCannotDeliver(); return true; }
-                truck.NotifyIffCannotDeliver(true, truck.Cargo.FirstOrPhantom.Product);
-
-#endif
                 return false;
             }
 
@@ -510,11 +486,7 @@ namespace AutoTerrainDesignations
             {
                 if (!Owns(excavator) || !IsEligible(excavator) || excavator.IsEmpty) return false;
                 excavator.KeepTruckQueueEnabled(30.Seconds());
-#if COI_UPDATE_4_3
                 var truck = excavator.TruckQueue.TryGetFirstTruckFor(excavator.Cargo.Product);
-#else
-                var truck = excavator.TruckQueue.TryGetFirstTruckFor(excavator.Cargo);
-#endif
                 if (truck.HasValue) return false;
                 RequestTruck(m_sessions[excavator.Id]);
                 return true;
@@ -539,11 +511,7 @@ namespace AutoTerrainDesignations
             {
                 var text = new StringBuilder($"[ATD Default Mine] Enabled={Enabled}, patches={DefaultMinePatches.Ready}, saving={m_saving}, excavators={m_sessions.Count}, trucks={m_trucks.Count}\n");
                 foreach (Session session in m_sessions.Values)
-#if COI_UPDATE_4_3
                     text.AppendLine($"Excavator {session.Excavator.Id}: job={session.Mining?.Id.ToString() ?? "none"}, scoop={session.Excavator.TotalCargoQuantity}, truck={session.Truck?.Truck.Id.ToString() ?? "none"}");
-#else
-                    text.AppendLine($"Excavator {session.Excavator.Id}: job={session.Mining?.Id.ToString() ?? "none"}, scoop={session.Excavator.Cargo.Count}, truck={session.Truck?.Truck.Id.ToString() ?? "none"}");
-#endif
                 return text.ToString();
             }
         }
