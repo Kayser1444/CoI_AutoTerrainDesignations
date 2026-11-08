@@ -1,4 +1,4 @@
-v0.10.0 [unreleased]
+v0.10.0 [packaged]
 
 - Require Captain of Industry Update 4.3 and load the mod DLL directly. Remove the pre-4.3 implementation and dual-version loader.
 
