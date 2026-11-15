@@ -1,3 +1,5 @@
+v0.10.2 [unreleased]
+
 v0.10.1 [released]
 
 - Reject an ATD active dumping destination before dispatch when the truck cannot use any of its designations. This lets vanilla keep looking for work instead of reporting a delivery job that was never enqueued (Hub topic 21295).
