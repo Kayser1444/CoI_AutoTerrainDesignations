@@ -1,3 +1,9 @@
+v0.10.1 [unreleased]
+
+- Reject an ATD active dumping destination before dispatch when the truck cannot use any of its designations. This lets vanilla keep looking for work instead of reporting a delivery job that was never enqueued (Hub topic 21295).
+
+- Replayed the affected save on Captain of Industry 0.8.8d build 633. The patched run passed the tick range that triggered the truck job assertion. See [the test record](docs/test/active-dumping-truck-idle.md).
+
 v0.10.0 [packaged]
 
 - Require Captain of Industry Update 4.3 and load the mod DLL directly. Remove the pre-4.3 implementation and dual-version loader.

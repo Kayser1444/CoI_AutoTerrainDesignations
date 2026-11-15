@@ -1,3 +1,7 @@
+v0.10.1 | 2026-11-15
+
+* Fixed: Trucks can look for other work when an active dumping destination has no usable designations
+
 v0.10.0 | 2026-11-08
 
 * Fixed: The Ore Sorting Plant import checkbox now appears below the import routes, clear of the export header

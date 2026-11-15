@@ -434,6 +434,24 @@ public static partial class AutoDepthDesignation
     internal static bool IsActiveDumpingInput(RegisteredInputBuffer buffer) =>
         buffer != null && s_activeDumpingByBuffer.ContainsKey(buffer);
 
+    internal static bool CanTruckServeActiveDumpingInput(RegisteredInputBuffer buffer, Truck truck)
+    {
+        if (!s_activeDumpingByBuffer.TryGetValue(buffer, out ActiveDumpingDemand? demand))
+            return true;
+        if (truck.AssignedTo.ValueOrNull is MineTower)
+            return false;
+
+        // Vanilla checks this even for a loaded truck following an explicit
+        // export route. Refuse the virtual input before vanilla commits to it:
+        // its delivery callers assume EnqueueJob actually puts a job on the truck.
+        foreach (TerrainDesignation designation in demand.Tower.ManagedDesignations)
+        {
+            if (IsEligibleActiveDumpingOrigin(demand.Tower, designation, demand.Product, truck))
+                return true;
+        }
+        return false;
+    }
+
     internal static bool TryHandleActiveDumpingBalancingJob(BalancingJobSpec spec)
     {
         if (!spec.InputBuffer.HasValue
@@ -603,6 +621,14 @@ internal static class ActiveDumpingPatches
         try
         {
             AutoDepthDesignation.SetActiveDumpingHooksAvailable(false);
+            MethodInfo? truckAllowedMethod = AccessTools.Method(
+                typeof(RegisteredInputBuffer), nameof(RegisteredInputBuffer.IsTruckAllowed));
+            if (truckAllowedMethod == null)
+                throw new MissingMethodException("RegisteredInputBuffer.IsTruckAllowed");
+            harmony.Patch(
+                truckAllowedMethod,
+                postfix: new HarmonyMethod(typeof(ActiveDumpingPatches), nameof(InputIsTruckAllowedPostfix)));
+
             MethodInfo? assignMethod = AccessTools.Method(
                 typeof(Truck), nameof(Truck.AssignBalancingJob),
                 new[] { typeof(BalancingJobSpec) });
@@ -626,6 +652,12 @@ internal static class ActiveDumpingPatches
             AutoDepthDesignation.DisableActiveDumpingCompatibility(
                 "Could not install active-demand delivery hooks: " + ex.Message);
         }
+    }
+
+    private static void InputIsTruckAllowedPostfix(RegisteredInputBuffer __instance, Truck truck, ref bool __result)
+    {
+        if (__result)
+            __result = AutoDepthDesignation.CanTruckServeActiveDumpingInput(__instance, truck);
     }
 
     private static bool TruckAssignBalancingJobPrefix(BalancingJobSpec spec)

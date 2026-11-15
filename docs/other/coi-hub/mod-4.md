@@ -2,6 +2,8 @@
 
 # ⛏️ Automatic Terrain Designations
 
+> **ATD 0.10.1 requires Captain of Industry Update 4.3 (0.8.8), Build 625 or newer.** Earlier ATD versions are available under Versions.
+
 *One Mine, One Click — Once You Plop, You Can’t Stop.*
 
 [🛡️ **Code analysis explained**](#code-analysis-explained)
@@ -13,6 +15,8 @@
 Beyond its core one-click mining workflow, ATD provides routed accessways, live ore composition, tower-level mining and dumping priorities, controlled Ore Sorting Plant exports, vehicle ordering and idle policies, debris clearing, manual corner designations, and automated farmland preparation.
 
 Version 0.9.3 adds a vehicle-order panel control for showing unlocked vehicle types the tower does not own, so you can queue them from that tower.
+
+Version 0.10.1 lets trucks look for other work when an active dumping destination has no usable designations.
 
 For forestry automation, see [*Automatic Forestry Designations (AFD)*](https://coigame.com/Mod/5/Kaysers-Automatic-Forestry-Designations). Blueprint authors may also like [*Blueprint Designer's Toolkit (BDT)*](https://coigame.com/Mod/1081/Kaysers-Blueprint-Designers-Toolkit).
 
