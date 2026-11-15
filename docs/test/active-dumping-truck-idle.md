@@ -6,6 +6,7 @@ Replay the reporter's `no ore.save` (SHA-256 `939742BDAF9212C1850AE09796B4296BE2
 
 - Baseline: the local ATD 0.10.0 DLL from November 12 asserted at tick 548875. The same save has several towers with active dumping priorities.
 - Patched: Debug build passed with zero warnings and errors. A fresh session verified the rebuilt DLL timestamp and advanced from tick 548585 to 552365 at 5× without the assertion. Neither test saved over the fixture.
+- Release 0.10.1: The packaged DLL matched the Release build byte for byte. A fresh session loaded that build and advanced from tick 548585 to 552350 at 5× without the assertion.
 
 ATD's virtual input previously passed vanilla candidate selection even if the truck had no eligible dump designation. The delivery factory hook could then enqueue nothing while vanilla assumed that delivery had been scheduled. The fix rejects those candidates at the native truck eligibility check, including when cargo is being routed to an explicit export destination.
 
