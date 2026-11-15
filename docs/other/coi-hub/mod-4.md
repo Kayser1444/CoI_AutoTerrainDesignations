@@ -2,8 +2,6 @@
 
 # ⛏️ Automatic Terrain Designations
 
-> **ATD 0.10.0 requires Captain of Industry Update 4.3 (0.8.8), Build 625 or newer.** Earlier ATD versions are available under Versions.
-
 *One Mine, One Click — Once You Plop, You Can’t Stop.*
 
 [🛡️ **Code analysis explained**](#code-analysis-explained)
