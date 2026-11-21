@@ -1,3 +1,5 @@
+v0.10.4 [unreleased]
+
 v0.10.3 [released]
 
 - Reuse the tower's bounded reachability search across access checks so large interactive mining plans avoid thousands of repeated terrain searches. On the reporter's save in Captain of Industry 0.8.8d (build 633), the Info-level retest completed without the reported freeze. The slowest API sample was 0.85 seconds, compared with a roughly 14-second stall before the fix.
