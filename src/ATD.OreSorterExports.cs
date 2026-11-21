@@ -580,6 +580,7 @@ public static partial class AutoDepthDesignation
                     postfix: new HarmonyMethod(typeof(AutoDepthDesignation), nameof(DefaultTruckJobProviderTryGetJobForPostfix)));
             }
 
+            OreSorterTruckMatchingPatches.Apply(harmony);
             LogInfo("Ore sorting plant export policy patches applied.");
         }
         catch (Exception ex)

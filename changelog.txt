@@ -1,3 +1,7 @@
+v0.10.2 | 2026-11-21
+
+* Fixed: Trucks assigned to an Ore Sorting Plant no longer take new logistics jobs unrelated to that plant
+
 v0.10.1 | 2026-11-15
 
 * Fixed: Trucks can look for other work when an active dumping destination has no usable designations

@@ -1,5 +1,9 @@
 v0.10.2 [unreleased]
 
+- Restrict new logistics jobs for trucks assigned to an Ore Sorting Plant to work involving that plant. Vanilla job matching now resolves the runtime assignment adapter to the real plant when comparing endpoints (Hub topic 21453).
+
+- Verified the Debug build and all five Harmony patch targets against the installed game assembly. The endpoint check distinguished the assigned sorter from another sorter and an unrelated storage, and preserved vanilla storage identity. Live gameplay verification is pending.
+
 v0.10.1 [released]
 
 - Reject an ATD active dumping destination before dispatch when the truck cannot use any of its designations. This lets vanilla keep looking for work instead of reporting a delivery job that was never enqueued (Hub topic 21295).
