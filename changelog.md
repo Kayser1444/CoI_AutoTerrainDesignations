@@ -1,4 +1,4 @@
-v0.10.2 [packaged]
+v0.10.2 [released]
 
 - Restrict new logistics jobs for trucks assigned to an Ore Sorting Plant to work involving that plant. Vanilla job matching now resolves the runtime assignment adapter to the real plant when comparing endpoints (Hub topic 21453).
 
