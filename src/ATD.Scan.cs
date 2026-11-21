@@ -10,6 +10,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Mafi;
 using Mafi.Collections;
@@ -36,6 +37,7 @@ namespace AutoTerrainDesignations
     {
         private static int s_latestCreateDesignationsRequestId;
         private static bool s_createDesignationsOperationActive;
+        private static long s_createDesignationsStartedTimestamp;
         private static bool s_miningBatchSubmitted;
         private static bool s_createQueuePumpActive;
         private static IAreaManagingTower? s_activeCreateTower;
@@ -410,6 +412,7 @@ namespace AutoTerrainDesignations
             if (requestId != s_latestCreateDesignationsRequestId)
                 yield break;
 
+            s_createDesignationsStartedTimestamp = Stopwatch.GetTimestamp();
             s_createDesignationsOperationActive = true;
             s_cancelExperimentalAccessSearch = false;
             LogDebug($"Create Designations request {requestId} started.");
@@ -1367,7 +1370,6 @@ namespace AutoTerrainDesignations
         private static Tile2i s_towerReachabilityFloodBbMax;
         private static Tile2i s_towerReachabilityFloodTowerPosition;
         private static object? s_towerReachabilityFloodPathFindingParams;
-        private static bool s_towerReachabilityFloodHasStart;
         private static bool s_towerReachabilityFloodValid;
 
         /// <summary>
@@ -1383,7 +1385,6 @@ namespace AutoTerrainDesignations
         private static void ClearTowerReachabilityFlood()
         {
             s_towerReachabilityFloodValid = false;
-            s_towerReachabilityFloodHasStart = false;
             s_towerReachabilityFloodPathFindingParams = null;
             s_towerReachabilityFloodVisited.Clear();
             s_towerReachabilityFloodQueue.Clear();
@@ -1405,47 +1406,72 @@ namespace AutoTerrainDesignations
         }
 
         /// <summary>
-        /// Builds one BFS flood from the tower for the base tower bounds. Subsequent access
-        /// checks with targets inside those bounds are answered by set membership instead of
-        /// repeating the same flood.
+        /// Builds a bounded flood from the tower and reuses it across access checks.
+        /// Retains the full searched rectangle, including its margin, so a nearby
+        /// target outside the tower area does not require another search.
         /// </summary>
         private static void EnsureTowerReachabilityFlood(
             IPathabilityProvider pathabilityProvider,
             VehiclePathFindingParams pfParams,
             Tile2i towerPosition,
             Tile2i bbMin,
-            Tile2i bbMax)
+            Tile2i bbMax,
+            HashSet<Tile2i>? targetTiles = null)
         {
-            if (s_towerReachabilityFloodValid
-                && s_towerReachabilityFloodBbMin.X <= bbMin.X
-                && s_towerReachabilityFloodBbMin.Y <= bbMin.Y
-                && s_towerReachabilityFloodBbMax.X >= bbMax.X
-                && s_towerReachabilityFloodBbMax.Y >= bbMax.Y
-                && s_towerReachabilityFloodTowerPosition == towerPosition
-                && Equals(s_towerReachabilityFloodPathFindingParams, pfParams))
-            {
-                return;
-            }
-
-            s_towerReachabilityFloodValid = false;
-            s_towerReachabilityFloodVisited.Clear();
-            s_towerReachabilityFloodQueue.Clear();
-            s_towerReachabilityFloodBbMin = bbMin;
-            s_towerReachabilityFloodBbMax = bbMax;
-            s_towerReachabilityFloodTowerPosition = towerPosition;
-            s_towerReachabilityFloodPathFindingParams = pfParams;
-            s_towerReachabilityFloodHasStart =
-                TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start);
-            if (!s_towerReachabilityFloodHasStart)
-            {
-                s_towerReachabilityFloodValid = true;
-                return;
-            }
-
             int minX = Math.Min(bbMin.X, towerPosition.X) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
             int minY = Math.Min(bbMin.Y, towerPosition.Y) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
             int maxX = Math.Max(bbMax.X, towerPosition.X) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
             int maxY = Math.Max(bbMax.Y, towerPosition.Y) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            bool canReuse = s_towerReachabilityFloodValid
+                && s_towerReachabilityFloodTowerPosition == towerPosition
+                && Equals(s_towerReachabilityFloodPathFindingParams, pfParams);
+            if (canReuse)
+            {
+                minX = Math.Min(minX, s_towerReachabilityFloodBbMin.X);
+                minY = Math.Min(minY, s_towerReachabilityFloodBbMin.Y);
+                maxX = Math.Max(maxX, s_towerReachabilityFloodBbMax.X);
+                maxY = Math.Max(maxY, s_towerReachabilityFloodBbMax.Y);
+            }
+
+            if (targetTiles != null)
+            {
+                // Grow by a margin at each newly crossed edge so adjacent
+                // targets reuse the expanded flood.
+                int targetMinX = minX;
+                int targetMinY = minY;
+                int targetMaxX = maxX;
+                int targetMaxY = maxY;
+                foreach (Tile2i target in targetTiles)
+                {
+                    targetMinX = Math.Min(targetMinX, target.X);
+                    targetMinY = Math.Min(targetMinY, target.Y);
+                    targetMaxX = Math.Max(targetMaxX, target.X);
+                    targetMaxY = Math.Max(targetMaxY, target.Y);
+                }
+                if (targetMinX < minX) minX = targetMinX - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+                if (targetMinY < minY) minY = targetMinY - RAMP_ACCESS_SEARCH_MARGIN_TILES;
+                if (targetMaxX > maxX) maxX = targetMaxX + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+                if (targetMaxY > maxY) maxY = targetMaxY + RAMP_ACCESS_SEARCH_MARGIN_TILES;
+            }
+
+            Tile2i floodMin = new Tile2i(minX, minY);
+            Tile2i floodMax = new Tile2i(maxX, maxY);
+            if (canReuse && s_towerReachabilityFloodBbMin == floodMin
+                && s_towerReachabilityFloodBbMax == floodMax)
+                return;
+
+            s_towerReachabilityFloodValid = false;
+            s_towerReachabilityFloodVisited.Clear();
+            s_towerReachabilityFloodQueue.Clear();
+            s_towerReachabilityFloodBbMin = floodMin;
+            s_towerReachabilityFloodBbMax = floodMax;
+            s_towerReachabilityFloodTowerPosition = towerPosition;
+            s_towerReachabilityFloodPathFindingParams = pfParams;
+            if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
+            {
+                s_towerReachabilityFloodValid = true;
+                return;
+            }
 
             HashSet<Tile2i> visited = s_towerReachabilityFloodVisited;
             Queue<Tile2i> queue = s_towerReachabilityFloodQueue;
@@ -1473,7 +1499,7 @@ namespace AutoTerrainDesignations
             s_towerReachabilityFloodValid = true;
             LogLegacyAccessDebug(
                 $"[ATD Reachability Debug] Shared flood rebuilt from tower={towerPosition} " +
-                $"start={start}: {visited.Count} reachable tile(s)");
+                $"start={start} bounds={floodMin}..{floodMax}: {visited.Count} reachable tile(s)");
         }
 
         private static bool IsRampMouthReachableFromTower(IAreaManagingTower tower, Tile2i rampMouthOrigin)
@@ -1611,94 +1637,9 @@ namespace AutoTerrainDesignations
                 pfParams,
                 towerPosition,
                 bbMin,
-                bbMax);
-
-            bool targetsWithinCachedFlood =
-                s_towerReachabilityFloodValid
-                && targetTiles.All(target =>
-                    target.X >= s_towerReachabilityFloodBbMin.X
-                    && target.X <= s_towerReachabilityFloodBbMax.X
-                    && target.Y >= s_towerReachabilityFloodBbMin.Y
-                    && target.Y <= s_towerReachabilityFloodBbMax.Y);
-            if (targetsWithinCachedFlood)
-            {
-                if (!s_towerReachabilityFloodHasStart)
-                {
-                    LogLegacyAccessDebug(
-                        $"[ATD Reachability Debug] Cannot find pathable tile near tower {towerPosition}");
-                    return false;
-                }
-
-                foreach (Tile2i target in targetTiles)
-                {
-                    if (s_towerReachabilityFloodVisited.Contains(target))
-                    {
-                        LogLegacyAccessDebug(
-                            $"[ATD Reachability Debug] Reachable via shared flood: target {target}");
-                        return true;
-                    }
-                }
-
-                LogLegacyAccessDebug(
-                    $"[ATD Reachability Debug] Not reachable via shared flood " +
-                    $"({s_towerReachabilityFloodVisited.Count} flooded tiles)");
-                return false;
-            }
-
-            if (!TryFindNearestPathableTile(pathabilityProvider, pfParams, towerPosition, out Tile2i start))
-            {
-                LogLegacyAccessDebug($"[ATD Reachability Debug] Cannot find pathable tile near tower {towerPosition}");
-                return false;
-            }
-
-            var terrMgr = s_desigManager?.TerrainManager;
-            int startHeight = terrMgr != null ? GetSurfaceHeight(terrMgr, start) : -1;
-            string targetsStr = terrMgr != null ? string.Join(", ", targetTiles.Select(t => $"{t} (h={GetSurfaceHeight(terrMgr, t)})")) : string.Join(", ", targetTiles);
-
-            LogLegacyAccessDebug($"[ATD Reachability Debug] Start search from tower={towerPosition} -> start={start} (h={startHeight}) to targets=[{targetsStr}]");
-
-            if (targetTiles.Contains(start))
-            {
-                LogLegacyAccessDebug($"[ATD Reachability Debug] Reachable immediately: target contains start");
-                return true;
-            }
-
-            int minX = Math.Min(Math.Min(bbMin.X, towerPosition.X), targetTiles.Min(t => t.X)) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
-            int minY = Math.Min(Math.Min(bbMin.Y, towerPosition.Y), targetTiles.Min(t => t.Y)) - RAMP_ACCESS_SEARCH_MARGIN_TILES;
-            int maxX = Math.Max(Math.Max(bbMax.X, towerPosition.X), targetTiles.Max(t => t.X)) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
-            int maxY = Math.Max(Math.Max(bbMax.Y, towerPosition.Y), targetTiles.Max(t => t.Y)) + RAMP_ACCESS_SEARCH_MARGIN_TILES;
-
-            var visited = new HashSet<Tile2i>();
-            var queue = new Queue<Tile2i>();
-            visited.Add(start);
-            queue.Enqueue(start);
-
-            while (queue.Count > 0 && visited.Count < MAX_RAMP_ACCESS_SEARCH_TILES)
-            {
-                Tile2i current = queue.Dequeue();
-
-                foreach (RelTile2i direction in s_rampAccessSearchDirections)
-                {
-                    Tile2i next = current + direction;
-                    if (next.X < minX || next.X > maxX || next.Y < minY || next.Y > maxY)
-                        continue;
-                    if (visited.Contains(next))
-                        continue;
-                    if (!pathabilityProvider.IsPathable(next, pfParams.PathabilityQueryMask))
-                        continue;
-                    if (targetTiles.Contains(next))
-                    {
-                        LogLegacyAccessDebug($"[ATD Reachability Debug] Reachable via path: reached target {next}");
-                        return true;
-                    }
-
-                    visited.Add(next);
-                    queue.Enqueue(next);
-                }
-            }
-
-            LogLegacyAccessDebug($"[ATD Reachability Debug] Not reachable: searched {visited.Count} tiles");
-            return false;
+                bbMax,
+                targetTiles);
+            return s_towerReachabilityFloodVisited.Overlaps(targetTiles);
         }
 
         private static Tile2i GetTowerPosition(IAreaManagingTower tower, Tile2i bbMin, Tile2i bbMax)

@@ -14,7 +14,7 @@ namespace AutoTerrainDesignations.Mining
         private readonly MiningRequest m_request;
         private readonly MiningPolicy m_policy;
         private readonly IAccessSearchExecutionControl? m_control;
-        private string m_phase = "";
+        private string m_action = nameof(AtdLocalization.MineScanOre);
         private static readonly Tile2i[] s_cardinalDirections = {
             new Tile2i(4, 0), new Tile2i(-4, 0), new Tile2i(0, 4), new Tile2i(0, -4) };
         private MiningPlanner(MiningRequest request, IAccessSearchExecutionControl? control)
@@ -23,7 +23,13 @@ namespace AutoTerrainDesignations.Mining
         {
             if (m_control?.CancellationRequested == true)
                 throw new OperationCanceledException("Mining cancelled");
-            m_control?.Publish("Planning mine", m_phase, 0, 0);
+            m_control?.Publish(m_action, string.Empty, 0, 0);
+        }
+
+        private void BeginAction(string action)
+        {
+            m_action = action;
+            Checkpoint();
         }
         // Geometry diagnostics are observational and never call the game logger on a worker.
         private void LogDebug(string message) { }
@@ -34,9 +40,7 @@ namespace AutoTerrainDesignations.Mining
 
         private MiningPlan Run(MiningStage stage)
         {
-            m_phase = stage.ToString();
-            Checkpoint();
-            m_control?.Publish("Planning mine", stage.ToString(), 0, 0);
+            BeginAction(nameof(AtdLocalization.MineScanOre));
             var targets = new HashSet<string>(m_request.ProductIds, StringComparer.Ordinal);
             Dictionary<Tile2i, float> spikeCutoffs = MiningSpikeFilter.BuildOreBottomCutoffs(
                 m_request, targets, MiningSpikeFilterParameters.VanillaCorrection);
@@ -87,13 +91,16 @@ namespace AutoTerrainDesignations.Mining
                 depths[origin] = depth;
             }
             if (depths.Count == 0) return Empty("NoQualifyingOre");
+            BeginAction(nameof(AtdLocalization.MineFilterOre));
             FilterIsolatedDesignations(depths, targets, resources, m_policy.PurityLevel);
             if (depths.Count == 0) return Empty("NoComponents");
+            BeginAction(nameof(AtdLocalization.MineShape));
             FillRectilinearHull(depths, targets, resources, m_policy.CorridorClearance);
             if (m_policy.FlattenBottom)
                 FlattenDesignationBottom(depths, m_policy.PurityLevel, m_policy.FlatteningStrength);
             if (stage == MiningStage.Body)
                 return new MiningPlan(depths, new Dict<Tile2i, int>(), "Body");
+            BeginAction(nameof(AtdLocalization.MineCheckProtected));
             int removed = 0;
             foreach (Tile2i origin in depths.Keys.ToArray())
             {
@@ -104,6 +111,7 @@ namespace AutoTerrainDesignations.Mining
             if (removed > 0)
                 FilterIsolatedDesignations(depths, targets, resources, m_policy.PurityLevel);
             if (depths.Count == 0) return Empty("SafetyRemovedAll", true);
+            BeginAction(nameof(AtdLocalization.MineSmoothCorners));
             var corners = BuildAndSmoothCornerHeights(depths, m_policy.MaxHeightDiff,
                 m_policy.PurityLevel <= 0);
             var plan = new MiningPlan(depths, corners, "Planned");
@@ -112,6 +120,7 @@ namespace AutoTerrainDesignations.Mining
             // complete plan after its rebuilt geometry passes an entire safety pass.
             // Every unsuccessful pass removes at least one origin, so this converges
             // without an arbitrary iteration limit that could publish unsafe work.
+            BeginAction(nameof(AtdLocalization.MineCheckSlopes));
             while (true)
             {
                 var rejected = new List<Tile2i>();

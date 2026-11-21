@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "채굴 계획 {0}차 · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "총 경과 시간 {0:0.0}초"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "광산 지형 정보 수집 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "굴착 계획 작성 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "굴착 계획 보완 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "안전 점검용 지형 정보 수집 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "광석 탐색 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "광상 선별 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "광산 형태 조정 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "보호 대상 지형 확인 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "광산 모서리 다듬는 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "굴착 사면 확인 중"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "기존 진입로 확인 중"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "보유하지 않은 잠금 해제 차량 종류를 표시해 이 타워에서 주문할 수 있습니다. 보유한 차량과 이 타워의 대기 중인 주문은 항상 표시됩니다."
   ],

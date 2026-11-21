@@ -1,3 +1,8 @@
+v0.10.3 | 2026-11-21
+
+* Fixed: Creating mining designations in large areas could freeze the game while checking access
+* The Create Designations progress message now shows total elapsed time, the current mining pass, and what ATD is doing
+
 v0.10.2 | 2026-11-21
 
 * Fixed: Trucks assigned to an Ore Sorting Plant no longer take new logistics jobs unrelated to that plant

@@ -19,13 +19,23 @@ namespace AutoTerrainDesignations.Access
             ATDAccesswayHandleSnapshot snapshot,
             int maxVisitedNodes,
             int sliceBudgetMilliseconds,
-            int timeoutSeconds)
+            int timeoutSeconds,
+            double? operationElapsedSeconds = null,
+            string operationElapsedFormat = "Total elapsed {0:0.0}s")
         {
             if (IsReplayCapture(snapshot))
                 return "Background recording · abort keeps placed terrain work";
             string prefix =
                 $"visited {snapshot.VisitedNodes:N0}/{maxVisitedNodes:N0} · "
                 + $"queue {snapshot.PendingNodes:N0} · ";
+            if (operationElapsedSeconds.HasValue)
+            {
+                string elapsed = string.Format(
+                    CultureInfo.CurrentCulture, operationElapsedFormat, operationElapsedSeconds.Value);
+                return snapshot.VisitedNodes > 0 || snapshot.PendingNodes > 0
+                    ? prefix + elapsed
+                    : elapsed;
+            }
             if (snapshot.ExecutionBackend
                 == ATDAccesswayExecutionBackend.Worker)
             {

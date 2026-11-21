@@ -210,5 +210,18 @@
   "AutoTerrainDesignations.EnqueueConfirmPromptSingular": "Order a new {0} for {2} at {1}?",
   "AutoTerrainDesignations.PreAssignedTooltipFmt": "Pre-assigned to {0}",
   "AutoTerrainDesignations.OrderConstructionShortcutHint": "Shift-Alt-click to order a new {0} for {2} at {1}",
-  "AutoTerrainDesignations.ZoomToDepotTooltip": "Zoom to {0}"
+  "AutoTerrainDesignations.ZoomToDepotTooltip": "Zoom to {0}",
+  "AutoTerrainDesignations.MineCaptureSafety": "Capturing safety terrain",
+  "AutoTerrainDesignations.MineCaptureTerrain": "Capturing mine terrain",
+  "AutoTerrainDesignations.MineCheckAccess": "Checking existing access",
+  "AutoTerrainDesignations.MineCheckProtected": "Checking protected terrain",
+  "AutoTerrainDesignations.MineCheckSlopes": "Checking excavation slopes",
+  "AutoTerrainDesignations.MineDraft": "Drafting the mine",
+  "AutoTerrainDesignations.MineFilterOre": "Filtering ore deposits",
+  "AutoTerrainDesignations.MinePassProgress": "Mine pass {0} · {1}",
+  "AutoTerrainDesignations.MineRefine": "Refining the mine",
+  "AutoTerrainDesignations.MineScanOre": "Scanning ore",
+  "AutoTerrainDesignations.MineShape": "Shaping the mine",
+  "AutoTerrainDesignations.MineSmoothCorners": "Smoothing mine corners",
+  "AutoTerrainDesignations.MineTotalElapsed": "Total elapsed {0:0.0}s"
 }

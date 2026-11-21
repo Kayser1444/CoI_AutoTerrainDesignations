@@ -688,6 +688,7 @@ namespace AutoTerrainDesignations
             }
 
             // 2. Identify existing access providers
+            sliceControl?.ReportPhase(AtdLocalization.MineCheckAccess.TranslatedString);
             var existingProviders = new List<AccessProvider>();
             var accessibleAccessOrigins = new HashSet<Tile2i>();
             var inaccessibleAccessOrigins = new HashSet<Tile2i>();

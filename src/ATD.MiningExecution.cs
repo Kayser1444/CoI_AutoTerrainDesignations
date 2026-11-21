@@ -147,7 +147,7 @@ namespace AutoTerrainDesignations
             long ceiling = AutoTerrainDesignationsMod.AccessSnapshotMemoryCeilingMiB * 1024L * 1024L;
             Tile2i min = TerrainDesignation.GetOrigin(area.BoundingBoxMin);
             Tile2i max = TerrainDesignation.GetOrigin(area.BoundingBoxMax);
-            control.ReportPhase("Capturing mine terrain");
+            control.ReportPhase(AtdLocalization.MineCaptureTerrain.TranslatedString);
             for (int y = min.Y; y < max.Y; y += 4)
             for (int x = min.X; x < max.X; x += 4)
             {
@@ -172,12 +172,17 @@ namespace AutoTerrainDesignations
             // Geometry determines the needed safety footprint. Each publication owns
             // sealed collections; later capture cannot mutate a worker's input.
             MiningStage stage = MiningStage.Body;
+            int pass = 0;
             while (true)
             {
                 CheckCapture();
+                pass++;
+                control.ReportPhase(FormatMiningPass(pass, stage == MiningStage.Body
+                    ? AtdLocalization.MineDraft.TranslatedString
+                    : AtdLocalization.MineRefine.TranslatedString));
                 output.Request = request.Seal();
                 IEnumerator work = useWorkerThread
-                    ? ExecuteMiningOnWorker(output.Request, stage, control, output, world)
+                    ? ExecuteMiningOnWorker(output.Request, stage, pass, control, output, world)
                     : ExecuteMiningOnGameThread(output.Request, stage, control, output, world);
                 try { while (work.MoveNext()) yield return work.Current; }
                 finally { (work as IDisposable)?.Dispose(); }
@@ -188,7 +193,7 @@ namespace AutoTerrainDesignations
                     : output.Plan.NeedsSafetyCoverage
                         ? MiningSafety.TraceExterior(request, output.Plan, new List<Tile2i>()) : null;
                 if (facts == null) break;
-                control.ReportPhase("Capturing mine safety footprint");
+                control.ReportPhase(FormatMiningPass(pass, AtdLocalization.MineCaptureSafety.TranslatedString));
                 timer.Restart();
                 foreach (Tile2i tile in facts)
                 {
@@ -233,8 +238,11 @@ namespace AutoTerrainDesignations
             }
         }
 
+        private static string FormatMiningPass(int pass, string action)
+            => string.Format(AtdLocalization.MinePassProgress.TranslatedString, pass, action);
+
         private static IEnumerator ExecuteMiningOnWorker(MiningRequest request,
-            MiningStage stage, ExperimentalAccessSliceControl control,
+            MiningStage stage, int pass, ExperimentalAccessSliceControl control,
             MiningExecutionResult output, int world)
         {
             output.Plan = null;
@@ -265,7 +273,20 @@ namespace AutoTerrainDesignations
                         yield break;
                     }
                     if (worker.TryReadProgress(id, out AccessSearchWorkerProgress? progress) && progress != null)
-                        control.ReportWorkerProgress(progress.Phase, 0, 0, progress.ProcessingMilliseconds);
+                    {
+                        string action = progress.Phase switch
+                        {
+                            nameof(AtdLocalization.MineScanOre) => AtdLocalization.MineScanOre.TranslatedString,
+                            nameof(AtdLocalization.MineFilterOre) => AtdLocalization.MineFilterOre.TranslatedString,
+                            nameof(AtdLocalization.MineShape) => AtdLocalization.MineShape.TranslatedString,
+                            nameof(AtdLocalization.MineCheckProtected) => AtdLocalization.MineCheckProtected.TranslatedString,
+                            nameof(AtdLocalization.MineSmoothCorners) => AtdLocalization.MineSmoothCorners.TranslatedString,
+                            nameof(AtdLocalization.MineCheckSlopes) => AtdLocalization.MineCheckSlopes.TranslatedString,
+                            _ => progress.Phase
+                        };
+                        control.ReportWorkerProgress(FormatMiningPass(pass, action), 0, 0,
+                            progress.ProcessingMilliseconds);
+                    }
                     yield return null;
                 }
             }
@@ -290,7 +311,6 @@ namespace AutoTerrainDesignations
             if (control.CancellationRequested || !IsWorldGenerationActive(world))
                 yield break;
 
-            control.ReportPhase("Planning mine");
             // The pure mining planner is synchronous; unlike access search it
             // has no resumable session. Opting out can therefore cause a hitch.
             output.Plan = MiningPlanner.Execute(request, stage);

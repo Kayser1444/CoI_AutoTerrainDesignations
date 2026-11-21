@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "Planungsdurchlauf {0} · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "Gesamtzeit {0:0.0} s"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "Erfasse Abbaugelände"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "Erstelle Abbauplan"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "Verfeinere Abbauplan"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "Erfasse Gelände für Sicherheitsprüfung"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "Suche nach Erz"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "Filtere Erzvorkommen"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "Forme das Abbaugebiet"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "Prüfe geschütztes Gelände"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "Glätte die Ecken des Abbaugebiets"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "Prüfe Abbauböschungen"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "Prüfe vorhandene Zufahrten"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "Freigeschaltete Fahrzeugtypen anzeigen, die du nicht besitzt, damit du sie über diesen Turm bestellen kannst. Eigene Fahrzeuge und die vorgemerkten Aufträge dieses Turms werden immer angezeigt."
   ],

@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "Grävplanering, omgång {0} · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "Total tid {0:0.0} s"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "Läser in gruvterräng"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "Tar fram en grävplan"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "Förfinar grävplanen"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "Läser in terräng för säkerhetskontroll"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "Söker efter malm"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "Filtrerar malmfyndigheter"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "Formar gruvan"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "Kontrollerar skyddad terräng"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "Jämnar ut gruvans hörn"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "Kontrollerar gruvslänter"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "Kontrollerar befintliga tillfarter"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "Visa upplåsta fordonstyper som du inte äger så att du kan beställa dem från det här tornet. Ägda fordon och tornets köade beställningar visas alltid."
   ],

@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "Проход планирования {0} · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "Общее время {0:0.0} с"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "Сбор данных о рельефе карьера"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "Составление плана выемки"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "Уточнение плана выемки"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "Сбор данных о рельефе для проверки безопасности"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "Поиск руды"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "Фильтрация залежей руды"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "Формирование карьера"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "Проверка защищённого рельефа"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "Сглаживание углов карьера"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "Проверка откосов выемки"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "Проверка существующих подъездов"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "Показывать открытые типы машин, которых у вас нет, чтобы заказывать их с этой башни. Имеющиеся машины и заказы этой башни в очереди видны всегда."
   ],

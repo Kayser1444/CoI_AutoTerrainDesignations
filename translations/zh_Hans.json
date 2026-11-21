@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "第 {0} 轮采矿规划 · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "总用时 {0:0.0} 秒"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "采集矿区地形数据"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "拟定开挖方案"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "调整开挖方案"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "采集安全检查所需的地形数据"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "扫描矿石"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "筛选矿床"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "确定矿坑形状"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "检查受保护的地形"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "平滑矿坑拐角"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "检查开挖边坡"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "检查现有通道"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "显示已解锁但尚未拥有的车辆类型，以便从此塔楼订购。已拥有的车辆和此塔楼排队中的订单始终显示。"
   ],

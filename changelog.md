@@ -1,5 +1,8 @@
 v0.10.3 [unreleased]
 
+- Reuse the tower's bounded reachability search across access checks so large interactive mining plans avoid thousands of repeated terrain searches. On the reporter's save in Captain of Industry 0.8.8d (build 633), the Info-level retest completed without the reported freeze. The slowest API sample was 0.85 seconds, compared with a roughly 14-second stall before the fix.
+- Show total elapsed time, the current mining pass, and the current action in the Create Designations toast. The owner confirmed the updated toast in game. The release adds translations for the new progress labels to all nine bundled languages.
+
 v0.10.2 [released]
 
 - Restrict new logistics jobs for trucks assigned to an Ore Sorting Plant to work involving that plant. Vanilla job matching now resolves the runtime assignment adapter to the real plant when comparing endpoints (Hub topic 21453).

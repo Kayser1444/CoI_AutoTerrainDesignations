@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "Passaggio di pianificazione {0} · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "Tempo totale {0:0.0} s"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "Acquisizione del terreno della miniera"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "Stesura del piano di scavo"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "Rifinitura del piano di scavo"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "Acquisizione del terreno per il controllo di sicurezza"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "Ricerca di minerali"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "Filtraggio dei giacimenti"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "Definizione della forma della miniera"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "Verifica del terreno protetto"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "Smussatura degli angoli della miniera"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "Verifica delle scarpate di scavo"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "Verifica degli accessi esistenti"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "Mostra i tipi di veicolo sbloccati che non possiedi per poterli ordinare da questa torre. I veicoli posseduti e gli ordini in coda di questa torre sono sempre visibili."
   ],

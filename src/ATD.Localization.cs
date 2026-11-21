@@ -16,6 +16,33 @@ namespace AutoTerrainDesignations
     /// </summary>
     internal static class AtdLocalization
     {
+        public static readonly LocStr MinePassProgress =
+            Loc.Str("AutoTerrainDesignations.MinePassProgress", "Mine pass {0} · {1}", "Progress toast. {0} is the mining pass number, {1} is the current action.");
+        public static readonly LocStr MineTotalElapsed =
+            Loc.Str("AutoTerrainDesignations.MineTotalElapsed", "Total elapsed {0:0.0}s", "Progress toast. {0} is total seconds since the request started.");
+        public static readonly LocStr MineCaptureTerrain =
+            Loc.Str("AutoTerrainDesignations.MineCaptureTerrain", "Capturing mine terrain", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineDraft =
+            Loc.Str("AutoTerrainDesignations.MineDraft", "Drafting the mine", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineRefine =
+            Loc.Str("AutoTerrainDesignations.MineRefine", "Refining the mine", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineCaptureSafety =
+            Loc.Str("AutoTerrainDesignations.MineCaptureSafety", "Capturing safety terrain", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineScanOre =
+            Loc.Str("AutoTerrainDesignations.MineScanOre", "Scanning ore", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineFilterOre =
+            Loc.Str("AutoTerrainDesignations.MineFilterOre", "Filtering ore deposits", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineShape =
+            Loc.Str("AutoTerrainDesignations.MineShape", "Shaping the mine", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineCheckProtected =
+            Loc.Str("AutoTerrainDesignations.MineCheckProtected", "Checking protected terrain", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineSmoothCorners =
+            Loc.Str("AutoTerrainDesignations.MineSmoothCorners", "Smoothing mine corners", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineCheckSlopes =
+            Loc.Str("AutoTerrainDesignations.MineCheckSlopes", "Checking excavation slopes", "Current action in the interactive mining progress toast.");
+        public static readonly LocStr MineCheckAccess =
+            Loc.Str("AutoTerrainDesignations.MineCheckAccess", "Checking existing access", "Current action in the interactive mining progress toast.");
+
         public static LocStr ShowUnownedVehicles =
             Loc.Str("AutoTerrainDesignations.ShowUnownedVehicles", "Show unlocked vehicle types you do not own so you can order them from this tower. Owned vehicles and this tower's queued orders are always shown.", "Tooltip for the union symbol button in vehicle panel headers, when unowned types are hidden.");
         public static LocStr HideUnownedVehicles =

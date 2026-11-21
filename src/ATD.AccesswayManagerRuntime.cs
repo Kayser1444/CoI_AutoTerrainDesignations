@@ -249,15 +249,25 @@ namespace AutoTerrainDesignations
                         => "Stop planned tower access",
                     _ => "Stop automatic farming access"
                 };
+                bool isCreateDesignations = s_createDesignationsOperationActive
+                    && ReferenceEquals(handle, s_createDesignationsAccessRequest);
+                double? operationElapsedSeconds = isCreateDesignations
+                    ? (Stopwatch.GetTimestamp() - s_createDesignationsStartedTimestamp)
+                        / (double)Stopwatch.Frequency
+                    : null;
                 var progressText = new LocStrFormatted(
                     captureMode ? $"[ATD] {snapshot.Phase}"
-                        : $"[ATD] {snapshot.Phase}; finding {workType}");
+                        : isCreateDesignations
+                            ? $"[ATD] {AtdLocalization.DesigCreateBtn.TranslatedString} · {snapshot.Phase}"
+                            : $"[ATD] {snapshot.Phase}; finding {workType}");
                 var statsText = new LocStrFormatted(
                     AccesswayProgressPresentation.FormatStats(
                         snapshot,
                         AutoTerrainDesignationsMod.AccessMaxVisitedNodes,
                         GetManagedAccesswaySliceBudgetMilliseconds(),
-                        AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds));
+                        AutoTerrainDesignationsMod.AccessSearchTimeoutSeconds,
+                        operationElapsedSeconds,
+                        AtdLocalization.MineTotalElapsed.TranslatedString));
                 if (s_terrainAnalysisToastHidden)
                     return;
 

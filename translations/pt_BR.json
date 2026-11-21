@@ -1,5 +1,57 @@
 [
   [
+    "AutoTerrainDesignations.MinePassProgress",
+    "Etapa de planejamento {0} · {1}"
+  ],
+  [
+    "AutoTerrainDesignations.MineTotalElapsed",
+    "Tempo total {0:0.0} s"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureTerrain",
+    "Coletando dados do terreno da mina"
+  ],
+  [
+    "AutoTerrainDesignations.MineDraft",
+    "Elaborando o plano de escavação"
+  ],
+  [
+    "AutoTerrainDesignations.MineRefine",
+    "Refinando o plano de escavação"
+  ],
+  [
+    "AutoTerrainDesignations.MineCaptureSafety",
+    "Coletando dados do terreno para verificar a segurança"
+  ],
+  [
+    "AutoTerrainDesignations.MineScanOre",
+    "Procurando minério"
+  ],
+  [
+    "AutoTerrainDesignations.MineFilterOre",
+    "Filtrando depósitos de minério"
+  ],
+  [
+    "AutoTerrainDesignations.MineShape",
+    "Definindo o formato da mina"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckProtected",
+    "Verificando o terreno protegido"
+  ],
+  [
+    "AutoTerrainDesignations.MineSmoothCorners",
+    "Suavizando os cantos da mina"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckSlopes",
+    "Verificando os taludes de escavação"
+  ],
+  [
+    "AutoTerrainDesignations.MineCheckAccess",
+    "Verificando os acessos existentes"
+  ],
+  [
     "AutoTerrainDesignations.ShowUnownedVehicles",
     "Mostrar os tipos de veículo desbloqueados que você não possui para poder solicitá-los nesta torre. Os veículos que você possui e os pedidos na fila desta torre são sempre exibidos."
   ],

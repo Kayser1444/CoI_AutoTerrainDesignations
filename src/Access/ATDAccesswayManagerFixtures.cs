@@ -242,6 +242,21 @@ namespace AutoTerrainDesignations.Access
                 return false;
             }
 
+            var laterMiningPass = new ATDAccesswayHandleSnapshot(
+                ATDAccesswayRequestState.Active, null, 0, 0,
+                processingMilliseconds: 1014d,
+                phase: "Mine pass 3 · Checking excavation slopes",
+                statusElapsedMilliseconds: 420d,
+                executionBackend: ATDAccesswayExecutionBackend.Worker);
+            string interactive = AccesswayProgressPresentation.FormatStats(
+                laterMiningPass, 100000, 15, 120, operationElapsedSeconds: 27.5d);
+            if (interactive != $"Total elapsed {27.5d:0.0}s")
+            {
+                failure = "Interactive progress shows the worker timer instead of total elapsed: "
+                    + interactive;
+                return false;
+            }
+
             var cooperativeSnapshot = new ATDAccesswayHandleSnapshot(
                 ATDAccesswayRequestState.Active,
                 null,
