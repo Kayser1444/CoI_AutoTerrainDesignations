@@ -92,7 +92,7 @@ is included by mistake, I intend to correct it promptly upon discovery or notice
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lib.Harmony" Version="2.3.3">
+    <PackageReference Include="Lib.Harmony" Version="2.4.3">
       <IncludeAssets>compile; runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>

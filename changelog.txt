@@ -1,3 +1,7 @@
+v0.10.4 | 2026-11-23
+
+* Updated bundled Harmony to 2.4.3, which includes a Unity Mono detour fix for affected Proton configurations
+
 v0.10.3 | 2026-11-21
 
 * Fixed: Creating mining designations in large areas could freeze the game while checking access

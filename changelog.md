@@ -1,5 +1,7 @@
 v0.10.4 [unreleased]
 
+- Bundle Harmony 2.4.3 with MonoMod.Core 1.3.6, which includes the Unity Mono detour fix for affected Proton configurations. Keep the version aligned across ATD, AFD, BDT, and KPIE because the game can reuse the first loaded copy.
+
 v0.10.3 [released]
 
 - Reuse the tower's bounded reachability search across access checks so large interactive mining plans avoid thousands of repeated terrain searches. On the reporter's save in Captain of Industry 0.8.8d (build 633), the Info-level retest completed without the reported freeze. The slowest API sample was 0.85 seconds, compared with a roughly 14-second stall before the fix.
