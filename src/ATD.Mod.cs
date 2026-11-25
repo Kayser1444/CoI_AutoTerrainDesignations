@@ -95,7 +95,7 @@ public static string Tt(string text) => text;
     public void RegisterPrototypes(ProtoRegistrator registrator)
     {
         m_harmony = new Harmony("com.auto-terrain-designations.mod");
-        bool migrateLegacyCornerKey = AutoDepthDesignation.TryLoadCornerDesignationKeyFromSettings(out KeyCode cornerKey);
+        bool migrateLegacyCornerKey = AutoDepthDesignation.TryLoadCornerDesignationKeyFromSettings(Manifest.RootDirectoryPath, out KeyCode cornerKey);
         if (migrateLegacyCornerKey)
         {
             SetCornerDesignationMode(FromPrimaryKeys(cornerKey));
@@ -719,12 +719,14 @@ public static string Tt(string text) => text;
     public void Initialize(DependencyResolver resolver, bool gameWasLoaded)
     {
         CustomKeybindsInjector.Register(resolver, this);
+#if ATD_REPLAY_LAB
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
+#endif
         try
         {
             AutoDepthDesignation.s_log.EnableConsoleLogging();
-            AutoDepthDesignation.SetModRootDirectoryPath(
-                Manifest.RootDirectoryPath);
+            AutoDepthDesignation.SetModPaths(
+                Manifest.RootDirectoryPath, resolver.Resolve<IFileSystemHelper>().GameDataRootDirPath, Manifest.Id);
             AutoDepthDesignation.s_log.RegisterAutoConsoleMirroring(this, resolver.Resolve<IGameLoopEvents>(), resolver.Resolve<GameConsoleCommandsExecutor>());
             AutoTerrainDesignationsTicker.DestroyActive();
 
@@ -733,8 +735,10 @@ public static string Tt(string text) => text;
             m_gameLoopEvents = resolver.Resolve<IGameLoopEvents>();
             m_simLoopEvents = resolver.Resolve<ISimLoopEvents>();
             m_saveManager = resolver.Resolve<ISaveManager>();
+#if ATD_REPLAY_LAB
             Access.AccessSearchReplayRecorder.SetSnapshotSaveRequester(
                 m_saveManager.RequestGameSave);
+#endif
             m_gameLoopEvents.Terminate.AddNonSaveable(this, onGameTerminated);
             m_simLoopEvents.BeforeSave.AddNonSaveable(this, beforeSave);
             m_simLoopEvents.UpdateAfterCmdProc.AddNonSaveable(this,
@@ -755,6 +759,7 @@ public static string Tt(string text) => text;
             INotificationsManager notificationsManager = resolver.Resolve<INotificationsManager>();
             IInputScheduler inputScheduler = resolver.Resolve<IInputScheduler>();
             ConfigSerializationContext configSerializationContext = resolver.Resolve<ConfigSerializationContext>();
+#if ATD_REPLAY_LAB
             MapManager? mapManager = resolver.TryResolve<MapManager>().ValueOrNull;
             CoreModConfig? coreModConfig =
                 resolver.TryResolve<CoreModConfig>().ValueOrNull;
@@ -764,6 +769,7 @@ public static string Tt(string text) => text;
             if (string.IsNullOrEmpty(mapName))
                 mapName = coreModConfig?.LoadedWorldMapName.ValueOrNull;
             Access.AccessSearchReplayRecorder.SetCurrentMapName(mapName);
+#endif
             IVehicleBuffersRegistry? vehicleBuffersRegistry = null;
             ITruckJobsFilterManager? truckJobsFilter = null;
             UnreachableTerrainDesignationsManager? unreachableTerrainDesignations = null;
@@ -908,8 +914,10 @@ public static string Tt(string text) => text;
 
     private void onGameTerminated()
     {
+#if ATD_REPLAY_LAB
         Access.AccessSearchReplayRecorder.SetSnapshotSaveRequester(null);
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
+#endif
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();
         AutoDepthDesignation.ResetWorldRuntimeState();
@@ -1001,7 +1009,9 @@ public static string Tt(string text) => text;
 
     public void Dispose()
     {
+#if ATD_REPLAY_LAB
         Access.AccessSearchReplayRecorder.SetCurrentMapName(null);
+#endif
         unsubscribeWorldEvents();
         AutoTerrainDesignationsTicker.DestroyActive();
         AutoDepthDesignation.ResetWorldRuntimeState();

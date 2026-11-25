@@ -57,20 +57,17 @@ namespace AutoTerrainDesignations
             public AccessSearchSnapshot Snapshot { get; }
             public AccessSearchResult SearchResult { get; }
             public AccessDesignationPlan Plan { get; }
-            public AccessReplayMemoryEvidence? MemoryEvidence { get; }
 
             public PlannedTowerCandidate(
                 PlannedTowerApproach approach,
                 AccessSearchSnapshot snapshot,
                 AccessSearchResult searchResult,
-                AccessDesignationPlan plan,
-                AccessReplayMemoryEvidence? memoryEvidence)
+                AccessDesignationPlan plan)
             {
                 Approach = approach;
                 Snapshot = snapshot;
                 SearchResult = searchResult;
                 Plan = plan;
-                MemoryEvidence = memoryEvidence;
             }
         }
 
@@ -319,8 +316,7 @@ namespace AutoTerrainDesignations
                 && plan.IsValid
                 && selectedApproach != null
                     ? new PlannedTowerCandidate(
-                        selectedApproach, snapshot, searchResult, plan,
-                        snapshotBuild.MemoryEvidence)
+                        selectedApproach, snapshot, searchResult, plan)
                     : null;
             if (best != null)
             {
@@ -373,8 +369,7 @@ namespace AutoTerrainDesignations
 
             var placedOrigins = new List<Tile2i>();
             var candidate = new ExperimentalAccessCandidate(
-                best.SearchResult, best.Plan, request, dryRun.ReplayTiming,
-                best.MemoryEvidence);
+                best.SearchResult, best.Plan);
             if (!TryPlaceExperimentalAccessCandidate(
                     best.Snapshot, levelingProto, candidate, tower,
                     placedOrigins, reservedRampTiles: null,
@@ -419,6 +414,10 @@ namespace AutoTerrainDesignations
             }
 
             RegisterGeneratedAccesswayOrigins(tower, placedOrigins);
+#if ATD_REPLAY_LAB
+            candidate.Request = request;
+            candidate.Timing = dryRun.ReplayTiming;
+            candidate.MemoryEvidence = snapshotBuild.MemoryEvidence;
             AccessReplayCaptureOperation? replayCapture =
                 AccessSearchReplayRecorder.BeginRecordAccepted(
                     candidate, "planned-tower-access");
@@ -452,6 +451,7 @@ namespace AutoTerrainDesignations
                 while (replayCompletion.MoveNext())
                     yield return replayCompletion.Current;
             }
+#endif
             ClearLastExperimentalCleanupMaterialization();
             LastExperimentalAccessSearch = best.SearchResult;
             SetTowerLastRampOutcome(tower, RampPlacementOutcome.Crested);

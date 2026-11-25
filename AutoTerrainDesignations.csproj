@@ -22,6 +22,16 @@ is included by mistake, I intend to correct it promptly upon discovery or notice
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(EnableReplayLab)' == 'true'">
+    <DefineConstants>$(DefineConstants);ATD_REPLAY_LAB</DefineConstants>
+    <OutputPath>bin\ReplayLab\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\ReplayLab\$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableReplayLab)' != 'true'">
+    <Compile Remove="src\Access\AccessSearchReplay.cs;src\Access\MiningReplayRecorder.cs;src\Mining\MiningReplayFacade.cs" />
+  </ItemGroup>
+
   <Target Name="CopyModFilesToProjectRoot" AfterTargets="Build" Condition="'$(SkipModDeployment)' != 'true'">
     <Message Text="Copying mod files to project root..." Importance="High" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)" OverwriteReadOnlyFiles="true" />

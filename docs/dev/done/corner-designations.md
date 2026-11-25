@@ -220,7 +220,7 @@ Corner mode depends on Harmony patches to hook into the vanilla designation flow
 
 - `TerrainDesignationController.Activate` postfix:
   - marks the designation tool as active
-  - reflects `m_heightBias`, apply sound, and switch sound
+  - reflects `m_heightBias` and captures the vanilla UI sound player and tool-specific apply sound via Harmony field injection
   - selects the correct toolbox and designation proto
 - `TerrainDesignationController.Deactivate` postfix:
   - clears runtime references

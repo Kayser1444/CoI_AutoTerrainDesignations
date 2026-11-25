@@ -10,6 +10,9 @@ remain optional follow-ons. Shared understanding was confirmed on 2026-08-24.
 Related design: [Accessway Search Worker](../in-progress/accessway-search-worker.md),
 [worker implementation tickets](accessway-search-worker-tickets.md), and
 [ADR 0006](../../adr/0006-replay-access-search-from-owned-snapshots.md).
+The proposed [hazard projection extension](access-hazard-projection-lab-extension.md)
+extends this laboratory with combined-projection and hazard replay; it is a
+design addendum, not a separate lab.
 
 ## Objective
 
@@ -169,7 +172,18 @@ commands may mutate it.
 
 ### Ticket 2A operator workflow
 
-Build and install the Release DLL, then arm one capture in the in-game console:
+Build and install the local Release DLL with replay support.
+
+```powershell
+.\build.ps1 -ReplayLab
+```
+
+This installs the development DLL in the mod directory and also writes it to
+`bin\ReplayLab\Release\net48\AutoTerrainDesignations.dll`, the default input
+for `access-lab.ps1`. Standard builds and release packages exclude the lab.
+Run a standard build to restore the player DLL in the mod directory.
+
+Arm one capture in the in-game console:
 
 ```text
 atd_access_replay_arm <case-name> <scenario-family>

@@ -298,7 +298,7 @@ switch ($Mode) {
         throw "No explicit migration exists for schema $($manifest.schema)."
     }
     'regress' {
-        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\Release\net48\AutoTerrainDesignations.dll' }
+        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\ReplayLab\Release\net48\AutoTerrainDesignations.dll' }
         $fixture = Invoke-LabChild '' $AssemblyPath $ManagedDirectory 'synthetic-fixture-gate'
         if ($fixture.ExitCode -ne 0) { Write-Report 'regression' @($fixture) @{ candidate = (Get-Sha256 $AssemblyPath) }; throw 'Synthetic fixture gate failed.' }
         $cases = Get-CorpusCases 'semantic'
@@ -334,7 +334,7 @@ switch ($Mode) {
             $game = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'Captain.*Industry' } | Select-Object -First 1
             if ($game) { throw 'Captain of Industry is running; authoritative benchmark deferred. Use -AllowBusyMachine only for a directional smoke run.' }
         }
-        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\Release\net48\AutoTerrainDesignations.dll' }
+        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\ReplayLab\Release\net48\AutoTerrainDesignations.dll' }
         $cases = Get-CorpusCases 'performance'
         if ($cases.Count -eq 0) { throw 'No promoted performance cases match the selected family.' }
         $results = @()
@@ -352,7 +352,7 @@ switch ($Mode) {
     }
     'attest' {
         if ([string]::IsNullOrWhiteSpace($CaseDirectory)) { throw 'CaseDirectory is required.' }
-        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\Release\net48\AutoTerrainDesignations.dll' }
+        if ([string]::IsNullOrWhiteSpace($AssemblyPath)) { $AssemblyPath = Join-Path $projectRoot 'bin\ReplayLab\Release\net48\AutoTerrainDesignations.dll' }
         $case = [pscustomobject]@{ Directory = [IO.Path]::GetFullPath($CaseDirectory); Promotion = (Get-Content -Raw -LiteralPath (Join-Path $CaseDirectory 'promotion.json') | ConvertFrom-Json) }
         $results = @(1..2 | ForEach-Object { Invoke-LabChild 'compatible-replay' $AssemblyPath $case.Directory "compatibility-$($_)" })
         if (@($results | Where-Object { $_.ExitCode -ne 0 }).Count -gt 0) { throw 'Compatibility qualification failed.' }

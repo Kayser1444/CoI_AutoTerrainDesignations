@@ -62,22 +62,18 @@ namespace AutoTerrainDesignations.Access
     {
         public AccessSearchResult SearchResult { get; }
         public AccessDesignationPlan Plan { get; }
-        public AccessPathRequest? Request { get; }
-        public AccessReplayPhaseTiming Timing { get; }
-        public AccessReplayMemoryEvidence? MemoryEvidence { get; }
+#if ATD_REPLAY_LAB
+        public AccessPathRequest? Request { get; set; }
+        public AccessSearchPhaseTiming Timing { get; set; }
+        public AccessReplayMemoryEvidence? MemoryEvidence { get; set; }
+#endif
 
         public ExperimentalAccessCandidate(
             AccessSearchResult searchResult,
-            AccessDesignationPlan plan,
-            AccessPathRequest? request = null,
-            AccessReplayPhaseTiming timing = default,
-            AccessReplayMemoryEvidence? memoryEvidence = null)
+            AccessDesignationPlan plan)
         {
             SearchResult = searchResult;
             Plan = plan;
-            Request = request;
-            Timing = timing;
-            MemoryEvidence = memoryEvidence;
         }
     }
 }

@@ -10,7 +10,8 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
     [switch]$Package,
-    [string]$CurrentManagedPath = ''
+    [string]$CurrentManagedPath = '',
+    [switch]$ReplayLab
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,11 +22,14 @@ $stagingDir = Join-Path $artifactsDir 'package'
 $archiveDir = Join-Path $PSScriptRoot 'archive'
 
 if (-not $PSBoundParameters.ContainsKey('Package')) {
-    $Package = $Configuration -eq 'Release'
+    $Package = $Configuration -eq 'Release' -and -not $ReplayLab
+}
+if ($Package -and $ReplayLab) {
+    throw 'The replay lab is for local development and cannot be packaged.'
 }
 
 Write-Host "Building AutoTerrainDesignations ($Configuration)..."
-$buildArguments = @('-c', $Configuration)
+$buildArguments = @('-c', $Configuration, "-p:EnableReplayLab=$($ReplayLab.IsPresent)")
 if ($CurrentManagedPath) {
     $buildArguments += "-p:CaptainIndustryManagedPath=$CurrentManagedPath"
 }
@@ -48,6 +52,7 @@ $packageVersion = if ($manifest.version) { [string]$manifest.version } else { 'd
 $packageRootName = 'AutoTerrainDesignations'
 $zipPath = Join-Path $PSScriptRoot ("{0}-{1}.zip" -f $packageId, $packageVersion)
 $packageRootDir = Join-Path $stagingDir $packageRootName
+$binaryDirectory = Join-Path $PSScriptRoot "bin\$Configuration\net48"
 
 # Archive old zip files
 New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
@@ -79,7 +84,8 @@ $filesToInclude = @(
 )
 
 foreach ($file in $filesToInclude) {
-    $sourcePath = Join-Path $PSScriptRoot $file
+    $sourceDirectory = if ($file -like '*.dll') { $binaryDirectory } else { $PSScriptRoot }
+    $sourcePath = Join-Path $sourceDirectory $file
     if (-not (Test-Path -LiteralPath $sourcePath)) { throw "Missing package input: $sourcePath" }
     if (Test-Path -LiteralPath $sourcePath) {
         New-Item -ItemType Directory -Path (Split-Path -Parent (Join-Path $packageRootDir $file)) -Force | Out-Null

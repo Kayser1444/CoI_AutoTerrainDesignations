@@ -22,27 +22,6 @@ using Mafi.Core.Terrain.Designation;
 namespace AutoTerrainDesignations.Access
 {
     /// <summary>
-    /// Observational timings attached to a replay case. They are deliberately
-    /// excluded from the canonical result comparison.
-    /// </summary>
-    internal readonly struct AccessReplayPhaseTiming
-    {
-        public double PreparationMilliseconds { get; }
-        public double SearchMilliseconds { get; }
-        public double MaterializationMilliseconds { get; }
-
-        public AccessReplayPhaseTiming(
-            double preparationMilliseconds,
-            double searchMilliseconds,
-            double materializationMilliseconds)
-        {
-            PreparationMilliseconds = Math.Max(0d, preparationMilliseconds);
-            SearchMilliseconds = Math.Max(0d, searchMilliseconds);
-            MaterializationMilliseconds = Math.Max(0d, materializationMilliseconds);
-        }
-    }
-
-    /// <summary>
     /// Optional memory evidence collected only for an explicitly armed
     /// laboratory capture. It is manifest metadata, never part of the replay
     /// request graph or canonical outcome.
@@ -516,7 +495,7 @@ namespace AutoTerrainDesignations.Access
 #else
                 "Release";
 #endif
-            AccessReplayPhaseTiming timing = candidate.Timing;
+            AccessSearchPhaseTiming timing = candidate.Timing;
             return "{\n"
                 + Json("schema", SchemaVersion.ToString(CultureInfo.InvariantCulture), false) + ",\n"
                 + Json("caseName", arm.Name) + ",\n"

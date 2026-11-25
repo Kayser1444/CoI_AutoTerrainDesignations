@@ -1,5 +1,11 @@
 v0.10.5 [unreleased]
 
+- Store global settings in `ModConfigs/AutoTerrainDesignations/ATDsettings.json` so in-game mod updates preserve them. On first load, copy the old settings file if it is still available.
+
+- Restore the vanilla placement sounds for corner mining, dumping, and leveling designations and the mode-switch sound for corner mode after the Update 4.3 audio changes. The owner verified the fix in game.
+
+- Move access and mining replay capture, replay commands, and the replay codec to opt-in `-ReplayLab` builds with a dedicated output directory. Keep access-search phase timings available for diagnostics and document the proposed hazard projection extension.
+
 v0.10.4 [released]
 
 - Bundle Harmony 2.4.3 with MonoMod.Core 1.3.6, which includes the Unity Mono detour fix for affected Proton configurations. Keep the version aligned across ATD, AFD, BDT, and KPIE because the game can reuse the first loaded copy.

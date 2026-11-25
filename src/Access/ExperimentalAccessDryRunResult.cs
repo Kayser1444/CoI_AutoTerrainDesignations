@@ -9,13 +9,13 @@ namespace AutoTerrainDesignations.Access
     {
         public AccessSearchResult? SearchResult { get; private set; }
         public AccessDesignationPlan? Plan { get; private set; }
-        public AccessReplayPhaseTiming ReplayTiming { get; private set; }
+        public AccessSearchPhaseTiming ReplayTiming { get; private set; }
         public bool IsComplete { get; private set; }
 
         public void Complete(
             AccessSearchResult searchResult,
             AccessDesignationPlan? plan,
-            AccessReplayPhaseTiming replayTiming = default)
+            AccessSearchPhaseTiming replayTiming = default)
         {
             if (IsComplete)
                 throw new InvalidOperationException(

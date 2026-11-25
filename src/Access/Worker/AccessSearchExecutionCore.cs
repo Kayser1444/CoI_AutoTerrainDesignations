@@ -111,7 +111,7 @@ namespace AutoTerrainDesignations.Access.Worker
                     result.FailureReason, result.StartOrigin);
             materialization.Stop();
             total.Stop();
-            var timing = new AccessReplayPhaseTiming(
+            var timing = new AccessSearchPhaseTiming(
                 preparationMilliseconds,
                 searchMilliseconds,
                 materialization.Elapsed.TotalMilliseconds);
@@ -174,7 +174,7 @@ namespace AutoTerrainDesignations.Access.Worker
             return AccessSearchExecutionOutcome.Interrupted(
                 result,
                 AccessDesignationPlan.Invalid(reason, result.StartOrigin),
-                new AccessReplayPhaseTiming(
+                new AccessSearchPhaseTiming(
                     preparationMilliseconds,
                     Math.Max(
                         0d,
@@ -203,7 +203,7 @@ namespace AutoTerrainDesignations.Access.Worker
     {
         public AccessSearchResult SearchResult { get; }
         public AccessDesignationPlan Plan { get; }
-        public AccessReplayPhaseTiming Timing { get; }
+        public AccessSearchPhaseTiming Timing { get; }
         public TimeSpan ProcessingTime { get; }
         public int PendingNodes { get; }
         public string TerminalPhase { get; }
@@ -211,7 +211,7 @@ namespace AutoTerrainDesignations.Access.Worker
         private AccessSearchExecutionOutcome(
             AccessSearchResult searchResult,
             AccessDesignationPlan plan,
-            AccessReplayPhaseTiming timing,
+            AccessSearchPhaseTiming timing,
             TimeSpan processingTime,
             int pendingNodes,
             string terminalPhase)
@@ -227,7 +227,7 @@ namespace AutoTerrainDesignations.Access.Worker
         internal static AccessSearchExecutionOutcome Completed(
             AccessSearchResult result,
             AccessDesignationPlan plan,
-            AccessReplayPhaseTiming timing,
+            AccessSearchPhaseTiming timing,
             TimeSpan processingTime,
             int pendingNodes)
             => new AccessSearchExecutionOutcome(
@@ -237,7 +237,7 @@ namespace AutoTerrainDesignations.Access.Worker
         internal static AccessSearchExecutionOutcome Interrupted(
             AccessSearchResult result,
             AccessDesignationPlan plan,
-            AccessReplayPhaseTiming timing,
+            AccessSearchPhaseTiming timing,
             TimeSpan processingTime,
             int pendingNodes,
             string terminalPhase)

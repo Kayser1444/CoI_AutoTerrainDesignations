@@ -1,4 +1,6 @@
+#if ATD_REPLAY_LAB
 using System;
+#endif
 using System.Globalization;
 
 namespace AutoTerrainDesignations.Access
@@ -11,9 +13,11 @@ namespace AutoTerrainDesignations.Access
             // processing time. Visibility follows how long the player has waited.
             => !snapshot.IsTerminal && activeWallSeconds >= 0.25d;
 
+#if ATD_REPLAY_LAB
         internal static bool IsReplayCapture(ATDAccesswayHandleSnapshot snapshot)
             => snapshot.Phase.StartsWith("Recording access replay", StringComparison.Ordinal)
                 || snapshot.Phase.StartsWith("Cancelling access replay", StringComparison.Ordinal);
+#endif
 
         internal static string FormatStats(
             ATDAccesswayHandleSnapshot snapshot,
@@ -23,8 +27,10 @@ namespace AutoTerrainDesignations.Access
             double? operationElapsedSeconds = null,
             string operationElapsedFormat = "Total elapsed {0:0.0}s")
         {
+#if ATD_REPLAY_LAB
             if (IsReplayCapture(snapshot))
                 return "Background recording · abort keeps placed terrain work";
+#endif
             string prefix =
                 $"visited {snapshot.VisitedNodes:N0}/{maxVisitedNodes:N0} · "
                 + $"queue {snapshot.PendingNodes:N0} · ";

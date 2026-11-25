@@ -102,6 +102,7 @@ namespace AutoTerrainDesignations
                     failure = $"Mining parity seed={seed} quality={level} clearance={clearance}";
                     return false;
                 }
+#if ATD_REPLAY_LAB
                 if (seed == 0 && level == 0 && clearance == 0
                     && !AccessSearchReplayRecorder.ValidateMiningContainer(request, actual, out failure)) return false;
                 var restored = (MiningRequest)AccessReplayGraphCodec.Deserialize(
@@ -112,6 +113,7 @@ namespace AutoTerrainDesignations
                     failure = "Mining captured-input round trip changed geometry.";
                     return false;
                 }
+#endif
             }
             if (!MiningFixtures.ValidateSafetyAndWorker(out failure)) return false;
             failure = string.Empty;

@@ -19,6 +19,7 @@ namespace AutoTerrainDesignations.Access.Worker
                     return false;
 
                 AccessPathRequest request = CreateRequest("worker-parity");
+#if ATD_REPLAY_LAB
                 var cooperativeWorkspace =
                     new AccessSearchWorkspace(request.Snapshot);
                 AccessSearchResult cooperativeResult =
@@ -32,6 +33,7 @@ namespace AutoTerrainDesignations.Access.Worker
                             cooperativeResult.StartOrigin);
                 byte[] expected = AccessSearchReplayCanonical.Serialize(
                     cooperativeResult, cooperativePlan);
+#endif
 
                 const int world = 81001;
                 AccessSearchWorker worker = AccessSearchWorker.Shared;
@@ -53,6 +55,7 @@ namespace AutoTerrainDesignations.Access.Worker
                         + (terminal?.Fault ?? "timeout");
                     return false;
                 }
+#if ATD_REPLAY_LAB
                 byte[] actual = AccessSearchReplayCanonical.Serialize(
                     terminal.Outcome.SearchResult,
                     terminal.Outcome.Plan);
@@ -61,6 +64,7 @@ namespace AutoTerrainDesignations.Access.Worker
                     failure = "Worker and cooperative canonical outcomes differ.";
                     return false;
                 }
+#endif
                 var overlaySamples =
                     new List<AccessSearchWorkerOverlaySample>();
                 worker.DrainOverlay(

@@ -12,6 +12,16 @@ namespace AutoTerrainDesignations.Mining
 {
     internal static partial class MiningFixtures
     {
+        private static bool HaveSameGeometry(MiningPlan first, MiningPlan second)
+            => first.Outcome == second.Outcome
+                && first.ReconcileEmpty == second.ReconcileEmpty
+                && first.Depths.Count == second.Depths.Count
+                && first.Depths.All(pair => second.Depths.TryGetValue(pair.Key, out int depth)
+                    && pair.Value == depth)
+                && first.Corners.Count == second.Corners.Count
+                && first.Corners.All(pair => second.Corners.TryGetValue(pair.Key, out int height)
+                    && pair.Value == height);
+
         internal static bool ValidateSafetyAndWorker(out string failure)
         {
             if (!ValidateDiagonalSafety(out failure)) return false;
@@ -56,7 +66,7 @@ namespace AutoTerrainDesignations.Mining
                 { failure = "Mining safety scenario " + scenario; return false; }
                 MiningPlan completeFacts = MiningPlanner.Execute(new MiningRequest(origins, new[] { "Ore" },
                     policy, new Tile2i(64, 64), truth, buildings));
-                if (!MiningReplayFacade.Canonical(actual).SequenceEqual(MiningReplayFacade.Canonical(completeFacts)))
+                if (!HaveSameGeometry(actual, completeFacts))
                 { failure = "Staged safety capture changed geometry."; return false; }
                 if (scenario == 0)
                 {
@@ -92,8 +102,8 @@ namespace AutoTerrainDesignations.Mining
             {
                 if (worker.TryConsumeTerminal(id, world, out AccessSearchWorkerTerminal? terminal))
                 {
-                    if (terminal!.MiningPlan == null || !MiningReplayFacade.Canonical(terminal.MiningPlan)
-                        .SequenceEqual(MiningReplayFacade.Canonical(MiningPlanner.Execute(workerInput!))))
+                    if (terminal!.MiningPlan == null
+                        || !HaveSameGeometry(terminal.MiningPlan, MiningPlanner.Execute(workerInput!)))
                     { failure = "Shared worker mining result differs: " + terminal.Fault; return false; }
                     var cancel = new CancelledControl();
                     try { MiningPlanner.Execute(workerInput!, MiningStage.Complete, cancel); }
@@ -135,10 +145,12 @@ namespace AutoTerrainDesignations.Mining
             columns[spike] = FilterFixtureColumn(18f);
             var targets = new HashSet<string> { ore };
             MiningRequest enabled = FilterFixtureRequest(true, origins, columns);
+#if ATD_REPLAY_LAB
             var restored = (MiningRequest)Access.AccessReplayGraphCodec.Deserialize(
                 Access.AccessReplayGraphCodec.Serialize(enabled), typeof(MiningRequest));
             if (!restored.Policy.FilterOreSpikes)
             { failure = "Ore-spike policy did not survive replay serialization."; return false; }
+#endif
             Dictionary<Tile2i, float> cutoffs = MiningSpikeFilter.BuildOreBottomCutoffs(
                 enabled, targets, MiningSpikeFilterParameters.VanillaCorrection);
             if (cutoffs.Count != 1 || !cutoffs.TryGetValue(spike, out float cutoff)

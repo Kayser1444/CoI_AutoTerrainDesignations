@@ -62,7 +62,7 @@ namespace AutoTerrainDesignations.Mining
                     MiningPlan next = MiningPlanner.Execute(staged.Seal(), MiningStage.SafetyCoverage);
                     if (!next.NeedsSafetyCoverage)
                     {
-                        if (!MiningReplayFacade.Canonical(next).SequenceEqual(MiningReplayFacade.Canonical(complete)))
+                        if (!HaveSameGeometry(next, complete))
                         { failure = label + ": staged capture changed geometry."; return false; }
                         break;
                     }

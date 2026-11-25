@@ -841,7 +841,9 @@ namespace AutoTerrainDesignations
                     origin => origin.Kind == AccessWorkOriginKind.ExternalTerrainWorkEndpoint);
                 EvaluatedAccessCandidate? experimentalCandidate = null;
                 bool experimentalCandidateUsesOutsideArea = false;
+#if ATD_REPLAY_LAB
                 AccessReplayMemoryEvidence? experimentalMemoryEvidence = null;
+#endif
                 string experimentalFailureSummary =
                     experimentalSnapshotTooLarge && !ReduceOversizedAreas
                         ? "SnapshotTooLarge"
@@ -946,8 +948,10 @@ namespace AutoTerrainDesignations
                         AccessSearchSnapshot refreshedSnapshot =
                             snapshotBuild.Snapshot;
                         experimentalSnapshot = refreshedSnapshot;
+#if ATD_REPLAY_LAB
                         experimentalMemoryEvidence =
                             snapshotBuild.MemoryEvidence;
+#endif
                         AccessSearchResult experimentalResult = null!;
                         AccessDesignationPlan? experimentalPlan = null;
 
@@ -1079,8 +1083,10 @@ namespace AutoTerrainDesignations
                                 AccessSearchSnapshot outsideSnapshot =
                                     outsideSnapshotBuild.Snapshot;
                                 experimentalSnapshot = outsideSnapshot;
+#if ATD_REPLAY_LAB
                                 experimentalMemoryEvidence =
                                     outsideSnapshotBuild.MemoryEvidence;
+#endif
                                 sliceControl?.ReportPhase("Preparing search request");
                                 long outsideRequestBuildStart =
                                     AtdDiagnostics.Timestamp();
@@ -1217,10 +1223,16 @@ namespace AutoTerrainDesignations
                         if (string.IsNullOrEmpty(experimentalFailureSummary))
                         {
                             experimentalCandidate = EvaluateExperimentalAccessCandidate(
-                                experimentalResult, experimentalPlan, request,
-                                experimentalDryRun.ReplayTiming,
-                                experimentalMemoryEvidence,
+                                experimentalResult, experimentalPlan,
                                 towerPos, terrMgr);
+#if ATD_REPLAY_LAB
+                            if (experimentalCandidate?.SourceCandidate is ExperimentalAccessCandidate replayCandidate)
+                            {
+                                replayCandidate.Request = request;
+                                replayCandidate.Timing = experimentalDryRun.ReplayTiming;
+                                replayCandidate.MemoryEvidence = experimentalMemoryEvidence;
+                            }
+#endif
                         }
                     }
                     else
@@ -1432,6 +1444,7 @@ namespace AutoTerrainDesignations
                                 result.SuppressWarningNotification = true;
                             placedRampOrigins?.AddRange(localPlacedOrigins);
                             RegisterGeneratedAccesswayOrigins(tower, localPlacedOrigins);
+#if ATD_REPLAY_LAB
                             AccessReplayCaptureOperation? replayCapture =
                                 AccessSearchReplayRecorder.BeginRecordAccepted(
                                 source,
@@ -1461,6 +1474,7 @@ namespace AutoTerrainDesignations
                                 while (replayCompletion.MoveNext())
                                     yield return replayCompletion.Current;
                             }
+#endif
                             ClearLastExperimentalCleanupMaterialization();
                             LogExperimentalAccessDebug($"[ATD Access] cluster={cluster.ClusterId} selected=true designations={localPlacedOrigins.Count} decidedBy={decidedBy}");
                             AccessDiagnostics.LogAccessProvided(

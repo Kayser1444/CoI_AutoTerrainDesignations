@@ -8,9 +8,9 @@
 // is included by mistake, I intend to correct it promptly upon discovery or notice.
 // Auto Terrain Designations - Settings Loading and Parsing
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using CoI.AutoHelpers.Settings;
 using Mafi;
 using UnityEngine;
 
@@ -32,7 +32,7 @@ namespace AutoTerrainDesignations
         private const int SETTINGS_DEFAULTS_REVISION = 5;
 
         private static bool s_settingsLoadAttempted;
-        private static string? s_loadedSettingsPath;
+        private static string? s_savedSettingsPath;
 
         static AutoDepthDesignation()
         {
@@ -164,222 +164,67 @@ namespace AutoTerrainDesignations
 
             try
             {
-                string? settingsPath = ResolveSettingsPath(out bool isLegacySettingsPath);
-                if (string.IsNullOrWhiteSpace(settingsPath) || !File.Exists(settingsPath))
+                string? destination = SavedSettingsPath;
+                if (destination == null)
                 {
-                    // File absent — generate defaults next to the mod folder so users can customise
-                    string? genPath = SavedSettingsPath;
-                    if (!string.IsNullOrWhiteSpace(genPath))
-                    {
-                        try
-                        {
-                            File.WriteAllText(genPath, BuildSettingsJson());
-                            s_loadedSettingsPath = genPath;
-                            s_log.Warning($"ATDsettings.json not found \u2014 defaults written to: {genPath}");
-                        }
-                        catch (Exception writeEx)
-                        {
-                            s_loadedSettingsPath = null;
-                            s_log.Warning($"Could not write default ATDsettings.json: {writeEx.Message}");
-                        }
-                    }
-                    else
-                    {
-                        s_loadedSettingsPath = null;
-                        s_log.Warning("ATDsettings.json not found and mod root path is unknown; using built-in defaults.");
-                    }
+                    s_log.Warning($"{SETTINGS_FILE_NAME} path is unavailable; using built-in defaults.");
                     return;
                 }
 
-                string json = File.ReadAllText(settingsPath);
-                int fileDefaultsRevision = ParseInt(
-                    json, "settingsDefaultsRevision") ?? 0;
-                string? fileVersion = ParseSettingsJson(json, isLegacySettingsPath);
-                s_loadedSettingsPath = isLegacySettingsPath
-                    ? Path.Combine(Path.GetDirectoryName(settingsPath) ?? string.Empty, SETTINGS_FILE_NAME)
-                    : settingsPath;
-
-                // If the file predates the current version, or was read from the old
-                // settings.json name, rewrite it to the current documented ATDsettings.json
-                // format while preserving user values.
-                if (isLegacySettingsPath
-                    || fileVersion != AutoTerrainDesignationsMod.ModVersion
-                    || fileDefaultsRevision < SETTINGS_DEFAULTS_REVISION)
+                string settingsPath = destination;
+                bool isLegacyName = false;
+                if (!File.Exists(destination))
                 {
-                    if (TrySaveSettings(out string migratedPath))
+                    string? legacyPath = ResolveLegacySettingsPath(s_modRootDirectoryPath, out isLegacyName);
+                    if (legacyPath != null)
                     {
-                        string source = isLegacySettingsPath ? "legacy settings.json" : "ATDsettings.json";
-                        s_log.Warning(
-                            $"{source} migrated to version "
-                            + $"{AutoTerrainDesignationsMod.ModVersion} "
-                            + $"(defaults revision {SETTINGS_DEFAULTS_REVISION}): "
-                            + migratedPath);
+                        try
+                        {
+                            if (ModSettingsFile.TryMigrate(legacyPath, destination))
+                                s_log.Info($"Migrated {SETTINGS_FILE_NAME} to: {destination}");
+                            else
+                                isLegacyName = false;
+                        }
+                        catch (Exception ex)
+                        {
+                            s_log.Warning($"Could not move {SETTINGS_FILE_NAME} to {destination}: {ex.Message}. Reading {legacyPath}.");
+                            settingsPath = legacyPath;
+                        }
+                    }
+                    else if (ModSettingsFile.Write(destination, BuildSettingsJson(), overwrite: false))
+                    {
+                        s_log.Warning($"{SETTINGS_FILE_NAME} not found; defaults written to: {destination}");
+                        return;
                     }
                 }
+
+                string json = File.ReadAllText(settingsPath);
+                int fileDefaultsRevision = ParseInt(json, "settingsDefaultsRevision") ?? 0;
+                string? fileVersion = ParseSettingsJson(json, isLegacyName);
+                bool needsRewrite = isLegacyName || fileDefaultsRevision < SETTINGS_DEFAULTS_REVISION
+                    || fileVersion != AutoTerrainDesignationsMod.ModVersion;
+                if (settingsPath == destination && needsRewrite && TrySaveSettings(out string migratedPath))
+                    s_log.Info($"Updated {SETTINGS_FILE_NAME} format: {migratedPath}");
             }
             catch (Exception ex)
             {
-                s_loadedSettingsPath = null;
-                s_log.Warning($"Failed to load ATDsettings.json: {ex.Message}");
+                s_log.Warning($"Failed to load {SETTINGS_FILE_NAME}: {ex.Message}");
             }
         }
 
-        private static string? ResolveSettingsPath(out bool isLegacySettingsPath)
+        private static string? ResolveLegacySettingsPath(string? modRoot, out bool isLegacyName)
         {
-            isLegacySettingsPath = false;
-            var rootDirs = new List<string>();
+            isLegacyName = false;
+            if (string.IsNullOrWhiteSpace(modRoot))
+                return null;
 
-            try
-            {
-                TryAddCandidateRoot(rootDirs, s_modRootDirectoryPath);
-            }
-            catch
-            {
-            }
+            string path = Path.Combine(modRoot, SETTINGS_FILE_NAME);
+            if (File.Exists(path))
+                return path;
 
-            try
-            {
-                TryAddCandidateRoot(rootDirs, typeof(AutoDepthDesignation).Assembly.Location);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                string? codeBase = typeof(AutoDepthDesignation).Assembly.CodeBase;
-                if (!string.IsNullOrWhiteSpace(codeBase)
-                    && Uri.TryCreate(codeBase, UriKind.Absolute, out Uri uri)
-                    && uri.IsFile)
-                {
-                    TryAddCandidateRoot(rootDirs, uri.LocalPath);
-                }
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                TryAddCandidateRoot(rootDirs, AppDomain.CurrentDomain.BaseDirectory);
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                TryAddCandidateRoot(rootDirs, Directory.GetCurrentDirectory());
-            }
-            catch
-            {
-            }
-
-            foreach (string root in rootDirs)
-            {
-                // Prefer directories that look like an actual mod root (manifest + ATDsettings),
-                // but still allow direct sibling ATDsettings.json next to a loaded DLL path.
-                // If the new file is absent, fall back to the old settings.json name so
-                // existing user configuration can be migrated into ATDsettings.json.
-                DirectoryInfo? dir;
-                try
-                {
-                    dir = new DirectoryInfo(root);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                for (int i = 0; i < 8 && dir != null; i++)
-                {
-                    string candidateSettings;
-                    string candidateLegacySettings;
-                    string candidateManifest;
-                    try
-                    {
-                        candidateSettings = Path.Combine(dir.FullName, SETTINGS_FILE_NAME);
-                        candidateLegacySettings = Path.Combine(dir.FullName, LEGACY_SETTINGS_FILE_NAME);
-                        candidateManifest = Path.Combine(dir.FullName, "manifest.json");
-                    }
-                    catch
-                    {
-                        dir = dir.Parent;
-                        continue;
-                    }
-
-                    if (File.Exists(candidateSettings) && File.Exists(candidateManifest))
-                    {
-                        return candidateSettings;
-                    }
-
-                    if (i == 0 && File.Exists(candidateSettings))
-                    {
-                        return candidateSettings;
-                    }
-
-                    if (File.Exists(candidateLegacySettings) && File.Exists(candidateManifest))
-                    {
-                        isLegacySettingsPath = true;
-                        return candidateLegacySettings;
-                    }
-
-                    if (i == 0 && File.Exists(candidateLegacySettings))
-                    {
-                        isLegacySettingsPath = true;
-                        return candidateLegacySettings;
-                    }
-
-                    dir = dir.Parent;
-                }
-            }
-
-            return null;
-        }
-
-        private static void TryAddCandidateRoot(List<string> roots, string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return;
-            }
-
-            string fullPath;
-            try
-            {
-                fullPath = Path.GetFullPath(path);
-            }
-            catch
-            {
-                return;
-            }
-
-            string? directory;
-            try
-            {
-                if (Directory.Exists(fullPath))
-                {
-                    directory = fullPath;
-                }
-                else
-                {
-                    directory = Path.GetDirectoryName(fullPath);
-                }
-            }
-            catch
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(directory))
-            {
-                return;
-            }
-
-            if (!roots.Contains(directory))
-            {
-                roots.Add(directory);
-            }
+            path = Path.Combine(modRoot, LEGACY_SETTINGS_FILE_NAME);
+            isLegacyName = File.Exists(path);
+            return isLegacyName ? path : null;
         }
 
         private static string? ParseSettingsJson(string json, bool forceMigration)
@@ -1011,13 +856,13 @@ namespace AutoTerrainDesignations
             catch { return null; }
         }
 
-        internal static bool TryLoadCornerDesignationKeyFromSettings(out KeyCode key)
+        internal static bool TryLoadCornerDesignationKeyFromSettings(string modRoot, out KeyCode key)
         {
             key = KeyCode.K;
 
             try
             {
-                string? settingsPath = ResolveSettingsPath(out bool isLegacySettingsPath);
+                string? settingsPath = ResolveLegacySettingsPath(modRoot, out _);
                 if (string.IsNullOrWhiteSpace(settingsPath) || !File.Exists(settingsPath))
                     return false;
 
@@ -1264,44 +1109,22 @@ namespace AutoTerrainDesignations
             return sb.ToString();
         }
 
-        /// <summary>
-        /// The file path where settings will be saved.  Returns the path the settings were
-        /// loaded from (or previously generated to), or falls back to
-        /// <c>ATDsettings.json</c> in the mod root directory.
-        /// </summary>
-        internal static string? SavedSettingsPath
-        {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(s_loadedSettingsPath))
-                    return s_loadedSettingsPath;
-                if (!string.IsNullOrWhiteSpace(s_modRootDirectoryPath))
-                    return Path.Combine(s_modRootDirectoryPath, SETTINGS_FILE_NAME);
-                return null;
-            }
-        }
+        internal static string? SavedSettingsPath => s_savedSettingsPath;
 
-        /// <summary>
-        /// Serialises current in-memory settings to <see cref="SavedSettingsPath"/> and
-        /// updates <c>s_loadedSettingsPath</c> on success.
-        /// </summary>
-        /// <param name="savedPath">Receives the path written on success, or <see cref="string.Empty"/> on failure.</param>
-        /// <returns><c>true</c> if the file was written successfully.</returns>
         internal static bool TrySaveSettings(out string savedPath)
         {
             string? target = SavedSettingsPath;
             if (target == null || target.Trim().Length == 0)
             {
                 savedPath = string.Empty;
-                s_log.Warning("Cannot save ATDsettings.json: mod root path is unknown.");
+                s_log.Warning("Cannot save ATDsettings.json: settings path is unavailable.");
                 return false;
             }
             string targetPath = target;
 
             try
             {
-                File.WriteAllText(targetPath, BuildSettingsJson());
-                s_loadedSettingsPath = targetPath;
+                ModSettingsFile.Write(targetPath, BuildSettingsJson());
                 savedPath = targetPath;
                 return true;
             }

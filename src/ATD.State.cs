@@ -1302,9 +1302,10 @@ namespace AutoTerrainDesignations
             DesignationPanel.Initialize(s_protosDb);
         }
 
-        public static void SetModRootDirectoryPath(string? modRootDirectoryPath)
+        internal static void SetModPaths(string modRootDirectoryPath, string gameDataRoot, string modId)
         {
             s_modRootDirectoryPath = modRootDirectoryPath;
+            s_savedSettingsPath = CoI.AutoHelpers.Settings.ModSettingsFile.GetPath(gameDataRoot, modId, SETTINGS_FILE_NAME);
         }
 
         /// <summary>Returns true once Initialize has completed successfully.</summary>

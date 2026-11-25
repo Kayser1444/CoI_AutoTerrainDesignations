@@ -57,6 +57,15 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                 Assembly assembly = Assembly.LoadFrom(assemblyPath);
                 if (reductionFixture)
                     return RunReductionFixture(assembly);
+                Type? replayFixtures = assembly.GetType(
+                    "AutoTerrainDesignations.Access.AccessSearchReplayFixtures");
+                if (caseMode && replayFixtures == null)
+                {
+                    Console.Error.WriteLine(
+                        "This command requires an ATD build with the replay lab enabled. "
+                        + "Build it with .\\build.ps1 -ReplayLab.");
+                    return 2;
+                }
                 if (replay)
                     return ReplayCase(assembly, Path.GetFullPath(args[3]));
                 if (candidateReplay || compatibleReplay)
@@ -96,23 +105,24 @@ namespace AutoTerrainDesignations.Tools.AccessV2FixtureRunner
                     Console.WriteLine($"Mining extraction fixtures: success={miningOk} failure={miningArgs[0]}");
                     if (!miningOk) return 1;
                 }
-                Type replayFixtures = assembly.GetType(
-                    "AutoTerrainDesignations.Access.AccessSearchReplayFixtures", true);
-                MethodInfo validateReplay = replayFixtures.GetMethod(
-                    "ValidateAll",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                    ?? throw new MissingMethodException(
-                        replayFixtures.FullName, "ValidateAll");
-                object[] replayFixtureArgs = { string.Empty };
-                bool replayFixtureSuccess = (bool)(
-                    validateReplay.Invoke(null, replayFixtureArgs) ?? false);
-                string replayFixtureFailure =
-                    replayFixtureArgs[0] as string ?? string.Empty;
-                Console.WriteLine(
-                    "Access replay codec fixtures: "
-                    + $"success={replayFixtureSuccess} "
-                    + $"failure={replayFixtureFailure}");
-                if (!replayFixtureSuccess) return 1;
+                if (replayFixtures != null)
+                {
+                    MethodInfo validateReplay = replayFixtures.GetMethod(
+                        "ValidateAll",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                        ?? throw new MissingMethodException(
+                            replayFixtures.FullName, "ValidateAll");
+                    object[] replayFixtureArgs = { string.Empty };
+                    bool replayFixtureSuccess = (bool)(
+                        validateReplay.Invoke(null, replayFixtureArgs) ?? false);
+                    string replayFixtureFailure =
+                        replayFixtureArgs[0] as string ?? string.Empty;
+                    Console.WriteLine(
+                        "Access replay codec fixtures: "
+                        + $"success={replayFixtureSuccess} "
+                        + $"failure={replayFixtureFailure}");
+                    if (!replayFixtureSuccess) return 1;
+                }
                 Type propRemovalPolicy = assembly.GetType(
                     "AutoTerrainDesignations.ATDPropRemovalLifecyclePolicy", true);
                 MethodInfo validatePropRemoval = propRemovalPolicy.GetMethod(

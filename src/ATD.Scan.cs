@@ -566,9 +566,11 @@ namespace AutoTerrainDesignations
             var cornerHeights = mining.Plan.Corners;
             if (maxOreDepths.Count == 0)
             {
+#if ATD_REPLAY_LAB
                 IEnumerator emptyReplay = RecordMiningReplay(mining);
                 try { while (emptyReplay.MoveNext()) yield return emptyReplay.Current; }
                 finally { (emptyReplay as IDisposable)?.Dispose(); }
+#endif
                 if (mining.Plan.ReconcileEmpty)
                 {
                     RemoveObsoleteGeneratedDesignationsForMiningPlan(tower, maxOreDepths);
@@ -673,9 +675,11 @@ namespace AutoTerrainDesignations
                 yield break;
             }
             if (placementRequest != s_latestCreateDesignationsRequestId) yield break;
+#if ATD_REPLAY_LAB
             IEnumerator replay = RecordMiningReplay(mining);
             try { while (replay.MoveNext()) yield return replay.Current; }
             finally { (replay as IDisposable)?.Dispose(); }
+#endif
 
             LogDebug(string.Format("Created {0} designations", designCount));
             if (AccessHarvestDisruptedTrees)

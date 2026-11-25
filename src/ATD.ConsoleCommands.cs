@@ -27,6 +27,7 @@ public sealed class AtdConsoleCommands
     [ConsoleCommand(false, false, "Prints Default Mine ownership, save suspension, and truck pairing state.", "atd_default_mine_status")]
     private string atdDefaultMineStatus() => AutoDepthDesignation.DescribeDefaultMine();
 
+#if ATD_REPLAY_LAB
     [ConsoleCommand(false, false, "Arms one replay capture: case name, scenario family, and optional case kind (access or mining).", "atd_access_replay_arm")]
     private string atdAccessReplayArm(
         string? caseName = null,
@@ -46,6 +47,7 @@ public sealed class AtdConsoleCommands
         AutoDepthDesignation.s_log.Info("[ATD Access Replay] " + message);
         return "[ATD] " + message;
     }
+#endif
 
     [ConsoleCommand(false, false, "Prints all current ATD global settings.", null)]
     private string atdGetSettings()
@@ -484,7 +486,7 @@ public sealed class AtdConsoleCommands
         return $"[ATD] minComponentSize[{level.Value}] set to {value.Value}.";
     }
 
-    [ConsoleCommand(false, false, "Saves current ATD global settings to ATDsettings.json in the mod folder.", null)]
+    [ConsoleCommand(false, false, "Saves current ATD global settings to ATDsettings.json under the game's ModConfigs folder.", null)]
     private string atdSaveSettings()
     {
         if (AutoDepthDesignation.TrySaveSettings(out string path))

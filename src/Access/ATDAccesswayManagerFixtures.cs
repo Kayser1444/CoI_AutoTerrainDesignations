@@ -280,6 +280,7 @@ namespace AutoTerrainDesignations.Access
 
         internal static bool ValidateBackgroundCaptureToast(out string failure)
         {
+#if ATD_REPLAY_LAB
             var recording = new ATDAccesswayHandleSnapshot(
                 ATDAccesswayRequestState.Active, null, 0, 0,
                 processingMilliseconds: 2d,
@@ -300,6 +301,7 @@ namespace AutoTerrainDesignations.Access
                 failure = "Background replay capture is presented as a path search.";
                 return false;
             }
+#endif
             var worker = new ATDAccesswayHandleSnapshot(ATDAccesswayRequestState.Active,
                 null, 0, 0, 2d, "Planning mine", 1000d, ATDAccesswayExecutionBackend.Worker);
             if (!AccesswayProgressPresentation.ShouldShowToast(worker, 1d))

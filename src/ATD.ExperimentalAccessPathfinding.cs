@@ -137,7 +137,9 @@ namespace AutoTerrainDesignations
             public AccessSearchSnapshot? Snapshot { get; set; }
             public AccessSearchWorkspace? Workspace { get; set; }
             public AccessCaptureDiagnostics? CaptureDiagnostics { get; set; }
+#if ATD_REPLAY_LAB
             public AccessReplayMemoryEvidence? MemoryEvidence { get; set; }
+#endif
             public string FailureReason { get; set; } = string.Empty;
         }
 
@@ -695,8 +697,10 @@ namespace AutoTerrainDesignations
         {
             long capturePreambleStart = AtdDiagnostics.Timestamp();
             Stopwatch snapshotTimer = Stopwatch.StartNew();
+#if ATD_REPLAY_LAB
             AccessReplayMemoryProbe? memoryProbe =
                 AccessSearchReplayRecorder.BeginMemoryProbe();
+#endif
             AccessSearchSnapshot snapshot = null!;
             string failureReason = string.Empty;
             AccessSearchPolicySnapshot policy =
@@ -1999,9 +2003,11 @@ namespace AutoTerrainDesignations
                 captureCoverage: reducedDomain?.CaptureTiles);
             snapshotTimer.Stop();
             output.Snapshot = snapshot;
+#if ATD_REPLAY_LAB
             output.MemoryEvidence = memoryProbe?.Complete(
                 snapshot.EstimatedRetainedMemoryBytes,
                 snapshot.CaptureMemoryCeilingBytes);
+#endif
             output.Workspace = createWorkspace
                 ? new AccessSearchWorkspace(snapshot)
                 : null;
@@ -2839,7 +2845,7 @@ namespace AutoTerrainDesignations
                                 workspace: null,
                                 preparationMilliseconds:
                                     outcome.Timing.PreparationMilliseconds,
-                                out AccessReplayPhaseTiming replayTiming,
+                                out AccessSearchPhaseTiming replayTiming,
                                 materializedPlan: outcome.Plan,
                                 completedTiming: outcome.Timing);
                         output.Complete(
@@ -3039,7 +3045,7 @@ namespace AutoTerrainDesignations
                         maxSlice,
                         workspace,
                         sessionDiagnostics.TotalMilliseconds,
-                        out AccessReplayPhaseTiming preparationTiming);
+                        out AccessSearchPhaseTiming preparationTiming);
                 if (sliceControl != null)
                 {
                     LogExperimentalAccessDebug(
@@ -3196,7 +3202,7 @@ namespace AutoTerrainDesignations
                 request, cluster, snapshot, result, recordedElapsed,
                 frames, maxSlice, workspace,
                 sessionDiagnostics.TotalMilliseconds,
-                out AccessReplayPhaseTiming replayTiming);
+                out AccessSearchPhaseTiming replayTiming);
             if (sliceControl != null)
             {
                 LogExperimentalAccessDebug(
@@ -3332,9 +3338,9 @@ namespace AutoTerrainDesignations
             TimeSpan maxSlice,
             AccessSearchWorkspace? workspace,
             double preparationMilliseconds,
-            out AccessReplayPhaseTiming replayTiming,
+            out AccessSearchPhaseTiming replayTiming,
             AccessDesignationPlan? materializedPlan = null,
-            AccessReplayPhaseTiming? completedTiming = null)
+            AccessSearchPhaseTiming? completedTiming = null)
         {
             double materializationMilliseconds =
                 completedTiming?.MaterializationMilliseconds ?? 0d;
@@ -3571,7 +3577,7 @@ namespace AutoTerrainDesignations
                     if (AtdDiagnostics.IsEnabled(AtdDiagnosticLevel.Trace))
                         LogExperimentalAccessTrace($"[ATD Access Rejected Path] cluster={cluster.ClusterId} {FormatExperimentalPath(result)}");
             }
-            replayTiming = completedTiming ?? new AccessReplayPhaseTiming(
+            replayTiming = completedTiming ?? new AccessSearchPhaseTiming(
                 preparationMilliseconds,
                 Math.Max(0d, elapsed.TotalMilliseconds
                     - preparationMilliseconds),
@@ -4809,9 +4815,6 @@ namespace AutoTerrainDesignations
         private static EvaluatedAccessCandidate? EvaluateExperimentalAccessCandidate(
             AccessSearchResult result,
             AccessDesignationPlan? plan,
-            AccessPathRequest request,
-            AccessReplayPhaseTiming replayTiming,
-            AccessReplayMemoryEvidence? memoryEvidence,
             Tile2i towerPosition,
             TerrainManager terrMgr)
         {
@@ -4850,8 +4853,7 @@ namespace AutoTerrainDesignations
                 designationCount: plan.Designations.Count
                     + plan.CleanupOrigins.Count,
                 stableOrder: int.MaxValue,
-                sourceCandidate: new ExperimentalAccessCandidate(
-                    result, plan, request, replayTiming, memoryEvidence));
+                sourceCandidate: new ExperimentalAccessCandidate(result, plan));
         }
 
         private static bool TryPlaceExperimentalAccessCandidate(
@@ -5771,6 +5773,7 @@ namespace AutoTerrainDesignations
             s_lastExperimentalPropRemovalRequests.Clear();
         }
 
+#if ATD_REPLAY_LAB
         private enum ExperimentalCleanupCompletionState
         {
             Accepted,
@@ -5779,11 +5782,13 @@ namespace AutoTerrainDesignations
         }
 
         private delegate bool ReplayLiveValidator(out string reason);
+#endif
 
         private static ATDPropRemovalRequestHandle[]
             SnapshotLastExperimentalPropRemovalRequests()
             => s_lastExperimentalPropRemovalRequests.ToArray();
 
+#if ATD_REPLAY_LAB
         private static ExperimentalCleanupCompletionState
             GetExperimentalCleanupCompletion(
                 IReadOnlyList<ATDPropRemovalRequestHandle> requests,
@@ -5894,6 +5899,7 @@ namespace AutoTerrainDesignations
             replayCapture.CompleteOnMainThread(
                 authoritativeAcceptance, acceptanceReason);
         }
+#endif
 
         private static bool HasPendingExperimentalPropRemovalRequests()
             => s_lastExperimentalPropRemovalRequests.Any(request => !request.IsCompleted);

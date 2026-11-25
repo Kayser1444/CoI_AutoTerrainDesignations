@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using Mafi;
+using Mafi.Unity.Audio;
 using Mafi.Unity.Ui.Controllers.Designations;
 using Mafi.Unity.Ui.Hud;
 using Mafi.Unity.Ui.Library;
@@ -69,13 +70,8 @@ namespace AutoTerrainDesignations
         // The live TerrainDesignationController instance (needed to read m_heightBias).
         private static object? s_miningController;
         private static System.Reflection.FieldInfo? s_heightBiasField;
-        // The apply sound of the active controller, reflected once on activate.
-        private static object? s_applySound;
-        private static System.Reflection.FieldInfo? s_applySoundField;
-        private static System.Reflection.MethodInfo? s_audioPlayMethod;
-        // The tab-switch sound (F-mode flip) — played when entering K-mode or cycling shape families.
-        private static object? s_switchSound;
-        private static System.Reflection.FieldInfo? s_switchSoundField;
+        private static UiSoundsPlayer? s_uiSounds;
+        private static UiSound s_applySound;
 
         // Tiles where ATD just placed a corner designation — protected from one subsequent
         // overwrite by the game's async placement command.
@@ -182,13 +178,16 @@ namespace AutoTerrainDesignations
 
         // Postfix on TerrainDesignationController.Activate — sets s_miningToolActive when the
         // player activates the Mining designation tool specifically.
-        public static void DesignationToolActivatePostfix(object __instance)
+        public static void DesignationToolActivatePostfix(
+            object __instance, UiSoundsPlayer ___m_uiSounds, UiSound ___m_applySound)
         {
             var typeName = __instance.GetType().Name;
             if (!s_controllerToToolType.TryGetValue(typeName, out _)) return;
 
             s_designationToolActive = true;
             s_miningController = __instance;
+            s_uiSounds = ___m_uiSounds;
+            s_applySound = ___m_applySound;
             if (s_heightBiasField == null)
             {
                 Type? t = __instance.GetType();
@@ -219,39 +218,6 @@ namespace AutoTerrainDesignations
                 s_areaToolboxButtonsField = entry.buttonsField;
                 s_currentAreaMode         = 0;
             }
-
-            // Reflect m_miningApplySound once per controller type.
-            if (s_applySoundField == null)
-            {
-                Type? t = __instance.GetType();
-                while (t != null && s_applySoundField == null)
-                {
-                    s_applySoundField = t.GetField("m_miningApplySound",
-                        System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.NonPublic);
-                    t = t.BaseType;
-                }
-            }
-            s_applySound = s_applySoundField?.GetValue(__instance);
-            // Cache the Play() method once from the concrete AudioSource type.
-            if (s_applySound != null && s_audioPlayMethod == null)
-                s_audioPlayMethod = s_applySound.GetType().GetMethod("Play",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public,
-                    null, System.Type.EmptyTypes, null);
-
-            // Reflect m_switchSound (TabSwitch — played on F-mode flip) once per controller type.
-            if (s_switchSoundField == null)
-            {
-                Type? t2 = __instance.GetType();
-                while (t2 != null && s_switchSoundField == null)
-                {
-                    s_switchSoundField = t2.GetField("m_switchSound",
-                        System.Reflection.BindingFlags.Instance |
-                        System.Reflection.BindingFlags.NonPublic);
-                    t2 = t2.BaseType;
-                }
-            }
-            s_switchSound = s_switchSoundField?.GetValue(__instance);
         }
 
         // Postfix on TerrainDesignationController.Deactivate.
@@ -262,8 +228,7 @@ namespace AutoTerrainDesignations
 
             s_designationToolActive = false;
             s_miningController = null;
-            s_applySound = null;
-            s_switchSound = null;
+            s_uiSounds = null;
             // ExitCornerMode must come BEFORE nulling the button refs, so
             // UpdateCornerButtonSelection inside it can still clear their Selected state.
             if (s_cornerModeActive)
@@ -302,7 +267,7 @@ namespace AutoTerrainDesignations
         }
 
         // Prefix on TerrainDesignationController.handleInitialState — in corner mode, only
-        // suppresses the vanilla LMB-down branch (which would play m_errorSound because
+        // suppresses the vanilla LMB-down branch (which would play the invalid-operation sound because
         // m_initialDesignation is always null while our preview patch is active).
         // RMB (ClearDesignation) is allowed through so vanilla handles AOE undesignation
         // normally, just like in M-mode.
@@ -390,11 +355,10 @@ namespace AutoTerrainDesignations
             s_cornerModeButtonInner?.Selected(s_cornerModeActive && family == 1);
         }
 
-        /// <summary>Plays TabSwitch sound via reflection (same as F-mode flip).</summary>
+        /// <summary>Plays the same TabSwitch sound as the vanilla F-mode switch.</summary>
         private static void PlaySwitchSound()
         {
-            if (s_switchSound != null)
-                s_audioPlayMethod?.Invoke(s_switchSound, null);
+            s_uiSounds?.Play(UiSound.TabSwitch);
         }
 
         private static void TryBeginDrag()
@@ -425,19 +389,19 @@ namespace AutoTerrainDesignations
 
             Tile2i end = SnapToDesignationGrid(pos3f.Xy.Tile2i);
             ClearAllPreviews();
-            int placed = 0;
+            bool anyPlaced = false;
             foreach (var (tile, v, absHeight) in ComputeCornerFill(s_dragOrigin, end, s_dragBaseHeight, s_dragEffectiveVariant))
             {
-                PlaceCornerAt(tile, absHeight, v);
-                placed++;
+                if (PlaceCornerAt(tile, absHeight, v))
+                    anyPlaced = true;
             }
-            if (placed > 0 && s_applySound != null)
-                s_audioPlayMethod?.Invoke(s_applySound, null);
+            if (anyPlaced)
+                s_uiSounds?.Play(s_applySound);
         }
 
-        private static void PlaceCornerAt(Tile2i origin, int baseHeight, CornerVariant variant)
+        private static bool PlaceCornerAt(Tile2i origin, int baseHeight, CornerVariant variant)
         {
-            if (s_desigManager == null || s_activeCornerProto == null) return;
+            if (s_desigManager == null || s_activeCornerProto == null) return false;
 
             DesignationData data = BuildCornerDesignationData(origin, baseHeight, variant);
             s_protectedCornerTiles.Remove(origin);
@@ -446,6 +410,7 @@ namespace AutoTerrainDesignations
             {
                 s_protectedCornerTiles.Add(origin);
             }
+            return placed;
         }
 
         // -- Preview --

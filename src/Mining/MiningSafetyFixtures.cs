@@ -44,7 +44,7 @@ namespace AutoTerrainDesignations.Mining
             { failure = $"{kind}: expected {expected} safe survivors, got {plan.Depths.Count}."; return false; }
             var reversed = new MiningRequest(origins.AsEnumerable().Reverse().ToArray(), request.ProductIds,
                 policy, request.TerrainSize, truth, buildings);
-            if (!MiningReplayFacade.Canonical(plan).SequenceEqual(MiningReplayFacade.Canonical(MiningPlanner.Execute(reversed))))
+            if (!HaveSameGeometry(plan, MiningPlanner.Execute(reversed)))
             { failure = kind + ": protection depends on origin enumeration order."; return false; }
 
             // Exercise the live capture protocol with initially body-only coverage.
@@ -76,8 +76,8 @@ namespace AutoTerrainDesignations.Mining
                 if (captured.Count == before || !MiningPlanner.Execute(sealedInput, MiningStage.SafetyCoverage).NeedsSafetyCoverage)
                 { failure = kind + ": capture made no progress or mutated a sealed worker input."; return false; }
             }
-            if (batches < 2 || !MiningReplayFacade.Canonical(plan).SequenceEqual(MiningReplayFacade.Canonical(discovered))
-                || !MiningReplayFacade.Canonical(plan).SequenceEqual(MiningReplayFacade.Canonical(MiningPlanner.Execute(staged.Seal()))))
+            if (batches < 2 || !HaveSameGeometry(plan, discovered)
+                || !HaveSameGeometry(plan, MiningPlanner.Execute(staged.Seal())))
             { failure = kind + ": multi-pass staged capture differs from complete terrain."; return false; }
 
             var small = new MiningRequest(origins.Take(2).ToArray(), request.ProductIds,

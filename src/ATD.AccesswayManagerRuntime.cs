@@ -22,7 +22,9 @@ namespace AutoTerrainDesignations
         private static double s_accesswayManagerNextHealthLogSeconds;
         private static bool s_accesswayManagerToastVisible;
         private static long s_accesswayManagerToastRequestId;
+#if ATD_REPLAY_LAB
         private static bool s_accesswayManagerToastCaptureMode;
+#endif
         private static Label? s_accesswayManagerProgressLabel;
         private static Label? s_accesswayManagerStatsLabel;
         private static UiContext? s_uiContext;
@@ -48,7 +50,9 @@ namespace AutoTerrainDesignations
             s_accesswayManagerNextHealthLogSeconds = 0d;
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
+#if ATD_REPLAY_LAB
             s_accesswayManagerToastCaptureMode = false;
+#endif
             s_accesswayManagerProgressLabel = null;
             s_accesswayManagerStatsLabel = null;
         }
@@ -238,10 +242,14 @@ namespace AutoTerrainDesignations
                         => "construction leveling access",
                     _ => "terrain access"
                 };
+#if ATD_REPLAY_LAB
                 bool captureMode = AccesswayProgressPresentation.IsReplayCapture(snapshot);
-                string stopWork = captureMode
-                    ? "Abort replay capture"
-                    : handle.Kind switch
+#endif
+                string stopWork =
+#if ATD_REPLAY_LAB
+                    captureMode ? "Abort replay capture" :
+#endif
+                    handle.Kind switch
                 {
                     ATDAccesswayRequestKind.CreateDesignations
                         => "Stop interactive mining access",
@@ -256,8 +264,10 @@ namespace AutoTerrainDesignations
                         / (double)Stopwatch.Frequency
                     : null;
                 var progressText = new LocStrFormatted(
-                    captureMode ? $"[ATD] {snapshot.Phase}"
-                        : isCreateDesignations
+#if ATD_REPLAY_LAB
+                    captureMode ? $"[ATD] {snapshot.Phase}" :
+#endif
+                    isCreateDesignations
                             ? $"[ATD] {AtdLocalization.DesigCreateBtn.TranslatedString} · {snapshot.Phase}"
                             : $"[ATD] {snapshot.Phase}; finding {workType}");
                 var statsText = new LocStrFormatted(
@@ -274,7 +284,9 @@ namespace AutoTerrainDesignations
                 var notification = s_uiRoot.ToastNotifProvider.m_notification;
                 if (!s_accesswayManagerToastVisible
                     || s_accesswayManagerToastRequestId != handle.RequestId
+#if ATD_REPLAY_LAB
                     || s_accesswayManagerToastCaptureMode != captureMode
+#endif
                     || s_accesswayManagerProgressLabel == null
                     || s_accesswayManagerStatsLabel == null)
                 {
@@ -327,7 +339,9 @@ namespace AutoTerrainDesignations
                             HideAccesswayManagerToastUntilComplete)
                             .MarginLeft(8.pt()));
                     s_accesswayManagerToastRequestId = handle.RequestId;
+#if ATD_REPLAY_LAB
                     s_accesswayManagerToastCaptureMode = captureMode;
+#endif
                     s_accesswayManagerToastVisible = true;
                 }
                 else
@@ -358,7 +372,9 @@ namespace AutoTerrainDesignations
             }
             s_accesswayManagerToastVisible = false;
             s_accesswayManagerToastRequestId = 0;
+#if ATD_REPLAY_LAB
             s_accesswayManagerToastCaptureMode = false;
+#endif
             s_accesswayManagerProgressLabel = null;
         }
 

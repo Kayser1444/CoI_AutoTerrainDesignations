@@ -144,7 +144,7 @@ See [Corner Designations](corner-designations.md) for the standalone guide.
 
 ## Global settings and console commands
 
-The per-tower settings in the inspector are separate from the global defaults stored in `ATDsettings.json`.
+The per-tower settings in the inspector are separate from the global defaults. On Windows, ATD keeps those defaults in `%APPDATA%\Captain of Industry\ModConfigs\AutoTerrainDesignations\ATDsettings.json`. If the old file is still in the mod folder on first load, ATD copies it to the new location.
 
 ### Vanilla fixes
 

@@ -117,7 +117,9 @@ namespace AutoTerrainDesignations
         private static IEnumerator CaptureAndPlanMining(IAreaManagingTower tower,
             ExperimentalAccessSliceControl control, MiningExecutionResult output)
         {
+#if ATD_REPLAY_LAB
             AccessSearchReplayRecorder.RequestSnapshotSaveIfArmed("mining");
+#endif
             TerrainManager terrain = s_desigManager!.TerrainManager;
             int world = CurrentWorldGeneration;
             bool useWorkerThread = UseWorkerThread;
@@ -317,6 +319,7 @@ namespace AutoTerrainDesignations
             yield break;
         }
 
+#if ATD_REPLAY_LAB
         private static IEnumerator RecordMiningReplay(MiningExecutionResult mining)
         {
             if (mining.Request == null || mining.Plan == null) yield break;
@@ -359,5 +362,6 @@ namespace AutoTerrainDesignations
                 finished = true;
             }
         }
+#endif
     }
 }
