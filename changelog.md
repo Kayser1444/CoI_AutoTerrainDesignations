@@ -1,4 +1,4 @@
-v0.10.5 [packaged]
+v0.10.5 [released]
 
 - Store global settings in `ModConfigs/AutoTerrainDesignations/ATDsettings.json` so in-game mod updates preserve them. On first load, copy the old settings file if it is still available.
 
